@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block titulo %}Jogadores{% endblock %}
+
+{% block conteudo %}
+
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">Jogadores</h1>
+        <p class="text-gray-500 mt-1">Gerir os jogadores do clube</p>
+    </div>
+    <a href="/jogadores/novo"
+       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
+        + Novo Jogador
+    </a>
+</div>
+
+{% if jogadores %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for jogador in jogadores %}
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hover:shadow-md transition">
+        <div class="flex items-start justify-between">
+            <div>
+                <div class="flex items-center gap-2">
+                    {% if jogador.numero_camisola %}
+                    <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">
+                        #{{ jogador.numero_camisola }}
+                    </span>
+                    {% endif %}
+                    <h2 class="font-bold text-gray-800">{{ jogador.nome }}</h2>
+                </div>
+                {% if jogador.posicao %}
+                <p class="text-gray-500 text-sm mt-1">{{ jogador.posicao }}</p>
+                {% endif %}
+                {% if jogador.equipa %}
+                <p class="text-gray-400 text-sm">{{ jogador.equipa.nome }}</p>
+                {% endif %}
+            </div>
+            <span class="text-3xl">🏃</span>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <a href="/jogadores/{{ jogador.id }}"
+               class="text-orange-500 hover:text-orange-600 text-sm font-medium">
+                Ver ficha →
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+    <span class="text-5xl">🏃</span>
+    <p class="text-gray-500 mt-4">Ainda não há jogadores registados.</p>
+    <a href="/jogadores/novo"
+       class="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+        Registar primeiro jogador
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}

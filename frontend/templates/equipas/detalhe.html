@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ equipa.nome }}{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/equipas" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar às equipas</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">{{ equipa.nome }}</h1>
+    <p class="text-gray-500 mt-1">{{ equipa.escalao.value }} — {{ equipa.genero.value }}</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- Informações básicas -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Informações da Equipa</h2>
+        <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+                <span class="text-gray-500">Nome</span>
+                <span class="font-medium text-gray-800">{{ equipa.nome }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">Escalão</span>
+                <span class="font-medium text-gray-800">{{ equipa.escalao.value }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">Género</span>
+                <span class="font-medium text-gray-800">{{ equipa.genero.value }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">Seccionista</span>
+                <span class="font-medium text-gray-800">
+                    {{ equipa.seccionista if equipa.seccionista else "Não definido" }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Treinadores -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">
+            Treinadores
+            <span class="text-gray-400 font-normal text-sm ml-1">({{ equipa.treinadores | length }})</span>
+        </h2>
+        {% if equipa.treinadores %}
+        <div class="space-y-3">
+            {% for treinador in equipa.treinadores %}
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="font-medium text-gray-800 text-sm">{{ treinador.nome }}</p>
+                    {% if treinador.telefone %}
+                    <p class="text-gray-400 text-xs">{{ treinador.telefone }}</p>
+                    {% endif %}
+                </div>
+                <a href="/treinadores/{{ treinador.id }}"
+                   class="text-orange-500 hover:text-orange-600 text-xs">
+                    Ver →
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-400 text-sm">Sem treinadores associados.</p>
+        {% endif %}
+    </div>
+
+    <!-- Jogadores -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2">
+        <h2 class="font-semibold text-gray-700 mb-4">
+            Jogadores
+            <span class="text-gray-400 font-normal text-sm ml-1">({{ equipa.jogadores | length }})</span>
+        </h2>
+        {% if equipa.jogadores %}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {% for jogador in equipa.jogadores %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-2">
+                    {% if jogador.numero_camisola %}
+                    <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">
+                        #{{ jogador.numero_camisola }}
+                    </span>
+                    {% endif %}
+                    <div>
+                        <p class="font-medium text-gray-800 text-sm">{{ jogador.nome }}</p>
+                        {% if jogador.posicao %}
+                        <p class="text-gray-400 text-xs">{{ jogador.posicao }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <a href="/jogadores/{{ jogador.id }}"
+                   class="text-orange-500 hover:text-orange-600 text-xs">
+                    Ver →
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-400 text-sm">Sem jogadores associados.</p>
+        {% endif %}
+    </div>
+
+</div>
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="font-semibold text-gray-700">Planeamento</h2>
+            <p class="text-gray-400 text-sm mt-1">Macrociclos, mesociclos e microciclos da equipa</p>
+        </div>
+        <a href="/planeamento/equipas/{{ equipa.id }}/macrociclos"
+           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            Ver planeamento →
+        </a>
+    </div>
+</div>
+<!-- Calendário de jogos -->
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="font-semibold text-gray-700">Calendário de Jogos</h2>
+            <p class="text-gray-400 text-sm mt-1">Jogos, resultados e convocatórias</p>
+        </div>
+        <a href="/jogos/equipas/{{ equipa.id }}"
+           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            Ver calendário →
+        </a>
+    </div>
+</div>
+{% endblock %}

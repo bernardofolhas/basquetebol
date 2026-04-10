@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block titulo %}Plano de Jogo — {{ jogo.adversario }}{% endblock %}
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/jogos/{{ jogo.id }}" class="text-orange-500 text-sm">← Voltar ao jogo</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">Plano de Jogo — vs {{ jogo.adversario }}</h1>
+    <p class="text-gray-500">{{ jogo.data }} — {{ jogo.competicao if jogo.competicao else '' }}</p>
+</div>
+
+<form method="POST" action="/jogos/{{ jogo.id }}/plano">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- 5 Inicial -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">5 Inicial + Rotações</h2>
+        {% for i in range(1, 6) %}
+        <div class="flex items-center gap-2 mb-2">
+            <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full w-6 text-center">{{ i }}</span>
+            <select name="titular_{{ i }}" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <option value="">Selecciona jogador</option>
+                {% for jogador in jogadores %}
+                <option value="{{ jogador.id }}" {% if plano and plano['titular_' ~ i]|string == jogador.id|string %}selected{% endif %}>
+                    {% if jogador.numero_camisola %}#{{ jogador.numero_camisola }} — {% endif %}{{ jogador.nome }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+        <div class="mt-4">
+            <label class="block text-xs text-gray-500 mb-1">Rotações previsíveis</label>
+            <textarea name="rotacoes" rows="3" placeholder="Descreve as rotações..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.rotacoes if plano and plano.rotacoes else '' }}</textarea>
+        </div>
+    </div>
+
+    <!-- Chaves do jogo -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Chaves do Jogo</h2>
+        <div class="mb-3">
+            <label class="block text-xs font-semibold text-orange-600 mb-1">Ataque</label>
+            <textarea name="chaves_ataque" rows="3" placeholder="Chaves ofensivas..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.chaves_ataque if plano and plano.chaves_ataque else '' }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label class="block text-xs font-semibold text-blue-600 mb-1">Defesa</label>
+            <textarea name="chaves_defesa" rows="3" placeholder="Chaves defensivas..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.chaves_defesa if plano and plano.chaves_defesa else '' }}</textarea>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-green-600 mb-1">Movimentos Ofensivos</label>
+            <textarea name="movimentos_ofensivos" rows="3" placeholder="Movimentos ofensivos..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.movimentos_ofensivos if plano and plano.movimentos_ofensivos else '' }}</textarea>
+        </div>
+    </div>
+
+    <!-- Estratégias Defensivas -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Estratégias Defensivas</h2>
+        {% for campo, label in [
+            ('bloqueio_direto_lateral', 'Bloqueio Direto Lateral'),
+            ('bloqueio_direto_central', 'Bloqueio Direto Central'),
+            ('handoff', 'Handoff'),
+            ('indiretos_entrada', 'Indiretos de Entrada'),
+            ('indiretos_saida', 'Indiretos de Saída'),
+            ('bola_dentro', 'Bola Dentro'),
+            ('situacoes_especiais', 'Situações Especiais')
+        ] %}
+        <div class="mb-3">
+            <label class="block text-xs font-semibold text-gray-500 mb-1">{{ label }}</label>
+            <textarea name="{{ campo }}" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano[campo] if plano and plano[campo] else '' }}</textarea>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Reflexão -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Reflexão</h2>
+        <textarea name="reflexao" rows="8" placeholder="Reflexão pós-jogo..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.reflexao if plano and plano.reflexao else '' }}</textarea>
+    </div>
+
+</div>
+
+<div class="mt-6">
+    <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+        Guardar Plano de Jogo
+    </button>
+</div>
+</form>
+
+{% endblock %}

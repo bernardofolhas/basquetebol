@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block titulo %}Calendário — {{ equipa.nome }}{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/equipas/{{ equipa.id }}" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar à equipa</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">Calendário de Jogos</h1>
+    <p class="text-gray-500 mt-1">{{ equipa.nome }} — {{ equipa.escalao.value }}</p>
+</div>
+
+<!-- Formulário para adicionar jogo -->
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <h2 class="font-semibold text-gray-700 mb-4">Adicionar Jogo</h2>
+    <form method="POST" action="/jogos/equipas/{{ equipa.id }}/novo">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Data *</label>
+                <input type="date" name="data" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                <input type="text" name="hora" placeholder="Ex: 15:00"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Adversário *</label>
+                <input type="text" name="adversario" placeholder="Nome do adversário" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Competição</label>
+                <input type="text" name="competicao" placeholder="Ex: Campeonato Nacional"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Local</label>
+                <input type="text" name="local" placeholder="Pavilhão..."
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Casa ou Fora?</label>
+                <select name="em_casa"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="true">Casa</option>
+                    <option value="false">Fora</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit"
+                class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            + Adicionar Jogo
+        </button>
+    </form>
+</div>
+
+<!-- Lista de jogos -->
+{% if jogos %}
+<div class="space-y-3">
+    {% for jogo in jogos %}
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hover:shadow-md transition">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+
+                <!-- Data -->
+                <div class="text-center min-w-16">
+                    <p class="text-2xl font-bold text-gray-800">{{ jogo.data.strftime('%d') }}</p>
+                    <p class="text-xs text-gray-400 uppercase">{{ jogo.data.strftime('%b %Y') }}</p>
+                </div>
+
+                <!-- Separador -->
+                <div class="w-px h-12 bg-gray-200"></div>
+
+                <!-- Informações do jogo -->
+                <div>
+                    <div class="flex items-center gap-2">
+                        <!-- Badge casa/fora -->
+                        <span class="{% if jogo.em_casa %}bg-green-100 text-green-700{% else %}bg-blue-100 text-blue-700{% endif %} text-xs px-2 py-0.5 rounded-full font-medium">
+                            {% if jogo.em_casa %}Casa{% else %}Fora{% endif %}
+                        </span>
+                        {% if jogo.competicao %}
+                        <span class="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{{ jogo.competicao }}</span>
+                        {% endif %}
+                    </div>
+                    <p class="font-bold text-gray-800 mt-1">vs {{ jogo.adversario }}</p>
+                    <div class="flex items-center gap-3 text-xs text-gray-400 mt-1">
+                        {% if jogo.hora %}<span>🕐 {{ jogo.hora }}</span>{% endif %}
+                        {% if jogo.local %}<span>📍 {{ jogo.local }}</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resultado ou pendente -->
+            <div class="text-right">
+                {% if jogo.pontos_nos is not none and jogo.pontos_adversario is not none %}
+                    <!-- Resultado registado -->
+                    {% if jogo.pontos_nos > jogo.pontos_adversario %}
+                    <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium mb-1 block">Vitória</span>
+                    {% elif jogo.pontos_nos < jogo.pontos_adversario %}
+                    <span class="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-medium mb-1 block">Derrota</span>
+                    {% else %}
+                    <span class="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full font-medium mb-1 block">Empate</span>
+                    {% endif %}
+                    <p class="text-2xl font-bold text-gray-800">{{ jogo.pontos_nos }} — {{ jogo.pontos_adversario }}</p>
+                {% else %}
+                    <span class="text-gray-400 text-xs">Sem resultado</span>
+                {% endif %}
+                <a href="/jogos/{{ jogo.id }}"
+                   class="text-orange-500 hover:text-orange-600 text-xs font-medium mt-1 block">
+                    Ver jogo →
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+    <span class="text-5xl">📅</span>
+    <p class="text-gray-500 mt-4">Ainda não há jogos no calendário.</p>
+</div>
+{% endif %}
+
+{% endblock %}

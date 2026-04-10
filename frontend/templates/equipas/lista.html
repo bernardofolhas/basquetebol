@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block titulo %}Equipas{% endblock %}
+
+{% block conteudo %}
+
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">Equipas</h1>
+        <p class="text-gray-500 mt-1">Gerir as equipas do clube</p>
+    </div>
+    <a href="/equipas/nova"
+       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
+        + Nova Equipa
+    </a>
+</div>
+
+{% if equipas %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for equipa in equipas %}
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hover:shadow-md transition">
+        <div class="flex items-start justify-between">
+            <div>
+                <h2 class="font-bold text-gray-800 text-lg">{{ equipa.nome }}</h2>
+                <p class="text-gray-500 text-sm mt-1">{{ equipa.escalao.value }} — {{ equipa.genero.value }}</p>
+                {% if equipa.seccionista %}
+                <p class="text-gray-400 text-sm mt-1">Seccionista: {{ equipa.seccionista }}</p>
+                {% endif %}
+            </div>
+            <span class="text-3xl">🏀</span>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <a href="/equipas/{{ equipa.id }}"
+               class="text-orange-500 hover:text-orange-600 text-sm font-medium">
+                Ver equipa →
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+    <span class="text-5xl">🏀</span>
+    <p class="text-gray-500 mt-4">Ainda não há equipas criadas.</p>
+    <a href="/equipas/nova"
+       class="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+        Criar primeira equipa
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}

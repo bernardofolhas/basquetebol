@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block titulo %}Macrociclo {{ macrociclo.numero }}{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/planeamento/equipas/{{ macrociclo.equipa_id }}/macrociclos"
+       class="text-orange-500 hover:text-orange-600 text-sm">
+        ← Voltar aos macrociclos
+    </a>
+    <div class="flex items-center gap-3 mt-2">
+        <span class="bg-orange-500 text-white font-bold px-3 py-1 rounded-full">
+            Macro {{ macrociclo.numero }}
+        </span>
+        <h1 class="text-2xl font-bold text-gray-800">
+            {{ macrociclo.data_inicio }} → {{ macrociclo.data_fim }}
+        </h1>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+    <!-- Objetivos técnicos/táticos -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Objetivos Técnicos/Táticos</h2>
+        <div class="space-y-3 text-sm">
+
+            <!-- Macro para mostrar cada objetivo só se estiver preenchido -->
+            {% for label, valor, cor in [
+                ('Técnica Individual Ofensiva', macrociclo.obj_tecnica_individual_ofensiva, 'blue'),
+                ('Técnica Individual Defensiva', macrociclo.obj_tecnica_individual_defensiva, 'blue'),
+                ('Tática Individual Ofensiva', macrociclo.obj_tatica_individual_ofensiva, 'green'),
+                ('Tática Individual Defensiva', macrociclo.obj_tatica_individual_defensiva, 'green'),
+                ('Tática Coletiva Ofensiva', macrociclo.obj_tatica_coletiva_ofensiva, 'orange'),
+                ('Tática Coletiva Defensiva', macrociclo.obj_tatica_coletiva_defensiva, 'orange')
+            ] %}
+            {% if valor %}
+            <div class="border-l-4 border-{{ cor }}-400 pl-3">
+                <p class="text-xs font-semibold text-gray-400 uppercase">{{ label }}</p>
+                <p class="text-gray-700 mt-1">{{ valor }}</p>
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            {% if not macrociclo.obj_tecnica_individual_ofensiva and
+                  not macrociclo.obj_tecnica_individual_defensiva and
+                  not macrociclo.obj_tatica_individual_ofensiva and
+                  not macrociclo.obj_tatica_individual_defensiva and
+                  not macrociclo.obj_tatica_coletiva_ofensiva and
+                  not macrociclo.obj_tatica_coletiva_defensiva %}
+            <p class="text-gray-400">Sem objetivos definidos.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Objetivos físicos e psicológicos -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Outros Objetivos</h2>
+        <div class="space-y-4 text-sm">
+            {% if macrociclo.obj_fisicos %}
+            <div class="border-l-4 border-purple-400 pl-3">
+                <p class="text-xs font-semibold text-gray-400 uppercase">Físicos</p>
+                <p class="text-gray-700 mt-1">{{ macrociclo.obj_fisicos }}</p>
+            </div>
+            {% endif %}
+            {% if macrociclo.obj_psicologicos %}
+            <div class="border-l-4 border-yellow-400 pl-3">
+                <p class="text-xs font-semibold text-gray-400 uppercase">Psicológicos</p>
+                <p class="text-gray-700 mt-1">{{ macrociclo.obj_psicologicos }}</p>
+            </div>
+            {% endif %}
+            {% if not macrociclo.obj_fisicos and not macrociclo.obj_psicologicos %}
+            <p class="text-gray-400">Sem objetivos definidos.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- Mesociclos deste macrociclo -->
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-gray-700">
+            Mesociclos
+            <span class="text-gray-400 font-normal text-sm ml-1">
+                ({{ mesociclos | length }})
+            </span>
+        </h2>
+    </div>
+
+    {% if mesociclos %}
+    <div class="space-y-3 mb-6">
+        {% for meso in mesociclos %}
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div class="flex items-center gap-3">
+                <span class="bg-blue-100 text-blue-700 text-sm font-bold px-2 py-1 rounded-full">
+                    Meso {{ meso.numero }}
+                </span>
+                <span class="text-gray-600 text-sm">
+                    {{ meso.data_inicio }} → {{ meso.data_fim }}
+                </span>
+                <span class="text-gray-400 text-xs">
+                    {{ meso.microciclos | length }} microciclo(s)
+                </span>
+            </div>
+            <a href="/planeamento/mesociclos/{{ meso.id }}"
+               class="text-orange-500 hover:text-orange-600 text-sm">
+                Ver →
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm mb-4">Ainda não há mesociclos criados.</p>
+    {% endif %}
+
+    <!-- Formulário inline para criar mesociclo rapidamente -->
+    <div class="border-t border-gray-100 pt-4">
+        <p class="text-sm font-medium text-gray-600 mb-3">
+            Adicionar Mesociclo {{ proximo_numero_meso }}
+        </p>
+        <form method="POST"
+              action="/planeamento/macrociclos/{{ macrociclo.id }}/mesociclos/novo"
+              class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Data de início *</label>
+                <input type="date" name="data_inicio" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Data de fim *</label>
+                <input type="date" name="data_fim" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div class="col-span-2">
+                <button type="submit"
+                        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                    + Criar Mesociclo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

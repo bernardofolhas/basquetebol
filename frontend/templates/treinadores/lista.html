@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block titulo %}Treinadores{% endblock %}
+
+{% block conteudo %}
+
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">Treinadores</h1>
+        <p class="text-gray-500 mt-1">Gerir os treinadores do clube</p>
+    </div>
+    <a href="/treinadores/novo"
+       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
+        + Novo Treinador
+    </a>
+</div>
+
+{% if treinadores %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for treinador in treinadores %}
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hover:shadow-md transition">
+        <div class="flex items-start justify-between">
+            <div>
+                <h2 class="font-bold text-gray-800 text-lg">{{ treinador.nome }}</h2>
+                {% if treinador.email %}
+                <p class="text-gray-500 text-sm mt-1">{{ treinador.email }}</p>
+                {% endif %}
+                {% if treinador.telefone %}
+                <p class="text-gray-500 text-sm">{{ treinador.telefone }}</p>
+                {% endif %}
+            </div>
+            <span class="text-3xl">👤</span>
+        </div>
+
+        {% if treinador.equipas %}
+        <div class="mt-3">
+            {% for equipa in treinador.equipas %}
+            <span class="inline-block bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full mr-1">
+                {{ equipa.nome }}
+            </span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <a href="/treinadores/{{ treinador.id }}"
+               class="text-orange-500 hover:text-orange-600 text-sm font-medium">
+                Ver treinador →
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+    <span class="text-5xl">👤</span>
+    <p class="text-gray-500 mt-4">Ainda não há treinadores registados.</p>
+    <a href="/treinadores/novo"
+       class="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+        Registar primeiro treinador
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}

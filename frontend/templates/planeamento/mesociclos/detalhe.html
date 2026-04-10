@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block titulo %}Mesociclo {{ mesociclo.numero }}{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/planeamento/macrociclos/{{ mesociclo.macrociclo_id }}"
+       class="text-orange-500 hover:text-orange-600 text-sm">
+        ← Voltar ao Macrociclo {{ mesociclo.macrociclo.numero }}
+    </a>
+    <div class="flex items-center gap-3 mt-2">
+        <span class="bg-blue-500 text-white font-bold px-3 py-1 rounded-full">
+            Meso {{ mesociclo.numero }}
+        </span>
+        <h1 class="text-2xl font-bold text-gray-800">
+            {{ mesociclo.data_inicio }} → {{ mesociclo.data_fim }}
+        </h1>
+    </div>
+</div>
+
+<!-- Microciclos deste mesociclo -->
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-gray-700">
+            Microciclos
+            <span class="text-gray-400 font-normal text-sm ml-1">
+                ({{ microciclos | length }})
+            </span>
+        </h2>
+    </div>
+
+    {% if microciclos %}
+    <div class="space-y-3 mb-6">
+        {% for micro in microciclos %}
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div class="flex items-center gap-3">
+                <span class="bg-green-100 text-green-700 text-sm font-bold px-2 py-1 rounded-full">
+                    Micro {{ micro.numero }}
+                </span>
+                <span class="text-gray-600 text-sm">
+                    {{ micro.data_inicio }} → {{ micro.data_fim }}
+                </span>
+                {% if micro.tipo %}
+                <span class="text-gray-400 text-xs bg-gray-100 px-2 py-0.5 rounded-full">
+                    {{ micro.tipo }}
+                </span>
+                {% endif %}
+                <span class="text-gray-400 text-xs">
+                    {{ micro.sessoes | length }} sessão(ões)
+                </span>
+            </div>
+            <a href="/planeamento/microciclos/{{ micro.id }}"
+               class="text-orange-500 hover:text-orange-600 text-sm">
+                Ver →
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm mb-4">Ainda não há microciclos criados.</p>
+    {% endif %}
+
+    <!-- Formulário inline para criar microciclo -->
+    <div class="border-t border-gray-100 pt-4">
+        <p class="text-sm font-medium text-gray-600 mb-3">
+            Adicionar Microciclo {{ proximo_numero_micro }}
+        </p>
+        <form method="POST"
+              action="/planeamento/mesociclos/{{ mesociclo.id }}/microciclos/novo"
+              class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Data de início *</label>
+                <input type="date" name="data_inicio" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Data de fim *</label>
+                <input type="date" name="data_fim" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Tipo de microciclo</label>
+                <!-- Select permite escolher de uma lista de opções predefinidas -->
+                <select name="tipo"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Selecciona o tipo</option>
+                    <option value="Introdutório">Introdutório</option>
+                    <option value="Carga">Carga</option>
+                    <option value="Competitivo">Competitivo</option>
+                    <option value="Recuperação">Recuperação</option>
+                    <option value="Pré-competitivo">Pré-competitivo</option>
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button type="submit"
+                        class="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                    + Criar Microciclo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
