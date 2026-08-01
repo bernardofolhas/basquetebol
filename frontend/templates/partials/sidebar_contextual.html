@@ -14,23 +14,14 @@
       <p class="ds-side-section">Equipa</p>
       {{ nav_link('/equipas/' ~ equipa_contexto_id, 'RE', 'Resumo', p == '/equipas/' ~ equipa_contexto_id) }}
       {{ nav_link('/equipas/' ~ equipa_contexto_id ~ '/plantel', 'PL', 'Plantel', p.endswith('/plantel') or p.startswith('/jogadores')) }}
-      {% set macro_nav = macrociclo if macrociclo is defined and macrociclo else none %}
-      {% set meso_nav = mesociclo if mesociclo is defined and mesociclo else none %}
-      {% set micro_nav = microciclo if microciclo is defined and microciclo else none %}
-      {% if not macro_nav and meso_nav %}{% set macro_nav = meso_nav.macrociclo %}{% endif %}
-      {% if not meso_nav and micro_nav %}{% set meso_nav = micro_nav.mesociclo %}{% endif %}
-      {% if not macro_nav and meso_nav %}{% set macro_nav = meso_nav.macrociclo %}{% endif %}
-      {% if sessao is defined and sessao and sessao.microciclo %}
-        {% set micro_nav = sessao.microciclo %}{% set meso_nav = micro_nav.mesociclo %}{% set macro_nav = meso_nav.macrociclo %}
-      {% endif %}
       <details class="ds-side-group" {% if p.startswith('/planeamento') or p.startswith('/treino') %}open{% endif %}>
         <summary class="ds-side-link"><span class="ds-side-icon">PN</span><span class="ds-side-label">Planeamento</span><span class="ds-side-chevron ds-side-label">⌄</span></summary>
         <div class="ds-side-submenu">
           {{ nav_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/anuais', 'AN', 'Plano anual', p.startswith('/planeamento/equipas/') and '/anuais' in p or p.startswith('/planeamento/anuais/')) }}
-          {{ nav_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/macrociclos', 'MA', 'Macrociclos', p.startswith('/planeamento/macrociclos')) }}
-          {% if macro_nav %}{{ nav_link('/planeamento/macrociclos/' ~ macro_nav.id, 'ME', 'Mesociclos', p.startswith('/planeamento/mesociclos')) }}{% else %}<span class="ds-side-link is-disabled"><span class="ds-side-icon">ME</span><span class="ds-side-label">Mesociclos</span></span>{% endif %}
-          {% if meso_nav %}{{ nav_link('/planeamento/mesociclos/' ~ meso_nav.id, 'MI', 'Microciclos', p.startswith('/planeamento/microciclos')) }}{% else %}<span class="ds-side-link is-disabled"><span class="ds-side-icon">MI</span><span class="ds-side-label">Microciclos</span></span>{% endif %}
-          {{ nav_link(('/planeamento/microciclos/' ~ micro_nav.id) if micro_nav else ('/calendario?equipa_id=' ~ equipa_contexto_id), 'PT', 'Planos de treino', p.startswith('/treino')) }}
+          {{ nav_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/macrociclos', 'MA', 'Macrociclos', '/macrociclos' in p and '/mesociclos' not in p) }}
+          {{ nav_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/mesociclos', 'ME', 'Mesociclos', '/mesociclos' in p and '/microciclos' not in p) }}
+          {{ nav_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/microciclos', 'MI', 'Microciclos', '/microciclos' in p) }}
+          {{ nav_link('/treino/equipas/' ~ equipa_contexto_id ~ '/planos', 'PT', 'Planos de treino', p.startswith('/treino')) }}
         </div>
       </details>
       {{ nav_link('/jogos/equipas/' ~ equipa_contexto_id, 'JG', 'Jogos', p.startswith('/jogos')) }}

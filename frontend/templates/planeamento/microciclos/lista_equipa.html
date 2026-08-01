@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+
+{% block titulo %}Microciclos - {{ equipa.nome }}{% endblock %}
+{% block conteudo %}
+{{ equipa_contexto(
+    equipa,
+    "Microciclos",
+    "Acesso direto a todas as semanas de trabalho da equipa.",
+    "planeamento",
+    "/equipas/" ~ equipa.id,
+    "Voltar à equipa"
+) }}
+
+{% if mesociclos %}
+<details class="mb-6 rounded-2xl border border-orange-100 bg-orange-50 p-4">
+    <summary class="cursor-pointer font-semibold text-orange-900">Criar um microciclo</summary>
+    <p class="mt-2 text-sm text-orange-800">Escolhe o mesociclo onde a nova semana deve ficar integrada.</p>
+    <div class="mt-3 flex flex-wrap gap-2">
+        {% for meso in mesociclos %}
+        <a href="/planeamento/mesociclos/{{ meso.id }}#novo-microciclo" class="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-100">
+            Meso {{ meso.numero }} · {{ meso.data_inicio|data_pt }} a {{ meso.data_fim|data_pt }}
+        </a>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}
+
+{% if microciclos %}
+<div class="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+    {% for micro in microciclos %}
+    <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Microciclo {{ micro.numero }}</span>
+            {% if micro.tipo %}<span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">{{ micro.tipo }}</span>{% endif %}
+        </div>
+        <p class="mt-3 font-semibold text-slate-900">{{ micro.data_inicio|data_pt }} a {{ micro.data_fim|data_pt }}</p>
+        <p class="mt-1 text-sm text-slate-500">Meso {{ micro.mesociclo.numero }} · Macro {{ micro.mesociclo.macrociclo.numero }}</p>
+        <p class="mt-1 text-sm text-slate-500">{{ micro.sessoes|selectattr('ativa')|list|length }} sessão(ões)</p>
+        <div class="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+            <a href="/planeamento/microciclos/{{ micro.id }}" class="rounded-xl bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600">Abrir</a>
+            <a href="/planeamento/microciclos/{{ micro.id }}/editar" class="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Editar</a>
+            <a href="/planeamento/microciclos/{{ micro.id }}/pdf" class="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">PDF</a>
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+    <h2 class="font-semibold text-slate-900">Ainda não existem microciclos</h2>
+    <p class="mt-2 text-sm text-slate-500">{% if mesociclos %}Usa a opção acima para escolher o mesociclo de destino.{% else %}Cria primeiro um mesociclo para enquadrar a semana.{% endif %}</p>
+    {% if not mesociclos %}<a href="/planeamento/equipas/{{ equipa.id }}/mesociclos" class="mt-4 inline-flex rounded-xl bg-orange-500 px-4 py-2.5 font-semibold text-white hover:bg-orange-600">Ver mesociclos</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -389,7 +389,7 @@
     {% endif %}
 
     <!-- Formulário inline criar microciclo -->
-    <div class="border-t border-gray-100 pt-4">
+    <div id="novo-microciclo" class="scroll-mt-24 border-t border-gray-100 pt-4">
         <p class="text-sm font-medium text-gray-600 mb-3">Adicionar Microciclo {{ proximo_numero_micro }}</p>
         <form method="POST" action="/planeamento/mesociclos/{{ mesociclo.id }}/microciclos/novo"
               class="grid grid-cols-2 md:grid-cols-4 gap-3">

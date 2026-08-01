@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+
+{% block titulo %}Planos de treino - {{ equipa.nome }}{% endblock %}
+{% block conteudo %}
+{{ equipa_contexto(
+    equipa,
+    "Planos de treino",
+    "Prepara, consulta e edita diretamente os planos das sessões da equipa.",
+    "planeamento",
+    "/equipas/" ~ equipa.id,
+    "Voltar à equipa"
+) }}
+
+<div class="mb-6 rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-900">
+    Cada plano está associado a uma sessão de treino. Para criar uma nova sessão, abre os <a href="/planeamento/equipas/{{ equipa.id }}/microciclos" class="font-bold underline">microciclos</a>; para preparar o conteúdo, usa diretamente a lista abaixo.
+</div>
+
+{% if sessoes %}
+<div class="space-y-3">
+    {% for sessao in sessoes %}
+    <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">Treino {{ sessao.numero_treino or 'sem número' }}</span>
+                    {% if sessao.plano_treino and sessao.plano_treino.exercicios %}
+                    <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Preparado · {{ sessao.plano_treino.exercicios|length }} exercício(s)</span>
+                    {% elif sessao.plano_treino %}
+                    <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Em preparação</span>
+                    {% else %}
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Por preparar</span>
+                    {% endif %}
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ sessao.estado|replace('_', ' ')|title }}</span>
+                </div>
+                <p class="mt-3 font-bold text-slate-900">{{ sessao.data|data_pt }}{% if sessao.hora_inicio %} · {{ sessao.hora_inicio }}{% if sessao.hora_fim %}-{{ sessao.hora_fim }}{% endif %}{% endif %}</p>
+                <p class="mt-1 text-sm text-slate-500">{{ sessao.local or 'Local por definir' }} · Micro {{ sessao.microciclo.numero }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="/treino/sessoes/{{ sessao.id }}" class="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600">{{ 'Editar plano' if sessao.plano_treino else 'Preparar plano' }}</a>
+                {% if sessao.plano_treino %}<a href="/treino/sessoes/{{ sessao.id }}/pdf" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">PDF</a>{% endif %}
+            </div>
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+    <h2 class="font-semibold text-slate-900">Ainda não existem sessões de treino</h2>
+    <p class="mt-2 text-sm text-slate-500">Cria uma sessão num microciclo e ela aparecerá automaticamente aqui.</p>
+    <a href="/planeamento/equipas/{{ equipa.id }}/microciclos" class="mt-4 inline-flex rounded-xl bg-orange-500 px-4 py-2.5 font-semibold text-white hover:bg-orange-600">Abrir microciclos</a>
+</div>
+{% endif %}
+{% endblock %}

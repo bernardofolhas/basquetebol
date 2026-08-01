@@ -583,7 +583,72 @@ async def eliminar_anual_equipa(
 def listar_macrociclos(equipa_id: int, request: Request, db: Session = Depends(get_db),
                        utilizador=Depends(exigir_autenticacao)):
     _verificar_acesso_planeamento(utilizador, equipa_id, db)
-    return RedirectResponse(url=f"/planeamento/equipas/{equipa_id}/anuais", status_code=303)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    macrociclos = db.query(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+    ).order_by(Macrociclo.data_inicio.desc(), Macrociclo.numero.desc()).all()
+    return templates.TemplateResponse(request, "planeamento/macrociclos/lista.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "macrociclos": macrociclos,
+    })
+
+
+@router.get("/equipas/{equipa_id}/mesociclos", response_class=HTMLResponse)
+def listar_mesociclos_equipa(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Lista todos os mesociclos da equipa sem exigir a abertura de um macro."""
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    macrociclos = db.query(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+    ).order_by(Macrociclo.data_inicio.desc(), Macrociclo.numero.desc()).all()
+    mesociclos = db.query(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+    ).order_by(Mesociclo.data_inicio.desc(), Mesociclo.numero.desc()).all()
+    return templates.TemplateResponse(request, "planeamento/mesociclos/lista_equipa.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "macrociclos": macrociclos,
+        "mesociclos": mesociclos,
+    })
+
+
+@router.get("/equipas/{equipa_id}/microciclos", response_class=HTMLResponse)
+def listar_microciclos_equipa(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Lista todos os microciclos da equipa sem exigir a abertura de um meso."""
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    mesociclos = db.query(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+    ).order_by(Mesociclo.data_inicio.desc(), Mesociclo.numero.desc()).all()
+    microciclos = db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+    ).order_by(Microciclo.data_inicio.desc(), Microciclo.numero.desc()).all()
+    return templates.TemplateResponse(request, "planeamento/microciclos/lista_equipa.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "mesociclos": mesociclos,
+        "microciclos": microciclos,
+    })
 
 
 # ─────────────────────────────────────────

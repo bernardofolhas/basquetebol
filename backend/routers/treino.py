@@ -5,6 +5,8 @@
 # organizados em blocos (A, B, C, D)
 # ─────────────────────────────────────────────────────────────
 
+from datetime import date
+
 from fastapi import APIRouter, Request, Depends, Form
 from template_config import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
@@ -16,7 +18,8 @@ from database import get_db
 from flash import set_flash
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
 from models.espaco_agenda import AgendaEspacoEquipa
-from models.planeamento import SessaoTreino
+from models.equipa import Equipa
+from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.treino import BibliotecoExercicio, BlocoTreino, ExercicioPlano, PlanoTreino
 from paths import STATIC_DIR, TEMPLATES_DIR
 from services.desenho_service import (
@@ -247,6 +250,32 @@ def _normalizar_bloco(bloco: str | None) -> str:
     if valor not in {"A", "B", "C", "D"}:
         raise ValueError("O bloco do exercício deve ser A, B, C ou D.")
     return valor
+
+
+@router.get("/equipas/{equipa_id}/planos", response_class=HTMLResponse)
+def listar_planos_treino_equipa(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Apresenta todas as sessões de treino como acesso direto aos respetivos planos."""
+    _verificar_acesso_treino(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    sessoes = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+        SessaoTreino.ativa.is_(True),
+        SessaoTreino.e_jogo.is_(False),
+    ).order_by(SessaoTreino.data.desc(), SessaoTreino.hora_inicio.desc()).all()
+    return templates.TemplateResponse(request, "treino/lista_equipa.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "sessoes": [enriquecer_sessao_para_ui(sessao) for sessao in sessoes],
+        "hoje": date.today(),
+    })
 
 
 # ─────────────────────────────────────────

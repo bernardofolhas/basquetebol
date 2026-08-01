@@ -215,7 +215,7 @@
     <p class="text-gray-400 text-sm mb-4">Ainda nao ha mesociclos criados.</p>
     {% endif %}
 
-    <div class="border-t border-gray-100 pt-4">
+    <div id="novo-mesociclo" class="scroll-mt-24 border-t border-gray-100 pt-4">
         <p class="text-sm font-medium text-gray-600 mb-3">Adicionar Mesociclo {{ proximo_numero_meso }}</p>
         <form method="POST"
               action="/planeamento/macrociclos/{{ macrociclo.id }}/mesociclos/novo"

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+
+{% block titulo %}Mesociclos - {{ equipa.nome }}{% endblock %}
+{% block conteudo %}
+{{ equipa_contexto(
+    equipa,
+    "Mesociclos",
+    "Consulta e edita todos os mesociclos da equipa sem percorrer os níveis anteriores.",
+    "planeamento",
+    "/equipas/" ~ equipa.id,
+    "Voltar à equipa"
+) }}
+
+{% if macrociclos %}
+<details class="mb-6 rounded-2xl border border-orange-100 bg-orange-50 p-4">
+    <summary class="cursor-pointer font-semibold text-orange-900">Criar um mesociclo</summary>
+    <p class="mt-2 text-sm text-orange-800">Escolhe o macrociclo onde o novo período deve ficar integrado.</p>
+    <div class="mt-3 flex flex-wrap gap-2">
+        {% for macro in macrociclos %}
+        <a href="/planeamento/macrociclos/{{ macro.id }}#novo-mesociclo" class="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-100">
+            Macro {{ macro.numero }} · {{ macro.data_inicio|data_pt }} a {{ macro.data_fim|data_pt }}
+        </a>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}
+
+{% if mesociclos %}
+<div class="grid gap-4 lg:grid-cols-2">
+    {% for meso in mesociclos %}
+    <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">Mesociclo {{ meso.numero }}</span>
+                    <span class="text-xs font-medium text-slate-500">Macro {{ meso.macrociclo.numero }}</span>
+                </div>
+                <p class="mt-3 font-semibold text-slate-900">{{ meso.data_inicio|data_pt }} a {{ meso.data_fim|data_pt }}</p>
+                <p class="mt-1 text-sm text-slate-500">{{ meso.microciclos|length }} microciclo(s)</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="/planeamento/mesociclos/{{ meso.id }}" class="rounded-xl bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600">Abrir</a>
+                <a href="/planeamento/mesociclos/{{ meso.id }}/editar" class="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Editar</a>
+            </div>
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+    <h2 class="font-semibold text-slate-900">Ainda não existem mesociclos</h2>
+    <p class="mt-2 text-sm text-slate-500">{% if macrociclos %}Usa a opção acima para escolher o macrociclo de destino.{% else %}Cria primeiro um macrociclo para definir o período de trabalho.{% endif %}</p>
+    {% if not macrociclos %}<a href="/planeamento/equipas/{{ equipa.id }}/macrociclos/novo" class="mt-4 inline-flex rounded-xl bg-orange-500 px-4 py-2.5 font-semibold text-white hover:bg-orange-600">Criar macrociclo</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
