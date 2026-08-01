@@ -34,6 +34,7 @@ class AtribuicaoEspacoSemanal(Base):
     plano_semanal_id = Column(Integer, ForeignKey("planos_semanais_clube.id"), nullable=False)
     espaco_id = Column(Integer, ForeignKey("espacos_treino.id"), nullable=False)
     equipa_id = Column(Integer, ForeignKey("equipas.id"), nullable=True)
+    treinador_id = Column(Integer, ForeignKey("treinadores.id"), nullable=True)
     evento_id = Column(Integer, ForeignKey("eventos_planeamento_clube.id"), nullable=True)
     data = Column(Date, nullable=False)
     hora_inicio = Column(String, nullable=False)
@@ -48,4 +49,5 @@ class AtribuicaoEspacoSemanal(Base):
     plano_semanal = relationship("PlanoSemanalClube", back_populates="atribuicoes_espacos")
     espaco = relationship("EspacoTreino", back_populates="atribuicoes_semanais")
     equipa = relationship("Equipa", backref="atribuicoes_espaco_semanais")
+    treinador = relationship("Treinador", backref="atribuicoes_espaco_semanais")
     evento = relationship("EventoPlaneamentoClube", back_populates="atribuicoes_espaco")

@@ -180,18 +180,8 @@
                             <span class="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">atribuído</span>
                             {% endif %}
                         </label>
-                        {% if espacos_disponiveis %}
-                        <select name="local" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                            <option value="">— Selecionar espaço —</option>
-                            {% for ag in espacos_disponiveis %}
-                            <option value="{{ ag.espaco.nome }}" {% if sessao.local == ag.espaco.nome %}selected{% endif %}>
-                                {{ ag.espaco.nome }} ({{ ag.hora_inicio }}–{{ ag.hora_fim }})
-                            </option>
-                            {% endfor %}
-                        </select>
-                        {% else %}
                         <input type="text" name="local" value="{{ sessao.local if sessao.local else '' }}" placeholder="Ex: Pavilhão Municipal" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                        {% endif %}
+                        <p class="mt-1 text-[11px] text-gray-400">Espaço usado na sessão. A escolha do treinador é livre.</p>
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-gray-500">Hora de início</label>
@@ -209,6 +199,17 @@
                         <label class="mb-1 block text-xs font-medium text-gray-500">RPE geral (1-10)</label>
                         <input type="number" name="intensidade_rpe" min="1" max="10" step="0.5" value="{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else '' }}" placeholder="Ex: 7" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
                         <p class="mt-1 text-[11px] text-gray-400">Perceção global da sessão.</p>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border px-4 py-3 text-sm {{ validacao_local.classes }}">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="font-semibold">{% if validacao_local.estado == 'confirmado' %}✓{% elif validacao_local.estado in ['diferente', 'sem_previsao'] %}⚠{% else %}ℹ{% endif %} {{ validacao_local.label }}</p>
+                        {% if validacao_local.previsao %}<p>{{ validacao_local.previsao.data|data_pt }} · {{ validacao_local.previsao.hora_inicio }}–{{ validacao_local.previsao.hora_fim }}</p>{% endif %}
+                    </div>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                        <p><span class="font-medium">Espaço previsto pelo clube:</span> {{ validacao_local.previsao.espaco.nome if validacao_local.previsao and validacao_local.previsao.espaco else 'Sem previsão' }}</p>
+                        <p><span class="font-medium">Espaço usado na sessão:</span> {{ sessao.local or 'Por definir' }}</p>
                     </div>
                 </div>
 

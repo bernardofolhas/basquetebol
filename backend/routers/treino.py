@@ -17,7 +17,6 @@ from auth_deps import AcessoNegado, exigir_autenticacao
 from database import get_db
 from flash import set_flash
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
-from models.espaco_agenda import AgendaEspacoEquipa
 from models.equipa import Equipa
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.treino import BibliotecoExercicio, BlocoTreino, ExercicioPlano, PlanoTreino
@@ -29,6 +28,7 @@ from services.desenho_service import (
 )
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
 from services.pdf_service import renderizar_pdf
+from services.planeamento_semanal_administrativo_service import obter_previsao_equipa, validar_local_sessao
 from services.sessao_workflow import (
     ESTADOS_SESSAO,
     normalizar_estado_sessao,
@@ -308,16 +308,8 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         bloco = f"d{ex.bloco_id}" if ex.bloco_id else (ex.bloco or "A")
         exercicios_por_bloco.setdefault(bloco, []).append(ex)
 
-    espacos_disponiveis = (
-        db.query(AgendaEspacoEquipa)
-        .filter(
-            AgendaEspacoEquipa.equipa_id == equipa.id,
-            AgendaEspacoEquipa.data == sessao.data,
-            AgendaEspacoEquipa.ativo == True,
-        )
-        .order_by(AgendaEspacoEquipa.hora_inicio)
-        .all()
-    )
+    espacos_disponiveis = obter_previsao_equipa(db, equipa.id, sessao.data, sessao.data)
+    validacao_local = validar_local_sessao(db, sessao, equipa.id)
 
     volume_planeado = sum(ex.minutos or 0 for ex in plano.exercicios)
     duracao_prevista = _duracao_prevista_minutos(sessao)
@@ -328,6 +320,7 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "plano": plano,
         "exercicios_por_bloco": exercicios_por_bloco,
         "espacos_disponiveis": espacos_disponiveis,
+        "validacao_local": validacao_local,
         "categorias_exercicio": ["TIO", "TID", "TaIO", "TaID", "TCO", "TCD", "FIS"],
         "resumo_blocos": _construir_resumo_blocos(plano),
         "blocos_ui": [{"key": f"d{bloco.id}", "id": bloco.id, "nome": bloco.nome, "tipo": bloco.tipo, "legado": False} for bloco in plano.blocos] + [{"key": letra, "id": None, "nome": f"Bloco {letra}", "tipo": "Legado", "legado": True} for letra in ["A", "B", "C", "D"] if letra in exercicios_por_bloco],

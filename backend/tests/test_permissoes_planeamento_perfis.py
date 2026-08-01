@@ -216,12 +216,13 @@ def test_interface_e_urls_respeitam_os_perfis(contexto_permissoes):
     secretaria = _cliente_autenticado(dados["credenciais"]["secretaria"])
     pagina_secretaria = secretaria.get("/secretaria/pendencias")
     assert pagina_secretaria.status_code == 200
-    assert "/planeamento-clube" not in pagina_secretaria.text
+    assert 'href="/planeamento-clube/semanal"' in pagina_secretaria.text
+    assert 'href="/planeamento-clube/espacos"' in pagina_secretaria.text
     assert 'action="/pesquisa"' not in pagina_secretaria.text
     assert 'href="/calendario"' not in pagina_secretaria.text
     bloqueio_secretaria = secretaria.get("/planeamento-clube/semanal", follow_redirects=False)
-    assert bloqueio_secretaria.status_code == 302
-    assert bloqueio_secretaria.headers["location"] == "/dashboard"
+    assert bloqueio_secretaria.status_code == 200
+    assert "/planeamento-clube/semanal/novo" not in bloqueio_secretaria.text
     assert secretaria.get("/biblioteca", follow_redirects=False).headers["location"] == "/dashboard"
     processo = secretaria.get(f"/jogadores/{dados['jogador_id']}")
     assert processo.status_code == 200

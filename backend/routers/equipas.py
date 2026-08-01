@@ -26,6 +26,7 @@ from models.planeamento_clube import EventoPlaneamentoClube
 from models.playbook import Playbook
 from paths import TEMPLATES_DIR
 from services.planeamento_integrado_service import obter_dashboard_planeamento_equipa
+from services.planeamento_semanal_administrativo_service import obter_previsao_equipa
 
 router = APIRouter(prefix="/equipas")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -155,11 +156,16 @@ def detalhe_equipa(
         hoje,
         hoje + timedelta(days=14),
     )["itens"]
+    inicio_semana = hoje - timedelta(days=hoje.weekday())
+    semana_prevista = obter_previsao_equipa(
+        db, equipa_id, inicio_semana, inicio_semana + timedelta(days=6)
+    )
 
     return templates.TemplateResponse(request, "equipas/detalhe.html", {
         "utilizador": utilizador,
         "equipa": equipa,
         "agenda_proxima": agenda,
+        "semana_prevista": semana_prevista,
         "erro": None,
     })
 

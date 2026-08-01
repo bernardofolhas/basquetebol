@@ -6,11 +6,11 @@
 
 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800">Planos Semanais</h1>
-        <p class="text-gray-500 mt-1">Acesso direto a todos os planos semanais do clube</p>
+        <h1 class="text-2xl font-bold text-gray-800">Planeamento semanal administrativo</h1>
+        <p class="text-gray-500 mt-1">Reservas logísticas de horários e espaços, independentes das sessões técnicas</p>
     </div>
     <div class="flex flex-wrap items-center gap-3">
-        {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}
+        {% if pode_gerir %}
         <a href="/planeamento-clube/semanal/novo" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">Criar plano semanal</a>
         {% endif %}
         <a href="/planeamento-clube/anual"
@@ -74,7 +74,6 @@
                 <th class="px-6 py-4">Mensal</th>
                 <th class="px-6 py-4">Eventos</th>
                 <th class="px-6 py-4">Atribuições de Espaços</th>
-                <th class="px-6 py-4">Última Sincronização</th>
                 <th class="px-6 py-4">Estado</th>
                 <th class="px-6 py-4">Ações</th>
             </tr>
@@ -99,14 +98,6 @@
                 <td class="px-6 py-4">{{ semanal.eventos | length }}</td>
                 <td class="px-6 py-4">{{ semanal.atribuicoes_espacos | length }}</td>
                 <td class="px-6 py-4">
-                    {% if semanal.ultima_sincronizacao_em %}
-                    <div>{{ semanal.ultima_sincronizacao_em.strftime("%d/%m/%Y %H:%M") }}</div>
-                    <div class="text-xs text-gray-400">{{ semanal.ultima_sincronizacao_por or "—" }}</div>
-                    {% else %}
-                    <span class="text-gray-400">Nunca</span>
-                    {% endif %}
-                </td>
-                <td class="px-6 py-4">
                     <span class="{% if semanal.estado == 'ativo' %}bg-green-100 text-green-700{% else %}bg-yellow-100 text-yellow-700{% endif %} text-xs px-2 py-1 rounded-full font-medium">
                         {{ semanal.estado }}
                     </span>
@@ -121,17 +112,11 @@
                            class="text-red-500 hover:text-red-600 font-medium">
                             PDF
                         </a>
-                        <a href="/planeamento-clube/semanal/{{ semanal.id }}/editar"
+                        {% if pode_gerir %}<a href="/planeamento-clube/semanal/{{ semanal.id }}/editar"
                            class="text-blue-500 hover:text-blue-600 font-medium">
                             Editar
                         </a>
-                        <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/duplicar"><button class="text-violet-600 hover:text-violet-700 font-medium">Duplicar</button></form>
-                        <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/sincronizar">
-                            <button type="submit"
-                                    class="text-green-600 hover:text-green-700 font-medium">
-                                Sincronizar
-                            </button>
-                        </form>
+                        <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/duplicar"><button class="text-violet-600 hover:text-violet-700 font-medium">Duplicar semana</button></form>{% endif %}
                     </div>
                 </td>
             </tr>
@@ -165,14 +150,6 @@
             </p>
             <p><span class="font-medium text-gray-700">Eventos:</span> {{ semanal.eventos | length }}</p>
             <p><span class="font-medium text-gray-700">Atribuições de Espaços:</span> {{ semanal.atribuicoes_espacos | length }}</p>
-            <p>
-                <span class="font-medium text-gray-700">Última Sincronização:</span>
-                {% if semanal.ultima_sincronizacao_em %}
-                {{ semanal.ultima_sincronizacao_em.strftime("%d/%m/%Y %H:%M") }}{% if semanal.ultima_sincronizacao_por %} — {{ semanal.ultima_sincronizacao_por }}{% endif %}
-                {% else %}
-                Nunca
-                {% endif %}
-            </p>
         </div>
         <div class="flex flex-wrap items-center gap-4 mt-4">
             <a href="/planeamento-clube/semanal/{{ semanal.id }}" class="text-orange-500 hover:text-orange-600 text-sm font-medium">
@@ -181,15 +158,10 @@
             <a href="/planeamento-clube/semanal/{{ semanal.id }}/pdf" class="text-red-500 hover:text-red-600 text-sm font-medium">
                 PDF
             </a>
-            <a href="/planeamento-clube/semanal/{{ semanal.id }}/editar" class="text-blue-500 hover:text-blue-600 text-sm font-medium">
+            {% if pode_gerir %}<a href="/planeamento-clube/semanal/{{ semanal.id }}/editar" class="text-blue-500 hover:text-blue-600 text-sm font-medium">
                 Editar
             </a>
-            <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/duplicar"><button class="text-violet-600 text-sm font-medium">Duplicar</button></form>
-            <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/sincronizar">
-                <button type="submit" class="text-green-600 hover:text-green-700 text-sm font-medium">
-                    Sincronizar
-                </button>
-            </form>
+            <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/duplicar"><button class="text-violet-600 text-sm font-medium">Duplicar semana</button></form>{% endif %}
         </div>
     </div>
     {% endfor %}

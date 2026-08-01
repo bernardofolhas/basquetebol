@@ -16,6 +16,7 @@
     </div>
     <p class="text-gray-500 mt-1">{{ semanal.data_inicio|data_pt }} → {{ semanal.data_fim|data_pt }}</p>
     <div class="mt-4 flex flex-wrap gap-2"><a href="/planeamento-clube/semanal/{{ semanal.id }}/pdf" class="inline-block rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">📄 Exportar PDF semanal</a><a href="/partilha/semanal/{{ semanal.id }}/pdf" class="inline-block rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100">PDF para partilhar</a></div>
+    <div class="mt-2"><a href="/planeamento-clube/indisponibilidades-treinador" class="text-sm font-semibold text-sky-700 hover:text-sky-800">Ver indisponibilidade de treinadores</a></div>
 </div>
 
 {% if erro %}
@@ -24,7 +25,7 @@
 </div>
 {% endif %}
 
-<div class="flex items-center gap-3 mb-6">
+{% if pode_gerir %}<div class="flex flex-wrap items-center gap-3 mb-6">
     <a href="/planeamento-clube/semanal/{{ semanal.id }}/editar"
        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition">
         Editar Plano Semanal
@@ -52,76 +53,49 @@
        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
         + Novo Evento Global
     </a>
-</div>
+</div>{% endif %}
 
-<div class="mb-6 flex flex-wrap gap-2">
+{% if pode_gerir %}<div class="mb-6 flex flex-wrap gap-2">
     {% if semanal.estado == 'ativo' %}
     <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/retirar-publicacao"><button class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100">Retirar publicação</button></form>
     {% else %}
     <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/publicar"><button class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Publicar plano</button></form>
     {% endif %}
     <span class="rounded-lg bg-gray-50 px-4 py-2 text-sm text-gray-500">Publicar bloqueia conflitos de espaço</span>
-</div>
+</div>{% endif %}
 
-{% if mensagem_sincronizacao %}
-<div class="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
-    <h2 class="font-semibold text-green-800 mb-2">Sincronização concluída</h2>
-    <p class="text-sm text-green-800">{{ mensagem_sincronizacao }}</p>
-</div>
-{% endif %}
-
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="font-semibold text-gray-700">Estado do Plano</h2>
-            <span class="{{ estado_visual_plano.classes }} text-xs font-semibold px-3 py-1 rounded-full">
-                {{ estado_visual_plano.label }}
-            </span>
-        </div>
-        <div class="space-y-2 text-sm text-gray-700">
-            <p><span class="font-medium">Período:</span> {{ semanal.data_inicio|data_pt }} → {{ semanal.data_fim|data_pt }}</p>
-            <p><span class="font-medium">Última sincronização:</span> {{ ultima_sincronizacao.em if ultima_sincronizacao.em else "Ainda não sincronizado" }}</p>
-            <p><span class="font-medium">Sincronizado por:</span> {{ ultima_sincronizacao.por if ultima_sincronizacao.por else "—" }}</p>
-            <p><span class="font-medium">Resumo guardado:</span> {{ ultima_sincronizacao.resumo if ultima_sincronizacao.resumo else "Sem histórico de sincronização." }}</p>
-        </div>
-    </div>
-
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="font-semibold text-gray-700">Sincronização com Equipas</h2>
-            <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-3 py-1 rounded-full">
-                Controlo manual
-            </span>
-        </div>
-        <p class="text-sm text-gray-600 mb-4">
-            Atualiza as sessões das equipas com base no Planeamento Global do Clube, protegendo alterações manuais posteriores.
-        </p>
-        <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/sincronizar">
-            <button type="submit"
-                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition">
-                Sincronizar com equipas
-            </button>
-        </form>
+<div class="mb-6 rounded-xl border border-sky-200 bg-sky-50 p-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div><h2 class="font-semibold text-sky-900">Previsão logística do clube</h2><p class="mt-1 text-sm text-sky-800">Reserva espaços e horários. Não cria sessões nem preenche planos técnicos dos treinadores.</p></div>
+        <span class="{{ estado_visual_plano.classes }} rounded-full px-3 py-1 text-xs font-semibold">{{ estado_visual_plano.label }}</span>
     </div>
 </div>
-
-{% if resumo_sincronizacao %}
-<div class="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
-    <h2 class="font-semibold text-green-800 mb-2">Resumo da última sincronização</h2>
-    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
-        <div><span class="text-green-700 font-medium">Geradas:</span> {{ resumo_sincronizacao.geradas }}</div>
-        <div><span class="text-green-700 font-medium">Atualizadas:</span> {{ resumo_sincronizacao.atualizadas }}</div>
-        <div><span class="text-green-700 font-medium">Ignoradas:</span> {{ resumo_sincronizacao.ignoradas }}</div>
-        <div><span class="text-green-700 font-medium">Manuais:</span> {{ resumo_sincronizacao.ignoradas_manuais }}</div>
-        <div><span class="text-green-700 font-medium">Sem microciclo:</span> {{ resumo_sincronizacao.sem_microciclo }}</div>
-        <div><span class="text-green-700 font-medium">Inativadas:</span> {{ resumo_sincronizacao.inativadas }}</div>
-    </div>
-</div>
-{% endif %}
 
 <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 max-w-3xl mb-6">
     <h2 class="font-semibold text-gray-700 mb-3">Observações</h2>
     <p class="text-sm text-gray-700 whitespace-pre-line">{{ semanal.observacoes or "Sem observações." }}</p>
+</div>
+
+<div class="mb-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 class="font-semibold text-gray-800">Slots disponíveis</h2><p class="mt-1 text-sm text-gray-500">Gerados pelos horários de cada espaço. Seleciona um slot livre para o atribuir.</p></div><span class="text-sm text-gray-500">{{ grelha_slots.total }} slot(s)</span></div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {% for dia in grelha_slots.dias %}
+        <section class="rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <h3 class="font-semibold text-gray-800">{{ dia.data|data_pt }}</h3>
+            <div class="mt-3 space-y-2">
+                {% for slot in dia.slots %}
+                {% if slot.atribuicao %}
+                <a href="/planeamento-clube/atribuicoes/{{ slot.atribuicao.id }}" class="block rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900"><strong>{{ slot.hora_inicio }}–{{ slot.hora_fim }} · {{ slot.espaco.nome }}</strong><br>{{ slot.atribuicao.equipa.nome if slot.atribuicao.equipa else 'Sem equipa' }}{% if slot.atribuicao.treinador %} · {{ slot.atribuicao.treinador.nome }}{% endif %}</a>
+                {% elif slot.bloqueio %}
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><strong>{{ slot.hora_inicio }}–{{ slot.hora_fim }} · {{ slot.espaco.nome }}</strong><br>Indisponível · {{ slot.bloqueio.motivo or 'Bloqueio' }}</div>
+                {% elif pode_gerir %}
+                <a href="/planeamento-clube/semanal/{{ semanal.id }}/atribuicoes/nova?espaco_id={{ slot.espaco.id }}&data={{ dia.data|data_iso }}&hora_inicio={{ slot.hora_inicio }}&hora_fim={{ slot.hora_fim }}" class="block rounded-lg border border-dashed border-gray-300 bg-white p-3 text-xs text-gray-700 hover:border-orange-400 hover:bg-orange-50"><strong>{{ slot.hora_inicio }}–{{ slot.hora_fim }} · {{ slot.espaco.nome }}</strong><br><span class="text-orange-600">Atribuir slot</span></a>
+                {% else %}<div class="rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-500">{{ slot.hora_inicio }}–{{ slot.hora_fim }} · {{ slot.espaco.nome }}<br>Livre</div>{% endif %}
+                {% else %}<p class="text-xs text-gray-400">Sem disponibilidade configurada.</p>{% endfor %}
+            </div>
+        </section>
+        {% endfor %}
+    </div>
 </div>
 
 <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
@@ -192,6 +166,7 @@
                     <th class="py-2 pr-4">Hora</th>
                     <th class="py-2 pr-4">Espaço</th>
                     <th class="py-2 pr-4">Equipa</th>
+                    <th class="py-2 pr-4">Treinador</th>
                     <th class="py-2 pr-4">Tipo</th>
                     <th class="py-2">Evento</th>
                 </tr>
@@ -212,56 +187,6 @@
     </div>
     {% else %}
     <p class="text-sm text-gray-400">Ainda não existem ocupações visíveis para esta semana.</p>
-    {% endif %}
-</div>
-
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
-    <div class="flex items-center justify-between mb-4">
-        <h2 class="font-semibold text-gray-700">
-            Sessões Sincronizadas
-            <span class="text-gray-400 font-normal text-sm ml-1">({{ sessoes_sincronizadas | length }})</span>
-        </h2>
-    </div>
-
-    {% if sessoes_sincronizadas %}
-    <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-            <thead>
-                <tr class="text-left text-gray-500 border-b border-gray-200">
-                    <th class="py-2 pr-4">Data</th>
-                    <th class="py-2 pr-4">Local</th>
-                    <th class="py-2 pr-4">Origem</th>
-                    <th class="py-2 pr-4">Estado</th>
-                    <th class="py-2 pr-4">Contexto</th>
-                    <th class="py-2">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for sessao in sessoes_sincronizadas %}
-                <tr class="border-b border-gray-100 text-gray-700">
-                    <td class="py-3 pr-4">{{ sessao.data|data_pt }}</td>
-                    <td class="py-3 pr-4">{{ sessao.local or "—" }}</td>
-                    <td class="py-3 pr-4">
-                        <span class="{{ sessao.origem_visual_classes }} text-xs font-semibold px-2 py-1 rounded-full">
-                            {{ sessao.origem_visual_label }}
-                        </span>
-                    </td>
-                    <td class="py-3 pr-4">
-                        <span class="{{ sessao.estado_visual_classes }} text-xs font-semibold px-2 py-1 rounded-full">
-                            {{ sessao.estado_visual_label }}
-                        </span>
-                    </td>
-                    <td class="py-3 pr-4">{{ sessao.origem_visual_contexto or "—" }}</td>
-                    <td class="py-3">
-                        <a href="/treino/sessoes/{{ sessao.id }}" class="text-orange-500 hover:text-orange-600">Ver plano</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <p class="text-gray-400 text-sm">Ainda não existem sessões sincronizadas para esta semana.</p>
     {% endif %}
 </div>
 
@@ -298,19 +223,20 @@
                     <td class="py-3 pr-4">{{ atribuicao.hora_fim }}</td>
                     <td class="py-3 pr-4">{{ atribuicao.tipo_ocupacao.value }}</td>
                     <td class="py-3 pr-4">{{ atribuicao.equipa.nome if atribuicao.equipa else "—" }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.treinador.nome if atribuicao.treinador else "—" }}</td>
                     <td class="py-3 pr-4">{{ atribuicao.evento.titulo if atribuicao.evento else "—" }}</td>
                     <td class="py-3 pr-4">{{ atribuicao.estado.value }}</td>
                     <td class="py-3">
                         <div class="flex items-center gap-3">
                             <a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}" class="text-orange-500 hover:text-orange-600">Ver</a>
-                            <a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/editar" class="text-blue-500 hover:text-blue-600">Editar</a>
+                            {% if pode_gerir %}<a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/editar" class="text-blue-500 hover:text-blue-600">Editar</a>
                             <form method="POST" action="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/eliminar">
                                 <button type="submit"
                                         class="text-red-500 hover:text-red-600"
                                         onclick="return confirm('Tens a certeza que queres eliminar esta atribuição?')">
                                     Eliminar
                                 </button>
-                            </form>
+                            </form>{% endif %}
                         </div>
                     </td>
                 </tr>

@@ -44,13 +44,15 @@
       {% if perfil == 'secretaria' %}
       <div class="my-3 border-t border-slate-200"></div><p class="ds-side-section">Administração do clube</p>
       {{ nav_link('/secretaria/pendencias', 'SE', 'Pendências', p.startswith('/secretaria')) }}
+      {{ nav_link('/planeamento-clube/semanal', 'HR', 'Horários previstos', p.startswith('/planeamento-clube/semanal')) }}
+      {{ nav_link('/planeamento-clube/espacos', 'ES', 'Espaços e slots', p.startswith('/planeamento-clube/espacos')) }}
       {% endif %}
 
       {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
       <div class="my-3 border-t border-slate-200"></div><p class="ds-side-section">Operação do clube</p>
       {{ nav_link('/dashboard/clube', 'DC', 'Visão do clube', p.startswith('/dashboard/clube')) }}
       {{ nav_link('/planeamento-clube/anual', 'PA', 'Planeamento', p.startswith('/planeamento-clube')) }}
-      {{ nav_link('/espacos/agenda', 'ES', 'Espaços', p.startswith('/espacos')) }}
+      {{ nav_link('/planeamento-clube/espacos', 'ES', 'Espaços e slots', p.startswith('/espacos') or p.startswith('/planeamento-clube/espacos')) }}
       {{ nav_link('/secretaria/pendencias', 'SE', 'Secretaria', p.startswith('/secretaria')) }}
       {{ nav_link('/jogadores', 'JD', 'Jogadores', p.startswith('/jogadores')) }}
       {{ nav_link('/treinadores', 'TR', 'Treinadores', p.startswith('/treinadores')) }}

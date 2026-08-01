@@ -21,6 +21,7 @@ import models.jogador
 import models.jogo
 import models.historico_planeamento
 import models.identidade_clube
+import models.indisponibilidade_treinador
 import models.planeamento
 import models.planeamento_clube
 import models.playbook

@@ -339,6 +339,22 @@ def actualizar_estrutura_planeamento_clube() -> None:
                 logger.info("Coluna 'ultima_sincronizacao_resumo' adicionada a planos_semanais_clube.")
 
     inspector = inspect(engine)
+    if inspector.has_table("atribuicoes_espaco_semanais"):
+        colunas_atribuicoes = {coluna["name"] for coluna in inspector.get_columns("atribuicoes_espaco_semanais")}
+        if "treinador_id" not in colunas_atribuicoes:
+            with engine.begin() as ligacao:
+                if dialecto == "postgresql":
+                    ligacao.execute(text(
+                        "ALTER TABLE atribuicoes_espaco_semanais "
+                        "ADD COLUMN IF NOT EXISTS treinador_id INTEGER REFERENCES treinadores(id)"
+                    ))
+                else:
+                    ligacao.execute(text(
+                        "ALTER TABLE atribuicoes_espaco_semanais ADD COLUMN treinador_id INTEGER"
+                    ))
+            logger.info("Coluna 'treinador_id' adicionada a atribuicoes_espaco_semanais.")
+
+    inspector = inspect(engine)
     if not inspector.has_table("evento_planeamento_clube_equipa"):
         tabela = Base.metadata.tables.get("evento_planeamento_clube_equipa")
         if tabela is not None:

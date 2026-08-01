@@ -72,6 +72,29 @@
     </section>
 </div>
 
+<section class="mt-6 rounded-2xl border border-sky-100 bg-white shadow-sm">
+    <div class="border-b border-sky-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-widest text-sky-600">Consulta logística</p>
+        <h2 class="mt-1 font-bold text-gray-800">Semana prevista pelo clube</h2>
+        <p class="mt-1 text-sm text-gray-500">Esta previsão não cria nem altera sessões de treino.</p>
+        {% if utilizador.perfil.value == 'treinador' %}<a href="/planeamento-clube/indisponibilidades-treinador" class="mt-2 inline-block text-sm font-semibold text-sky-700">Indicar indisponibilidade</a>{% endif %}
+    </div>
+    {% if semana_prevista %}
+    <div class="divide-y divide-gray-100">
+        {% for item in semana_prevista %}
+        <div class="grid gap-2 px-6 py-4 text-sm sm:grid-cols-[110px_110px_1fr_1fr]">
+            <p class="font-semibold text-gray-800">{{ item.data|data_pt }}</p>
+            <p class="text-gray-600">{{ item.hora_inicio }}–{{ item.hora_fim }}</p>
+            <div><p class="font-semibold text-gray-800">{{ item.espaco.nome }}</p><p class="text-gray-500">{{ item.tipo_ocupacao.value|replace('_', ' ')|capitalize }}</p></div>
+            <div><p class="text-gray-700">{{ item.treinador.nome if item.treinador else 'Treinador por definir' }}</p>{% if item.observacoes %}<p class="mt-1 text-gray-500">{{ item.observacoes }}</p>{% endif %}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="px-6 py-8 text-center text-sm text-gray-500">O clube ainda não publicou reservas para esta equipa nesta semana.</p>
+    {% endif %}
+</section>
+
 {% if agenda_proxima|length > 1 %}
 <section class="mt-6 rounded-2xl border border-gray-100 bg-white shadow-sm">
     <div class="border-b border-gray-100 px-6 py-4">

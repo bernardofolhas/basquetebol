@@ -343,6 +343,7 @@ def construir_mapa_espacos_semanal(atribuicoes: list[AtribuicaoEspacoSemanal]) -
             "hora": _formar_intervalo_hora(atribuicao.hora_inicio, atribuicao.hora_fim),
             "espaco": atribuicao.espaco.nome if atribuicao.espaco else "Espaço por definir",
             "equipa": atribuicao.equipa.nome if atribuicao.equipa else "Sem equipa definida",
+            "treinador": atribuicao.treinador.nome if atribuicao.treinador else "Por definir",
             "tipo": atribuicao.tipo_ocupacao.value.replace("_", " ").capitalize() if getattr(atribuicao.tipo_ocupacao, "value", None) else "Ocupação",
             "evento": atribuicao.evento.titulo if atribuicao.evento else None,
             "estado": atribuicao.estado.value if getattr(atribuicao.estado, "value", None) else str(atribuicao.estado),
@@ -368,6 +369,31 @@ def construir_mapa_espacos_semanal(atribuicoes: list[AtribuicaoEspacoSemanal]) -
                         f"{seguinte.hora_inicio}-{seguinte.hora_fim}."
                     ),
                 })
+
+    for atributo, etiqueta in (("equipa_id", "equipa"), ("treinador_id", "treinador")):
+        agrupadas_recurso = defaultdict(list)
+        for atribuicao in atribuicoes_ordenadas:
+            recurso_id = getattr(atribuicao, atributo, None)
+            if recurso_id:
+                agrupadas_recurso[(atribuicao.data, recurso_id)].append(atribuicao)
+        for itens in agrupadas_recurso.values():
+            itens_ordenados = sorted(itens, key=lambda item: (_obter_hora_ordenacao(item.hora_inicio), item.id))
+            for indice, atual in enumerate(itens_ordenados):
+                for seguinte in itens_ordenados[indice + 1:]:
+                    if atual.hora_fim <= seguinte.hora_inicio:
+                        break
+                    nome = getattr(getattr(atual, etiqueta, None), "nome", etiqueta.capitalize())
+                    conflitos.append({
+                        "data": atual.data,
+                        "espaco": atual.espaco.nome if atual.espaco else "Espaço por definir",
+                        "atribuicao_a": atual,
+                        "atribuicao_b": seguinte,
+                        "mensagem": (
+                            f"{nome} tem duas reservas sobrepostas em {atual.data}: "
+                            f"{atual.hora_inicio}-{atual.hora_fim} e "
+                            f"{seguinte.hora_inicio}-{seguinte.hora_fim}."
+                        ),
+                    })
 
     conflitos.sort(key=lambda conflito: (conflito["data"], conflito["espaco"]))
     return {

@@ -22,6 +22,7 @@
             <p><span class="font-medium">Plano semanal:</span> {{ atribuicao.plano_semanal.titulo }}</p>
             <p><span class="font-medium">Espaço:</span> {{ atribuicao.espaco.nome }}</p>
             <p><span class="font-medium">Equipa:</span> {{ atribuicao.equipa.nome if atribuicao.equipa else "—" }}</p>
+            <p><span class="font-medium">Treinador:</span> {{ atribuicao.treinador.nome if atribuicao.treinador else "—" }}</p>
             <p><span class="font-medium">Evento global:</span> {{ atribuicao.evento.titulo if atribuicao.evento else "—" }}</p>
             <p><span class="font-medium">Observações:</span> {{ atribuicao.observacoes or "—" }}</p>
         </div>
@@ -36,7 +37,7 @@
     </div>
 </div>
 
-<div class="flex items-center gap-4">
+{% if pode_gerir %}<div class="flex items-center gap-4">
     <a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/editar"
        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition">
         Editar Atribuição
@@ -48,6 +49,6 @@
             Eliminar Atribuição
         </button>
     </form>
-</div>
+</div>{% endif %}
 
 {% endblock %}

@@ -12,10 +12,10 @@
             <h1 class="text-2xl font-bold text-gray-800">Ocupação Semanal de Espaços</h1>
             <p class="text-gray-500 mt-1">{{ semanal.titulo }} • {{ semanal.data_inicio|data_pt }} → {{ semanal.data_fim|data_pt }}</p>
         </div>
-        <a href="/planeamento-clube/semanal/{{ semanal.id }}/atribuicoes/nova"
+        {% if pode_gerir %}<a href="/planeamento-clube/semanal/{{ semanal.id }}/atribuicoes/nova"
            class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
             + Nova Atribuição
-        </a>
+        </a>{% endif %}
     </div>
 </div>
 {% else %}
@@ -24,10 +24,10 @@
         <h1 class="text-2xl font-bold text-gray-800">Espaços de Treino</h1>
         <p class="text-gray-500 mt-1">Gestão operacional dos espaços disponíveis do clube</p>
     </div>
-    <a href="/planeamento-clube/espacos/novo"
+    {% if pode_gerir %}<a href="/planeamento-clube/espacos/novo"
        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
         + Novo Espaço
-    </a>
+    </a>{% endif %}
 </div>
 {% endif %}
 
@@ -64,14 +64,14 @@
                     <td class="py-3">
                         <div class="flex items-center gap-3">
                             <a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}" class="text-orange-500 hover:text-orange-600">Ver</a>
-                            <a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/editar" class="text-blue-500 hover:text-blue-600">Editar</a>
+                            {% if pode_gerir %}<a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/editar" class="text-blue-500 hover:text-blue-600">Editar</a>
                             <form method="POST" action="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/eliminar">
                                 <button type="submit"
                                         class="text-red-500 hover:text-red-600"
                                         onclick="return confirm('Tens a certeza que queres eliminar esta atribuição?')">
                                     Eliminar
                                 </button>
-                            </form>
+                            </form>{% endif %}
                         </div>
                     </td>
                 </tr>
@@ -104,14 +104,14 @@
             </div>
             <div class="flex items-center gap-3">
                 <a href="/planeamento-clube/espacos/{{ espaco.id }}" class="text-orange-500 hover:text-orange-600 text-sm font-medium">Ver</a>
-                <a href="/planeamento-clube/espacos/{{ espaco.id }}/editar" class="text-blue-500 hover:text-blue-600 text-sm font-medium">Editar</a>
+                {% if pode_gerir %}<a href="/planeamento-clube/espacos/{{ espaco.id }}/editar" class="text-blue-500 hover:text-blue-600 text-sm font-medium">Editar</a>
                 <form method="POST" action="/planeamento-clube/espacos/{{ espaco.id }}/eliminar">
                     <button type="submit"
                             class="text-red-500 hover:text-red-600 text-sm font-medium"
                             onclick="return confirm('Tens a certeza que queres eliminar este espaço?')">
                         Eliminar
                     </button>
-                </form>
+                </form>{% endif %}
             </div>
         </div>
     </div>

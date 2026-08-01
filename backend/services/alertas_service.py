@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 
 def _obter_intervalo_alertas():
@@ -16,6 +16,7 @@ def obter_alertas_treinador(db, equipa_ids: list):
     actualmente esperado pelos templates do dashboard do treinador.
     """
     from models.jogador import Jogador
+    from models.atribuicao_espaco_semanal import AtribuicaoEspacoSemanal, EstadoAtribuicaoEspacoEnum
 
     hoje, limite = _obter_intervalo_alertas()
     alertas = []
@@ -45,6 +46,24 @@ def obter_alertas_treinador(db, equipa_ids: list):
                 "mensagem": f"{jogador.nome} — inscrição pendente",
                 "urgente": False
             })
+
+    previsoes_recentes = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.equipa_id.in_(equipa_ids),
+        AtribuicaoEspacoSemanal.estado == EstadoAtribuicaoEspacoEnum.publicado,
+        AtribuicaoEspacoSemanal.data >= hoje,
+        AtribuicaoEspacoSemanal.data <= limite,
+        AtribuicaoEspacoSemanal.atualizado_em >= datetime.now() - timedelta(days=7),
+    ).order_by(AtribuicaoEspacoSemanal.data, AtribuicaoEspacoSemanal.hora_inicio).limit(8).all()
+    for previsao in previsoes_recentes:
+        alertas.append({
+            "tipo": "planeamento_semanal",
+            "mensagem": (
+                f"Previsão do clube atualizada: {previsao.data.strftime('%d/%m/%Y')} "
+                f"{previsao.hora_inicio}-{previsao.hora_fim} · "
+                f"{previsao.espaco.nome if previsao.espaco else 'espaço por definir'}"
+            ),
+            "urgente": False,
+        })
 
     alertas.sort(key=lambda alerta: alerta["urgente"], reverse=True)
     return alertas
