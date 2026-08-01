@@ -50,9 +50,20 @@ def exigir_qualquer_perfil(request: Request, db: Session = Depends(get_db)):
     utilizador = obter_utilizador_atual(request, db)
     if not utilizador:
         raise NaoAutenticado()
-    if not verificar_perfil(utilizador, ["administrador", "coordenador", "treinador"]):
+    perfis = _perfis_com_superadmin_em_apoio(
+        request,
+        ["administrador", "coordenador", "treinador", "secretaria"],
+    )
+    if not verificar_perfil(utilizador, perfis):
         raise NaoAutenticado()
     return utilizador
+
+
+def _perfis_com_superadmin_em_apoio(request: Request, perfis: list[str]) -> list[str]:
+    permitidos = list(perfis)
+    if getattr(request.state, "clube_atual", None):
+        permitidos.append("superadministrador")
+    return permitidos
 
 
 def exigir_coordenacao(request: Request, db: Session = Depends(get_db)):
@@ -60,9 +71,35 @@ def exigir_coordenacao(request: Request, db: Session = Depends(get_db)):
     utilizador = obter_utilizador_atual(request, db)
     if not utilizador:
         raise NaoAutenticado()
-    perfis = ["administrador", "coordenador"]
-    if getattr(request.state, "clube_atual", None):
-        perfis.append("superadministrador")
+    perfis = _perfis_com_superadmin_em_apoio(request, ["administrador", "coordenador"])
+    if not verificar_perfil(utilizador, perfis):
+        raise SemPermissao("/dashboard")
+    return utilizador
+
+
+def exigir_operacao_desportiva(request: Request, db: Session = Depends(get_db)):
+    """Perfis que podem consultar a operação técnica e desportiva."""
+    utilizador = obter_utilizador_atual(request, db)
+    if not utilizador:
+        raise NaoAutenticado()
+    perfis = _perfis_com_superadmin_em_apoio(
+        request,
+        ["administrador", "coordenador", "treinador"],
+    )
+    if not verificar_perfil(utilizador, perfis):
+        raise SemPermissao("/dashboard")
+    return utilizador
+
+
+def exigir_secretaria(request: Request, db: Session = Depends(get_db)):
+    """Perfis autorizados a tratar processos administrativos do clube."""
+    utilizador = obter_utilizador_atual(request, db)
+    if not utilizador:
+        raise NaoAutenticado()
+    perfis = _perfis_com_superadmin_em_apoio(
+        request,
+        ["administrador", "coordenador", "secretaria"],
+    )
     if not verificar_perfil(utilizador, perfis):
         raise SemPermissao("/dashboard")
     return utilizador
@@ -73,9 +110,7 @@ def exigir_admin(request: Request, db: Session = Depends(get_db)):
     utilizador = obter_utilizador_atual(request, db)
     if not utilizador:
         raise NaoAutenticado()
-    perfis = ["administrador"]
-    if getattr(request.state, "clube_atual", None):
-        perfis.append("superadministrador")
+    perfis = _perfis_com_superadmin_em_apoio(request, ["administrador"])
     if not verificar_perfil(utilizador, perfis):
         raise SemPermissao("/dashboard", status_code=403)
     return utilizador

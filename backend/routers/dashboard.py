@@ -34,6 +34,9 @@ def dashboard(
         contexto = get_dashboard_treinador(db, utilizador)
         return templates.TemplateResponse(request, "dashboard_treinador.html", contexto)
 
+    if utilizador.perfil.value == "secretaria":
+        return RedirectResponse(url="/secretaria/pendencias", status_code=303)
+
     if utilizador.perfil.value == "coordenador":
         contexto = get_dashboard_coordenador(db, utilizador)
         return templates.TemplateResponse(request, "dashboard_coordenador.html", contexto)

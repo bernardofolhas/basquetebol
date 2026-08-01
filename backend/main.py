@@ -38,6 +38,7 @@ from database import (
     Base,
     actualizar_estrutura_assiduidade,
     actualizar_estrutura_jogadores,
+    actualizar_estrutura_perfis,
     actualizar_estrutura_planeamento_clube,
     base_dados_disponivel,
     engine,
@@ -90,6 +91,7 @@ try:
     _validar_caminhos()
     validar_ligacao_base_dados()
     Base.metadata.create_all(bind=engine)
+    actualizar_estrutura_perfis()
     actualizar_estrutura_planeamento_clube()
     actualizar_estrutura_assiduidade()
     actualizar_estrutura_jogadores()

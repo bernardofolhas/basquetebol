@@ -10,6 +10,7 @@ class PerfilEnum(str, enum.Enum):
     administrador = "administrador"
     coordenador = "coordenador"
     treinador = "treinador"
+    secretaria = "secretaria"
 
 
 class Utilizador(Base):

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
-from auth_deps import exigir_autenticacao, verificar_ou_negar_equipa
+from auth_deps import exigir_autenticacao, exigir_coordenacao, exigir_operacao_desportiva, verificar_ou_negar_equipa
 from database import get_db
 from models.equipa import Equipa
 from models.planeamento import Macrociclo, Mesociclo, Microciclo
@@ -49,7 +49,7 @@ def calendario_partilhavel(
     fim: date | None = None,
     equipa_id: int | None = None,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     fim = fim or (inicio + timedelta(days=30))
     equipa = None
@@ -113,7 +113,7 @@ def micro_partilhavel(micro_id: int, request: Request, db: Session = Depends(get
 
 
 @router.get("/anual/{anual_id}/pdf")
-def anual_partilhavel(anual_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def anual_partilhavel(anual_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
     anual = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
     if not anual:
         return RedirectResponse("/planeamento-clube/anual", status_code=303)
@@ -121,7 +121,7 @@ def anual_partilhavel(anual_id: int, request: Request, db: Session = Depends(get
 
 
 @router.get("/semanal/{semanal_id}/pdf")
-def semanal_partilhavel(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def semanal_partilhavel(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
     semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
     if not semanal:
         return RedirectResponse("/planeamento-clube/semanal", status_code=303)

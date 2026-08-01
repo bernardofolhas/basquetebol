@@ -4,7 +4,7 @@ from template_config import Jinja2Templates
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from auth_deps import exigir_autenticacao
+from auth_deps import exigir_operacao_desportiva
 from database import get_db
 from flash import set_flash
 from models.treino import BibliotecoExercicio
@@ -20,7 +20,7 @@ CATEGORIAS = ["TIO", "TID", "TaIO", "TaID", "TCO", "TCD", "FIS"]
 def listar_biblioteca(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
     categoria: str = Query(""),
     q: str = Query(""),
     tags: str = Query(""),
@@ -58,7 +58,7 @@ def listar_biblioteca(
 async def criar_exercicio(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
     nome: str = Form(""),
     categoria: str = Form(""),
     descricao: str = Form(""),
@@ -90,7 +90,7 @@ async def criar_exercicio(
 def api_buscar_exercicios(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
     q: str = Query(""),
     categoria: str = Query(""),
     tags: str = Query(""),
@@ -122,7 +122,7 @@ def detalhe_exercicio(
     exercicio_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     ex = db.query(BibliotecoExercicio).filter(BibliotecoExercicio.id == exercicio_id).first()
     if not ex:
@@ -139,7 +139,7 @@ async def editar_exercicio(
     exercicio_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
     nome: str = Form(""),
     categoria: str = Form(""),
     descricao: str = Form(""),
@@ -167,7 +167,7 @@ async def apagar_exercicio_biblioteca(
     exercicio_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     ex = db.query(BibliotecoExercicio).filter(BibliotecoExercicio.id == exercicio_id).first()
     if ex:
@@ -182,7 +182,7 @@ async def guardar_desenho_biblioteca(
     exercicio_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     dados = await request.json()
     desenho_base64 = dados.get("dados")

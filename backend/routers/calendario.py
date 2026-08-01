@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, Response
 from template_config import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from auth_deps import exigir_autenticacao
+from auth_deps import exigir_operacao_desportiva
 from database import get_db
 from models.equipa import Equipa
 from models.espaco_treino import EspacoTreino
@@ -127,7 +127,7 @@ def _obter_contexto_calendario(request: Request, db: Session, utilizador) -> dic
 def calendario_global(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     """Apresenta a agenda operacional integrada do clube."""
     contexto = _obter_contexto_calendario(request, db, utilizador)
@@ -138,7 +138,7 @@ def calendario_global(
 def exportar_pdf_calendario_global(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     """Exporta a agenda operacional integrada numa tabela A4 legível."""
     contexto = _obter_contexto_calendario(request, db, utilizador)

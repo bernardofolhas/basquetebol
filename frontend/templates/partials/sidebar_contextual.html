@@ -32,9 +32,16 @@
       {% else %}
       <p class="ds-side-section">O meu trabalho</p>
       {{ nav_link('/dashboard', 'IN', 'Início', p == '/dashboard') }}
+      {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
       {{ nav_link('/calendario', 'CA', 'Calendário', p.startswith('/calendario')) }}
-      {% if perfil != 'treinador' %}{{ nav_link('/equipas', 'EQ', 'Equipas', p.startswith('/equipas')) }}{% endif %}
+      {{ nav_link('/equipas', 'EQ', 'Equipas', p.startswith('/equipas')) }}
       {{ nav_link('/biblioteca', 'BI', 'Biblioteca', p.startswith('/biblioteca')) }}
+      {% endif %}
+
+      {% if perfil == 'secretaria' %}
+      <div class="my-3 border-t border-slate-200"></div><p class="ds-side-section">Administração do clube</p>
+      {{ nav_link('/secretaria/pendencias', 'SE', 'Pendências', p.startswith('/secretaria')) }}
+      {% endif %}
 
       {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
       <div class="my-3 border-t border-slate-200"></div><p class="ds-side-section">Operação do clube</p>

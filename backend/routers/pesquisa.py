@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from auth import verificar_acesso_equipa
-from auth_deps import exigir_autenticacao
+from auth_deps import exigir_operacao_desportiva
 from database import get_db
 from models.equipa import Equipa
 from models.jogador import Jogador
@@ -22,7 +22,7 @@ def pesquisa_global(
     request: Request,
     q: str = Query("", max_length=80),
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     termo = q.strip()
     equipas = []

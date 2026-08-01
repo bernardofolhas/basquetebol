@@ -21,6 +21,7 @@
   </a>
   {% endif %}
 
+  {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
   <form action="/pesquisa" method="get" class="ml-auto hidden w-full max-w-xs md:block">
     <label class="relative block">
       <span class="sr-only">Pesquisar</span>
@@ -28,8 +29,9 @@
       <input name="q" minlength="2" placeholder="Pesquisar no clube" class="w-full rounded-xl border border-white/20 bg-black/15 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/65 focus:border-white/50 focus:outline-none focus:ring-2 focus:ring-white/30">
     </label>
   </form>
+  {% endif %}
 
-  <details class="ds-menu relative {% if not equipa_contexto_id %}ml-auto md:ml-0{% endif %}">
+  <details class="ds-menu relative {% if perfil == 'secretaria' or not equipa_contexto_id %}ml-auto md:ml-0{% endif %}">
     <summary class="ds-top-action" aria-label="Ações rápidas">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="hidden xl:inline">Criar</span>
     </summary>

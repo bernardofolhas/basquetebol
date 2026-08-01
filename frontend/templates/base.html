@@ -20,6 +20,7 @@
   {% set perfil = utilizador.perfil.value %}
   {% set p = request.url.path %}
   {% set equipa_contexto_id = none %}{% set equipa_contexto_nome = none %}
+  {% if perfil != 'secretaria' %}
   {% if equipa is defined and equipa %}{% set equipa_contexto_id = equipa.id %}{% set equipa_contexto_nome = equipa.nome %}
   {% elif jogo is defined and jogo %}{% set equipa_contexto_id = jogo.equipa_id %}{% if jogo.equipa %}{% set equipa_contexto_nome = jogo.equipa.nome %}{% endif %}
   {% elif macrociclo is defined and macrociclo %}{% set equipa_contexto_id = macrociclo.equipa_id %}{% if macrociclo.equipa %}{% set equipa_contexto_nome = macrociclo.equipa.nome %}{% endif %}
@@ -27,6 +28,7 @@
   {% elif microciclo is defined and microciclo and microciclo.mesociclo and microciclo.mesociclo.macrociclo %}{% set equipa_contexto_id = microciclo.mesociclo.macrociclo.equipa_id %}{% if microciclo.mesociclo.macrociclo.equipa %}{% set equipa_contexto_nome = microciclo.mesociclo.macrociclo.equipa.nome %}{% endif %}
   {% elif sessao is defined and sessao and sessao.microciclo and sessao.microciclo.mesociclo and sessao.microciclo.mesociclo.macrociclo %}{% set equipa_contexto_id = sessao.microciclo.mesociclo.macrociclo.equipa_id %}{% if sessao.microciclo.mesociclo.macrociclo.equipa %}{% set equipa_contexto_nome = sessao.microciclo.mesociclo.macrociclo.equipa.nome %}{% endif %}
   {% elif jogador is defined and jogador and jogador.equipa_id %}{% set equipa_contexto_id = jogador.equipa_id %}{% if jogador.equipa %}{% set equipa_contexto_nome = jogador.equipa.nome %}{% endif %}{% endif %}
+  {% endif %}
 
   {% include "partials/navbar_global.html" %}
   <div id="sidebar-overlay" class="fixed inset-0 top-16 z-30 hidden bg-slate-950/45 lg:hidden" aria-hidden="true"></div>

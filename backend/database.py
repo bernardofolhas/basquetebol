@@ -106,6 +106,20 @@ def validar_ligacao_base_dados() -> None:
         raise RuntimeError("Não foi possível estabelecer ligação à base de dados.") from exc
 
 
+def actualizar_estrutura_perfis() -> None:
+    """Mantém o enum PostgreSQL compatível em instalações sem Alembic automático."""
+    if engine.dialect.name != "postgresql" or not inspect(engine).has_table("utilizadores"):
+        return
+    with engine.begin() as ligacao:
+        existe = ligacao.execute(text(
+            "SELECT 1 FROM pg_enum "
+            "WHERE enumtypid = 'perfilenum'::regtype AND enumlabel = 'secretaria'"
+        )).first()
+        if not existe:
+            ligacao.execute(text("ALTER TYPE perfilenum ADD VALUE 'secretaria'"))
+            logger.info("Perfil 'secretaria' adicionado ao enum da base de dados.")
+
+
 def actualizar_estrutura_planeamento_clube() -> None:
     """
     Garante compatibilidade mínima do esquema para evoluções recentes do

@@ -9,6 +9,8 @@ from auth_deps import (
     AcessoNegado,
     exigir_admin,
     exigir_autenticacao,
+    exigir_operacao_desportiva,
+    exigir_secretaria,
     verificar_ou_negar_equipa,
 )
 from auth import verificar_perfil
@@ -17,6 +19,7 @@ from flash import set_flash
 from models.equipa import Equipa
 from models.fisico import TesteFisico
 from models.jogador import Jogador, RegistoAntropometrico
+from models.utilizador import PerfilEnum
 from paths import TEMPLATES_DIR
 from services.assiduidade_service import obter_relatorio_assiduidade_jogador
 from services.pdf_service import renderizar_pdf
@@ -49,6 +52,8 @@ def _equipas_para_utilizador(utilizador, db: Session) -> list:
 
 def _verificar_acesso_jogador(utilizador, jogador: Jogador, db: Session) -> None:
     """Lança AcessoNegado se o utilizador não puder aceder ao jogador."""
+    if verificar_perfil(utilizador, ["secretaria"]):
+        return
     if jogador.equipa_id:
         verificar_ou_negar_equipa(utilizador, jogador.equipa_id, db)
     elif verificar_perfil(utilizador, ["treinador"]):
@@ -250,6 +255,13 @@ def detalhe_jogador(
 
     _verificar_acesso_jogador(utilizador, jogador, db)
 
+    if utilizador.perfil == PerfilEnum.secretaria:
+        return templates.TemplateResponse(request, "jogadores/detalhe_secretaria.html", {
+            "utilizador": utilizador,
+            "jogador": jogador,
+            "idade": _calcular_idade(jogador.data_nascimento),
+        })
+
     antropometrias = sorted(
         jogador.registos_antropometricos or [],
         key=lambda registo: registo.data,
@@ -282,7 +294,7 @@ def exportar_pdf_evolucao_jogador(
     jogador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     jogador = db.query(Jogador).options(
         joinedload(Jogador.equipa),
@@ -331,7 +343,7 @@ async def adicionar_antropometria(
     jogador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
     data: str = Form(...),
     altura: str = Form(""),
     peso: str = Form(""),
@@ -369,7 +381,7 @@ def form_editar_jogador(
     jogador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     jogador = db.query(Jogador).filter(Jogador.id == jogador_id).first()
     if not jogador:
@@ -388,7 +400,7 @@ async def editar_jogador(
     jogador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
     nome: str = Form(...),
     data_nascimento: str = Form(""),
     naturalidade: str = Form(""),
@@ -472,7 +484,7 @@ async def guardar_inscricao(
     jogador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_secretaria),
     inscricao_estado: str = Form(""),
     inscricao_observacoes: str = Form(""),
     exame_medico_data: str = Form(""),

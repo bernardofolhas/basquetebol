@@ -8,7 +8,7 @@ from template_config import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from auth import verificar_perfil
-from auth_deps import exigir_autenticacao, exigir_coordenacao
+from auth_deps import exigir_coordenacao
 from flash import set_flash
 from database import get_db
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
@@ -1187,7 +1187,7 @@ def _obter_mensagem_erro_eliminacao(codigo: str | None):
 
 
 @router.get("/vista", response_class=HTMLResponse)
-def vista_treinador(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def vista_treinador(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
     hoje = date.today()
     fim_janela = hoje + timedelta(days=30)
 
@@ -1230,7 +1230,7 @@ def vista_treinador(request: Request, db: Session = Depends(get_db), utilizador=
 
 
 @router.get("/anual", response_class=HTMLResponse)
-def listar_planeamentos_anuais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def listar_planeamentos_anuais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
 
     planeamentos = db.query(PlaneamentoClubeAnual).order_by(PlaneamentoClubeAnual.data_inicio.desc()).all()
     return templates.TemplateResponse(request, "planeamento_clube/anual_lista.html", {
@@ -1241,7 +1241,7 @@ def listar_planeamentos_anuais(request: Request, db: Session = Depends(get_db), 
 
 
 @router.get("/mensal", response_class=HTMLResponse)
-def listar_planeamentos_mensais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def listar_planeamentos_mensais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
 
     ano = request.query_params.get("ano", "").strip()
     mes = request.query_params.get("mes", "").strip()
@@ -1274,7 +1274,7 @@ def listar_planeamentos_mensais(request: Request, db: Session = Depends(get_db),
 
 
 @router.get("/semanal", response_class=HTMLResponse)
-def listar_planos_semanais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def listar_planos_semanais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
 
     planeamento_mensal_id = request.query_params.get("planeamento_mensal_id", "").strip()
     estado = request.query_params.get("estado", "").strip()
@@ -1353,7 +1353,7 @@ async def criar_planeamento_anual(
 
 
 @router.get("/anual/{anual_id}", response_class=HTMLResponse)
-def detalhe_planeamento_anual(anual_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def detalhe_planeamento_anual(anual_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
 
     planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
     if not planeamento:
@@ -1391,7 +1391,7 @@ def exportar_pdf_planeamento_anual(
     anual_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_coordenacao),
 ):
     planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
     if not planeamento:
@@ -1447,7 +1447,7 @@ def exportar_pdf_calendario_anual(
     anual_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_coordenacao),
 ):
     planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
     if not planeamento:
@@ -1577,7 +1577,7 @@ async def criar_planeamento_mensal(
 
 
 @router.get("/mensal/{mensal_id}", response_class=HTMLResponse)
-def detalhe_planeamento_mensal(mensal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def detalhe_planeamento_mensal(mensal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
 
     mensal = db.query(PlaneamentoClubeMensal).filter(PlaneamentoClubeMensal.id == mensal_id).first()
     if not mensal:
@@ -1614,7 +1614,7 @@ def exportar_pdf_planeamento_mensal(
     mensal_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_coordenacao),
 ):
     mensal = db.query(PlaneamentoClubeMensal).filter(PlaneamentoClubeMensal.id == mensal_id).first()
     if not mensal:
@@ -1861,7 +1861,7 @@ async def criar_plano_semanal(
 
 
 @router.get("/semanal/{semanal_id}", response_class=HTMLResponse)
-def detalhe_plano_semanal(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def detalhe_plano_semanal(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
 
     semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
     if not semanal:
@@ -1924,7 +1924,7 @@ def exportar_pdf_plano_semanal(
     semanal_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_coordenacao),
 ):
     semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
     if not semanal:
@@ -2158,7 +2158,7 @@ async def criar_espaco(
 
 
 @router.get("/espacos/{espaco_id}", response_class=HTMLResponse)
-def detalhe_espaco(espaco_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def detalhe_espaco(espaco_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
 
     espaco = db.query(EspacoTreino).filter(EspacoTreino.id == espaco_id).first()
     if not espaco:
@@ -2735,7 +2735,7 @@ async def adicionar_atividade_ao_planeamento(
 
 
 @router.get("/eventos/{evento_id}", response_class=HTMLResponse)
-def detalhe_evento(evento_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+def detalhe_evento(evento_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
 
     evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
     if not evento:

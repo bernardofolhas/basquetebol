@@ -1752,8 +1752,8 @@ def test_evento_para_todas_as_equipas_aparece_no_contexto_da_equipa():
             follow_redirects=False,
         )
 
-        detalhe_equipa_1 = client.get(f"/equipas/{equipa_id_1}", follow_redirects=False)
-        detalhe_equipa_2 = client.get(f"/equipas/{equipa_id_2}", follow_redirects=False)
+        detalhe_equipa_1 = client.get(f"/equipas/{equipa_id_1}/eventos", follow_redirects=False)
+        detalhe_equipa_2 = client.get(f"/equipas/{equipa_id_2}/eventos", follow_redirects=False)
 
         assert detalhe_equipa_1.status_code == 200
         assert detalhe_equipa_2.status_code == 200
@@ -1791,8 +1791,8 @@ def test_evento_associado_a_uma_equipa_aparece_apenas_nessa_equipa():
             follow_redirects=False,
         )
 
-        detalhe_equipa_1 = client.get(f"/equipas/{equipa_id_1}", follow_redirects=False)
-        detalhe_equipa_2 = client.get(f"/equipas/{equipa_id_2}", follow_redirects=False)
+        detalhe_equipa_1 = client.get(f"/equipas/{equipa_id_1}/eventos", follow_redirects=False)
+        detalhe_equipa_2 = client.get(f"/equipas/{equipa_id_2}/eventos", follow_redirects=False)
 
         assert detalhe_equipa_1.status_code == 200
         assert detalhe_equipa_2.status_code == 200
@@ -2646,7 +2646,7 @@ def test_evento_global_mostra_origem_no_contexto_da_equipa():
             follow_redirects=False,
         )
 
-        detalhe_equipa = client.get(f"/equipas/{equipa_id_1}", follow_redirects=False)
+        detalhe_equipa = client.get(f"/equipas/{equipa_id_1}/eventos", follow_redirects=False)
 
         assert detalhe_equipa.status_code == 200
         assert TITULO_EVENTO_MANUAL in detalhe_equipa.text

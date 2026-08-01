@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
-from auth_deps import exigir_coordenacao
+from auth_deps import exigir_secretaria
 from database import get_db
 from flash import set_flash
 from models.documento_jogador import DocumentoJogador
@@ -63,7 +63,7 @@ def _obter_pendencias(db: Session) -> dict:
 def pagina_pendencias(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_secretaria),
 ):
     return templates.TemplateResponse(request, "secretaria/pendencias.html", {
         "utilizador": utilizador,
@@ -75,7 +75,7 @@ def pagina_pendencias(
 def exportar_pendencias_pdf(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_secretaria),
 ):
     contexto = {"utilizador": utilizador, **_obter_pendencias(db)}
     pdf = renderizar_pdf(request, "secretaria/pendencias_pdf.html", contexto)
@@ -91,7 +91,7 @@ def criar_documento_jogador(
     jogador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_secretaria),
     tipo: str = Form(...),
     nome: str = Form(...),
     data_documento: str = Form(""),
@@ -136,7 +136,7 @@ def apagar_documento_jogador(
     documento_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_secretaria),
 ):
     documento = db.query(DocumentoJogador).filter(DocumentoJogador.id == documento_id).first()
     if documento:

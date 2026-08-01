@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from template_config import Jinja2Templates
@@ -10,6 +12,7 @@ from auth_deps import (
     exigir_admin,
     exigir_autenticacao,
     exigir_coordenacao,
+    exigir_operacao_desportiva,
     verificar_ou_negar_equipa,
 )
 from database import get_db
@@ -22,6 +25,7 @@ from models.planeamento import Macrociclo
 from models.planeamento_clube import EventoPlaneamentoClube
 from models.playbook import Playbook
 from paths import TEMPLATES_DIR
+from services.planeamento_integrado_service import obter_dashboard_planeamento_equipa
 
 router = APIRouter(prefix="/equipas")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -74,7 +78,7 @@ def _eventos_visiveis_equipa(equipa_id: int, db: Session):
 def listar_equipas(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     from auth import verificar_perfil
     if verificar_perfil(utilizador, ["administrador", "coordenador"]):
@@ -99,10 +103,8 @@ def listar_equipas(
 def form_nova_equipa(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_coordenacao),
 ):
-    if not verificar_perfil(utilizador, ["administrador", "coordenador"]):
-        return RedirectResponse(url="/equipas", status_code=302)
     return templates.TemplateResponse(request, "equipas/form.html", {
         "utilizador": utilizador,
         "escaloes": EscalaoEnum,
@@ -115,14 +117,12 @@ def form_nova_equipa(
 async def criar_equipa(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_autenticacao),
+    utilizador=Depends(exigir_coordenacao),
     nome: str = Form(...),
     escalao: str = Form(...),
     genero: str = Form(...),
     seccionista: str = Form(""),
 ):
-    if not verificar_perfil(utilizador, ["administrador", "coordenador"]):
-        return RedirectResponse(url="/equipas", status_code=302)
     equipa = Equipa(
         nome=nome,
         escalao=escalao,
@@ -148,12 +148,18 @@ def detalhe_equipa(
     if not equipa:
         return RedirectResponse(url="/equipas")
 
-    eventos_visiveis = _eventos_visiveis_equipa(equipa_id, db)
+    hoje = date.today()
+    agenda = obter_dashboard_planeamento_equipa(
+        db,
+        equipa_id,
+        hoje,
+        hoje + timedelta(days=14),
+    )["itens"]
 
     return templates.TemplateResponse(request, "equipas/detalhe.html", {
         "utilizador": utilizador,
         "equipa": equipa,
-        "eventos_globais": eventos_visiveis,
+        "agenda_proxima": agenda,
         "erro": None,
     })
 

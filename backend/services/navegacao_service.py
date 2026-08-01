@@ -59,6 +59,13 @@ def _agrupar_pendencias(tarefas: list[dict]) -> list[dict]:
 
 def _acoes_rapidas(utilizador, equipas: list) -> list[dict]:
     perfil = utilizador.perfil.value
+    if perfil == "secretaria":
+        return [{
+            "label": "Rever pendências",
+            "descricao": "Documentos, inscrições e exames",
+            "link": "/secretaria/pendencias",
+            "icone": "secretaria",
+        }]
     acoes = [
         {"label": "Abrir calendário", "descricao": "Ver a operação do clube", "link": "/calendario", "icone": "calendario"},
     ]
@@ -94,6 +101,8 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
     equipa_ids = [equipa.id for equipa in equipas] if utilizador.perfil == PerfilEnum.treinador else None
     painel = obter_painel_operacional(db, equipa_ids=equipa_ids)
     tarefas = painel.get("tarefas", [])
+    if utilizador.perfil == PerfilEnum.secretaria:
+        tarefas = [tarefa for tarefa in tarefas if _grupo_tarefa(tarefa) == "secretaria"]
     return {
         "dashboard_url": "/dashboard",
         "equipas": [{"id": equipa.id, "nome": equipa.nome} for equipa in equipas],
