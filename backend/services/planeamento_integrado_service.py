@@ -272,7 +272,7 @@ def _item_atividade(atividade: Atividade) -> dict:
     )
 
 
-def _item_evento(evento: EventoPlaneamentoClube) -> dict:
+def _item_evento(evento: EventoPlaneamentoClube, equipa_id: int | None = None) -> dict:
     metadados = metadados_tipo_agenda(evento.tipo)
     categoria = metadados["categoria"]
 
@@ -288,6 +288,10 @@ def _item_evento(evento: EventoPlaneamentoClube) -> dict:
         if len(evento.equipas) > 2:
             equipa_nome += f" +{len(evento.equipas) - 2}"
 
+    link = f"/planeamento-clube/eventos/{evento.id}"
+    if equipa_id and evento.tipo in TIPOS_EVENTO_TREINO:
+        link = f"/agenda/atividades/{evento.id}/plano?equipa_id={equipa_id}"
+
     item = _criar_item_base(
         item_id=f"evento-{evento.id}",
         categoria=categoria,
@@ -300,7 +304,7 @@ def _item_evento(evento: EventoPlaneamentoClube) -> dict:
         equipa_nome=equipa_nome,
         origem_label="Planeamento global",
         detalhe=detalhe,
-        link=f"/planeamento-clube/eventos/{evento.id}",
+        link=link,
     )
     item.update({
         "badge": metadados["label"],
@@ -558,7 +562,7 @@ def _construir_itens_integrados(
             continue
         if evento.tipo == TipoEventoPlaneamentoClubeEnum.jogo and evento.jogo_id and evento.jogo_id in jogo_ids_representados:
             continue
-        itens.append(_item_evento(evento))
+        itens.append(_item_evento(evento, equipa_id=equipa_id))
 
     return _ordenar_itens(itens)
 

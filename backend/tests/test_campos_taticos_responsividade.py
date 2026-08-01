@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -6,10 +7,17 @@ import pytest
 from auth import encriptar_password
 from database import SessionLocal
 from models.equipa import Equipa
+from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
+from models.planeamento_clube import (
+    EventoPlaneamentoClube,
+    OrigemEventoPlaneamentoClubeEnum,
+    TipoEventoPlaneamentoClubeEnum,
+)
 from models.treinador import Treinador
 from models.treino import ExercicioPlano
 from models.utilizador import PerfilEnum, Utilizador
 from routers.treino import _campos_exercicio, _contexto_impressao_plano, _definir_slots_ativos, _slots_ativos
+from services.planeamento_integrado_service import _item_evento
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -89,6 +97,139 @@ def test_sidebar_liga_todos_os_niveis_a_listas_independentes():
     assert "'/treino/equipas/' ~ equipa_contexto_id ~ '/planos'" in sidebar
     assert "('/calendario?equipa_id=' ~ equipa_contexto_id)" not in sidebar
     assert "is-disabled" not in sidebar
+
+
+def test_treino_da_agenda_aponta_para_resolucao_do_plano():
+    evento = EventoPlaneamentoClube(
+        id=91,
+        clube_id=2,
+        tipo=TipoEventoPlaneamentoClubeEnum.treino_equipa,
+        titulo="Treino global",
+        data=date(2026, 9, 1),
+        aplica_a_todas_equipas=True,
+        origem=OrigemEventoPlaneamentoClubeEnum.manual,
+    )
+
+    item = _item_evento(evento, equipa_id=730)
+
+    assert item["link"] == "/agenda/atividades/91/plano?equipa_id=730"
+    assert item["agenda_editavel"] is True
+
+
+def test_abrir_treino_global_cria_sessao_e_abre_plano(client):
+    db = SessionLocal()
+    treinador = utilizador = macrociclo = evento = None
+    try:
+        equipa = db.query(Equipa).first()
+        if not equipa:
+            pytest.skip("A base de testes não tem uma equipa disponível.")
+
+        macrociclo = Macrociclo(
+            clube_id=equipa.clube_id,
+            numero=991,
+            data_inicio=date(2098, 9, 1),
+            data_fim=date(2098, 9, 30),
+            equipa_id=equipa.id,
+        )
+        db.add(macrociclo)
+        db.flush()
+        mesociclo = Mesociclo(
+            clube_id=equipa.clube_id,
+            numero=991,
+            data_inicio=date(2098, 9, 1),
+            data_fim=date(2098, 9, 30),
+            macrociclo_id=macrociclo.id,
+        )
+        db.add(mesociclo)
+        db.flush()
+        microciclo = Microciclo(
+            clube_id=equipa.clube_id,
+            numero=991,
+            data_inicio=date(2098, 9, 7),
+            data_fim=date(2098, 9, 13),
+            mesociclo_id=mesociclo.id,
+        )
+        db.add(microciclo)
+        evento = EventoPlaneamentoClube(
+            clube_id=equipa.clube_id,
+            tipo=TipoEventoPlaneamentoClubeEnum.treino_equipa,
+            titulo="Treino para abrir",
+            data=date(2098, 9, 8),
+            equipa_id=equipa.id,
+            aplica_a_todas_equipas=False,
+            origem=OrigemEventoPlaneamentoClubeEnum.manual,
+        )
+        db.add(evento)
+        treinador = Treinador(clube_id=equipa.clube_id, nome="Treinador abertura plano")
+        treinador.equipas.append(equipa)
+        db.add(treinador)
+        db.flush()
+        utilizador = Utilizador(
+            nome="Treinador abertura plano",
+            username="coach_open_plan_test",
+            email="coach-open-plan-test@example.invalid",
+            password_hash=encriptar_password("Teste123!"),
+            perfil=PerfilEnum.treinador,
+            clube_id=equipa.clube_id,
+            treinador_id=treinador.id,
+            ativo=True,
+        )
+        db.add(utilizador)
+        db.commit()
+        evento_id, equipa_id = evento.id, equipa.id
+
+        login = client.post(
+            "/login-form",
+            data={"username": utilizador.username, "password": "Teste123!"},
+            follow_redirects=False,
+        )
+        assert login.status_code in (302, 303)
+
+        abertura = client.get(
+            f"/agenda/atividades/{evento_id}/plano?equipa_id={equipa_id}",
+            follow_redirects=False,
+        )
+        assert abertura.status_code == 303
+        assert abertura.headers["location"].startswith("/treino/sessoes/")
+
+        plano = client.get(abertura.headers["location"], follow_redirects=False)
+        assert plano.status_code == 200
+        assert "Plano de Treino" in plano.text
+
+        segunda_abertura = client.get(
+            f"/agenda/atividades/{evento_id}/plano?equipa_id={equipa_id}",
+            follow_redirects=False,
+        )
+        assert segunda_abertura.headers["location"] == abertura.headers["location"]
+
+        db.expire_all()
+        sessoes = db.query(SessaoTreino).filter(
+            SessaoTreino.evento_planeamento_clube_id == evento_id,
+        ).all()
+        assert len(sessoes) == 1
+        sessao = sessoes[0]
+        assert sessao.microciclo_id == microciclo.id
+        assert sessao.plano_treino is not None
+    finally:
+        db.rollback()
+        if macrociclo:
+            db.delete(macrociclo)
+            db.flush()
+        if evento:
+            evento_atual = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento.id).first()
+            if evento_atual:
+                db.delete(evento_atual)
+        if utilizador:
+            utilizador_atual = db.query(Utilizador).filter(Utilizador.id == utilizador.id).first()
+            if utilizador_atual:
+                db.delete(utilizador_atual)
+        if treinador:
+            treinador_atual = db.query(Treinador).filter(Treinador.id == treinador.id).first()
+            if treinador_atual:
+                treinador_atual.equipas.clear()
+                db.delete(treinador_atual)
+        db.commit()
+        db.close()
 
 
 def test_treinador_abre_listas_de_planeamento_diretamente(client):

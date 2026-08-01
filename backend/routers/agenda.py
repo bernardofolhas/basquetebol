@@ -124,6 +124,12 @@ def _verificar_acesso(utilizador, equipa_id: int | None, db: Session, aplica_a_t
         raise AcessoNegado("/equipas")
 
 
+def _evento_visivel_para_equipa(evento: EventoPlaneamentoClube, equipa_id: int) -> bool:
+    if evento.aplica_a_todas_equipas or evento.equipa_id == equipa_id:
+        return True
+    return any(equipa.id == equipa_id for equipa in evento.equipas)
+
+
 def _obter_espaco_nome(db: Session, espaco_id: int | None) -> str | None:
     if not espaco_id:
         return None
@@ -152,6 +158,7 @@ def _criar_sessao_se_necessario(
             SessaoTreino.e_jogo.is_(False),
         ).count() + 1
     sessao = SessaoTreino(
+        clube_id=evento.clube_id,
         data=evento.data,
         local=_obter_espaco_nome(db, evento.espaco_id),
         hora_inicio=evento.hora_inicio,
@@ -168,6 +175,68 @@ def _criar_sessao_se_necessario(
         evento_planeamento_clube=evento,
     )
     db.add(sessao)
+
+
+@router.get("/atividades/{evento_id}/plano")
+def abrir_plano_de_evento_treino(
+    evento_id: int,
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Resolve um treino da agenda para a sessão e abre o respetivo plano."""
+    _verificar_acesso(utilizador, equipa_id, db)
+    evento = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.id == evento_id,
+        EventoPlaneamentoClube.ativo.is_(True),
+    ).with_for_update().first()
+    if not evento or evento.tipo not in {
+        TipoEventoPlaneamentoClubeEnum.treino_equipa,
+        TipoEventoPlaneamentoClubeEnum.treino_individual,
+    } or not _evento_visivel_para_equipa(evento, equipa_id):
+        raise AcessoNegado(f"/planeamento/equipas/{equipa_id}/microciclos")
+
+    sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        SessaoTreino.evento_planeamento_clube_id == evento.id,
+        SessaoTreino.ativa.is_(True),
+        Macrociclo.equipa_id == equipa_id,
+    ).order_by(SessaoTreino.id.desc()).first()
+    if sessao:
+        return RedirectResponse(url=f"/treino/sessoes/{sessao.id}", status_code=303)
+
+    microciclo = db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+        Microciclo.data_inicio <= evento.data,
+        Microciclo.data_fim >= evento.data,
+    ).order_by(Microciclo.data_inicio.desc(), Microciclo.id.desc()).first()
+    if not microciclo:
+        set_flash(
+            request,
+            "Este treino ainda não pertence a um microciclo. Cria ou ajusta a semana para preparar o plano.",
+            "error",
+        )
+        return RedirectResponse(url=f"/planeamento/equipas/{equipa_id}/microciclos", status_code=303)
+
+    _criar_sessao_se_necessario(
+        db,
+        evento,
+        microciclo,
+        evento.tipo.value,
+        equipa_id,
+    )
+    db.flush()
+    sessao = db.query(SessaoTreino).filter(
+        SessaoTreino.evento_planeamento_clube_id == evento.id,
+        SessaoTreino.microciclo_id == microciclo.id,
+    ).order_by(SessaoTreino.id.desc()).first()
+    if not sessao:
+        db.rollback()
+        set_flash(request, "Não foi possível preparar este treino. Tenta novamente.", "error")
+        return RedirectResponse(url=f"/planeamento/microciclos/{microciclo.id}", status_code=303)
+
+    db.commit()
+    return RedirectResponse(url=f"/treino/sessoes/{sessao.id}", status_code=303)
 
 
 def _atualizar_sessao_ligada(db: Session, evento: EventoPlaneamentoClube, tipo: str) -> None:
