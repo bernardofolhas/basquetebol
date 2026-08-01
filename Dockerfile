@@ -28,6 +28,9 @@ COPY . .
 # criação local para desenvolvimento e para o primeiro arranque.
 RUN mkdir -p frontend/static/uploads/branding frontend/static/uploads/jogadores
 
-EXPOSE 8000
+# O Railway atribui a porta de execução através da variável PORT (8080 no
+# serviço publicado). Declarar a mesma porta permite-lhe encaminhar o domínio
+# público corretamente para este contentor.
+EXPOSE 8080
 
 CMD ["python", "run.py"]
