@@ -56,14 +56,11 @@
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             {% for label, valor, cor in [
-                ('Tecnica Individual Ofensiva', macrociclo.obj_tecnica_individual_ofensiva, 'blue'),
-                ('Tecnica Individual Defensiva', macrociclo.obj_tecnica_individual_defensiva, 'blue'),
-                ('Tatica Individual Ofensiva', macrociclo.obj_tatica_individual_ofensiva, 'emerald'),
-                ('Tatica Individual Defensiva', macrociclo.obj_tatica_individual_defensiva, 'emerald'),
-                ('Tatica Coletiva Ofensiva', macrociclo.obj_tatica_coletiva_ofensiva, 'orange'),
-                ('Tatica Coletiva Defensiva', macrociclo.obj_tatica_coletiva_defensiva, 'orange'),
-                ('Fisicos', macrociclo.obj_fisicos, 'violet'),
-                ('Psicologicos', macrociclo.obj_psicologicos, 'amber')
+                ('Objetivos Gerais', macrociclo.objetivos_gerais, 'slate'),
+                ('Ofensivos', macrociclo.objetivos_ofensivos, 'blue'),
+                ('Defensivos', macrociclo.objetivos_defensivos, 'emerald'),
+                ('Físicos', macrociclo.obj_fisicos, 'violet'),
+                ('Psicológicos', macrociclo.obj_psicologicos, 'amber')
             ] %}
             {% if valor %}
             <div class="rounded-xl border border-{{ cor }}-100 bg-{{ cor }}-50 p-4">
@@ -72,13 +69,8 @@
             </div>
             {% endif %}
             {% endfor %}
-            {% if not macrociclo.obj_tecnica_individual_ofensiva and
-                  not macrociclo.obj_tecnica_individual_defensiva and
-                  not macrociclo.obj_tatica_individual_ofensiva and
-                  not macrociclo.obj_tatica_individual_defensiva and
-                  not macrociclo.obj_tatica_coletiva_ofensiva and
-                  not macrociclo.obj_tatica_coletiva_defensiva and
-                  not macrociclo.obj_fisicos and
+            {% if not macrociclo.objetivos_gerais and not macrociclo.objetivos_ofensivos and
+                  not macrociclo.objetivos_defensivos and not macrociclo.obj_fisicos and
                   not macrociclo.obj_psicologicos %}
             <div class="md:col-span-2 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-400">
                 Ainda nao existem objetivos definidos para este macrociclo.

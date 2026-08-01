@@ -99,35 +99,14 @@
 </div>
 
 <!-- OBJETIVOS -->
-{% set tem_obj = mesociclo.obj_tecnica_individual_ofensiva or mesociclo.obj_tecnica_individual_defensiva or mesociclo.obj_tatica_individual_ofensiva or mesociclo.obj_tatica_individual_defensiva or mesociclo.obj_tatica_coletiva_ofensiva or mesociclo.obj_tatica_coletiva_defensiva or mesociclo.obj_fisicos or mesociclo.obj_psicologicos %}
+{% set tem_obj = objetivos_por_categoria %}
 {% if tem_obj %}
 <div class="section">
     <div class="section-title">Objetivos</div>
     <div class="obj-grid">
-        {% if mesociclo.obj_tecnica_individual_ofensiva %}
-        <div class="obj-box"><div class="obj-label">TIO — Técnica Individual Ofensiva</div><div class="obj-text">{{ mesociclo.obj_tecnica_individual_ofensiva }}</div></div>
-        {% endif %}
-        {% if mesociclo.obj_tecnica_individual_defensiva %}
-        <div class="obj-box"><div class="obj-label">TID — Técnica Individual Defensiva</div><div class="obj-text">{{ mesociclo.obj_tecnica_individual_defensiva }}</div></div>
-        {% endif %}
-        {% if mesociclo.obj_tatica_individual_ofensiva %}
-        <div class="obj-box"><div class="obj-label green">TaIO — Tática Individual Ofensiva</div><div class="obj-text">{{ mesociclo.obj_tatica_individual_ofensiva }}</div></div>
-        {% endif %}
-        {% if mesociclo.obj_tatica_individual_defensiva %}
-        <div class="obj-box"><div class="obj-label green">TaID — Tática Individual Defensiva</div><div class="obj-text">{{ mesociclo.obj_tatica_individual_defensiva }}</div></div>
-        {% endif %}
-        {% if mesociclo.obj_tatica_coletiva_ofensiva %}
-        <div class="obj-box"><div class="obj-label orange">TCO — Tática Coletiva Ofensiva</div><div class="obj-text">{{ mesociclo.obj_tatica_coletiva_ofensiva }}</div></div>
-        {% endif %}
-        {% if mesociclo.obj_tatica_coletiva_defensiva %}
-        <div class="obj-box"><div class="obj-label orange">TCD — Tática Coletiva Defensiva</div><div class="obj-text">{{ mesociclo.obj_tatica_coletiva_defensiva }}</div></div>
-        {% endif %}
-        {% if mesociclo.obj_fisicos %}
-        <div class="obj-box"><div class="obj-label purple">Físicos</div><div class="obj-text">{{ mesociclo.obj_fisicos }}</div></div>
-        {% endif %}
-        {% if mesociclo.obj_psicologicos %}
-        <div class="obj-box"><div class="obj-label yellow">Psicológicos</div><div class="obj-text">{{ mesociclo.obj_psicologicos }}</div></div>
-        {% endif %}
+        {% for objetivo in objetivos_por_categoria %}
+        <div class="obj-box"><div class="obj-label">{{ objetivo.label }}</div><div class="obj-text">{{ objetivo.texto }}</div></div>
+        {% endfor %}
     </div>
 </div>
 {% endif %}

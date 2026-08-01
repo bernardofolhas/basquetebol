@@ -68,6 +68,11 @@ class Macrociclo(Base):
     data_inicio = Column(Date, nullable=False)
     data_fim = Column(Date, nullable=False)
 
+    # Categorias simplificadas de objetivos apresentadas ao utilizador.
+    objetivos_gerais = Column(Text, nullable=True)
+    objetivos_ofensivos = Column(Text, nullable=True)
+    objetivos_defensivos = Column(Text, nullable=True)
+
     # Objetivos divididos pelas categorias táticas/técnicas
     obj_tecnica_individual_ofensiva = Column(Text, nullable=True)
     obj_tecnica_individual_defensiva = Column(Text, nullable=True)
@@ -123,6 +128,10 @@ class Mesociclo(Base):
     data_inicio = Column(Date, nullable=False)
     data_fim = Column(Date, nullable=False)
 
+    objetivos_gerais = Column(Text, nullable=True)
+    objetivos_ofensivos = Column(Text, nullable=True)
+    objetivos_defensivos = Column(Text, nullable=True)
+
     # Objetivos (mesmas categorias do macrociclo)
     obj_tecnica_individual_ofensiva = Column(Text, nullable=True)
     obj_tecnica_individual_defensiva = Column(Text, nullable=True)
@@ -168,6 +177,10 @@ class Microciclo(Base):
 
     # Tipo de microciclo (ex: Introdutório, Carga, Competitivo, Recuperação)
     tipo = Column(String, nullable=True)
+
+    objetivos_gerais = Column(Text, nullable=True)
+    objetivos_ofensivos = Column(Text, nullable=True)
+    objetivos_defensivos = Column(Text, nullable=True)
 
     # Objetivos semanais
     obj_tecnica_individual_ofensiva = Column(Text, nullable=True)

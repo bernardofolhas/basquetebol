@@ -642,12 +642,9 @@ async def criar_macrociclo(
     planeamento_anual_equipa_id: str = Form(""),
     data_inicio: str = Form(...),
     data_fim: str = Form(...),
-    obj_tecnica_individual_ofensiva: str = Form(""),
-    obj_tecnica_individual_defensiva: str = Form(""),
-    obj_tatica_individual_ofensiva: str = Form(""),
-    obj_tatica_individual_defensiva: str = Form(""),
-    obj_tatica_coletiva_ofensiva: str = Form(""),
-    obj_tatica_coletiva_defensiva: str = Form(""),
+    objetivos_gerais: str = Form(""),
+    objetivos_ofensivos: str = Form(""),
+    objetivos_defensivos: str = Form(""),
     obj_fisicos: str = Form(""),
     obj_psicologicos: str = Form(""),
 ):
@@ -681,13 +678,9 @@ async def criar_macrociclo(
         numero=total_macros + 1,
         data_inicio=inicio,
         data_fim=fim,
-        # if campo else None — se o campo estiver vazio, guarda None em vez de string vazia
-        obj_tecnica_individual_ofensiva=obj_tecnica_individual_ofensiva or None,
-        obj_tecnica_individual_defensiva=obj_tecnica_individual_defensiva or None,
-        obj_tatica_individual_ofensiva=obj_tatica_individual_ofensiva or None,
-        obj_tatica_individual_defensiva=obj_tatica_individual_defensiva or None,
-        obj_tatica_coletiva_ofensiva=obj_tatica_coletiva_ofensiva or None,
-        obj_tatica_coletiva_defensiva=obj_tatica_coletiva_defensiva or None,
+        objetivos_gerais=objetivos_gerais or None,
+        objetivos_ofensivos=objetivos_ofensivos or None,
+        objetivos_defensivos=objetivos_defensivos or None,
         obj_fisicos=obj_fisicos or None,
         obj_psicologicos=obj_psicologicos or None,
         equipa_id=equipa_id,
@@ -815,12 +808,9 @@ async def editar_macrociclo(
     utilizador=Depends(exigir_autenticacao),
     data_inicio: str = Form(...),
     data_fim: str = Form(...),
-    obj_tecnica_individual_ofensiva: str = Form(""),
-    obj_tecnica_individual_defensiva: str = Form(""),
-    obj_tatica_individual_ofensiva: str = Form(""),
-    obj_tatica_individual_defensiva: str = Form(""),
-    obj_tatica_coletiva_ofensiva: str = Form(""),
-    obj_tatica_coletiva_defensiva: str = Form(""),
+    objetivos_gerais: str = Form(""),
+    objetivos_ofensivos: str = Form(""),
+    objetivos_defensivos: str = Form(""),
     obj_fisicos: str = Form(""),
     obj_psicologicos: str = Form(""),
 ):
@@ -838,12 +828,15 @@ async def editar_macrociclo(
         return RedirectResponse(url=f"/planeamento/macrociclos/{macro_id}/editar", status_code=303)
     macrociclo.data_inicio = inicio
     macrociclo.data_fim = fim
-    macrociclo.obj_tecnica_individual_ofensiva = obj_tecnica_individual_ofensiva or None
-    macrociclo.obj_tecnica_individual_defensiva = obj_tecnica_individual_defensiva or None
-    macrociclo.obj_tatica_individual_ofensiva = obj_tatica_individual_ofensiva or None
-    macrociclo.obj_tatica_individual_defensiva = obj_tatica_individual_defensiva or None
-    macrociclo.obj_tatica_coletiva_ofensiva = obj_tatica_coletiva_ofensiva or None
-    macrociclo.obj_tatica_coletiva_defensiva = obj_tatica_coletiva_defensiva or None
+    macrociclo.objetivos_gerais = objetivos_gerais or None
+    macrociclo.objetivos_ofensivos = objetivos_ofensivos or None
+    macrociclo.objetivos_defensivos = objetivos_defensivos or None
+    macrociclo.obj_tecnica_individual_ofensiva = None
+    macrociclo.obj_tecnica_individual_defensiva = None
+    macrociclo.obj_tatica_individual_ofensiva = None
+    macrociclo.obj_tatica_individual_defensiva = None
+    macrociclo.obj_tatica_coletiva_ofensiva = None
+    macrociclo.obj_tatica_coletiva_defensiva = None
     macrociclo.obj_fisicos = obj_fisicos or None
     macrociclo.obj_psicologicos = obj_psicologicos or None
     db.commit()
@@ -878,12 +871,9 @@ async def criar_mesociclo(
     utilizador=Depends(exigir_autenticacao),
     data_inicio: str = Form(...),
     data_fim: str = Form(...),
-    obj_tecnica_individual_ofensiva: str = Form(""),
-    obj_tecnica_individual_defensiva: str = Form(""),
-    obj_tatica_individual_ofensiva: str = Form(""),
-    obj_tatica_individual_defensiva: str = Form(""),
-    obj_tatica_coletiva_ofensiva: str = Form(""),
-    obj_tatica_coletiva_defensiva: str = Form(""),
+    objetivos_gerais: str = Form(""),
+    objetivos_ofensivos: str = Form(""),
+    objetivos_defensivos: str = Form(""),
     obj_fisicos: str = Form(""),
     obj_psicologicos: str = Form(""),
 ):
@@ -898,12 +888,9 @@ async def criar_mesociclo(
         numero=total_mesos + 1,
         data_inicio=date.fromisoformat(data_inicio),
         data_fim=date.fromisoformat(data_fim),
-        obj_tecnica_individual_ofensiva=obj_tecnica_individual_ofensiva or None,
-        obj_tecnica_individual_defensiva=obj_tecnica_individual_defensiva or None,
-        obj_tatica_individual_ofensiva=obj_tatica_individual_ofensiva or None,
-        obj_tatica_individual_defensiva=obj_tatica_individual_defensiva or None,
-        obj_tatica_coletiva_ofensiva=obj_tatica_coletiva_ofensiva or None,
-        obj_tatica_coletiva_defensiva=obj_tatica_coletiva_defensiva or None,
+        objetivos_gerais=objetivos_gerais or None,
+        objetivos_ofensivos=objetivos_ofensivos or None,
+        objetivos_defensivos=objetivos_defensivos or None,
         obj_fisicos=obj_fisicos or None,
         obj_psicologicos=obj_psicologicos or None,
         macrociclo_id=macro_id
@@ -1141,12 +1128,9 @@ async def editar_mesociclo(
     utilizador=Depends(exigir_autenticacao),
     data_inicio: str = Form(...),
     data_fim: str = Form(...),
-    obj_tecnica_individual_ofensiva: str = Form(""),
-    obj_tecnica_individual_defensiva: str = Form(""),
-    obj_tatica_individual_ofensiva: str = Form(""),
-    obj_tatica_individual_defensiva: str = Form(""),
-    obj_tatica_coletiva_ofensiva: str = Form(""),
-    obj_tatica_coletiva_defensiva: str = Form(""),
+    objetivos_gerais: str = Form(""),
+    objetivos_ofensivos: str = Form(""),
+    objetivos_defensivos: str = Form(""),
     obj_fisicos: str = Form(""),
     obj_psicologicos: str = Form(""),
 ):
@@ -1156,12 +1140,15 @@ async def editar_mesociclo(
         return RedirectResponse(url="/equipas")
     mesociclo.data_inicio = date.fromisoformat(data_inicio)
     mesociclo.data_fim = date.fromisoformat(data_fim)
-    mesociclo.obj_tecnica_individual_ofensiva = obj_tecnica_individual_ofensiva or None
-    mesociclo.obj_tecnica_individual_defensiva = obj_tecnica_individual_defensiva or None
-    mesociclo.obj_tatica_individual_ofensiva = obj_tatica_individual_ofensiva or None
-    mesociclo.obj_tatica_individual_defensiva = obj_tatica_individual_defensiva or None
-    mesociclo.obj_tatica_coletiva_ofensiva = obj_tatica_coletiva_ofensiva or None
-    mesociclo.obj_tatica_coletiva_defensiva = obj_tatica_coletiva_defensiva or None
+    mesociclo.objetivos_gerais = objetivos_gerais or None
+    mesociclo.objetivos_ofensivos = objetivos_ofensivos or None
+    mesociclo.objetivos_defensivos = objetivos_defensivos or None
+    mesociclo.obj_tecnica_individual_ofensiva = None
+    mesociclo.obj_tecnica_individual_defensiva = None
+    mesociclo.obj_tatica_individual_ofensiva = None
+    mesociclo.obj_tatica_individual_defensiva = None
+    mesociclo.obj_tatica_coletiva_ofensiva = None
+    mesociclo.obj_tatica_coletiva_defensiva = None
     mesociclo.obj_fisicos = obj_fisicos or None
     mesociclo.obj_psicologicos = obj_psicologicos or None
     db.commit()
@@ -1262,12 +1249,9 @@ async def criar_microciclo(
     data_inicio: str = Form(...),
     data_fim: str = Form(...),
     tipo: str = Form(""),
-    obj_tecnica_individual_ofensiva: str = Form(""),
-    obj_tecnica_individual_defensiva: str = Form(""),
-    obj_tatica_individual_ofensiva: str = Form(""),
-    obj_tatica_individual_defensiva: str = Form(""),
-    obj_tatica_coletiva_ofensiva: str = Form(""),
-    obj_tatica_coletiva_defensiva: str = Form(""),
+    objetivos_gerais: str = Form(""),
+    objetivos_ofensivos: str = Form(""),
+    objetivos_defensivos: str = Form(""),
     obj_fisicos: str = Form(""),
     obj_psicologicos: str = Form(""),
 ):
@@ -1282,12 +1266,9 @@ async def criar_microciclo(
         data_inicio=date.fromisoformat(data_inicio),
         data_fim=date.fromisoformat(data_fim),
         tipo=tipo or None,
-        obj_tecnica_individual_ofensiva=obj_tecnica_individual_ofensiva or None,
-        obj_tecnica_individual_defensiva=obj_tecnica_individual_defensiva or None,
-        obj_tatica_individual_ofensiva=obj_tatica_individual_ofensiva or None,
-        obj_tatica_individual_defensiva=obj_tatica_individual_defensiva or None,
-        obj_tatica_coletiva_ofensiva=obj_tatica_coletiva_ofensiva or None,
-        obj_tatica_coletiva_defensiva=obj_tatica_coletiva_defensiva or None,
+        objetivos_gerais=objetivos_gerais or None,
+        objetivos_ofensivos=objetivos_ofensivos or None,
+        objetivos_defensivos=objetivos_defensivos or None,
         obj_fisicos=obj_fisicos or None,
         obj_psicologicos=obj_psicologicos or None,
         mesociclo_id=meso_id
@@ -1327,12 +1308,9 @@ async def editar_microciclo(
     data_inicio: str = Form(...),
     data_fim: str = Form(...),
     tipo: str = Form(""),
-    obj_tecnica_individual_ofensiva: str = Form(""),
-    obj_tecnica_individual_defensiva: str = Form(""),
-    obj_tatica_individual_ofensiva: str = Form(""),
-    obj_tatica_individual_defensiva: str = Form(""),
-    obj_tatica_coletiva_ofensiva: str = Form(""),
-    obj_tatica_coletiva_defensiva: str = Form(""),
+    objetivos_gerais: str = Form(""),
+    objetivos_ofensivos: str = Form(""),
+    objetivos_defensivos: str = Form(""),
     obj_fisicos: str = Form(""),
     obj_psicologicos: str = Form(""),
 ):
@@ -1343,12 +1321,15 @@ async def editar_microciclo(
     microciclo.data_inicio = date.fromisoformat(data_inicio)
     microciclo.data_fim = date.fromisoformat(data_fim)
     microciclo.tipo = tipo or None
-    microciclo.obj_tecnica_individual_ofensiva = obj_tecnica_individual_ofensiva or None
-    microciclo.obj_tecnica_individual_defensiva = obj_tecnica_individual_defensiva or None
-    microciclo.obj_tatica_individual_ofensiva = obj_tatica_individual_ofensiva or None
-    microciclo.obj_tatica_individual_defensiva = obj_tatica_individual_defensiva or None
-    microciclo.obj_tatica_coletiva_ofensiva = obj_tatica_coletiva_ofensiva or None
-    microciclo.obj_tatica_coletiva_defensiva = obj_tatica_coletiva_defensiva or None
+    microciclo.objetivos_gerais = objetivos_gerais or None
+    microciclo.objetivos_ofensivos = objetivos_ofensivos or None
+    microciclo.objetivos_defensivos = objetivos_defensivos or None
+    microciclo.obj_tecnica_individual_ofensiva = None
+    microciclo.obj_tecnica_individual_defensiva = None
+    microciclo.obj_tatica_individual_ofensiva = None
+    microciclo.obj_tatica_individual_defensiva = None
+    microciclo.obj_tatica_coletiva_ofensiva = None
+    microciclo.obj_tatica_coletiva_defensiva = None
     microciclo.obj_fisicos = obj_fisicos or None
     microciclo.obj_psicologicos = obj_psicologicos or None
     db.commit()

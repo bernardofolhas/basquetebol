@@ -42,15 +42,9 @@
 
                 <!-- Resumo dos objetivos preenchidos -->
                 <div class="mt-3 flex flex-wrap gap-2">
-                    {% if macro.obj_tecnica_individual_ofensiva %}
-                    <span class="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-full">TIO</span>
-                    {% endif %}
-                    {% if macro.obj_tecnica_individual_defensiva %}
-                    <span class="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-full">TID</span>
-                    {% endif %}
-                    {% if macro.obj_tatica_coletiva_ofensiva %}
-                    <span class="bg-green-50 text-green-600 text-xs px-2 py-1 rounded-full">TCO</span>
-                    {% endif %}
+                    {% if macro.objetivos_gerais %}<span class="bg-slate-50 text-slate-600 text-xs px-2 py-1 rounded-full">GERAIS</span>{% endif %}
+                    {% if macro.objetivos_ofensivos %}<span class="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-full">OFENSIVOS</span>{% endif %}
+                    {% if macro.objetivos_defensivos %}<span class="bg-green-50 text-green-600 text-xs px-2 py-1 rounded-full">DEFENSIVOS</span>{% endif %}
                     {% if macro.obj_fisicos %}
                     <span class="bg-purple-50 text-purple-600 text-xs px-2 py-1 rounded-full">FÍS</span>
                     {% endif %}

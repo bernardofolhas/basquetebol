@@ -58,19 +58,12 @@
         <div>
             <div class="panel">
                 <h2 class="panel-title">Objetivos do macrociclo</h2>
-                {% for label, valor in [
-                    ('Técnica individual ofensiva', macrociclo.obj_tecnica_individual_ofensiva),
-                    ('Técnica individual defensiva', macrociclo.obj_tecnica_individual_defensiva),
-                    ('Tática individual ofensiva', macrociclo.obj_tatica_individual_ofensiva),
-                    ('Tática individual defensiva', macrociclo.obj_tatica_individual_defensiva),
-                    ('Tática coletiva ofensiva', macrociclo.obj_tatica_coletiva_ofensiva),
-                    ('Tática coletiva defensiva', macrociclo.obj_tatica_coletiva_defensiva),
-                    ('Físicos', macrociclo.obj_fisicos),
-                    ('Psicológicos', macrociclo.obj_psicologicos)
-                ] %}
+                {% for objetivo in objetivos_por_categoria %}
+                    {% set label = objetivo.label %}
+                    {% set valor = objetivo.texto %}
                 {% if valor %}<div class="objective"><strong>{{ label }}</strong><p>{{ valor }}</p></div>{% endif %}
                 {% endfor %}
-                {% if not macrociclo.obj_tecnica_individual_ofensiva and not macrociclo.obj_tecnica_individual_defensiva and not macrociclo.obj_tatica_individual_ofensiva and not macrociclo.obj_tatica_individual_defensiva and not macrociclo.obj_tatica_coletiva_ofensiva and not macrociclo.obj_tatica_coletiva_defensiva and not macrociclo.obj_fisicos and not macrociclo.obj_psicologicos %}
+                {% if not objetivos_por_categoria %}
                 <p class="muted">Sem objetivos registados.</p>
                 {% endif %}
             </div>

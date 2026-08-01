@@ -431,14 +431,11 @@
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         {% set obj_campos = [
-            ('obj_tecnica_individual_ofensiva', 'TIO — Técnica Individual Ofensiva', 'blue'),
-            ('obj_tecnica_individual_defensiva', 'TID — Técnica Individual Defensiva', 'blue'),
-            ('obj_tatica_individual_ofensiva', 'TaIO — Tática Individual Ofensiva', 'green'),
-            ('obj_tatica_individual_defensiva', 'TaID — Tática Individual Defensiva', 'green'),
-            ('obj_tatica_coletiva_ofensiva', 'TCO — Tática Coletiva Ofensiva', 'orange'),
-            ('obj_tatica_coletiva_defensiva', 'TCD — Tática Coletiva Defensiva', 'orange'),
-            ('obj_fisicos', 'Físicos', 'purple'),
-            ('obj_psicologicos', 'Psicológicos', 'yellow'),
+            ('objetivos_gerais', 'Objetivos Gerais', 'slate'),
+            ('objetivos_ofensivos', 'Objetivos Ofensivos', 'blue'),
+            ('objetivos_defensivos', 'Objetivos Defensivos', 'green'),
+            ('obj_fisicos', 'Objetivos Físicos', 'purple'),
+            ('obj_psicologicos', 'Objetivos Psicológicos', 'yellow'),
         ] %}
         {% for campo, label, cor in obj_campos %}
         {% set valor = mesociclo[campo] %}
@@ -449,7 +446,7 @@
         </div>
         {% endif %}
         {% endfor %}
-        {% set tem_objetivos = mesociclo.obj_tecnica_individual_ofensiva or mesociclo.obj_tecnica_individual_defensiva or mesociclo.obj_tatica_individual_ofensiva or mesociclo.obj_tatica_individual_defensiva or mesociclo.obj_tatica_coletiva_ofensiva or mesociclo.obj_tatica_coletiva_defensiva or mesociclo.obj_fisicos or mesociclo.obj_psicologicos %}
+        {% set tem_objetivos = mesociclo.objetivos_gerais or mesociclo.objetivos_ofensivos or mesociclo.objetivos_defensivos or mesociclo.obj_fisicos or mesociclo.obj_psicologicos %}
         {% if not tem_objetivos %}
         <div class="md:col-span-2 text-center py-6 text-gray-400 text-sm">
             Sem objetivos definidos.

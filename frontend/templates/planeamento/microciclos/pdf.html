@@ -88,19 +88,12 @@
         </div>
     </div>
 
-    {% set tem_obj = microciclo.obj_tecnica_individual_ofensiva or microciclo.obj_tecnica_individual_defensiva or microciclo.obj_tatica_individual_ofensiva or microciclo.obj_tatica_individual_defensiva or microciclo.obj_tatica_coletiva_ofensiva or microciclo.obj_tatica_coletiva_defensiva or microciclo.obj_fisicos or microciclo.obj_psicologicos %}
+    {% set tem_obj = objetivos_por_categoria %}
     {% if tem_obj %}
     <div class="section">
         <div class="section-title">Objetivos do Microciclo</div>
         <div class="obj-grid">
-            {% if microciclo.obj_tecnica_individual_ofensiva %}<div class="obj-box"><div class="obj-label">TIO</div>{{ microciclo.obj_tecnica_individual_ofensiva }}</div>{% endif %}
-            {% if microciclo.obj_tecnica_individual_defensiva %}<div class="obj-box"><div class="obj-label">TID</div>{{ microciclo.obj_tecnica_individual_defensiva }}</div>{% endif %}
-            {% if microciclo.obj_tatica_individual_ofensiva %}<div class="obj-box"><div class="obj-label">TaIO</div>{{ microciclo.obj_tatica_individual_ofensiva }}</div>{% endif %}
-            {% if microciclo.obj_tatica_individual_defensiva %}<div class="obj-box"><div class="obj-label">TaID</div>{{ microciclo.obj_tatica_individual_defensiva }}</div>{% endif %}
-            {% if microciclo.obj_tatica_coletiva_ofensiva %}<div class="obj-box"><div class="obj-label">TCO</div>{{ microciclo.obj_tatica_coletiva_ofensiva }}</div>{% endif %}
-            {% if microciclo.obj_tatica_coletiva_defensiva %}<div class="obj-box"><div class="obj-label">TCD</div>{{ microciclo.obj_tatica_coletiva_defensiva }}</div>{% endif %}
-            {% if microciclo.obj_fisicos %}<div class="obj-box"><div class="obj-label">Físicos</div>{{ microciclo.obj_fisicos }}</div>{% endif %}
-            {% if microciclo.obj_psicologicos %}<div class="obj-box"><div class="obj-label">Psicológicos</div>{{ microciclo.obj_psicologicos }}</div>{% endif %}
+            {% for objetivo in objetivos_por_categoria %}<div class="obj-box"><div class="obj-label">{{ objetivo.label }}</div>{{ objetivo.texto }}</div>{% endfor %}
         </div>
     </div>
     {% endif %}

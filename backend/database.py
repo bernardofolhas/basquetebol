@@ -153,6 +153,28 @@ def actualizar_estrutura_recuperacao_password() -> None:
     logger.info("Versão de sessão adicionada aos utilizadores.")
 
 
+def actualizar_estrutura_objetivos_planeamento() -> None:
+    """Garante as cinco categorias simples de objetivos nos ciclos."""
+    tabelas = ("macrociclos", "mesociclos", "microciclos")
+    inspector = inspect(engine)
+    dialecto = engine.dialect.name
+    tipos = {"macrociclos": inspector.has_table("macrociclos"),
+             "mesociclos": inspector.has_table("mesociclos"),
+             "microciclos": inspector.has_table("microciclos")}
+    if not any(tipos.values()):
+        return
+    with engine.begin() as ligacao:
+        for tabela in tabelas:
+            if not tipos[tabela]:
+                continue
+            colunas = {coluna["name"] for coluna in inspect(engine).get_columns(tabela)}
+            for coluna in ("objetivos_gerais", "objetivos_ofensivos", "objetivos_defensivos"):
+                if coluna not in colunas:
+                    ligacao.execute(text(
+                        f"ALTER TABLE {tabela} ADD COLUMN {coluna} TEXT"
+                    ))
+
+
 def actualizar_estrutura_planeamento_clube() -> None:
     """
     Garante compatibilidade mínima do esquema para evoluções recentes do
