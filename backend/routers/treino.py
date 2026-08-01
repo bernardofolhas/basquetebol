@@ -36,6 +36,37 @@ from services.sessao_workflow import (
 router = APIRouter(prefix="/treino")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+TIPOS_CAMPO = {
+    1: ("meio", "Campo meio", "campo_meio.png"),
+    2: ("completo", "Campo completo", "campo_completo.png"),
+    3: ("meio", "Campo meio extra", "campo_meio.png"),
+    4: ("completo", "Campo completo extra", "campo_completo.png"),
+}
+
+
+def _slots_ativos(exercicio: ExercicioPlano) -> list[int]:
+    valor = exercicio.campos_ativos
+    if valor is None:
+        return [1, 2] + [numero for numero in (3, 4) if getattr(exercicio, f"desenho_{numero}", None)]
+    return [int(item) for item in valor.split(",") if item.isdigit() and int(item) in TIPOS_CAMPO]
+
+
+def _definir_slots_ativos(exercicio: ExercicioPlano, slots: list[int]) -> None:
+    exercicio.campos_ativos = ",".join(str(numero) for numero in TIPOS_CAMPO if numero in slots)
+
+
+def _campos_exercicio(exercicio: ExercicioPlano) -> list[dict]:
+    return [
+        {
+            "numero": numero,
+            "tipo": TIPOS_CAMPO[numero][0],
+            "label": TIPOS_CAMPO[numero][1],
+            "imagem": TIPOS_CAMPO[numero][2],
+            "desenho": getattr(exercicio, f"desenho_{numero}"),
+        }
+        for numero in _slots_ativos(exercicio)
+    ]
+
 
 def _reordenar_exercicios_bloco(db: Session, plano_id: int, bloco: str) -> None:
     """Mantém a ordenação sequencial dos exercícios dentro de cada bloco."""
@@ -85,17 +116,22 @@ def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador) -> dic
     caminho_campo_completo = STATIC_DIR / "campos" / "campo_completo.png"
     exercicios_por_bloco = {f"d{bloco.id}": [] for bloco in plano.blocos} if plano else {}
     exercicios = list(plano.exercicios or []) if plano else []
+    nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
+    if not nome_treinador and getattr(equipa, "treinadores", None):
+        nome_treinador = equipa.treinadores[0].nome
     for exercicio in exercicios:
         bloco = f"d{exercicio.bloco_id}" if exercicio.bloco_id else (exercicio.bloco or "A")
         if bloco not in exercicios_por_bloco and not exercicio.bloco_id:
             exercicios_por_bloco[bloco] = []
         if bloco in exercicios_por_bloco:
-            setattr(exercicio, "desenho_1_pdf", normalizar_data_uri(exercicio.desenho_1))
-            setattr(exercicio, "desenho_2_pdf", normalizar_data_uri(exercicio.desenho_2))
-            setattr(exercicio, "desenho_3_pdf", normalizar_data_uri(exercicio.desenho_3))
-            setattr(exercicio, "desenho_4_pdf", normalizar_data_uri(exercicio.desenho_4))
-            setattr(exercicio, "campo_meio_composto_pdf", compor_desenho_sobre_campo(caminho_campo_meio, exercicio.desenho_1))
-            setattr(exercicio, "campo_completo_composto_pdf", compor_desenho_sobre_campo(caminho_campo_completo, exercicio.desenho_2))
+            campos_pdf = []
+            for campo in _campos_exercicio(exercicio):
+                caminho = caminho_campo_meio if campo["tipo"] == "meio" else caminho_campo_completo
+                campos_pdf.append({
+                    **campo,
+                    "imagem_composta": compor_desenho_sobre_campo(caminho, campo["desenho"]),
+                })
+            setattr(exercicio, "campos_pdf", campos_pdf)
             exercicios_por_bloco[bloco].append(exercicio)
 
     return {
@@ -112,6 +148,7 @@ def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador) -> dic
         "campo_meio_data_uri": imagem_estatica_data_uri(caminho_campo_meio),
         "campo_completo_data_uri": imagem_estatica_data_uri(caminho_campo_completo),
         "identidade": getattr(request.state, "identidade_clube", {}),
+        "nome_treinador": nome_treinador or utilizador.nome,
     }
 
 
@@ -238,6 +275,7 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
 
     exercicios_por_bloco = {f"d{bloco.id}": [] for bloco in plano.blocos}
     for ex in plano.exercicios:
+        setattr(ex, "campos_ui", _campos_exercicio(ex))
         bloco = f"d{ex.bloco_id}" if ex.bloco_id else (ex.bloco or "A")
         exercicios_por_bloco.setdefault(bloco, []).append(ex)
 
@@ -389,7 +427,7 @@ async def duplicar_bloco(bloco_id: int, request: Request, db: Session = Depends(
     copia = BlocoTreino(plano_id=bloco.plano_id, nome=f"{bloco.nome} (cópia)", tipo=bloco.tipo, ordem=len(bloco.plano.blocos) + 1)
     db.add(copia); db.flush()
     for ex in bloco.exercicios:
-        db.add(ExercicioPlano(plano_id=ex.plano_id, bloco_id=copia.id, ordem=ex.ordem, hora=ex.hora, minutos=ex.minutos, rpe=ex.rpe, nome=ex.nome, categoria=ex.categoria, desenho_1=ex.desenho_1, desenho_2=ex.desenho_2, desenho_3=ex.desenho_3, desenho_4=ex.desenho_4, organizacao=ex.organizacao, coaching_points=ex.coaching_points))
+        db.add(ExercicioPlano(plano_id=ex.plano_id, bloco_id=copia.id, ordem=ex.ordem, hora=ex.hora, minutos=ex.minutos, rpe=ex.rpe, nome=ex.nome, categoria=ex.categoria, desenho_1=ex.desenho_1, desenho_2=ex.desenho_2, desenho_3=ex.desenho_3, desenho_4=ex.desenho_4, campos_ativos=ex.campos_ativos, organizacao=ex.organizacao, coaching_points=ex.coaching_points))
     db.commit(); set_flash(request, "Bloco e exercícios duplicados.")
     return RedirectResponse(url=f"/treino/sessoes/{bloco.plano.sessao_id}", status_code=303)
 
@@ -479,6 +517,8 @@ async def adicionar_exercicio(
     )
     if biblioteca and biblioteca.desenho:
         exercicio.desenho_1 = biblioteca.desenho
+    if biblioteca and biblioteca.desenho_campo_completo:
+        exercicio.desenho_2 = biblioteca.desenho_campo_completo
 
     _marcar_sessao_como_alterada_manual(plano.sessao if plano else None)
     db.add(exercicio)
@@ -540,6 +580,7 @@ async def adicionar_exercicio_da_biblioteca(
         nome=biblioteca.nome,
         categoria=biblioteca.categoria,
         desenho_1=biblioteca.desenho,
+        desenho_2=biblioteca.desenho_campo_completo,
         organizacao=biblioteca.organizacao,
         coaching_points=biblioteca.coaching_points,
     )
@@ -602,6 +643,7 @@ async def duplicar_exercicio(exercicio_id: int, request: Request, db: Session = 
         desenho_2=exercicio.desenho_2,
         desenho_3=exercicio.desenho_3,
         desenho_4=exercicio.desenho_4,
+        campos_ativos=exercicio.campos_ativos,
         organizacao=exercicio.organizacao,
         coaching_points=exercicio.coaching_points,
     )
@@ -723,18 +765,64 @@ async def guardar_desenho(exercicio_id: int, request: Request, db: Session = Dep
     if not exercicio:
         return JSONResponse({"sucesso": False, "erro": "Exercício não encontrado"})
 
-    if numero == 1:
-        exercicio.desenho_1 = desenho_base64
-    elif numero == 2:
-        exercicio.desenho_2 = desenho_base64
-    elif numero == 3:
-        exercicio.desenho_3 = desenho_base64
-    elif numero == 4:
-        exercicio.desenho_4 = desenho_base64
+    if numero not in TIPOS_CAMPO:
+        return JSONResponse({"sucesso": False, "erro": "Campo inválido"}, status_code=422)
+
+    setattr(exercicio, f"desenho_{numero}", desenho_base64)
+    slots = _slots_ativos(exercicio)
+    if numero not in slots:
+        slots.append(numero)
+        _definir_slots_ativos(exercicio, slots)
 
     _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
     db.commit()
     return JSONResponse({"sucesso": True})
+
+
+@router.post("/exercicios/{exercicio_id}/campos")
+async def adicionar_campo_exercicio(
+    exercicio_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    tipo: str = Form(...),
+):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
+    exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
+    if not exercicio:
+        return RedirectResponse(url="/equipas", status_code=303)
+    candidatos = [1, 3] if tipo == "meio" else [2, 4] if tipo == "completo" else []
+    slots = _slots_ativos(exercicio)
+    disponivel = next((numero for numero in candidatos if numero not in slots), None)
+    if disponivel is None:
+        set_flash(request, "Já atingiste o limite de dois campos deste tipo.", "error")
+    else:
+        slots.append(disponivel)
+        _definir_slots_ativos(exercicio, slots)
+        _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+        db.commit()
+        set_flash(request, "Campo acrescentado ao exercício.")
+    return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}", status_code=303)
+
+
+@router.post("/exercicios/{exercicio_id}/campos/{numero}/apagar")
+async def apagar_campo_exercicio(
+    exercicio_id: int,
+    numero: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
+    exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
+    if not exercicio or numero not in TIPOS_CAMPO:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _definir_slots_ativos(exercicio, [slot for slot in _slots_ativos(exercicio) if slot != numero])
+    setattr(exercicio, f"desenho_{numero}", None)
+    _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+    db.commit()
+    set_flash(request, "Campo removido sem afetar os restantes.")
+    return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}", status_code=303)
 
 
 # ─────────────────────────────────────────

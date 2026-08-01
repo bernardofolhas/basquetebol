@@ -153,6 +153,49 @@ def actualizar_estrutura_recuperacao_password() -> None:
     logger.info("Versão de sessão adicionada aos utilizadores.")
 
 
+def actualizar_estrutura_campos_desenho() -> None:
+    """Adiciona gestão individual de campos táticos a instalações existentes."""
+    inspector = inspect(engine)
+    dialecto = engine.dialect.name
+    if inspector.has_table("exercicios_plano"):
+        colunas = {coluna["name"] for coluna in inspector.get_columns("exercicios_plano")}
+        if "campos_ativos" not in colunas:
+            with engine.begin() as ligacao:
+                if dialecto == "postgresql":
+                    ligacao.execute(text(
+                        "ALTER TABLE exercicios_plano ADD COLUMN IF NOT EXISTS "
+                        "campos_ativos VARCHAR NOT NULL DEFAULT '1,2'"
+                    ))
+                else:
+                    ligacao.execute(text(
+                        "ALTER TABLE exercicios_plano ADD COLUMN "
+                        "campos_ativos VARCHAR NOT NULL DEFAULT '1,2'"
+                    ))
+                ligacao.execute(text(
+                    "UPDATE exercicios_plano SET campos_ativos = CASE "
+                    "WHEN desenho_3 IS NOT NULL AND desenho_4 IS NOT NULL THEN '1,2,3,4' "
+                    "WHEN desenho_3 IS NOT NULL THEN '1,2,3' "
+                    "WHEN desenho_4 IS NOT NULL THEN '1,2,4' ELSE '1,2' END"
+                ))
+            logger.info("Campos táticos ativos adicionados aos exercícios.")
+
+    inspector = inspect(engine)
+    if inspector.has_table("biblioteca_exercicios"):
+        colunas = {coluna["name"] for coluna in inspector.get_columns("biblioteca_exercicios")}
+        if "desenho_campo_completo" not in colunas:
+            with engine.begin() as ligacao:
+                if dialecto == "postgresql":
+                    ligacao.execute(text(
+                        "ALTER TABLE biblioteca_exercicios ADD COLUMN IF NOT EXISTS "
+                        "desenho_campo_completo TEXT NULL"
+                    ))
+                else:
+                    ligacao.execute(text(
+                        "ALTER TABLE biblioteca_exercicios ADD COLUMN desenho_campo_completo TEXT NULL"
+                    ))
+            logger.info("Desenho de campo inteiro adicionado à biblioteca.")
+
+
 def actualizar_estrutura_objetivos_planeamento() -> None:
     """Garante as cinco categorias simples de objetivos nos ciclos."""
     tabelas = ("macrociclos", "mesociclos", "microciclos")

@@ -6,12 +6,12 @@
     <title>Plano de Treino — {{ sessao.data|data_pt }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        @page { size: A4 portrait; margin: 9mm; }
-        body { font-family: Arial, sans-serif; font-size: 10px; color: #111827; background: #f4f4f5; padding: 12px; }
+        @page { size: A4 portrait; margin: 8mm 8mm 14mm; @bottom-center { content: element(page-footer); } }
+        body { width: 100%; font-family: Arial, sans-serif; font-size: 9px; color: #111827; background: #f4f4f5; padding: 12px; }
         body.modo-pdf { background: #fff; padding: 0; }
         .toolbar { margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; padding: 12px; text-align: center; }
         .btn-print { border: none; border-radius: 8px; background: #ea580c; color: #fff; padding: 10px 18px; font-size: 14px; cursor: pointer; }
-        .sheet { background: #fff; border: 2px solid #111827; }
+        .sheet { width: 100%; max-width: 194mm; margin: 0 auto; background: #fff; border: 1px solid #111827; }
         .sheet-header { display: grid; grid-template-columns: 1.6fr 1fr; gap: 10px; padding: 10px 14px; background: linear-gradient(135deg, var(--pdf-primary-dark), var(--pdf-primary)); color: var(--pdf-on-primary); }
         .sheet-header small { display: block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.88; }
         .sheet-header h1 { margin-top: 4px; font-size: 18px; line-height: 1.1; }
@@ -36,21 +36,27 @@
         .objectives h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 6px; }
         .objectives p { white-space: pre-line; }
 
-        .content { padding: 0 20px 20px; }
-        .block-section { margin-top: 14px; page-break-inside: avoid; }
-        .block-title { background: var(--pdf-secondary); color: #fff; padding: 8px 12px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.12em; }
-        .exercise { border: 1px solid #d1d5db; border-top: 0; page-break-inside: avoid; }
-        .exercise-head { display: grid; grid-template-columns: 58px 58px minmax(0, 1.5fr) 72px 58px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+        .content { padding: 0 10px 12px; }
+        .block-section { margin-top: 10px; }
+        .block-title { break-after: avoid; page-break-after: avoid; background: var(--pdf-secondary); color: #fff; padding: 6px 9px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.12em; }
+        .exercise { border: 1px solid #d1d5db; border-top: 0; }
+        .exercise.force-page { break-before: page; page-break-before: always; border-top: 1px solid #d1d5db; }
+        .exercise-head { display: grid; grid-template-columns: 15mm 15mm minmax(0, 1fr) 23mm 14mm; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
         .exercise-head div { border-right: 1px solid #e5e7eb; padding: 6px 8px; }
         .exercise-head div:last-child { border-right: 0; }
         .exercise-head label { display: block; font-size: 8px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.08em; }
         .exercise-head strong { display: block; font-size: 11px; color: #111827; }
-        .exercise-body { display: grid; grid-template-columns: 160px 160px 1fr 1fr; min-height: 150px; }
+        .exercise-head div:not(:nth-child(3)) label, .exercise-head div:not(:nth-child(3)) strong { white-space: nowrap; }
+        .exercise-head div:nth-child(3) strong { overflow-wrap: anywhere; }
+        .exercise-body { display: grid; grid-template-columns: minmax(0, 46%) minmax(0, 27%) minmax(0, 27%); min-height: 34mm; }
+        .exercise-body.no-courts { grid-template-columns: 1fr 1fr; }
         .exercise-cell { border-right: 1px solid #e5e7eb; padding: 8px; }
         .exercise-cell:last-child { border-right: 0; }
         .exercise-cell h4 { font-size: 8px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px; }
-        .exercise-cell p { white-space: pre-line; font-size: 10px; line-height: 1.45; }
-        .court { position: relative; border: 1px solid #d1d5db; background: #fff; overflow: hidden; height: 106px; }
+        .exercise-cell p { white-space: pre-line; font-size: 9px; line-height: 1.35; overflow-wrap: anywhere; }
+        .courts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+        .court-card h5 { margin-bottom: 2px; color: #64748b; font-size: 7px; text-transform: uppercase; }
+        .court { position: relative; border: 1px solid #d1d5db; background: #fff; overflow: hidden; height: 30mm; }
         .court img.base, .court img.overlay { display: block; width: 100%; height: 100%; object-fit: contain; }
         .court img.base { position: relative; z-index: 1; }
         .court img.overlay { position: absolute; inset: 0; z-index: 2; }
@@ -59,7 +65,7 @@
         .reflection h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 8px; }
         .reflection p { white-space: pre-line; line-height: 1.5; }
 
-        .footer { padding: 12px 20px 18px; text-align: center; color: #6b7280; font-size: 10px; }
+        .footer { position: running(page-footer); width: 100%; padding-top: 2mm; border-top: 1px solid #d1d5db; text-align: center; color: #6b7280; font-size: 8px; }
         .club-mark { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: bold; }
         .club-mark img { width: 34px; height: 34px; object-fit: contain; }
         .modo-pdf .toolbar { display: none; }
@@ -67,7 +73,7 @@
         @media print {
             body { background: #fff; padding: 0; }
             .toolbar { display: none; }
-            .sheet { border: 0; }
+            .sheet { max-width: none; border: 0; }
         }
     </style>
     {{ estilo_pdf() }}
@@ -77,6 +83,10 @@
 <div class="toolbar">
     <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
     <a href="/treino/sessoes/{{ sessao.id }}" style="margin-left: 15px; color: #666; font-size: 12px;">← Voltar ao plano</a>
+</div>
+
+<div class="footer">
+    {{ nome_treinador }} · {{ identidade.nome_oficial|default('Clube de Basquetebol') }}
 </div>
 
 <div class="sheet">
@@ -162,7 +172,7 @@
         <div class="block-section">
             <div class="block-title">{{ bloco_ui.nome }}{% if bloco_ui.tipo %} · {{ bloco_ui.tipo }}{% endif %}</div>
             {% for ex in exercicios_por_bloco[bloco_letra] %}
-            <div class="exercise">
+            <div class="exercise {% if loop.index0 > 0 and loop.index0 % 2 == 0 %}force-page{% endif %}">
                 <div class="exercise-head">
                     <div>
                         <label>Hora</label>
@@ -185,19 +195,20 @@
                         <strong>{{ ex.rpe if ex.rpe is not none else "—" }}</strong>
                     </div>
                 </div>
-                <div class="exercise-body">
+                <div class="exercise-body {% if not ex.campos_pdf %}no-courts{% endif %}">
+                    {% if ex.campos_pdf %}
                     <div class="exercise-cell">
-                        <h4>Campo meio</h4>
-                        <div class="court">
-                            {% if ex.campo_meio_composto_pdf %}<img class="base" src="{{ ex.campo_meio_composto_pdf }}" alt="Campo de meio-campo com desenho tático">{% endif %}
+                        <h4>Quadros táticos</h4>
+                        <div class="courts-grid">
+                            {% for campo in ex.campos_pdf %}
+                            <div class="court-card">
+                                <h5>{{ campo.label }}</h5>
+                                <div class="court">{% if campo.imagem_composta %}<img class="base" src="{{ campo.imagem_composta }}" alt="{{ campo.label }} com desenho tático">{% endif %}</div>
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
-                    <div class="exercise-cell">
-                        <h4>Campo completo</h4>
-                        <div class="court">
-                            {% if ex.campo_completo_composto_pdf %}<img class="base" src="{{ ex.campo_completo_composto_pdf }}" alt="Campo completo com desenho tático">{% endif %}
-                        </div>
-                    </div>
+                    {% endif %}
                     <div class="exercise-cell">
                         <h4>Organização</h4>
                         <p>{{ ex.organizacao if ex.organizacao else "" }}</p>
@@ -219,9 +230,6 @@
         </div>
     </div>
 
-    <div class="footer">
-        {{ identidade.texto_rodape|default('Plataforma de Gestão de Basquetebol') }} · {{ equipa.nome }} · {{ data_exportacao }}
-    </div>
 </div>
 
 </body>

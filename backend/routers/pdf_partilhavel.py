@@ -22,7 +22,7 @@ def _ids_equipas_utilizador(utilizador) -> list[int] | None:
     return [equipa.id for equipa in getattr(getattr(utilizador, "treinador", None), "equipas", [])]
 
 
-def _responder(request, db, utilizador, *, titulo, data_inicio, data_fim, nome, equipa=None, categorias=None, equipa_ids=None, template="pdf_partilhavel.html"):
+def _responder(request, db, utilizador, *, titulo, data_inicio, data_fim, nome, equipa=None, categorias=None, equipa_ids=None, template="calendario_partilhavel_pdf.html"):
     if equipa_ids is None:
         equipa_ids = _ids_equipas_utilizador(utilizador)
     agenda = preparar_agenda_partilhavel(

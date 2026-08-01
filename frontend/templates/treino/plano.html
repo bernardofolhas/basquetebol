@@ -27,21 +27,24 @@
 </div>
 {% endmacro %}
 
-{% macro campo_desenho(canvas_id, imagem, ex_id, num_desenho, label, guardado) %}
-<div>
+{% macro campo_desenho(canvas_id, ex_id, campo) %}
+<div class="rounded-2xl border border-gray-200 bg-gray-50 p-3">
     <div class="mb-2 flex items-center justify-between">
-        <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">{{ label }}</p>
-        {% if guardado %}
+        <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-500">{{ campo.label }}</p>
+        {% if campo.desenho %}
         <span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">Guardado</span>
         {% endif %}
     </div>
     {{ toolbar(canvas_id) }}
-    <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if imagem == 'campo_meio.png' %}144 / 112{% else %}209 / 141{% endif %};">
-        <img src="/static/campos/{{ imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
-        <canvas id="{{ canvas_id }}" class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
+    <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}144 / 112{% else %}209 / 141{% endif %};">
+        <img src="/static/campos/{{ campo.imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
+        <canvas id="{{ canvas_id }}" data-desenho="{{ campo.desenho|default('', true)|e }}" class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
     </div>
-    <div class="mt-2 flex justify-end">
-        <button type="button" onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ num_desenho }})" class="rounded-lg bg-orange-500 px-3 py-1 text-xs font-medium text-white transition hover:bg-orange-600">Guardar desenho</button>
+    <div class="mt-2 flex flex-wrap justify-end gap-2">
+        <form method="POST" action="/treino/exercicios/{{ ex_id }}/campos/{{ campo.numero }}/apagar" onsubmit="return confirm('Remover apenas este campo e o respetivo desenho?')">
+            <button type="submit" class="rounded-lg border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover campo</button>
+        </form>
+        <button type="button" onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ campo.numero }})" class="rounded-lg bg-orange-500 px-3 py-1 text-xs font-medium text-white transition hover:bg-orange-600">Guardar desenho</button>
     </div>
 </div>
 {% endmacro %}
@@ -329,7 +332,7 @@
                     {% if exercicios_por_bloco[bloco_letra] %}
                     <div class="space-y-5">
                         {% for ex in exercicios_por_bloco[bloco_letra] %}
-                        <div class="rounded-[24px] border border-gray-200 bg-gray-50 p-5">
+                        <div id="exercicio-{{ ex.id }}" class="rounded-[24px] border border-gray-200 bg-gray-50 p-4 sm:p-5">
                             <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-2">
@@ -421,23 +424,19 @@
                             <details class="mt-4 rounded-2xl border border-gray-200 bg-white" data-drawings="true" data-exercicio-id="{{ ex.id }}" ontoggle="togglePainelDesenhos('{{ ex.id }}', this.open)">
                                 <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-gray-700">Quadros táticos e desenhos</summary>
                                 <div class="border-t border-gray-100 px-4 py-4">
-                                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        {{ campo_desenho('canvas1_' ~ ex.id, 'campo_meio.png', ex.id, 1, 'Campo meio', ex.desenho_1) }}
-                                        {{ campo_desenho('canvas2_' ~ ex.id, 'campo_completo.png', ex.id, 2, 'Campo completo', ex.desenho_2) }}
-                                    </div>
-
-                                    <div class="mt-4 flex flex-wrap gap-2">
-                                        <button type="button" onclick="toggleCampoExtra('extra_meio_{{ ex.id }}')" class="rounded-lg border border-orange-200 px-3 py-1 text-xs font-medium text-orange-500 transition hover:bg-orange-50">+ Campo meio extra</button>
-                                        <button type="button" onclick="toggleCampoExtra('extra_completo_{{ ex.id }}')" class="rounded-lg border border-orange-200 px-3 py-1 text-xs font-medium text-orange-500 transition hover:bg-orange-50">+ Campo completo extra</button>
-                                    </div>
-
-                                    <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <div id="extra_meio_{{ ex.id }}" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
-                                            {{ campo_desenho('canvas3_' ~ ex.id, 'campo_meio.png', ex.id, 3, 'Campo meio extra', ex.desenho_3) }}
+                                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                                        <p class="text-sm text-gray-500">Adiciona apenas os campos necessários. O exercício pode ficar sem quadros.</p>
+                                        <div class="flex flex-wrap gap-2">
+                                            <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos"><input type="hidden" name="tipo" value="meio"><button class="rounded-lg border border-orange-200 px-3 py-1.5 text-xs font-medium text-orange-600 hover:bg-orange-50">+ Campo meio</button></form>
+                                            <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos"><input type="hidden" name="tipo" value="completo"><button class="rounded-lg border border-orange-200 px-3 py-1.5 text-xs font-medium text-orange-600 hover:bg-orange-50">+ Campo completo</button></form>
                                         </div>
-                                        <div id="extra_completo_{{ ex.id }}" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
-                                            {{ campo_desenho('canvas4_' ~ ex.id, 'campo_completo.png', ex.id, 4, 'Campo completo extra', ex.desenho_4) }}
-                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                                        {% for campo in ex.campos_ui %}
+                                        {{ campo_desenho('canvas' ~ campo.numero ~ '_' ~ ex.id, ex.id, campo) }}
+                                        {% else %}
+                                        <div class="col-span-full rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-5 py-8 text-center text-sm text-gray-500">Este exercício não tem campos. Podes acrescentar um quando for útil.</div>
+                                        {% endfor %}
                                     </div>
                                 </div>
                             </details>
@@ -537,6 +536,16 @@ function inicializarDesenho(canvasId) {
     setTimeout(configurarCanvas, 100);
     const ctx = canvas.getContext('2d');
     CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 2, corLinha: '#333333' };
+    if (canvas.dataset.desenho) {
+        const imagemGuardada = new Image();
+        imagemGuardada.onload = () => {
+            const estado = CANVAS_ESTADO[canvasId];
+            if (!estado) return;
+            estado.imagemFundo = imagemGuardada;
+            redesenhar(canvasId);
+        };
+        imagemGuardada.src = canvas.dataset.desenho;
+    }
     canvas.addEventListener('mousedown', (e) => aoPremir(canvasId, e));
     canvas.addEventListener('mousemove', (e) => aoMover(canvasId, e));
     canvas.addEventListener('mouseup', (e) => aoSoltar(canvasId, e));
@@ -549,8 +558,10 @@ function inicializarDesenho(canvasId) {
 
 function togglePainelDesenhos(exercicioId, aberto) {
     if (!aberto) return;
-    ['canvas1_', 'canvas2_'].forEach((prefixo) => {
-        const canvasId = `${prefixo}${exercicioId}`;
+    const painel = document.querySelector(`details[data-exercicio-id="${exercicioId}"]`);
+    if (!painel) return;
+    painel.querySelectorAll('canvas').forEach((canvas) => {
+        const canvasId = canvas.id;
         if (!CANVAS_ESTADO[canvasId]) {
             inicializarDesenho(canvasId);
             setTimeout(() => definirFerramenta(canvasId, 'jogador_ataque'), 200);
@@ -824,24 +835,6 @@ function guardarDesenho(canvasId, exercicioId, numeroDesenho) {
             }
         }
     });
-}
-
-function toggleCampoExtra(divId) {
-    const div = document.getElementById(divId);
-    if (!div) return;
-    const estaEscondido = div.style.maxHeight === '0px' || div.style.maxHeight === '0';
-    if (estaEscondido) {
-        div.style.maxHeight = '600px';
-        const canvas = div.querySelector('canvas');
-        if (canvas && !CANVAS_ESTADO[canvas.id]) {
-            setTimeout(() => {
-                inicializarDesenho(canvas.id);
-                definirFerramenta(canvas.id, 'jogador_ataque');
-            }, 350);
-        }
-    } else {
-        div.style.maxHeight = '0';
-    }
 }
 
 let _bibFormId = null;

@@ -31,7 +31,7 @@
     {{ estilo_pdf() }}
 </head>
 <body>
-    {{ cabecalho_pdf('Calendário semanal · Microciclo ' ~ microciclo.numero, equipa.nome ~ ' · ' ~ (microciclo.data_inicio|data_pt) ~ ' → ' ~ (microciclo.data_fim|data_pt), 'Documento para partilha · ' ~ data_exportacao) }}
+    {{ cabecalho_pdf('Calendário semanal · Microciclo ' ~ microciclo.numero, equipa.nome ~ ' · ' ~ (microciclo.data_inicio|data_pt) ~ ' → ' ~ (microciclo.data_fim|data_pt), '') }}
 
     <div class="summary">
         <div class="summary-box">

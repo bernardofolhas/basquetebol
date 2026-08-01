@@ -4,6 +4,31 @@
 
 {% block conteudo %}
 
+{% macro toolbar_biblioteca(canvas_id) %}
+<div id="toolbar_{{ canvas_id }}" class="mb-2 flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-2">
+    {% for ferramenta, texto, titulo in [('seleccionar','⊹','Selecionar e mover'),('jogador_ataque','⬤ A','Jogador ataque'),('jogador_defesa','▲ D','Jogador defesa'),('coach','⊙ C','Treinador'),('cone','△','Cone'),('bola','●','Bola'),('seta','→','Seta'),('seta_tracejada','⇢','Seta tracejada'),('seta_zigzag','≋','Drible'),('seta_curva','⌒','Seta curva'),('bloqueio','⊣','Bloqueio'),('linha','—','Linha'),('apagar','✕','Apagar elemento')] %}
+    <button type="button" data-ferramenta="{{ ferramenta }}" onclick="definirFerramenta('{{ canvas_id }}', '{{ ferramenta }}')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="{{ titulo }}">{{ texto }}</button>
+    {% endfor %}
+    <button type="button" onclick="desfazer('{{ canvas_id }}')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Desfazer">↩</button>
+    <button type="button" onclick="limparTudo('{{ canvas_id }}')" class="rounded bg-gray-100 px-2 py-1 text-xs text-red-500" title="Limpar desenho">🗑</button>
+</div>
+{% endmacro %}
+
+{% macro campo_biblioteca(canvas_id, tipo, titulo, imagem, desenho) %}
+<section class="rounded-xl border border-gray-200 bg-white p-3">
+    <div class="mb-2 flex items-center justify-between gap-2"><h3 class="text-sm font-semibold text-gray-700">{{ titulo }}</h3>{% if desenho %}<span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">Guardado</span>{% endif %}</div>
+    {{ toolbar_biblioteca(canvas_id) }}
+    <div class="relative overflow-hidden rounded-lg border border-gray-200 bg-white" style="aspect-ratio:{% if tipo == 'meio' %}144/112{% else %}209/141{% endif %}">
+        <img src="/static/campos/{{ imagem }}" class="absolute inset-0 h-full w-full object-contain">
+        <canvas id="{{ canvas_id }}" data-desenho="{{ desenho|default('', true)|e }}" class="absolute inset-0 h-full w-full cursor-copy" style="touch-action:none"></canvas>
+    </div>
+    <div class="mt-3 flex flex-wrap justify-end gap-2">
+        <button type="button" onclick="limparEGuardarDesenhoBiblioteca('{{ canvas_id }}', {{ ex.id }}, '{{ tipo }}')" class="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50">Apagar desenho</button>
+        <button type="button" id="btn_guardar_{{ canvas_id }}" onclick="guardarDesenhoBiblioteca('{{ canvas_id }}', {{ ex.id }}, '{{ tipo }}')" class="rounded-lg bg-orange-500 px-3 py-2 text-xs font-medium text-white hover:bg-orange-600">Guardar desenho</button>
+    </div>
+</section>
+{% endmacro %}
+
 <div class="mb-6">
     <a href="/biblioteca" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar à biblioteca</a>
     <div class="flex items-center justify-between mt-2">
@@ -77,46 +102,10 @@
         </form>
     </div>
 
-    <!-- Desenho -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 class="font-semibold text-gray-700 mb-4">Desenho (meio campo)</h2>
-
-        <div id="toolbar_canvas_bib" class="flex flex-wrap gap-1 mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
-            <button type="button" data-ferramenta="seleccionar" onclick="definirFerramenta('canvas_bib', 'seleccionar')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Seleccionar/Mover">⊹</button>
-            <button type="button" data-ferramenta="jogador_ataque" onclick="definirFerramenta('canvas_bib', 'jogador_ataque')" class="bg-orange-500 text-white text-xs px-2 py-1 rounded font-bold" title="Jogador ataque">⬤ A</button>
-            <button type="button" data-ferramenta="jogador_defesa" onclick="definirFerramenta('canvas_bib', 'jogador_defesa')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded font-bold" title="Jogador defesa">▲ D</button>
-            <button type="button" data-ferramenta="coach" onclick="definirFerramenta('canvas_bib', 'coach')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded font-bold" title="Coach">⊙ C</button>
-            <button type="button" data-ferramenta="cone" onclick="definirFerramenta('canvas_bib', 'cone')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Cone">○</button>
-            <button type="button" data-ferramenta="bola" onclick="definirFerramenta('canvas_bib', 'bola')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Bola">🏀</button>
-            <span class="border-l border-gray-300 mx-1"></span>
-            <button type="button" data-ferramenta="seta" onclick="definirFerramenta('canvas_bib', 'seta')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Seta">→</button>
-            <button type="button" data-ferramenta="seta_tracejada" onclick="definirFerramenta('canvas_bib', 'seta_tracejada')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Seta tracejada">⇢</button>
-            <button type="button" data-ferramenta="seta_zigzag" onclick="definirFerramenta('canvas_bib', 'seta_zigzag')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Drible">≋</button>
-            <button type="button" data-ferramenta="seta_curva" onclick="definirFerramenta('canvas_bib', 'seta_curva')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Seta curva">⌒</button>
-            <button type="button" data-ferramenta="bloqueio" onclick="definirFerramenta('canvas_bib', 'bloqueio')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded font-bold" title="Bloqueio">⊣</button>
-            <button type="button" data-ferramenta="linha" onclick="definirFerramenta('canvas_bib', 'linha')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Linha">—</button>
-            <span class="border-l border-gray-300 mx-1"></span>
-            <button type="button" onclick="desfazer('canvas_bib')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Desfazer">↩</button>
-            <button type="button" data-ferramenta="apagar" onclick="definirFerramenta('canvas_bib', 'apagar')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Apagar elemento">✕</button>
-            <button type="button" onclick="limparTudo('canvas_bib')" class="bg-gray-100 text-red-500 text-xs px-2 py-1 rounded" title="Limpar tudo">🗑</button>
-        </div>
-
-        <div class="relative border border-gray-200 rounded-lg overflow-hidden" style="background: white; min-height: 280px; max-height: 280px;">
-            <img src="/static/campos/campo_meio.png" class="w-full object-contain" style="display: block; max-height: 280px;">
-            <canvas id="canvas_bib" class="absolute top-0 left-0 w-full h-full cursor-copy" style="touch-action: none;"></canvas>
-        </div>
-
-        {% if ex.desenho %}
-        <p class="text-xs text-green-600 mt-2">✓ Tem um desenho guardado — carregado no canvas.</p>
-        {% endif %}
-
-        <div class="mt-3 flex justify-end">
-            <button type="button" id="btn_guardar_bib"
-                    onclick="guardarDesenhoBiblioteca({{ ex.id }})"
-                    class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                Guardar desenho
-            </button>
-        </div>
+    <div class="space-y-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
+        <div><h2 class="font-semibold text-gray-700">Quadros táticos</h2><p class="mt-1 text-sm text-gray-500">Edita separadamente o meio-campo e o campo inteiro. Os cones estão disponíveis na barra de ferramentas.</p></div>
+        {{ campo_biblioteca('canvas_bib_meio', 'meio', 'Meio-campo', 'campo_meio.png', ex.desenho) }}
+        {{ campo_biblioteca('canvas_bib_completo', 'completo', 'Campo inteiro', 'campo_completo.png', ex.desenho_campo_completo) }}
     </div>
 
 </div>
@@ -340,7 +329,7 @@ function definirFerramenta(canvasId, ferramenta) {
     est.ferramenta = ferramenta;
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
     est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'not-allowed' : 'crosshair';
-    const toolbar = document.getElementById('toolbar_canvas_bib');
+    const toolbar = document.getElementById('toolbar_' + canvasId);
     if (toolbar) {
         toolbar.querySelectorAll('button[data-ferramenta]').forEach(btn => {
             const activo = btn.dataset.ferramenta === ferramenta;
@@ -366,13 +355,13 @@ function desfazer(canvasId) {
     redesenhar(canvasId);
 }
 
-function guardarDesenhoBiblioteca(exercicioId) {
-    const est = CANVAS_ESTADO['canvas_bib'];
+function guardarDesenhoBiblioteca(canvasId, exercicioId, tipo, dadosOverride) {
+    const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
-    const btn = document.getElementById('btn_guardar_bib');
+    const btn = document.getElementById('btn_guardar_' + canvasId);
     fetch(`/biblioteca/${exercicioId}/desenho`, {
         method: 'POST',
-        body: JSON.stringify({ dados: est.canvas.toDataURL('image/png') }),
+        body: JSON.stringify({ tipo, dados: dadosOverride === undefined ? est.canvas.toDataURL('image/png') : dadosOverride }),
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
@@ -386,21 +375,28 @@ function guardarDesenhoBiblioteca(exercicioId) {
     });
 }
 
+function limparEGuardarDesenhoBiblioteca(canvasId, exercicioId, tipo) {
+    if (!confirm('Apagar apenas este desenho?')) return;
+    limparTudo(canvasId);
+    guardarDesenhoBiblioteca(canvasId, exercicioId, tipo, null);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    inicializarDesenho('canvas_bib');
-    setTimeout(() => {
-        definirFerramenta('canvas_bib', 'jogador_ataque');
-        {% if ex.desenho %}
-        const img = new Image();
-        img.onload = () => {
-            const est = CANVAS_ESTADO['canvas_bib'];
-            if (!est) return;
-            est.imagemFundo = img;
-            redesenhar('canvas_bib');
-        };
-        img.src = '{{ ex.desenho | safe }}';
-        {% endif %}
-    }, 300);
+    ['canvas_bib_meio', 'canvas_bib_completo'].forEach((canvasId) => {
+        inicializarDesenho(canvasId);
+        const canvas = document.getElementById(canvasId);
+        setTimeout(() => definirFerramenta(canvasId, 'jogador_ataque'), 250);
+        if (canvas && canvas.dataset.desenho) {
+            const img = new Image();
+            img.onload = () => {
+                const est = CANVAS_ESTADO[canvasId];
+                if (!est) return;
+                est.imagemFundo = img;
+                redesenhar(canvasId);
+            };
+            img.src = canvas.dataset.desenho;
+        }
+    });
 });
 </script>
 

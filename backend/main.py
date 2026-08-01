@@ -38,6 +38,7 @@ from middleware_navegacao import NavegacaoGlobalMiddleware
 from database import (
     Base,
     actualizar_estrutura_assiduidade,
+    actualizar_estrutura_campos_desenho,
     actualizar_estrutura_jogadores,
     actualizar_estrutura_perfis,
     actualizar_estrutura_planeamento_clube,
@@ -98,6 +99,7 @@ try:
     actualizar_estrutura_perfis()
     actualizar_estrutura_planeamento_clube()
     actualizar_estrutura_recuperacao_password()
+    actualizar_estrutura_campos_desenho()
     actualizar_estrutura_objetivos_planeamento()
     actualizar_estrutura_planeamento_equipa()
     actualizar_estrutura_assiduidade()

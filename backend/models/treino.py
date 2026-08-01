@@ -98,6 +98,8 @@ class ExercicioPlano(Base):
     # Campos de desenho extra (opcionais)
     desenho_3 = Column(Text, nullable=True)  # Campo meio extra
     desenho_4 = Column(Text, nullable=True)  # Campo completo extra
+    # Lista ordenada das posições visíveis (1..4). Permite um exercício sem campos.
+    campos_ativos = Column(String, nullable=False, default="1,2", server_default="1,2")
 
     # Organização do exercício
     organizacao = Column(Text, nullable=True)
@@ -121,4 +123,5 @@ class BibliotecoExercicio(Base):
     organizacao = Column(Text, nullable=True)
     coaching_points = Column(Text, nullable=True)
     desenho = Column(Text, nullable=True)      # base64 PNG, half-court
+    desenho_campo_completo = Column(Text, nullable=True)
     tags = Column(String, nullable=True)

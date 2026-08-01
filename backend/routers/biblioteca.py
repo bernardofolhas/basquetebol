@@ -41,7 +41,10 @@ def listar_biblioteca(
     if tags:
         query = query.filter(BibliotecoExercicio.tags.ilike(f"%{tags}%"))
     if desenho == "1":
-        query = query.filter(BibliotecoExercicio.desenho.isnot(None))
+        query = query.filter(or_(
+            BibliotecoExercicio.desenho.isnot(None),
+            BibliotecoExercicio.desenho_campo_completo.isnot(None),
+        ))
     exercicios = query.all()
     return templates.TemplateResponse(request, "biblioteca/lista.html", {
         "utilizador": utilizador,
@@ -111,7 +114,7 @@ def api_buscar_exercicios(
             "organizacao": ex.organizacao or "",
             "coaching_points": ex.coaching_points or "",
             "tags": ex.tags or "",
-            "tem_desenho": bool(ex.desenho),
+            "tem_desenho": bool(ex.desenho or ex.desenho_campo_completo),
         }
         for ex in exercicios
     ])
@@ -186,9 +189,15 @@ async def guardar_desenho_biblioteca(
 ):
     dados = await request.json()
     desenho_base64 = dados.get("dados")
+    tipo = dados.get("tipo", "meio")
     ex = db.query(BibliotecoExercicio).filter(BibliotecoExercicio.id == exercicio_id).first()
     if not ex:
         return JSONResponse({"sucesso": False, "erro": "Exercício não encontrado"})
-    ex.desenho = desenho_base64
+    if tipo == "meio":
+        ex.desenho = desenho_base64
+    elif tipo == "completo":
+        ex.desenho_campo_completo = desenho_base64
+    else:
+        return JSONResponse({"sucesso": False, "erro": "Tipo de campo inválido"}, status_code=422)
     db.commit()
     return JSONResponse({"sucesso": True})
