@@ -1,0 +1,39 @@
+# Variáveis de ambiente — nunca versionar chaves secretas
+.env
+
+# Bytecode Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Ambientes virtuais
+.venv/
+venv/
+
+# Bases de dados SQLite locais
+*.db
+*.sqlite3
+
+# Cache de testes
+.pytest_cache/
+backend/.pytest_cache/
+
+# Cobertura de testes
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log
+
+# Ficheiros gerados localmente e dados carregados pelos utilizadores
+frontend/static/uploads/
+tmp/
+backups/
+
+# Ficheiros temporários do sistema
+.DS_Store
+Thumbs.db
