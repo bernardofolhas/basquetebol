@@ -40,6 +40,7 @@ from database import (
     actualizar_estrutura_jogadores,
     actualizar_estrutura_perfis,
     actualizar_estrutura_planeamento_clube,
+    actualizar_estrutura_planeamento_equipa,
     base_dados_disponivel,
     engine,
     get_db,
@@ -93,6 +94,7 @@ try:
     Base.metadata.create_all(bind=engine)
     actualizar_estrutura_perfis()
     actualizar_estrutura_planeamento_clube()
+    actualizar_estrutura_planeamento_equipa()
     actualizar_estrutura_assiduidade()
     actualizar_estrutura_jogadores()
     logger.info("Infraestrutura inicial da aplicação preparada com sucesso.")

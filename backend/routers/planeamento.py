@@ -32,7 +32,8 @@ from services.pdf_service import renderizar_pdf
 from services.sincronizacao_ui import preparar_sessoes_para_ui, sessao_corresponde_filtro
 
 # Importamos os modelos que vamos precisar
-from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
+from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnualEquipa, SessaoTreino
+from models.planeamento_clube import PlaneamentoClubeAnual
 from models.atribuicao_espaco_semanal import (
     AtribuicaoEspacoSemanal,
     EstadoAtribuicaoEspacoEnum,
@@ -61,6 +62,49 @@ def _obter_equipa_id_por_macrociclo(db: Session, macro_id: int) -> int | None:
     """Resolve a equipa associada a um macrociclo."""
     macrociclo = db.query(Macrociclo).filter(Macrociclo.id == macro_id).first()
     return macrociclo.equipa_id if macrociclo else None
+
+
+def _obter_equipa_id_por_anual(db: Session, anual_id: int) -> int | None:
+    anual = db.query(PlaneamentoAnualEquipa).filter(PlaneamentoAnualEquipa.id == anual_id).first()
+    return anual.equipa_id if anual else None
+
+
+def _epoca_para_data(data_inicio: date) -> str:
+    ano = data_inicio.year if data_inicio.month >= 7 else data_inicio.year - 1
+    return f"{ano}/{ano + 1}"
+
+
+def _obter_ou_criar_anual_equipa(
+    db: Session,
+    equipa: Equipa,
+    data_inicio: date,
+    data_fim: date,
+) -> PlaneamentoAnualEquipa:
+    anual = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.equipa_id == equipa.id,
+        PlaneamentoAnualEquipa.data_inicio <= data_inicio,
+        PlaneamentoAnualEquipa.data_fim >= data_fim,
+    ).first()
+    if anual:
+        return anual
+
+    anual_clube = db.query(PlaneamentoClubeAnual).filter(
+        PlaneamentoClubeAnual.data_inicio <= data_inicio,
+        PlaneamentoClubeAnual.data_fim >= data_fim,
+    ).first()
+    epoca = _epoca_para_data(data_inicio)
+    anual = PlaneamentoAnualEquipa(
+        equipa_id=equipa.id,
+        planeamento_clube_anual_id=anual_clube.id if anual_clube else None,
+        epoca=epoca,
+        titulo=f"Planeamento anual {epoca}",
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        objetivos_gerais=anual_clube.objetivos_gerais if anual_clube else None,
+    )
+    db.add(anual)
+    db.flush()
+    return anual
 
 
 def _obter_equipa_id_por_mesociclo(db: Session, meso_id: int) -> int | None:
@@ -306,6 +350,232 @@ def _verificar_divergencia_atribuicao(db, sessao_data, equipa_id, local_planeado
 
 
 # ─────────────────────────────────────────
+# PLANEAMENTO ANUAL DA EQUIPA
+# ─────────────────────────────────────────
+@router.get("/equipas/{equipa_id}/anuais", response_class=HTMLResponse)
+def listar_planeamentos_anuais_equipa(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+    planeamentos = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.equipa_id == equipa_id,
+    ).order_by(PlaneamentoAnualEquipa.data_inicio.desc()).all()
+    return templates.TemplateResponse(request, "planeamento/anuais/lista.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "planeamentos": planeamentos,
+    })
+
+
+def _contexto_form_anual_equipa(db: Session, equipa: Equipa) -> dict:
+    return {
+        "equipa": equipa,
+        "planeamentos_clube": db.query(PlaneamentoClubeAnual).order_by(
+            PlaneamentoClubeAnual.data_inicio.desc(),
+        ).all(),
+    }
+
+
+@router.get("/equipas/{equipa_id}/anuais/novo", response_class=HTMLResponse)
+def form_novo_anual_equipa(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+    contexto = _contexto_form_anual_equipa(db, equipa)
+    contexto.update({"utilizador": utilizador, "planeamento": None})
+    return templates.TemplateResponse(request, "planeamento/anuais/form.html", contexto)
+
+
+def _aplicar_dados_anual_equipa(
+    planeamento: PlaneamentoAnualEquipa,
+    *,
+    epoca: str,
+    titulo: str,
+    data_inicio: str,
+    data_fim: str,
+    planeamento_clube_anual_id: str,
+    objetivos_gerais: str,
+    obj_tecnica_individual_ofensiva: str,
+    obj_tecnica_individual_defensiva: str,
+    obj_tatica_individual_ofensiva: str,
+    obj_tatica_individual_defensiva: str,
+    obj_tatica_coletiva_ofensiva: str,
+    obj_tatica_coletiva_defensiva: str,
+    obj_fisicos: str,
+    obj_psicologicos: str,
+    reflexao: str,
+    estado: str,
+) -> None:
+    inicio = date.fromisoformat(data_inicio)
+    fim = date.fromisoformat(data_fim)
+    if inicio > fim:
+        raise ValueError("A data de início não pode ser posterior à data de fim.")
+    planeamento.epoca = epoca.strip()
+    planeamento.titulo = titulo.strip()
+    planeamento.data_inicio = inicio
+    planeamento.data_fim = fim
+    planeamento.planeamento_clube_anual_id = int(planeamento_clube_anual_id) if planeamento_clube_anual_id else None
+    planeamento.objetivos_gerais = objetivos_gerais.strip() or None
+    planeamento.obj_tecnica_individual_ofensiva = obj_tecnica_individual_ofensiva.strip() or None
+    planeamento.obj_tecnica_individual_defensiva = obj_tecnica_individual_defensiva.strip() or None
+    planeamento.obj_tatica_individual_ofensiva = obj_tatica_individual_ofensiva.strip() or None
+    planeamento.obj_tatica_individual_defensiva = obj_tatica_individual_defensiva.strip() or None
+    planeamento.obj_tatica_coletiva_ofensiva = obj_tatica_coletiva_ofensiva.strip() or None
+    planeamento.obj_tatica_coletiva_defensiva = obj_tatica_coletiva_defensiva.strip() or None
+    planeamento.obj_fisicos = obj_fisicos.strip() or None
+    planeamento.obj_psicologicos = obj_psicologicos.strip() or None
+    planeamento.reflexao = reflexao.strip() or None
+    planeamento.estado = estado if estado in {"rascunho", "ativo", "concluido"} else "rascunho"
+
+
+@router.post("/equipas/{equipa_id}/anuais/novo")
+async def criar_anual_equipa(
+    equipa_id: int, request: Request, db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao), epoca: str = Form(...), titulo: str = Form(...),
+    data_inicio: str = Form(...), data_fim: str = Form(...), planeamento_clube_anual_id: str = Form(""),
+    objetivos_gerais: str = Form(""), obj_tecnica_individual_ofensiva: str = Form(""),
+    obj_tecnica_individual_defensiva: str = Form(""), obj_tatica_individual_ofensiva: str = Form(""),
+    obj_tatica_individual_defensiva: str = Form(""), obj_tatica_coletiva_ofensiva: str = Form(""),
+    obj_tatica_coletiva_defensiva: str = Form(""), obj_fisicos: str = Form(""),
+    obj_psicologicos: str = Form(""), reflexao: str = Form(""), estado: str = Form("rascunho"),
+):
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+    planeamento = PlaneamentoAnualEquipa(equipa_id=equipa_id)
+    _aplicar_dados_anual_equipa(planeamento, **{
+        "epoca": epoca, "titulo": titulo, "data_inicio": data_inicio, "data_fim": data_fim,
+        "planeamento_clube_anual_id": planeamento_clube_anual_id, "objetivos_gerais": objetivos_gerais,
+        "obj_tecnica_individual_ofensiva": obj_tecnica_individual_ofensiva,
+        "obj_tecnica_individual_defensiva": obj_tecnica_individual_defensiva,
+        "obj_tatica_individual_ofensiva": obj_tatica_individual_ofensiva,
+        "obj_tatica_individual_defensiva": obj_tatica_individual_defensiva,
+        "obj_tatica_coletiva_ofensiva": obj_tatica_coletiva_ofensiva,
+        "obj_tatica_coletiva_defensiva": obj_tatica_coletiva_defensiva,
+        "obj_fisicos": obj_fisicos, "obj_psicologicos": obj_psicologicos,
+        "reflexao": reflexao, "estado": estado,
+    })
+    if planeamento.planeamento_clube_anual_id:
+        anual_clube = db.query(PlaneamentoClubeAnual).filter(
+            PlaneamentoClubeAnual.id == planeamento.planeamento_clube_anual_id,
+        ).first()
+        if not anual_clube:
+            raise AcessoNegado(f"/planeamento/equipas/{equipa_id}/anuais")
+        if not planeamento.objetivos_gerais:
+            planeamento.objetivos_gerais = anual_clube.objetivos_gerais
+    db.add(planeamento)
+    db.commit()
+    set_flash(request, "Planeamento anual da equipa criado.")
+    return RedirectResponse(url=f"/planeamento/anuais/{planeamento.id}", status_code=303)
+
+
+@router.get("/anuais/{anual_id}", response_class=HTMLResponse)
+def detalhe_anual_equipa(
+    anual_id: int, request: Request, db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_anual(db, anual_id), db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(PlaneamentoAnualEquipa.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/equipas", status_code=303)
+    macrociclos = db.query(Macrociclo).filter(
+        Macrociclo.planeamento_anual_equipa_id == anual_id,
+    ).order_by(Macrociclo.numero).all()
+    return templates.TemplateResponse(request, "planeamento/anuais/detalhe.html", {
+        "utilizador": utilizador,
+        "planeamento": planeamento,
+        "equipa": planeamento.equipa,
+        "macrociclos": macrociclos,
+    })
+
+
+@router.get("/anuais/{anual_id}/editar", response_class=HTMLResponse)
+def form_editar_anual_equipa(
+    anual_id: int, request: Request, db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_anual(db, anual_id), db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(PlaneamentoAnualEquipa.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/equipas", status_code=303)
+    contexto = _contexto_form_anual_equipa(db, planeamento.equipa)
+    contexto.update({"utilizador": utilizador, "planeamento": planeamento})
+    return templates.TemplateResponse(request, "planeamento/anuais/form.html", contexto)
+
+
+@router.post("/anuais/{anual_id}/editar")
+async def editar_anual_equipa(
+    anual_id: int, request: Request, db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao), epoca: str = Form(...), titulo: str = Form(...),
+    data_inicio: str = Form(...), data_fim: str = Form(...), planeamento_clube_anual_id: str = Form(""),
+    objetivos_gerais: str = Form(""), obj_tecnica_individual_ofensiva: str = Form(""),
+    obj_tecnica_individual_defensiva: str = Form(""), obj_tatica_individual_ofensiva: str = Form(""),
+    obj_tatica_individual_defensiva: str = Form(""), obj_tatica_coletiva_ofensiva: str = Form(""),
+    obj_tatica_coletiva_defensiva: str = Form(""), obj_fisicos: str = Form(""),
+    obj_psicologicos: str = Form(""), reflexao: str = Form(""), estado: str = Form("rascunho"),
+):
+    _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_anual(db, anual_id), db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(PlaneamentoAnualEquipa.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _aplicar_dados_anual_equipa(planeamento, **{
+        "epoca": epoca, "titulo": titulo, "data_inicio": data_inicio, "data_fim": data_fim,
+        "planeamento_clube_anual_id": planeamento_clube_anual_id, "objetivos_gerais": objetivos_gerais,
+        "obj_tecnica_individual_ofensiva": obj_tecnica_individual_ofensiva,
+        "obj_tecnica_individual_defensiva": obj_tecnica_individual_defensiva,
+        "obj_tatica_individual_ofensiva": obj_tatica_individual_ofensiva,
+        "obj_tatica_individual_defensiva": obj_tatica_individual_defensiva,
+        "obj_tatica_coletiva_ofensiva": obj_tatica_coletiva_ofensiva,
+        "obj_tatica_coletiva_defensiva": obj_tatica_coletiva_defensiva,
+        "obj_fisicos": obj_fisicos, "obj_psicologicos": obj_psicologicos,
+        "reflexao": reflexao, "estado": estado,
+    })
+    if planeamento.planeamento_clube_anual_id and not db.query(PlaneamentoClubeAnual).filter(
+        PlaneamentoClubeAnual.id == planeamento.planeamento_clube_anual_id,
+    ).first():
+        raise AcessoNegado(f"/planeamento/anuais/{anual_id}/editar")
+    macro_fora_periodo = db.query(Macrociclo).filter(
+        Macrociclo.planeamento_anual_equipa_id == anual_id,
+        (Macrociclo.data_inicio < planeamento.data_inicio) | (Macrociclo.data_fim > planeamento.data_fim),
+    ).first()
+    if macro_fora_periodo:
+        db.rollback()
+        set_flash(request, "As novas datas deixam macrociclos fora do planeamento anual.", "erro")
+        return RedirectResponse(url=f"/planeamento/anuais/{anual_id}/editar", status_code=303)
+    db.commit()
+    set_flash(request, "Planeamento anual da equipa atualizado.")
+    return RedirectResponse(url=f"/planeamento/anuais/{anual_id}", status_code=303)
+
+
+@router.post("/anuais/{anual_id}/eliminar")
+async def eliminar_anual_equipa(
+    anual_id: int, request: Request, db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _obter_equipa_id_por_anual(db, anual_id)
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(PlaneamentoAnualEquipa.id == anual_id).first()
+    if planeamento:
+        db.delete(planeamento)
+        db.commit()
+        set_flash(request, "Planeamento anual da equipa eliminado.")
+    return RedirectResponse(url=f"/planeamento/equipas/{equipa_id}/anuais", status_code=303)
+
+
+# ─────────────────────────────────────────
 # LISTA DE MACROCICLOS DE UMA EQUIPA
 # URL: GET /planeamento/equipas/{equipa_id}/macrociclos
 # ─────────────────────────────────────────
@@ -313,60 +583,7 @@ def _verificar_divergencia_atribuicao(db, sessao_data, equipa_id, local_planeado
 def listar_macrociclos(equipa_id: int, request: Request, db: Session = Depends(get_db),
                        utilizador=Depends(exigir_autenticacao)):
     _verificar_acesso_planeamento(utilizador, equipa_id, db)
-
-    # Procura a equipa pelo ID que vem na URL
-    # filter() filtra os resultados — equivale a WHERE em SQL
-    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
-    if not equipa:
-        return RedirectResponse(url="/equipas")
-
-    # Procura todos os macrociclos desta equipa
-    # order_by ordena pelo número do macro (1, 2, 3...)
-    macrociclos = db.query(Macrociclo).filter(
-        Macrociclo.equipa_id == equipa_id
-    ).order_by(Macrociclo.numero).all()
-
-    # Microciclos recentes da equipa (acesso direto)
-    microciclos_recentes = (
-        db.query(Microciclo)
-        .join(Mesociclo, Microciclo.mesociclo_id == Mesociclo.id)
-        .join(Macrociclo, Mesociclo.macrociclo_id == Macrociclo.id)
-        .filter(Macrociclo.equipa_id == equipa_id)
-        .order_by(Microciclo.data_inicio.desc())
-        .limit(8)
-        .all()
-    )
-
-    # Mesociclos recentes da equipa (acesso direto)
-    mesociclos_recentes = (
-        db.query(Mesociclo)
-        .join(Macrociclo, Mesociclo.macrociclo_id == Macrociclo.id)
-        .filter(Macrociclo.equipa_id == equipa_id)
-        .order_by(Mesociclo.data_inicio.desc())
-        .limit(8)
-        .all()
-    )
-
-    # Sessões de treino recentes/próximas da equipa (acesso direto)
-    sessoes_recentes = (
-        db.query(SessaoTreino)
-        .join(Microciclo, SessaoTreino.microciclo_id == Microciclo.id)
-        .join(Mesociclo, Microciclo.mesociclo_id == Mesociclo.id)
-        .join(Macrociclo, Mesociclo.macrociclo_id == Macrociclo.id)
-        .filter(Macrociclo.equipa_id == equipa_id)
-        .order_by(SessaoTreino.data.desc())
-        .limit(8)
-        .all()
-    )
-
-    return templates.TemplateResponse(request, "planeamento/macrociclos/lista.html", {
-        "utilizador": utilizador,
-        "equipa": equipa,
-        "macrociclos": macrociclos,
-        "microciclos_recentes": microciclos_recentes,
-        "mesociclos_recentes": mesociclos_recentes,
-        "sessoes_recentes": sessoes_recentes,
-    })
+    return RedirectResponse(url=f"/planeamento/equipas/{equipa_id}/anuais", status_code=303)
 
 
 # ─────────────────────────────────────────
@@ -375,17 +592,29 @@ def listar_macrociclos(equipa_id: int, request: Request, db: Session = Depends(g
 # ─────────────────────────────────────────
 @router.get("/equipas/{equipa_id}/macrociclos/novo", response_class=HTMLResponse)
 def form_novo_macrociclo(equipa_id: int, request: Request, db: Session = Depends(get_db),
-                         utilizador=Depends(exigir_autenticacao)):
+                         utilizador=Depends(exigir_autenticacao), anual_id: int | None = None):
     _verificar_acesso_planeamento(utilizador, equipa_id, db)
 
     equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
     if not equipa:
         return RedirectResponse(url="/equipas")
 
-    # Conta quantos macrociclos já existem para esta equipa
-    # .count() devolve um número inteiro em vez de uma lista
+    planeamento_anual = None
+    if anual_id:
+        planeamento_anual = db.query(PlaneamentoAnualEquipa).filter(
+            PlaneamentoAnualEquipa.id == anual_id,
+            PlaneamentoAnualEquipa.equipa_id == equipa_id,
+        ).first()
+    if not planeamento_anual:
+        planeamento_anual = db.query(PlaneamentoAnualEquipa).filter(
+            PlaneamentoAnualEquipa.equipa_id == equipa_id,
+        ).order_by(PlaneamentoAnualEquipa.data_inicio.desc()).first()
+    if not planeamento_anual:
+        set_flash(request, "Cria primeiro o planeamento anual da equipa.", "info")
+        return RedirectResponse(url=f"/planeamento/equipas/{equipa_id}/anuais/novo", status_code=303)
+
     total_macros = db.query(Macrociclo).filter(
-        Macrociclo.equipa_id == equipa_id
+        Macrociclo.planeamento_anual_equipa_id == planeamento_anual.id,
     ).count()
 
     # O número do novo macro é o total actual + 1
@@ -395,7 +624,8 @@ def form_novo_macrociclo(equipa_id: int, request: Request, db: Session = Depends
     return templates.TemplateResponse(request, "planeamento/macrociclos/form.html", {
         "utilizador": utilizador,
         "equipa": equipa,
-        "proximo_numero": proximo_numero
+        "proximo_numero": proximo_numero,
+        "planeamento_anual_equipa": planeamento_anual,
     })
 
 
@@ -409,6 +639,7 @@ async def criar_macrociclo(
     request: Request,
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_autenticacao),
+    planeamento_anual_equipa_id: str = Form(""),
     data_inicio: str = Form(...),
     data_fim: str = Form(...),
     obj_tecnica_individual_ofensiva: str = Form(""),
@@ -422,15 +653,34 @@ async def criar_macrociclo(
 ):
     _verificar_acesso_planeamento(utilizador, equipa_id, db)
 
-    # Calcula o número do novo macro automaticamente
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+    inicio = date.fromisoformat(data_inicio)
+    fim = date.fromisoformat(data_fim)
+    planeamento_anual = None
+    if planeamento_anual_equipa_id:
+        planeamento_anual = db.query(PlaneamentoAnualEquipa).filter(
+            PlaneamentoAnualEquipa.id == int(planeamento_anual_equipa_id),
+            PlaneamentoAnualEquipa.equipa_id == equipa_id,
+        ).first()
+    if not planeamento_anual:
+        planeamento_anual = _obter_ou_criar_anual_equipa(db, equipa, inicio, fim)
+    if inicio < planeamento_anual.data_inicio or fim > planeamento_anual.data_fim:
+        set_flash(request, "O macrociclo tem de ficar dentro das datas do planeamento anual.", "erro")
+        return RedirectResponse(
+            url=f"/planeamento/equipas/{equipa_id}/macrociclos/novo?anual_id={planeamento_anual.id}",
+            status_code=303,
+        )
+
     total_macros = db.query(Macrociclo).filter(
-        Macrociclo.equipa_id == equipa_id
+        Macrociclo.planeamento_anual_equipa_id == planeamento_anual.id,
     ).count()
 
     macrociclo = Macrociclo(
         numero=total_macros + 1,
-        data_inicio=date.fromisoformat(data_inicio),
-        data_fim=date.fromisoformat(data_fim),
+        data_inicio=inicio,
+        data_fim=fim,
         # if campo else None — se o campo estiver vazio, guarda None em vez de string vazia
         obj_tecnica_individual_ofensiva=obj_tecnica_individual_ofensiva or None,
         obj_tecnica_individual_defensiva=obj_tecnica_individual_defensiva or None,
@@ -440,7 +690,8 @@ async def criar_macrociclo(
         obj_tatica_coletiva_defensiva=obj_tatica_coletiva_defensiva or None,
         obj_fisicos=obj_fisicos or None,
         obj_psicologicos=obj_psicologicos or None,
-        equipa_id=equipa_id
+        equipa_id=equipa_id,
+        planeamento_anual_equipa_id=planeamento_anual.id,
     )
 
     # db.add() prepara o objecto para ser inserido na BD
@@ -449,7 +700,7 @@ async def criar_macrociclo(
     db.commit()
 
     set_flash(request, "Macrociclo criado com sucesso.")
-    return RedirectResponse(url=f"/planeamento/equipas/{equipa_id}/macrociclos", status_code=303)
+    return RedirectResponse(url=f"/planeamento/anuais/{planeamento_anual.id}", status_code=303)
 
 
 # ─────────────────────────────────────────
@@ -482,6 +733,7 @@ def detalhe_macrociclo(macro_id: int, request: Request, db: Session = Depends(ge
     return templates.TemplateResponse(request, "planeamento/macrociclos/detalhe.html", {
         "utilizador": utilizador,
         "macrociclo": macrociclo,
+        "planeamento_anual_equipa": macrociclo.planeamento_anual_equipa,
         "mesociclos": mesociclos,
         "proximo_numero_meso": proximo_numero_meso,
         "dashboard_planeamento": dashboard_planeamento,
@@ -551,6 +803,7 @@ def form_editar_macrociclo(macro_id: int, request: Request, db: Session = Depend
         "utilizador": utilizador,
         "equipa": equipa,
         "macrociclo": macrociclo,
+        "planeamento_anual_equipa": macrociclo.planeamento_anual_equipa,
     })
 
 
@@ -575,8 +828,16 @@ async def editar_macrociclo(
     macrociclo = db.query(Macrociclo).filter(Macrociclo.id == macro_id).first()
     if not macrociclo:
         return RedirectResponse(url="/equipas")
-    macrociclo.data_inicio = date.fromisoformat(data_inicio)
-    macrociclo.data_fim = date.fromisoformat(data_fim)
+    inicio = date.fromisoformat(data_inicio)
+    fim = date.fromisoformat(data_fim)
+    if macrociclo.planeamento_anual_equipa and (
+        inicio < macrociclo.planeamento_anual_equipa.data_inicio
+        or fim > macrociclo.planeamento_anual_equipa.data_fim
+    ):
+        set_flash(request, "O macrociclo tem de ficar dentro das datas do planeamento anual.", "erro")
+        return RedirectResponse(url=f"/planeamento/macrociclos/{macro_id}/editar", status_code=303)
+    macrociclo.data_inicio = inicio
+    macrociclo.data_fim = fim
     macrociclo.obj_tecnica_individual_ofensiva = obj_tecnica_individual_ofensiva or None
     macrociclo.obj_tecnica_individual_defensiva = obj_tecnica_individual_defensiva or None
     macrociclo.obj_tatica_individual_ofensiva = obj_tatica_individual_ofensiva or None
@@ -596,11 +857,13 @@ async def eliminar_macrociclo(macro_id: int, request: Request, db: Session = Dep
     equipa_id = _obter_equipa_id_por_macrociclo(db, macro_id)
     _verificar_acesso_planeamento(utilizador, equipa_id, db)
     macrociclo = db.query(Macrociclo).filter(Macrociclo.id == macro_id).first()
+    anual_id = macrociclo.planeamento_anual_equipa_id if macrociclo else None
     if macrociclo:
         db.delete(macrociclo)
         db.commit()
         set_flash(request, "Macrociclo eliminado.")
-    return RedirectResponse(url=f"/planeamento/equipas/{equipa_id}/macrociclos", status_code=303)
+    retorno = f"/planeamento/anuais/{anual_id}" if anual_id else f"/planeamento/equipas/{equipa_id}/anuais"
+    return RedirectResponse(url=retorno, status_code=303)
 
 
 # ─────────────────────────────────────────

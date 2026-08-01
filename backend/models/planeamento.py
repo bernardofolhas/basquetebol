@@ -1,7 +1,53 @@
 # Importações necessárias do SQLAlchemy e Python
-from sqlalchemy import Column, Integer, String, Date, Text, ForeignKey, Float, Boolean
+from datetime import datetime
+
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship, backref
 from database import Base
+
+
+class PlaneamentoAnualEquipa(Base):
+    """Enquadramento anual próprio da equipa, opcionalmente alinhado com o clube."""
+
+    __tablename__ = "planeamentos_anuais_equipa"
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
+    equipa_id = Column(Integer, ForeignKey("equipas.id", ondelete="CASCADE"), nullable=False, index=True)
+    planeamento_clube_anual_id = Column(
+        Integer,
+        ForeignKey("planeamentos_clube_anuais.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    epoca = Column(String, nullable=False)
+    titulo = Column(String, nullable=False)
+    data_inicio = Column(Date, nullable=False)
+    data_fim = Column(Date, nullable=False)
+    objetivos_gerais = Column(Text, nullable=True)
+    obj_tecnica_individual_ofensiva = Column(Text, nullable=True)
+    obj_tecnica_individual_defensiva = Column(Text, nullable=True)
+    obj_tatica_individual_ofensiva = Column(Text, nullable=True)
+    obj_tatica_individual_defensiva = Column(Text, nullable=True)
+    obj_tatica_coletiva_ofensiva = Column(Text, nullable=True)
+    obj_tatica_coletiva_defensiva = Column(Text, nullable=True)
+    obj_fisicos = Column(Text, nullable=True)
+    obj_psicologicos = Column(Text, nullable=True)
+    reflexao = Column(Text, nullable=True)
+    estado = Column(String, nullable=False, default="rascunho", server_default="rascunho")
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    equipa = relationship(
+        "Equipa",
+        backref=backref("planeamentos_anuais", cascade="all, delete", passive_deletes=True),
+    )
+    planeamento_clube_anual = relationship("PlaneamentoClubeAnual", backref="planeamentos_equipas")
+    macrociclos = relationship(
+        "Macrociclo",
+        back_populates="planeamento_anual_equipa",
+        cascade="all, delete",
+    )
 
 
 # ─────────────────────────────────────────
@@ -38,9 +84,16 @@ class Macrociclo(Base):
     # Ligação à equipa — cada macrociclo pertence a uma equipa
     # ForeignKey cria a ligação entre tabelas
     equipa_id = Column(Integer, ForeignKey("equipas.id"), nullable=False)
+    planeamento_anual_equipa_id = Column(
+        Integer,
+        ForeignKey("planeamentos_anuais_equipa.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     # relationship permite aceder a equipa.macrociclos e macrociclo.equipa
     equipa = relationship("Equipa", backref="macrociclos")
+    planeamento_anual_equipa = relationship("PlaneamentoAnualEquipa", back_populates="macrociclos")
 
     # Um macrociclo tem vários mesociclos
     mesociclos = relationship("Mesociclo", back_populates="macrociclo", cascade="all, delete")

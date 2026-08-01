@@ -72,7 +72,7 @@ def _acoes_rapidas(utilizador, equipas: list) -> list[dict]:
     if equipas:
         equipa = equipas[0]
         acoes.extend([
-            {"label": "Preparar treino", "descricao": equipa.nome, "link": f"/planeamento/equipas/{equipa.id}/macrociclos", "icone": "treino"},
+            {"label": "Preparar treino", "descricao": equipa.nome, "link": f"/planeamento/equipas/{equipa.id}/anuais", "icone": "treino"},
             {"label": "Criar convocatória", "descricao": equipa.nome, "link": f"/jogos/equipas/{equipa.id}", "icone": "jogo"},
         ])
     if perfil in {"administrador", "coordenador", "superadministrador"}:

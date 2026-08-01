@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+
+{% block titulo %}{{ "Editar" if planeamento else "Novo" }} planeamento anual - {{ equipa.nome }}{% endblock %}
+{% block conteudo %}
+{{ equipa_contexto(equipa, ("Editar planeamento anual" if planeamento else "Novo planeamento anual"), "Define o rumo da época da equipa sem depender da estrutura operacional do clube.", "planeamento", ("/planeamento/anuais/" ~ planeamento.id if planeamento else "/planeamento/equipas/" ~ equipa.id ~ "/anuais"), "Voltar") }}
+
+<form method="POST" action="{{ '/planeamento/anuais/' ~ planeamento.id ~ '/editar' if planeamento else '/planeamento/equipas/' ~ equipa.id ~ '/anuais/novo' }}" class="space-y-6">
+    <section class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div class="mb-5">
+            <h2 class="font-semibold text-gray-900">Enquadramento da época</h2>
+            <p class="mt-1 text-sm text-gray-500">A ligação ao clube é opcional. O treinador mantém o planeamento próprio da equipa.</p>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <label class="text-sm font-medium text-gray-700">Época *<input required name="epoca" value="{{ planeamento.epoca if planeamento else '' }}" placeholder="2026/2027" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5"></label>
+            <label class="text-sm font-medium text-gray-700 md:col-span-1 xl:col-span-2">Título *<input required name="titulo" value="{{ planeamento.titulo if planeamento else '' }}" placeholder="Planeamento anual da equipa" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5"></label>
+            <label class="text-sm font-medium text-gray-700">Estado<select name="estado" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5"><option value="rascunho" {% if not planeamento or planeamento.estado == 'rascunho' %}selected{% endif %}>Rascunho</option><option value="ativo" {% if planeamento and planeamento.estado == 'ativo' %}selected{% endif %}>Ativo</option><option value="concluido" {% if planeamento and planeamento.estado == 'concluido' %}selected{% endif %}>Concluído</option></select></label>
+            <label class="text-sm font-medium text-gray-700">Data de início *<input required type="date" name="data_inicio" value="{{ planeamento.data_inicio|data_iso if planeamento else '' }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5"></label>
+            <label class="text-sm font-medium text-gray-700">Data de fim *<input required type="date" name="data_fim" value="{{ planeamento.data_fim|data_iso if planeamento else '' }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5"></label>
+            <label class="text-sm font-medium text-gray-700 md:col-span-2">Referência do clube (opcional)<select name="planeamento_clube_anual_id" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5"><option value="">Sem ligação, planeamento autónomo</option>{% for anual in planeamentos_clube %}<option value="{{ anual.id }}" {% if planeamento and planeamento.planeamento_clube_anual_id == anual.id %}selected{% endif %}>{{ anual.epoca }} · {{ anual.titulo }}</option>{% endfor %}</select></label>
+        </div>
+    </section>
+
+    <section class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h2 class="font-semibold text-gray-900">Objetivos da equipa</h2>
+        <label class="mt-4 block text-sm font-medium text-gray-700">Objetivos gerais<textarea name="objetivos_gerais" rows="3" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5">{{ planeamento.objetivos_gerais if planeamento and planeamento.objetivos_gerais else '' }}</textarea></label>
+        {% set campos = [
+            ('obj_tecnica_individual_ofensiva', 'Técnica individual ofensiva'),
+            ('obj_tecnica_individual_defensiva', 'Técnica individual defensiva'),
+            ('obj_tatica_individual_ofensiva', 'Tática individual ofensiva'),
+            ('obj_tatica_individual_defensiva', 'Tática individual defensiva'),
+            ('obj_tatica_coletiva_ofensiva', 'Tática coletiva ofensiva'),
+            ('obj_tatica_coletiva_defensiva', 'Tática coletiva defensiva'),
+            ('obj_fisicos', 'Físicos'), ('obj_psicologicos', 'Psicológicos')
+        ] %}
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+            {% for nome, label in campos %}<label class="text-sm font-medium text-gray-700">{{ label }}<textarea name="{{ nome }}" rows="2" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5">{{ planeamento|attr(nome) if planeamento and planeamento|attr(nome) else '' }}</textarea></label>{% endfor %}
+        </div>
+        <label class="mt-4 block text-sm font-medium text-gray-700">Reflexão anual<textarea name="reflexao" rows="3" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5">{{ planeamento.reflexao if planeamento and planeamento.reflexao else '' }}</textarea></label>
+    </section>
+    <div class="flex gap-3"><button class="rounded-xl bg-orange-500 px-5 py-2.5 font-medium text-white hover:bg-orange-600">{{ "Guardar alterações" if planeamento else "Criar planeamento anual" }}</button><a href="{{ '/planeamento/anuais/' ~ planeamento.id if planeamento else '/planeamento/equipas/' ~ equipa.id ~ '/anuais' }}" class="rounded-xl bg-gray-100 px-5 py-2.5 font-medium text-gray-700">Cancelar</a></div>
+</form>
+{% endblock %}

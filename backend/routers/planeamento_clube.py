@@ -23,7 +23,7 @@ from models.equipa import Equipa
 from models.espaco_treino import EspacoTreino, TipoEspacoTreinoEnum
 from models.jogo import Jogo
 from models.historico_planeamento import HistoricoPlaneamentoClube
-from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
+from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnualEquipa, SessaoTreino
 from models.planeamento_clube import (
     EventoPlaneamentoClube,
     OrigemEventoPlaneamentoClubeEnum,
@@ -760,20 +760,54 @@ def _obter_ou_criar_macrociclo_para_equipa_intervalo(
     data_fim: date,
 ) -> Macrociclo:
     """Obtém um macrociclo da equipa que cobre o intervalo ou cria um novo."""
+    planeamento_anual = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.equipa_id == equipa_id,
+        PlaneamentoAnualEquipa.data_inicio <= data_inicio,
+        PlaneamentoAnualEquipa.data_fim >= data_fim,
+    ).order_by(PlaneamentoAnualEquipa.data_inicio.desc()).first()
+    if not planeamento_anual:
+        equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+        anual_clube = db.query(PlaneamentoClubeAnual).filter(
+            PlaneamentoClubeAnual.data_inicio <= data_inicio,
+            PlaneamentoClubeAnual.data_fim >= data_fim,
+        ).order_by(PlaneamentoClubeAnual.data_inicio.desc()).first()
+        if anual_clube:
+            inicio_anual, fim_anual = anual_clube.data_inicio, anual_clube.data_fim
+            epoca = anual_clube.epoca
+        else:
+            ano = data_inicio.year if data_inicio.month >= 7 else data_inicio.year - 1
+            inicio_anual, fim_anual = date(ano, 7, 1), date(ano + 1, 6, 30)
+            epoca = f"{ano}/{ano + 1}"
+        planeamento_anual = PlaneamentoAnualEquipa(
+            clube_id=equipa.clube_id,
+            equipa_id=equipa_id,
+            planeamento_clube_anual_id=anual_clube.id if anual_clube else None,
+            epoca=epoca,
+            titulo=f"Planeamento anual {epoca}",
+            data_inicio=inicio_anual,
+            data_fim=fim_anual,
+            objetivos_gerais=anual_clube.objetivos_gerais if anual_clube else None,
+        )
+        db.add(planeamento_anual)
+        db.flush()
+
     macrociclo = db.query(Macrociclo).filter(
-        Macrociclo.equipa_id == equipa_id,
+        Macrociclo.planeamento_anual_equipa_id == planeamento_anual.id,
         Macrociclo.data_inicio <= data_inicio,
         Macrociclo.data_fim >= data_fim,
     ).order_by(Macrociclo.data_inicio.desc(), Macrociclo.id.desc()).first()
     if macrociclo:
         return macrociclo
 
-    total_macrociclos = db.query(Macrociclo).filter(Macrociclo.equipa_id == equipa_id).count()
+    total_macrociclos = db.query(Macrociclo).filter(
+        Macrociclo.planeamento_anual_equipa_id == planeamento_anual.id,
+    ).count()
     macrociclo = Macrociclo(
         numero=total_macrociclos + 1,
-        data_inicio=date(data_inicio.year, 1, 1),
-        data_fim=date(data_fim.year, 12, 31),
+        data_inicio=planeamento_anual.data_inicio,
+        data_fim=planeamento_anual.data_fim,
         equipa_id=equipa_id,
+        planeamento_anual_equipa_id=planeamento_anual.id,
         reflexao="Macrociclo criado automaticamente para suportar sessões do planeamento global.",
     )
     db.add(macrociclo)
@@ -1374,6 +1408,9 @@ def detalhe_planeamento_anual(anual_id: int, request: Request, db: Session = Dep
         HistoricoPlaneamentoClube.entidade == "planeamento_anual",
         HistoricoPlaneamentoClube.entidade_id == anual_id,
     ).order_by(HistoricoPlaneamentoClube.criado_em.desc()).limit(20).all()
+    planeamentos_equipas = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.planeamento_clube_anual_id == anual_id,
+    ).order_by(PlaneamentoAnualEquipa.epoca, PlaneamentoAnualEquipa.equipa_id).all()
 
     return templates.TemplateResponse(request, "planeamento_clube/anual_detalhe.html", {
         "utilizador": utilizador,
@@ -1382,6 +1419,7 @@ def detalhe_planeamento_anual(anual_id: int, request: Request, db: Session = Dep
         "eventos": eventos,
         "dashboard_planeamento": dashboard_planeamento,
         "historico": historico,
+        "planeamentos_equipas": planeamentos_equipas,
         "erro": _obter_mensagem_erro_eliminacao(request.query_params.get("erro")),
     })
 

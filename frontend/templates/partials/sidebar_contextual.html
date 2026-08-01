@@ -14,7 +14,7 @@
       <p class="ds-side-section">Equipa</p>
       {{ nav_link('/equipas/' ~ equipa_contexto_id, 'RE', 'Resumo', p == '/equipas/' ~ equipa_contexto_id) }}
       {{ nav_link('/equipas/' ~ equipa_contexto_id ~ '/plantel', 'PL', 'Plantel', p.endswith('/plantel') or p.startswith('/jogadores')) }}
-      {{ nav_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/macrociclos', 'PN', 'Planeamento', p.startswith('/planeamento') or p.startswith('/treino')) }}
+      {{ nav_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/anuais', 'PN', 'Planeamento', p.startswith('/planeamento') or p.startswith('/treino')) }}
       {{ nav_link('/jogos/equipas/' ~ equipa_contexto_id, 'JG', 'Jogos', p.startswith('/jogos')) }}
       {{ nav_link('/assiduidade/equipas/' ~ equipa_contexto_id, 'AS', 'Assiduidade', p.startswith('/assiduidade')) }}
       {{ nav_link('/fisico/equipas/' ~ equipa_contexto_id, 'FS', 'Físico', p.startswith('/fisico')) }}
@@ -24,7 +24,9 @@
 
       {% if p.startswith('/planeamento') or p.startswith('/treino') %}
       <div class="my-3 border-t border-slate-200"></div><p class="ds-side-section">Nível de planeamento</p>
-      {{ nav_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/macrociclos', 'MA', 'Macrociclos', 'macrociclos' in p) }}
+      {{ nav_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/anuais', 'AN', 'Planeamento anual', '/anuais' in p) }}
+      {% if planeamento_anual_equipa is defined and planeamento_anual_equipa %}{{ nav_link('/planeamento/anuais/' ~ planeamento_anual_equipa.id, 'MA', 'Macrociclos', 'macrociclos' in p) }}{% endif %}
+      {% if planeamento_anual_equipa is not defined and macrociclo is defined and macrociclo and macrociclo.planeamento_anual_equipa %}{{ nav_link('/planeamento/anuais/' ~ macrociclo.planeamento_anual_equipa.id, 'MA', 'Macrociclos', 'macrociclos' in p) }}{% endif %}
       {% if macrociclo is defined and macrociclo %}{{ nav_link('/planeamento/macrociclos/' ~ macrociclo.id, 'ME', 'Mesociclos', 'mesociclos' in p) }}{% endif %}
       {% if mesociclo is defined and mesociclo %}{{ nav_link('/planeamento/mesociclos/' ~ mesociclo.id, 'MI', 'Microciclos', 'microciclos' in p) }}{% endif %}
       {{ nav_link('/calendario?equipa_id=' ~ equipa_contexto_id, 'CA', 'Calendário da equipa', p.startswith('/calendario')) }}

@@ -422,6 +422,73 @@ def actualizar_estrutura_planeamento_clube() -> None:
             logger.info("Coluna 'tags' adicionada a biblioteca_exercicios.")
 
 
+def actualizar_estrutura_planeamento_equipa() -> None:
+    """Liga instalações existentes ao novo planeamento anual de equipa."""
+    inspector = inspect(engine)
+    if not inspector.has_table("macrociclos") or not inspector.has_table("planeamentos_anuais_equipa"):
+        return
+
+    colunas = {coluna["name"] for coluna in inspector.get_columns("macrociclos")}
+    if "planeamento_anual_equipa_id" not in colunas:
+        with engine.begin() as ligacao:
+            if engine.dialect.name == "postgresql":
+                ligacao.execute(text(
+                    "ALTER TABLE macrociclos ADD COLUMN IF NOT EXISTS "
+                    "planeamento_anual_equipa_id INTEGER "
+                    "REFERENCES planeamentos_anuais_equipa(id) ON DELETE CASCADE"
+                ))
+                ligacao.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_macrociclos_planeamento_anual_equipa_id "
+                    "ON macrociclos (planeamento_anual_equipa_id)"
+                ))
+            else:
+                ligacao.execute(text(
+                    "ALTER TABLE macrociclos ADD COLUMN planeamento_anual_equipa_id INTEGER"
+                ))
+        logger.info("Ligação anual adicionada aos macrociclos.")
+
+    from models.planeamento import Macrociclo, PlaneamentoAnualEquipa
+    from models.planeamento_clube import PlaneamentoClubeAnual
+
+    db = SessionLocal()
+    try:
+        macros = db.query(Macrociclo).filter(Macrociclo.planeamento_anual_equipa_id.is_(None)).all()
+        for macro in macros:
+            ano_inicio = macro.data_inicio.year if macro.data_inicio.month >= 7 else macro.data_inicio.year - 1
+            epoca = f"{ano_inicio}/{ano_inicio + 1}"
+            anual = db.query(PlaneamentoAnualEquipa).filter(
+                PlaneamentoAnualEquipa.equipa_id == macro.equipa_id,
+                PlaneamentoAnualEquipa.epoca == epoca,
+            ).first()
+            if not anual:
+                anual_clube = db.query(PlaneamentoClubeAnual).filter(
+                    PlaneamentoClubeAnual.clube_id == macro.clube_id,
+                    PlaneamentoClubeAnual.data_inicio <= macro.data_inicio,
+                    PlaneamentoClubeAnual.data_fim >= macro.data_fim,
+                ).first()
+                anual = PlaneamentoAnualEquipa(
+                    clube_id=macro.clube_id,
+                    equipa_id=macro.equipa_id,
+                    planeamento_clube_anual_id=anual_clube.id if anual_clube else None,
+                    epoca=epoca,
+                    titulo=f"Planeamento anual {epoca}",
+                    data_inicio=macro.data_inicio,
+                    data_fim=macro.data_fim,
+                    objetivos_gerais=anual_clube.objetivos_gerais if anual_clube else None,
+                )
+                db.add(anual)
+                db.flush()
+            else:
+                anual.data_inicio = min(anual.data_inicio, macro.data_inicio)
+                anual.data_fim = max(anual.data_fim, macro.data_fim)
+            macro.planeamento_anual_equipa_id = anual.id
+        db.commit()
+        if macros:
+            logger.info("%s macrociclo(s) associados ao planeamento anual da equipa.", len(macros))
+    finally:
+        db.close()
+
+
 def actualizar_estrutura_assiduidade() -> None:
     """Atualiza instalações antigas com o estado detalhado de assiduidade."""
     inspector = inspect(engine)

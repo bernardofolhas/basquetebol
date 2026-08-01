@@ -22,6 +22,7 @@
   {% set equipa_contexto_id = none %}{% set equipa_contexto_nome = none %}
   {% if perfil != 'secretaria' %}
   {% if equipa is defined and equipa %}{% set equipa_contexto_id = equipa.id %}{% set equipa_contexto_nome = equipa.nome %}
+  {% elif planeamento_anual_equipa is defined and planeamento_anual_equipa %}{% set equipa_contexto_id = planeamento_anual_equipa.equipa_id %}{% if planeamento_anual_equipa.equipa %}{% set equipa_contexto_nome = planeamento_anual_equipa.equipa.nome %}{% endif %}
   {% elif jogo is defined and jogo %}{% set equipa_contexto_id = jogo.equipa_id %}{% if jogo.equipa %}{% set equipa_contexto_nome = jogo.equipa.nome %}{% endif %}
   {% elif macrociclo is defined and macrociclo %}{% set equipa_contexto_id = macrociclo.equipa_id %}{% if macrociclo.equipa %}{% set equipa_contexto_nome = macrociclo.equipa.nome %}{% endif %}
   {% elif mesociclo is defined and mesociclo and mesociclo.macrociclo %}{% set equipa_contexto_id = mesociclo.macrociclo.equipa_id %}{% if mesociclo.macrociclo.equipa %}{% set equipa_contexto_nome = mesociclo.macrociclo.equipa.nome %}{% endif %}

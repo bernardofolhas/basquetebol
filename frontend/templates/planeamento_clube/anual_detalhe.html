@@ -51,6 +51,14 @@
     </a>
 </div>
 
+<div class="mb-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div><h2 class="font-semibold text-gray-900">Planeamentos anuais das equipas</h2><p class="mt-1 text-sm text-gray-500">Ligação entre a estratégia do clube e o trabalho técnico de cada equipa.</p></div>
+        <span class="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{{ planeamentos_equipas|length }} equipa(s)</span>
+    </div>
+    {% if planeamentos_equipas %}<div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{% for item in planeamentos_equipas %}<a href="/planeamento/anuais/{{ item.id }}" class="rounded-xl border border-gray-100 bg-slate-50 p-4 hover:border-orange-200"><p class="font-medium text-gray-900">{{ item.equipa.nome }}</p><p class="mt-1 text-xs text-gray-500">{{ item.epoca }} · {{ item.macrociclos|length }} macrociclo(s)</p></a>{% endfor %}</div>{% else %}<p class="mt-4 text-sm text-gray-500">Nenhuma equipa ligou ainda o seu planeamento anual a este plano do clube.</p>{% endif %}
+</div>
+
 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
     <div class="rounded-2xl border border-orange-100 bg-orange-50 p-4">
         <p class="text-xs uppercase tracking-[0.2em] text-orange-500">Mensais</p>
