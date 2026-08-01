@@ -1,0 +1,84 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!doctype html>
+<html lang="pt">
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page { size: A4; margin: 9mm 12mm 11mm; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body { font-family: sans-serif; color: #1f2937; font-size: 9pt; }
+        h1 { color: #ea580c; margin: 0; font-size: 21pt; }
+        h2 { color: #374151; font-size: 12pt; margin: 18px 0 8px; border-bottom: 2px solid #fed7aa; padding-bottom: 4px; }
+        .meta { color: #6b7280; margin-top: 4px; }
+        .cards { display: flex; gap: 8px; margin-top: 14px; }
+        .card { flex: 1; border: 1px solid #e5e7eb; border-radius: 6px; padding: 9px; }
+        .label { color: #6b7280; font-size: 8pt; text-transform: uppercase; }
+        .value { color: #ea580c; font-size: 17pt; font-weight: bold; margin-top: 3px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        th { background: #f97316; color: white; text-align: left; }
+        th, td { border: 1px solid #d1d5db; padding: 5px; }
+        .number { text-align: center; }
+        .empty { color: #9ca3af; }
+        .profile-page { page-break-after: always; }
+        .profile { display: flex; gap: 14px; align-items: flex-start; margin-top: 8px; }
+        .photo { width: 42mm; height: 52mm; object-fit: cover; border: 1px solid #d1d5db; border-radius: 6px; }
+        .identity { flex: 1; }
+        .identity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+        .identity-item { border: 1px solid #e5e7eb; padding: 7px 8px; min-height: 14mm; }
+        .identity-item .label { margin-bottom: 3px; }
+        .photo-placeholder { display: flex; align-items: center; justify-content: center; background: #f1f5f9; color: #94a3b8; font-size: 30pt; font-weight: bold; }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body>
+    <section class="profile-page">
+    {{ cabecalho_pdf('Ficha individual', jogador.nome ~ ((' · ' ~ jogador.equipa.nome) if jogador.equipa else ''), 'Informação individual') }}
+    <div class="profile">
+        {% if jogador.fotografia_pdf %}<img class="photo" src="{{ jogador.fotografia_pdf }}" alt="Fotografia">{% else %}<div class="photo photo-placeholder">{{ jogador.nome[:1]|upper }}</div>{% endif %}
+        <div class="identity"><h1>{{ jogador.nome }}</h1><div class="identity-grid">
+            {% for label, valor in [('Data de nascimento', jogador.data_nascimento), ('Idade', (idade ~ ' anos') if idade is not none else '—'), ('Equipa', jogador.equipa.nome if jogador.equipa else 'Sem equipa'), ('Escalão', jogador.equipa.escalao.value if jogador.equipa else '—'), ('Género', jogador.equipa.genero.value if jogador.equipa else '—'), ('Posição', jogador.posicao), ('Número', jogador.numero_camisola), ('Telefone', jogador.telefone), ('Email', jogador.email), ('Inscrição', jogador.inscricao_estado), ('Exame médico', jogador.exame_medico_estado)] %}<div class="identity-item"><div class="label">{{ label }}</div><strong>{{ valor or '—' }}</strong></div>{% endfor %}
+        </div></div>
+    </div>
+    <h2>Observações essenciais</h2><p>{{ jogador.inscricao_observacoes or jogador.exame_medico_observacoes or 'Sem observações.' }}</p>
+    {{ rodape_pdf(jogador.nome ~ ' · Informação individual') }}
+    </section>
+
+    {{ cabecalho_pdf('Ficha de evolução', jogador.nome ~ ((' · ' ~ jogador.equipa.nome) if jogador.equipa else ''), 'Evolução desportiva') }}
+
+    <div class="cards">
+        <div class="card"><div class="label">Assiduidade</div><div class="value">{{ evolucao.assiduidade.percentagem }}%</div><div>{{ evolucao.assiduidade.presentes }} participações / {{ evolucao.assiduidade.total }} registos</div></div>
+        <div class="card"><div class="label">Última altura</div><div class="value">{{ evolucao.antropometrias[0].altura if evolucao.antropometrias and evolucao.antropometrias[0].altura else '—' }}</div><div>{{ evolucao.antropometrias[0].data if evolucao.antropometrias else 'Sem registo' }}</div></div>
+        <div class="card"><div class="label">Último peso</div><div class="value">{{ evolucao.antropometrias[0].peso if evolucao.antropometrias and evolucao.antropometrias[0].peso else '—' }}</div><div>{{ 'kg' if evolucao.antropometrias else '' }}</div></div>
+    </div>
+
+    <h2>Avaliação técnica</h2>
+    <p><strong>Resumo:</strong> {{ jogador.resumo_tecnico or 'Sem avaliação preenchida.' }}</p>
+    <p><strong>Objetivos a médio prazo:</strong> {{ jogador.objetivos_medio_prazo or 'Sem objetivos preenchidos.' }}</p>
+    <p><strong>Objetivos a longo prazo:</strong> {{ jogador.objetivos_longo_prazo or 'Sem objetivos preenchidos.' }}</p>
+
+    <h2>Assiduidade recente</h2>
+    {% if evolucao.assiduidade.registos %}
+    <table><thead><tr><th>Data</th><th>Sessão</th><th>Estado</th><th>Nota</th></tr></thead><tbody>
+        {% for registo in evolucao.assiduidade.registos[:12] %}
+        <tr><td>{{ registo.sessao.data }}</td><td>{{ 'Jogo' if registo.sessao.e_jogo else 'Treino' }}</td><td>{{ registo.estado_visual.label }}</td><td>{{ registo.motivo_falta or '—' }}</td></tr>
+        {% endfor %}
+    </tbody></table>
+    {% else %}<p class="empty">Sem registos de assiduidade.</p>{% endif %}
+
+    <h2>Antropometria</h2>
+    {% if evolucao.antropometrias %}
+    <table><thead><tr><th>Data</th><th class="number">Altura (cm)</th><th class="number">Peso (kg)</th><th class="number">Envergadura (cm)</th></tr></thead><tbody>
+        {% for registo in evolucao.antropometrias[:8] %}<tr><td>{{ registo.data|data_pt }}</td><td class="number">{{ registo.altura or '—' }}</td><td class="number">{{ registo.peso or '—' }}</td><td class="number">{{ registo.envergadura or '—' }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="empty">Sem registos antropométricos.</p>{% endif %}
+
+    <h2>Testes físicos</h2>
+    {% if evolucao.testes %}
+    <table><thead><tr><th>Data</th><th>Teste</th><th class="number">Resultado</th><th>Observações</th></tr></thead><tbody>
+        {% for teste in evolucao.testes[:10] %}<tr><td>{{ teste.data|data_pt }}</td><td>{{ teste.tipo_teste }}</td><td class="number">{{ teste.resultado or '—' }} {{ teste.unidade or '' }}</td><td>{{ teste.observacoes or '—' }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="empty">Sem testes físicos.</p>{% endif %}
+    {{ rodape_pdf(jogador.nome ~ ' · Evolução') }}
+</body>
+</html>

@@ -1,30 +1,30 @@
 {% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
 
-{% block titulo %}Novo Macrociclo — {{ equipa.nome }}{% endblock %}
+{% block titulo %}{{ "Editar" if macrociclo else "Novo" }} Macrociclo — {{ equipa.nome }}{% endblock %}
 
 {% block conteudo %}
 
-<div class="mb-6">
-    <a href="/planeamento/equipas/{{ equipa.id }}/macrociclos"
-       class="text-orange-500 hover:text-orange-600 text-sm">
-        ← Voltar aos macrociclos
-    </a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-2">
-        Macrociclo {{ proximo_numero }} — {{ equipa.nome }}
-    </h1>
-</div>
+{{ equipa_contexto(
+    equipa,
+    ("Editar Macrociclo " ~ macrociclo.numero) if macrociclo else ("Novo Macrociclo " ~ proximo_numero),
+    "Define o período geral da época e os objetivos estruturais que vão orientar mesociclos e microciclos.",
+    "planeamento",
+    '/planeamento/macrociclos/' ~ macrociclo.id if macrociclo else '/planeamento/equipas/' ~ equipa.id ~ '/macrociclos',
+    'Voltar'
+) }}
 
-<form method="POST" action="/planeamento/equipas/{{ equipa.id }}/macrociclos/novo">
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<form method="POST" action="{{ '/planeamento/macrociclos/' ~ macrociclo.id ~ '/editar' if macrociclo else '/planeamento/equipas/' ~ equipa.id ~ '/macrociclos/novo' }}">
+<div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_320px]">
+<div class="space-y-6">
 
     <!-- Informações básicas -->
     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 class="font-semibold text-gray-700 mb-4">Informações Básicas</h2>
 
-        <!-- Campo apenas de leitura — o número é automático -->
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Número do Macrociclo</label>
-            <input type="text" value="Macrociclo {{ proximo_numero }}" disabled
+            <input type="text" value="Macrociclo {{ macrociclo.numero if macrociclo else proximo_numero }}" disabled
                    class="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500">
         </div>
 
@@ -32,11 +32,13 @@
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Data de início *</label>
                 <input type="date" name="data_inicio" required
+                       value="{{ macrociclo.data_inicio|data_iso if macrociclo else '' }}"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Data de fim *</label>
                 <input type="date" name="data_fim" required
+                       value="{{ macrociclo.data_fim|data_iso if macrociclo else '' }}"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
         </div>
@@ -53,7 +55,7 @@
             </label>
             <textarea name="obj_tecnica_individual_ofensiva" rows="2"
                       placeholder="Objetivos de técnica individual ofensiva..."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ macrociclo.obj_tecnica_individual_ofensiva if macrociclo and macrociclo.obj_tecnica_individual_ofensiva else '' }}</textarea>
         </div>
 
         <!-- TID — Técnica Individual Defensiva -->
@@ -63,7 +65,7 @@
             </label>
             <textarea name="obj_tecnica_individual_defensiva" rows="2"
                       placeholder="Objetivos de técnica individual defensiva..."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ macrociclo.obj_tecnica_individual_defensiva if macrociclo and macrociclo.obj_tecnica_individual_defensiva else '' }}</textarea>
         </div>
 
         <!-- TaIO — Tática Individual Ofensiva -->
@@ -73,7 +75,7 @@
             </label>
             <textarea name="obj_tatica_individual_ofensiva" rows="2"
                       placeholder="Objetivos de tática individual ofensiva..."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ macrociclo.obj_tatica_individual_ofensiva if macrociclo and macrociclo.obj_tatica_individual_ofensiva else '' }}</textarea>
         </div>
 
         <!-- TaID — Tática Individual Defensiva -->
@@ -83,7 +85,7 @@
             </label>
             <textarea name="obj_tatica_individual_defensiva" rows="2"
                       placeholder="Objetivos de tática individual defensiva..."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ macrociclo.obj_tatica_individual_defensiva if macrociclo and macrociclo.obj_tatica_individual_defensiva else '' }}</textarea>
         </div>
 
         <!-- TCO — Tática Coletiva Ofensiva -->
@@ -93,7 +95,7 @@
             </label>
             <textarea name="obj_tatica_coletiva_ofensiva" rows="2"
                       placeholder="Objetivos de tática coletiva ofensiva..."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ macrociclo.obj_tatica_coletiva_ofensiva if macrociclo and macrociclo.obj_tatica_coletiva_ofensiva else '' }}</textarea>
         </div>
 
         <!-- TCD — Tática Coletiva Defensiva -->
@@ -103,7 +105,7 @@
             </label>
             <textarea name="obj_tatica_coletiva_defensiva" rows="2"
                       placeholder="Objetivos de tática coletiva defensiva..."
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ macrociclo.obj_tatica_coletiva_defensiva if macrociclo and macrociclo.obj_tatica_coletiva_defensiva else '' }}</textarea>
         </div>
     </div>
 
@@ -115,24 +117,45 @@
                 <label class="block text-xs font-semibold text-purple-600 mb-1">Físicos</label>
                 <textarea name="obj_fisicos" rows="3"
                           placeholder="Objetivos físicos..."
-                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ macrociclo.obj_fisicos if macrociclo and macrociclo.obj_fisicos else '' }}</textarea>
             </div>
             <div>
                 <label class="block text-xs font-semibold text-yellow-600 mb-1">Psicológicos</label>
                 <textarea name="obj_psicologicos" rows="3"
                           placeholder="Objetivos psicológicos..."
-                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ macrociclo.obj_psicologicos if macrociclo and macrociclo.obj_psicologicos else '' }}</textarea>
             </div>
         </div>
     </div>
 
 </div>
 
+<aside class="space-y-4">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Como usar este nível</h2>
+        <div class="space-y-3 text-sm text-gray-600">
+            <div class="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100">
+                <p class="font-medium text-gray-800">1. Delimita o período</p>
+                <p class="mt-1">Escolhe o intervalo global que enquadra a fase da época.</p>
+            </div>
+            <div class="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100">
+                <p class="font-medium text-gray-800">2. Define prioridades</p>
+                <p class="mt-1">Preenche apenas os objetivos realmente relevantes para este bloco.</p>
+            </div>
+            <div class="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100">
+                <p class="font-medium text-gray-800">3. Desce para mesos</p>
+                <p class="mt-1">Depois deste passo, os mesociclos ficam mais fáceis de estruturar.</p>
+            </div>
+        </div>
+    </div>
+</aside>
+</div>
+
 <!-- Botões de acção -->
 <div class="flex gap-3 mt-6">
     <button type="submit"
             class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
-        Criar Macrociclo
+        {{ "Guardar alterações" if macrociclo else "Criar Macrociclo" }}
     </button>
     <a href="/planeamento/equipas/{{ equipa.id }}/macrociclos"
        class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition">

@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ "Editar" if modo == "editar" else "Novo" }} Evento Global{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/planeamento-clube/eventos" class="text-orange-500 text-sm">← Voltar aos eventos</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">
+        {{ "Editar Evento Global" if modo == "editar" else "Novo Evento Global" }}
+    </h1>
+    <p class="text-gray-500 mt-1">Criar ou ajustar um evento do calendário global do clube</p>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <form method="POST"
+          action="{{ '/planeamento-clube/eventos/' ~ evento.id ~ '/editar' if modo == 'editar' else '/planeamento-clube/eventos/novo' }}"
+          class="space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
+                <select name="tipo" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    {% for tipo in tipos_evento_agenda|default([]) %}
+                    <option value="{{ tipo.value }}" {% if evento and evento.tipo.value == tipo.value %}selected{% endif %}>{{ tipo.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Título *</label>
+                <input type="text" name="titulo" required
+                       value="{{ evento.titulo if evento else '' }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data *</label>
+                <input type="date" name="data_evento" required
+                       value="{{ (evento.data if evento and evento.data else prefill.data|default(''))|data_iso }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Treinador</label>
+                <select name="treinador_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Sem treinador associado</option>
+                    {% for treinador in treinadores %}
+                    <option value="{{ treinador.id }}" {% if evento and evento.treinador_id == treinador.id %}selected{% endif %}>{{ treinador.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Espaço</label>
+                <select name="espaco_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Sem espaço associado</option>
+                    {% for espaco in espacos %}
+                    <option value="{{ espaco.id }}" {% if evento and evento.espaco_id == espaco.id %}selected{% endif %}>{{ espaco.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Hora de início</label>
+                <input type="time" name="hora_inicio"
+                       value="{{ evento.hora_inicio if evento and evento.hora_inicio else '' }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Hora de fim</label>
+                <input type="time" name="hora_fim"
+                       value="{{ evento.hora_fim if evento and evento.hora_fim else '' }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+            <textarea name="descricao" rows="3"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">{{ evento.descricao if evento and evento.descricao else '' }}</textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Planeamento anual</label>
+                <select name="planeamento_anual_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Sem associação</option>
+                    {% for anual in planeamentos_anuais %}
+                    <option value="{{ anual.id }}" {% if (evento and evento.planeamento_anual_id == anual.id) or (not evento and prefill.planeamento_anual_id|default('') == anual.id|string) %}selected{% endif %}>{{ anual.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Planeamento mensal</label>
+                <select name="planeamento_mensal_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Sem associação</option>
+                    {% for mensal in planeamentos_mensais %}
+                    <option value="{{ mensal.id }}" {% if (evento and evento.planeamento_mensal_id == mensal.id) or (not evento and prefill.planeamento_mensal_id|default('') == mensal.id|string) %}selected{% endif %}>{{ mensal.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Plano semanal</label>
+                <select name="plano_semanal_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Sem associação</option>
+                    {% for semanal in planos_semanais %}
+                    <option value="{{ semanal.id }}" {% if (evento and evento.plano_semanal_id == semanal.id) or (not evento and prefill.plano_semanal_id|default('') == semanal.id|string) %}selected{% endif %}>{{ semanal.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Equipas associadas</label>
+                <select name="equipas_ids" multiple size="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    {% for equipa in equipas %}
+                    <option value="{{ equipa.id }}" {% if evento and (evento.equipa_id == equipa.id or equipa in evento.equipas) %}selected{% endif %}>{{ equipa.nome }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-gray-400 mt-1">Podes escolher uma ou várias equipas.</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <input type="hidden" name="aplica_a_todas_equipas" value="false">
+            <input type="checkbox" name="aplica_a_todas_equipas" value="true" {% if evento and evento.aplica_a_todas_equipas %}checked{% endif %}
+                   class="rounded border-gray-300 text-orange-500 focus:ring-orange-400">
+            <label class="text-sm text-gray-700">Aplicar a todas as equipas</label>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+            <textarea name="observacoes" rows="3"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">{{ evento.observacoes if evento and evento.observacoes else '' }}</textarea>
+        </div>
+
+        {% if evento and evento.origem.value != 'manual' %}
+        <div class="rounded-lg bg-gray-50 border border-gray-200 p-4 text-sm text-gray-600">
+            Origem do evento: <span class="font-medium">{{ evento.origem.value }}</span>
+            {% if evento.jogo_id %}<span class="ml-2">Jogo ligado: #{{ evento.jogo_id }}</span>{% endif %}
+            {% if evento.atividade_id %}<span class="ml-2">Atividade ligada: #{{ evento.atividade_id }}</span>{% endif %}
+        </div>
+        {% endif %}
+
+        <div>
+            <button type="submit"
+                    class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+                {{ "Guardar Alterações" if modo == "editar" else "Criar Evento" }}
+            </button>
+        </div>
+    </form>
+</div>
+
+{% if modo == "criar" %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Associar Jogo Existente</h2>
+        <form method="POST"
+              action="/planeamento-clube/eventos/jogo/{% if jogos %}{{ jogos[0].id }}{% else %}0{% endif %}"
+              id="form-associar-jogo"
+              class="space-y-3"
+              onsubmit="this.action='/planeamento-clube/eventos/jogo/' + this.jogo_id.value;">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Jogo</label>
+                <select name="jogo_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    {% for jogo in jogos %}
+                    <option value="{{ jogo.id }}">{{ jogo.data|data_pt }} — {{ jogo.equipa.nome if jogo.equipa else 'Equipa' }} vs {{ jogo.adversario }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Planeamento anual</label>
+                <select name="planeamento_anual_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <option value="">Sem associação</option>
+                    {% for anual in planeamentos_anuais %}
+                    <option value="{{ anual.id }}">{{ anual.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Planeamento mensal</label>
+                <select name="planeamento_mensal_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <option value="">Sem associação</option>
+                    {% for mensal in planeamentos_mensais %}
+                    <option value="{{ mensal.id }}">{{ mensal.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Plano semanal</label>
+                <select name="plano_semanal_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <option value="">Sem associação</option>
+                    {% for semanal in planos_semanais %}
+                    <option value="{{ semanal.id }}">{{ semanal.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Espaço</label>
+                <select name="espaco_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <option value="">Sem espaço associado</option>
+                    {% for espaco in espacos %}
+                    <option value="{{ espaco.id }}">{{ espaco.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Equipas</label>
+                <select name="equipas_ids" multiple size="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    {% for equipa in equipas %}
+                    <option value="{{ equipa.id }}">{{ equipa.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="md:col-span-2 flex items-center gap-2">
+                <input type="hidden" name="aplica_a_todas_equipas" value="false">
+                <input type="checkbox" name="aplica_a_todas_equipas" value="true" class="rounded border-gray-300 text-orange-500 focus:ring-orange-400">
+                <label class="text-sm text-gray-700">Aplicar a todas as equipas</label>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <textarea name="observacoes" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+            </div>
+            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition">
+                Associar Jogo
+            </button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Associar Atividade Existente</h2>
+        <form method="POST"
+              action="/planeamento-clube/eventos/atividade/{% if atividades %}{{ atividades[0].id }}{% else %}0{% endif %}"
+              id="form-associar-atividade"
+              class="space-y-3"
+              onsubmit="this.action='/planeamento-clube/eventos/atividade/' + this.atividade_id.value;">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Atividade</label>
+                <select name="atividade_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    {% for atividade in atividades %}
+                    <option value="{{ atividade.id }}">{{ atividade.data|data_pt }} — {{ atividade.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Planeamento anual</label>
+                <select name="planeamento_anual_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <option value="">Sem associação</option>
+                    {% for anual in planeamentos_anuais %}
+                    <option value="{{ anual.id }}">{{ anual.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Planeamento mensal</label>
+                <select name="planeamento_mensal_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <option value="">Sem associação</option>
+                    {% for mensal in planeamentos_mensais %}
+                    <option value="{{ mensal.id }}">{{ mensal.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Plano semanal</label>
+                <select name="plano_semanal_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <option value="">Sem associação</option>
+                    {% for semanal in planos_semanais %}
+                    <option value="{{ semanal.id }}">{{ semanal.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Espaço</label>
+                <select name="espaco_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <option value="">Sem espaço associado</option>
+                    {% for espaco in espacos %}
+                    <option value="{{ espaco.id }}">{{ espaco.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Equipas</label>
+                <select name="equipas_ids" multiple size="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    {% for equipa in equipas %}
+                    <option value="{{ equipa.id }}">{{ equipa.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="md:col-span-2 flex items-center gap-2">
+                <input type="hidden" name="aplica_a_todas_equipas" value="false">
+                <input type="checkbox" name="aplica_a_todas_equipas" value="true" class="rounded border-gray-300 text-orange-500 focus:ring-orange-400">
+                <label class="text-sm text-gray-700">Aplicar a todas as equipas</label>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <textarea name="observacoes" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+            </div>
+            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition">
+                Associar Atividade
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

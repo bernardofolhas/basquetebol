@@ -1,0 +1,80 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ setplay.nome }} — {{ equipa.nome }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; font-size: 10px; color: #111; background: white; }
+        @page { size: A4; margin: 12mm 10mm 12mm 10mm; }
+
+        /* HEADER */
+        .header { border-bottom: 3px solid #4f46e5; padding-bottom: 8px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .header h1 { font-size: 17px; font-weight: bold; color: #1e1b4b; }
+        .header-meta { font-size: 9px; color: #6b7280; margin-top: 3px; }
+        .badge-cat { display: inline-block; background: #e0e7ff; color: #4338ca; font-size: 9px; font-weight: bold; padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
+        .header-right { text-align: right; font-size: 8px; color: #9ca3af; }
+
+        /* DESCRICAO */
+        .descricao { background: #f9fafb; border-left: 3px solid #6366f1; padding: 6px 10px; margin-bottom: 14px; font-size: 9px; color: #374151; font-style: italic; }
+
+        /* PASSO */
+        .passo { page-break-inside: avoid; margin-bottom: 16px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
+        .passo-header { background: #4f46e5; color: white; padding: 4px 10px; font-size: 10px; font-weight: bold; }
+        .passo-body { display: grid; grid-template-columns: 55% 45%; min-height: 160px; }
+        .passo-campo { padding: 6px; position: relative; border-right: 1px solid #e5e7eb; }
+        .passo-campo .campo-wrapper { position: relative; }
+        .passo-campo img.fundo { width: 100%; display: block; border-radius: 3px; }
+        .passo-campo img.desenho { position: absolute; top: 0; left: 0; width: 100%; }
+        .passo-obs { padding: 8px 10px; }
+        .passo-obs label { display: block; font-size: 8px; font-weight: bold; color: #6366f1; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px; }
+        .passo-obs p { font-size: 9px; color: #374151; line-height: 1.5; white-space: pre-wrap; }
+        .passo-obs .vazio { font-size: 9px; color: #9ca3af; font-style: italic; }
+
+        /* FOOTER */
+        .footer { border-top: 1px solid #e5e7eb; padding-top: 5px; margin-top: 14px; font-size: 8px; color: #9ca3af; display: flex; justify-content: space-between; }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body>
+
+<!-- HEADER -->
+{{ cabecalho_pdf(setplay.nome, equipa.nome ~ ' · ' ~ (passos | length) ~ ' passo(s) · ' ~ (setplay.categoria or 'Setplay'), 'Playbook · ' ~ data_exportacao) }}
+
+{% if setplay.descricao %}
+<div class="descricao">{{ setplay.descricao }}</div>
+{% endif %}
+
+<!-- PASSOS -->
+{% for passo in passos %}
+<div class="passo">
+    <div class="passo-header">Passo {{ loop.index }}</div>
+    <div class="passo-body">
+        <!-- Campo com desenho -->
+        <div class="passo-campo">
+            <div class="campo-wrapper">
+                <img class="fundo" src="/static/campos/campo_meio.png" alt="campo">
+                {% if passo.desenho %}
+                <img class="desenho" src="{{ passo.desenho }}" alt="desenho">
+                {% endif %}
+            </div>
+        </div>
+        <!-- Observação -->
+        <div class="passo-obs">
+            <label>Observação</label>
+            {% if passo.observacao %}
+            <p>{{ passo.observacao }}</p>
+            {% else %}
+            <p class="vazio">Sem observação.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- FOOTER -->
+{{ rodape_pdf(equipa.nome ~ ' · Playbook · ' ~ setplay.nome) }}
+
+</body>
+</html>

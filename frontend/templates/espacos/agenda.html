@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block titulo %}Distribuição de Espaços{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">🏟️ Distribuição de Espaços</h1>
+        <p class="text-gray-500 mt-1">Atribui espaços de treino às equipas por data e horário</p>
+    </div>
+    <a href="/planeamento-clube/espacos"
+       class="text-sm text-gray-500 hover:text-gray-700">
+        Gerir espaços →
+    </a>
+</div>
+
+<!-- Formulário de atribuição -->
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <h2 class="font-semibold text-gray-700 mb-4">Nova Atribuição</h2>
+    {% if not espacos %}
+    <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+        Não existem espaços de treino activos. <a href="/planeamento-clube/espacos/novo" class="underline font-medium">Criar espaço →</a>
+    </div>
+    {% else %}
+    <form method="POST" action="/espacos/agenda/nova">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Equipa *</label>
+                <select name="equipa_id" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Selecciona</option>
+                    {% for eq in equipas %}
+                    <option value="{{ eq.id }}" {% if eq.id == equipa_id_filtro %}selected{% endif %}>{{ eq.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Espaço *</label>
+                <select name="espaco_id" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Selecciona</option>
+                    {% for esp in espacos %}
+                    <option value="{{ esp.id }}">{{ esp.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Data *</label>
+                <input type="date" name="data" required value="{{ hoje|data_iso }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Início *</label>
+                <input type="time" name="hora_inicio" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Término *</label>
+                <input type="time" name="hora_fim" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div class="flex items-end">
+                <button type="submit"
+                        class="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                    + Atribuir
+                </button>
+            </div>
+        </div>
+        <div class="mt-3">
+            <label class="block text-xs text-gray-500 mb-1">Observações (opcional)</label>
+            <input type="text" name="observacoes" placeholder="Ex: Pavilhão partilhado, confirmar disponibilidade..."
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<!-- Filtros -->
+<div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100 mb-6">
+    <form method="GET" action="/espacos/agenda" class="flex flex-wrap gap-3 items-end">
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Equipa</label>
+            <select name="equipa_id"
+                    class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <option value="0">Todas as equipas</option>
+                {% for eq in equipas %}
+                <option value="{{ eq.id }}" {% if eq.id == equipa_id_filtro %}selected{% endif %}>{{ eq.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Semana</label>
+            <input type="date" name="semana" value="{{ semana_filtro|data_iso }}"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+        </div>
+        <div class="flex gap-2">
+            <button type="submit"
+                    class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+                Filtrar
+            </button>
+            {% if equipa_id_filtro or semana_filtro %}
+            <a href="/espacos/agenda"
+               class="bg-gray-50 hover:bg-gray-100 text-gray-500 px-4 py-2 rounded-lg text-sm font-medium transition">
+                Limpar
+            </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Tabela de atribuições -->
+{% if atribuicoes %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <table class="min-w-full text-sm">
+        <thead>
+            <tr class="bg-gray-50 text-left text-gray-500 text-xs uppercase tracking-wider">
+                <th class="px-5 py-3 font-medium">Data</th>
+                <th class="px-5 py-3 font-medium">Horário</th>
+                <th class="px-5 py-3 font-medium">Espaço</th>
+                <th class="px-5 py-3 font-medium">Equipa</th>
+                <th class="px-5 py-3 font-medium">Obs.</th>
+                <th class="px-5 py-3 font-medium text-right">Ações</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for a in atribuicoes %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-5 py-3 font-medium text-gray-800">
+                    {{ a.data }}
+                </td>
+                <td class="px-5 py-3 text-gray-600">
+                    {{ a.hora_inicio }} – {{ a.hora_fim }}
+                </td>
+                <td class="px-5 py-3">
+                    <span class="font-medium text-gray-800">{{ a.espaco.nome }}</span>
+                    {% if a.espaco.localizacao %}
+                    <p class="text-gray-400 text-xs">{{ a.espaco.localizacao }}</p>
+                    {% endif %}
+                </td>
+                <td class="px-5 py-3 text-gray-700">
+                    {{ a.equipa.nome }}
+                </td>
+                <td class="px-5 py-3 text-gray-400 text-xs max-w-xs truncate">
+                    {{ a.observacoes or "—" }}
+                </td>
+                <td class="px-5 py-3 text-right">
+                    <form method="POST" action="/espacos/agenda/{{ a.id }}/apagar" class="inline">
+                        <button type="button"
+                                onclick="if(confirm('Remover esta atribuição?')) this.closest('form').submit()"
+                                class="text-red-400 hover:text-red-600 text-xs font-medium">
+                            Remover
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="text-xs text-gray-400 mt-3">{{ atribuicoes | length }} atribuição(ões) encontrada(s)</p>
+{% else %}
+<div class="text-center py-16 text-gray-400">
+    <p class="text-4xl mb-3">🏟️</p>
+    <p class="font-medium text-gray-500">Sem atribuições</p>
+    <p class="text-sm mt-1">Usa o formulário acima para atribuir espaços às equipas.</p>
+</div>
+{% endif %}
+
+{% endblock %}

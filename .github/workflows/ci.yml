@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Executar testes
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///ci.db
+          SECRET_KEY: chave_ci_segura_ficticia
+          SESSION_SECRET_KEY: chave_sessao_ci_segura_ficticia
+          ALGORITHM: HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES: 480
+          APP_ENV: production
+        run: python -m pytest tests -q

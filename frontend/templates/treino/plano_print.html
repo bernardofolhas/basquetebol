@@ -1,0 +1,228 @@
+{% from "partials/pdf_branding.html" import estilo_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Plano de Treino — {{ sessao.data|data_pt }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        @page { size: A4 portrait; margin: 9mm; }
+        body { font-family: Arial, sans-serif; font-size: 10px; color: #111827; background: #f4f4f5; padding: 12px; }
+        body.modo-pdf { background: #fff; padding: 0; }
+        .toolbar { margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; padding: 12px; text-align: center; }
+        .btn-print { border: none; border-radius: 8px; background: #ea580c; color: #fff; padding: 10px 18px; font-size: 14px; cursor: pointer; }
+        .sheet { background: #fff; border: 2px solid #111827; }
+        .sheet-header { display: grid; grid-template-columns: 1.6fr 1fr; gap: 10px; padding: 10px 14px; background: linear-gradient(135deg, var(--pdf-primary-dark), var(--pdf-primary)); color: var(--pdf-on-primary); }
+        .sheet-header small { display: block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.88; }
+        .sheet-header h1 { margin-top: 4px; font-size: 18px; line-height: 1.1; }
+        .sheet-header p { margin-top: 4px; font-size: 10px; opacity: 0.95; }
+        .header-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-self: end; }
+        .header-stat { border: 1px solid rgba(255,255,255,0.35); border-radius: 7px; padding: 5px 7px; background: rgba(255,255,255,0.12); text-align: right; }
+        .header-stat strong { display: block; margin-top: 2px; font-size: 14px; }
+
+        .meta { padding: 9px 14px 7px; }
+        .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+        .meta-box { border: 1px solid #d1d5db; min-height: 34px; padding: 4px 6px; }
+        .meta-box label { display: block; font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; }
+        .meta-box strong { display: block; margin-top: 3px; font-size: 10px; color: #111827; }
+
+        .block-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
+        .block-card { border: 1px solid #d1d5db; min-height: 38px; padding: 5px 7px; }
+        .block-card h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; }
+        .block-card strong { display: block; margin-top: 8px; font-size: 15px; }
+        .block-card span { display: block; margin-top: 4px; font-size: 10px; color: #6b7280; }
+
+        .objectives { margin-top: 10px; border: 1px solid #d1d5db; padding: 10px 12px; }
+        .objectives h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 6px; }
+        .objectives p { white-space: pre-line; }
+
+        .content { padding: 0 20px 20px; }
+        .block-section { margin-top: 14px; page-break-inside: avoid; }
+        .block-title { background: var(--pdf-secondary); color: #fff; padding: 8px 12px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.12em; }
+        .exercise { border: 1px solid #d1d5db; border-top: 0; page-break-inside: avoid; }
+        .exercise-head { display: grid; grid-template-columns: 58px 58px minmax(0, 1.5fr) 72px 58px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+        .exercise-head div { border-right: 1px solid #e5e7eb; padding: 6px 8px; }
+        .exercise-head div:last-child { border-right: 0; }
+        .exercise-head label { display: block; font-size: 8px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.08em; }
+        .exercise-head strong { display: block; font-size: 11px; color: #111827; }
+        .exercise-body { display: grid; grid-template-columns: 160px 160px 1fr 1fr; min-height: 150px; }
+        .exercise-cell { border-right: 1px solid #e5e7eb; padding: 8px; }
+        .exercise-cell:last-child { border-right: 0; }
+        .exercise-cell h4 { font-size: 8px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px; }
+        .exercise-cell p { white-space: pre-line; font-size: 10px; line-height: 1.45; }
+        .court { position: relative; border: 1px solid #d1d5db; background: #fff; overflow: hidden; height: 106px; }
+        .court img.base, .court img.overlay { display: block; width: 100%; height: 100%; object-fit: contain; }
+        .court img.base { position: relative; z-index: 1; }
+        .court img.overlay { position: absolute; inset: 0; z-index: 2; }
+
+        .reflection { margin-top: 16px; border: 1px solid #d1d5db; min-height: 90px; padding: 12px; }
+        .reflection h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 8px; }
+        .reflection p { white-space: pre-line; line-height: 1.5; }
+
+        .footer { padding: 12px 20px 18px; text-align: center; color: #6b7280; font-size: 10px; }
+        .club-mark { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: bold; }
+        .club-mark img { width: 34px; height: 34px; object-fit: contain; }
+        .modo-pdf .toolbar { display: none; }
+
+        @media print {
+            body { background: #fff; padding: 0; }
+            .toolbar { display: none; }
+            .sheet { border: 0; }
+        }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body class="{% if modo_pdf %}modo-pdf{% endif %}">
+
+<div class="toolbar">
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+    <a href="/treino/sessoes/{{ sessao.id }}" style="margin-left: 15px; color: #666; font-size: 12px;">← Voltar ao plano</a>
+</div>
+
+<div class="sheet">
+    <div class="sheet-header">
+        <div>
+            <div class="club-mark">
+                {% if identidade.logo_principal %}<img src="{{ identidade.logo_principal }}" alt="Logotipo">{% endif %}
+                <span>{{ identidade.nome_oficial|default('Clube de Basquetebol') }}</span>
+            </div>
+            <small>Ficha de treino</small>
+            <h1>{{ equipa.nome }}</h1>
+            <p>{{ sessao.data|data_pt }}{% if sessao.local %} · {{ sessao.local }}{% endif %}</p>
+        </div>
+        <div class="header-stats">
+            <div class="header-stat">
+                <small>Exercícios</small>
+                <strong>{{ total_exercicios }}</strong>
+            </div>
+            <div class="header-stat">
+                <small>Minutos</small>
+                <strong>{{ volume_planeado if volume_planeado else "—" }}</strong>
+            </div>
+            <div class="header-stat">
+                <small>RPE geral</small>
+                <strong>{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else "—" }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="meta">
+        <div class="meta-grid">
+            <div class="meta-box">
+                <label>Data</label>
+                <strong>{{ sessao.data|data_pt }}</strong>
+            </div>
+            <div class="meta-box">
+                <label>Hora</label>
+                <strong>{{ sessao.hora_inicio if sessao.hora_inicio else "—" }}{% if sessao.hora_fim %} - {{ sessao.hora_fim }}{% endif %}</strong>
+            </div>
+            <div class="meta-box">
+                <label>Treino nº</label>
+                <strong>{{ sessao.numero_treino if sessao.numero_treino else "—" }}</strong>
+            </div>
+            <div class="meta-box">
+                <label>Escalão</label>
+                <strong>{{ plano.escalao if plano and plano.escalao else equipa.escalao.value }}</strong>
+            </div>
+            <div class="meta-box">
+                <label>Local</label>
+                <strong>{{ sessao.local if sessao.local else "Por definir" }}</strong>
+            </div>
+            <div class="meta-box">
+                <label>Estado</label>
+                <strong>{{ sessao.estado_visual_label }}</strong>
+            </div>
+            <div class="meta-box">
+                <label>RPE geral</label>
+                <strong>{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else "Por preencher" }}</strong>
+            </div>
+        </div>
+
+        <div class="block-summary">
+            {% for item in resumo_blocos %}
+            <div class="block-card">
+                <h3>{{ item.bloco }}</h3>
+                <strong>{{ item.total }} exercício(s)</strong>
+                <span>{{ item.minutos if item.minutos else 0 }} min</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if plano and plano.objectivos %}
+        <div class="objectives">
+            <h2>Objetivos</h2>
+            <p>{{ plano.objectivos }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="content">
+        {% for bloco_ui in blocos_ui %}{% set bloco_letra = bloco_ui.key %}
+        {% if exercicios_por_bloco.get(bloco_letra) %}
+        <div class="block-section">
+            <div class="block-title">{{ bloco_ui.nome }}{% if bloco_ui.tipo %} · {{ bloco_ui.tipo }}{% endif %}</div>
+            {% for ex in exercicios_por_bloco[bloco_letra] %}
+            <div class="exercise">
+                <div class="exercise-head">
+                    <div>
+                        <label>Hora</label>
+                        <strong>{{ ex.hora if ex.hora else "—" }}</strong>
+                    </div>
+                    <div>
+                        <label>Min</label>
+                        <strong>{{ ex.minutos if ex.minutos else "—" }}</strong>
+                    </div>
+                    <div>
+                        <label>Exercício</label>
+                        <strong>{{ ex.nome if ex.nome else "Exercício" }}</strong>
+                    </div>
+                    <div>
+                        <label>Categoria</label>
+                        <strong>{{ ex.categoria if ex.categoria else "—" }}</strong>
+                    </div>
+                    <div>
+                        <label>RPE</label>
+                        <strong>{{ ex.rpe if ex.rpe is not none else "—" }}</strong>
+                    </div>
+                </div>
+                <div class="exercise-body">
+                    <div class="exercise-cell">
+                        <h4>Campo meio</h4>
+                        <div class="court">
+                            {% if ex.campo_meio_composto_pdf %}<img class="base" src="{{ ex.campo_meio_composto_pdf }}" alt="Campo de meio-campo com desenho tático">{% endif %}
+                        </div>
+                    </div>
+                    <div class="exercise-cell">
+                        <h4>Campo completo</h4>
+                        <div class="court">
+                            {% if ex.campo_completo_composto_pdf %}<img class="base" src="{{ ex.campo_completo_composto_pdf }}" alt="Campo completo com desenho tático">{% endif %}
+                        </div>
+                    </div>
+                    <div class="exercise-cell">
+                        <h4>Organização</h4>
+                        <p>{{ ex.organizacao if ex.organizacao else "" }}</p>
+                    </div>
+                    <div class="exercise-cell">
+                        <h4>Coaching Points</h4>
+                        <p>{{ ex.coaching_points if ex.coaching_points else "" }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <div class="reflection">
+            <h2>Reflexão</h2>
+            <p>{{ plano.reflexao if plano and plano.reflexao else "" }}</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        {{ identidade.texto_rodape|default('Plataforma de Gestão de Basquetebol') }} · {{ equipa.nome }} · {{ data_exportacao }}
+    </div>
+</div>
+
+</body>
+</html>

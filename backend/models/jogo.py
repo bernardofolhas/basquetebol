@@ -4,7 +4,7 @@
 # ─────────────────────────────────────────────────────────────
 
 from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 from database import Base
 
 
@@ -12,6 +12,7 @@ class Jogo(Base):
     __tablename__ = "jogos"
 
     id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     # Informações básicas
     data = Column(Date, nullable=False)
@@ -35,19 +36,26 @@ class Jogo(Base):
     equipa = relationship("Equipa", backref="jogos")
 
     # Convocados para este jogo
-    convocados = relationship("Convocado", back_populates="jogo",
-                              cascade="all, delete")
+    convocados = relationship("Convocado", back_populates="jogo", cascade="all, delete")
+    plano = relationship(
+        "PlanoJogo",
+        back_populates="jogo",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )
 
 
 class Convocado(Base):
     # Jogador convocado para um jogo específico
     __tablename__ = "convocados"
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
 
     # Ligação ao jogo e ao jogador
-    jogo_id = Column(Integer, ForeignKey("jogos.id"), nullable=False)
-    jogador_id = Column(Integer, ForeignKey("jogadores.id"), nullable=False)
+    jogo_id = Column(Integer, ForeignKey("jogos.id", ondelete="CASCADE"), nullable=False)
+    jogador_id = Column(Integer, ForeignKey("jogadores.id", ondelete="CASCADE"), nullable=False)
 
     # Informações da convocatória
     hora_encontro = Column(String, nullable=True)   # Ex: "14:00"
@@ -60,16 +68,17 @@ class Convocado(Base):
 
 class PlanoJogo(Base):
     __tablename__ = "planos_jogo"
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
-    jogo_id = Column(Integer, ForeignKey("jogos.id"), nullable=False, unique=True)
+    jogo_id = Column(Integer, ForeignKey("jogos.id", ondelete="CASCADE"), nullable=False, unique=True)
 
     # 5 inicial
-    titular_1 = Column(Integer, ForeignKey("jogadores.id"), nullable=True)
-    titular_2 = Column(Integer, ForeignKey("jogadores.id"), nullable=True)
-    titular_3 = Column(Integer, ForeignKey("jogadores.id"), nullable=True)
-    titular_4 = Column(Integer, ForeignKey("jogadores.id"), nullable=True)
-    titular_5 = Column(Integer, ForeignKey("jogadores.id"), nullable=True)
+    titular_1 = Column(Integer, ForeignKey("jogadores.id", ondelete="SET NULL"), nullable=True)
+    titular_2 = Column(Integer, ForeignKey("jogadores.id", ondelete="SET NULL"), nullable=True)
+    titular_3 = Column(Integer, ForeignKey("jogadores.id", ondelete="SET NULL"), nullable=True)
+    titular_4 = Column(Integer, ForeignKey("jogadores.id", ondelete="SET NULL"), nullable=True)
+    titular_5 = Column(Integer, ForeignKey("jogadores.id", ondelete="SET NULL"), nullable=True)
     rotacoes = Column(Text, nullable=True)
 
     # Chaves
@@ -88,4 +97,4 @@ class PlanoJogo(Base):
 
     reflexao = Column(Text, nullable=True)
 
-    jogo = relationship("Jogo", backref="plano_jogo", uselist=False)    
+    jogo = relationship("Jogo", back_populates="plano")

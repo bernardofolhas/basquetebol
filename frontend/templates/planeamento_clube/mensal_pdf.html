@@ -1,0 +1,40 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ mensal.titulo }}</title>
+    <style>
+        * { box-sizing: border-box; }
+        @page { size: A4 landscape; margin: 9mm; }
+        body { margin: 0; font-family: Arial, sans-serif; color: #172033; font-size: 8.5px; }
+        .header { background: #d90416; color: white; padding: 11px 14px; display: flex; justify-content: space-between; }
+        h1 { margin: 0; font-size: 19px; } h2 { margin: 0 0 6px; font-size: 10px; text-transform: uppercase; }
+        .sub { color: #fee2e2; margin-top: 4px; } .right { text-align: right; font-size: 8px; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin: 9px 0; }
+        .stat { border: 1px solid #cbd5e1; padding: 7px; text-align: center; } .stat strong { display: block; font-size: 15px; color: #b91c1c; } .stat span { color: #64748b; font-size: 7px; text-transform: uppercase; }
+        .columns { display: grid; grid-template-columns: 35% 65%; gap: 9px; align-items: start; }
+        .panel { border: 1px solid #cbd5e1; padding: 7px; margin-bottom: 8px; } .title { background: #e5e7eb; padding: 4px 6px; font-size: 10px; font-weight: bold; margin: -7px -7px 6px; }
+        .calendar { table-layout: fixed; } table { width: 100%; border-collapse: collapse; } th { background: #334155; color: white; padding: 4px; text-align: left; } td { border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; } tr:nth-child(even) td { background: #f8fafc; }
+        .calendar td { height: 47px; } .day { font-weight: bold; color: #475569; } .event { margin-top: 3px; padding: 2px 3px; background: #ffedd5; color: #9a3412; border-radius: 3px; font-size: 7px; }
+        thead { display: table-header-group; } tr { page-break-inside: avoid; } .footer { border-top: 1px solid #cbd5e1; margin-top: 8px; padding-top: 5px; display: flex; justify-content: space-between; color: #64748b; font-size: 8px; }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body>
+    {{ cabecalho_pdf(mensal.titulo, mensal.mes ~ '/' ~ mensal.ano ~ ' · Estado: ' ~ mensal.estado, 'Planeamento mensal · ' ~ data_exportacao) }}
+    <div class="stats"><div class="stat"><strong>{{ estatisticas_operacionais.total_equipas }}</strong><span>Equipas</span></div><div class="stat"><strong>{{ estatisticas_operacionais.total_treinos }}</strong><span>Treinos</span></div><div class="stat"><strong>{{ estatisticas_operacionais.total_jogos }}</strong><span>Jogos</span></div><div class="stat"><strong>{{ estatisticas_operacionais.total_semanais }}</strong><span>Planos semanais</span></div></div>
+    <div class="columns">
+        <div>
+            <div class="panel"><div class="title">Objetivos do mês</div><p style="white-space:pre-line;margin:0">{{ mensal.objetivos_mes or 'Sem objetivos definidos.' }}</p></div>
+            <div class="panel"><div class="title">Planos semanais</div>{% if semanais %}<table><thead><tr><th>Título</th><th>Período</th><th>Estado</th></tr></thead><tbody>{% for semanal in semanais %}<tr><td>{{ semanal.titulo }}</td><td>{{ semanal.data_inicio|data_pt }} -> {{ semanal.data_fim|data_pt }}</td><td>{{ semanal.estado }}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Sem planos semanais.</p>{% endif %}</div>
+            {% if mensal.observacoes %}<div class="panel"><div class="title">Observações</div><p style="white-space:pre-line;margin:0">{{ mensal.observacoes }}</p></div>{% endif %}
+        </div>
+        <div>
+            <div class="panel"><div class="title">Calendário de {{ calendario_mensal.nome_mes }} {{ calendario_mensal.ano }}</div><table class="calendar"><thead><tr>{% for dia in calendario_mensal.dias_semana %}<th>{{ dia }}</th>{% endfor %}</tr></thead><tbody>{% for semana in calendario_mensal.semanas %}<tr>{% for dia in semana %}<td><div class="day">{{ dia.dia }}</div>{% for evento in dia.eventos %}<div class="event">{{ evento.hora_inicio or 'Dia inteiro' }} · {{ evento.titulo }}</div>{% endfor %}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+            <div class="panel"><div class="title">Jogos do mês</div>{% if jogos_do_mes %}<table><thead><tr><th>Data</th><th>Equipa</th><th>Adversário</th><th>Local</th></tr></thead><tbody>{% for jogo in jogos_do_mes %}<tr><td>{{ jogo.data|data_pt }}{% if jogo.hora %} · {{ jogo.hora }}{% endif %}</td><td>{{ jogo.equipa.nome }}</td><td>{{ jogo.adversario }}</td><td>{{ jogo.local or ' ' }}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Sem jogos marcados.</p>{% endif %}</div>
+        </div>
+    </div>
+    {{ rodape_pdf('Planeamento mensal · ' ~ mensal.mes ~ '/' ~ mensal.ano) }}
+</body>
+</html>

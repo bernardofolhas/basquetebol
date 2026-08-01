@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% block titulo %}Planeamento Físico — {{ equipa.nome }}{% endblock %}
+{% block conteudo %}
+
+{{ equipa_contexto(
+    equipa,
+    "Planeamento Físico",
+    "Organização semanal e mensal do trabalho físico da equipa.",
+    "fisico",
+    "/equipas/" ~ equipa.id,
+    "Voltar à equipa"
+) }}
+
+<!-- Formulário para criar planeamento -->
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <h2 class="font-semibold text-gray-700 mb-4">Novo Planeamento</h2>
+    <form method="POST" action="/fisico/equipas/{{ equipa.id }}/novo">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Data início *</label>
+                <input type="date" name="data_inicio" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Data fim *</label>
+                <input type="date" name="data_fim" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Tipo</label>
+                <select name="tipo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="Semanal">Semanal</option>
+                    <option value="Mensal">Mensal</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {% for campo, label, cor in [
+                ('resistencia', 'Resistência', 'blue'),
+                ('velocidade', 'Velocidade', 'orange'),
+                ('forca', 'Força', 'red'),
+                ('flexibilidade', 'Flexibilidade', 'green'),
+                ('coordenacao', 'Coordenação', 'purple'),
+                ('observacoes', 'Observações', 'gray')
+            ] %}
+            <div>
+                <label class="block text-xs font-semibold text-{{ cor }}-600 mb-1">{{ label }}</label>
+                <textarea name="{{ campo }}" rows="2"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            Criar Planeamento
+        </button>
+    </form>
+</div>
+
+<!-- Lista de planeamentos -->
+{% if planeamentos %}
+<div class="space-y-4">
+    {% for p in planeamentos %}
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">{{ p.tipo }}</span>
+                <span class="text-gray-600 text-sm ml-2">{{ p.data_inicio|data_pt }} → {{ p.data_fim|data_pt }}</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            {% for campo, label, cor in [
+                ('resistencia', 'Resistência', 'blue'),
+                ('velocidade', 'Velocidade', 'orange'),
+                ('forca', 'Força', 'red'),
+                ('flexibilidade', 'Flexibilidade', 'green'),
+                ('coordenacao', 'Coordenação', 'purple')
+            ] %}
+            {% if p[campo] %}
+            <div class="border-l-4 border-{{ cor }}-400 pl-3">
+                <p class="text-xs font-semibold text-gray-400 uppercase">{{ label }}</p>
+                <p class="text-gray-700 mt-1">{{ p[campo] }}</p>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+    <span class="text-5xl">💪</span>
+    <p class="text-gray-500 mt-4">Ainda não há planeamentos físicos.</p>
+</div>
+{% endif %}
+
+{% endblock %}

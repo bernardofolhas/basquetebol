@@ -22,7 +22,7 @@
             <div class="flex justify-between">
                 <span class="text-gray-500">Data de nascimento</span>
                 <span class="font-medium text-gray-800">
-                    {{ treinador.data_nascimento if treinador.data_nascimento else "Não definida" }}
+                    {{ treinador.data_nascimento|data_pt if treinador.data_nascimento else "Não definida" }}
                 </span>
             </div>
             <div class="flex justify-between">
@@ -90,5 +90,21 @@
     </div>
 
 </div>
-
+<div class="flex gap-3 mt-6">
+    {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}
+    <a href="/treinadores/{{ treinador.id }}/editar"
+       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+        ✏️ Editar
+    </a>
+    {% endif %}
+    {% if utilizador.perfil.value == 'administrador' %}
+    <form method="POST" action="/treinadores/{{ treinador.id }}/apagar">
+        <button type="button"
+                onclick="if(confirm('Tens a certeza que queres apagar este treinador?')) this.closest('form').submit()"
+                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            🗑️ Apagar
+        </button>
+    </form>
+    {% endif %}
+</div>
 {% endblock %}

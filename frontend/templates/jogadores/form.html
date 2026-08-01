@@ -1,72 +1,83 @@
 {% extends "base.html" %}
-
-{% block titulo %}Novo Jogador{% endblock %}
-
+{% block titulo %}{{ "Editar" if jogador else "Novo" }} Jogador{% endblock %}
 {% block conteudo %}
 
 <div class="mb-6">
     <a href="/jogadores" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar aos jogadores</a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-2">Novo Jogador</h1>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">{{ "Editar Jogador" if jogador else "Novo Jogador" }}</h1>
 </div>
 
-<form method="POST" action="/jogadores/novo">
+<form method="POST" enctype="multipart/form-data" action="{{ '/jogadores/' ~ jogador.id ~ '/editar' if jogador else '/jogadores/novo' }}">
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
     <!-- Informações básicas -->
     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 class="font-semibold text-gray-700 mb-4">Informações Básicas</h2>
 
+        <div class="mb-5 flex items-center gap-4 rounded-xl bg-gray-50 p-4">
+            <div class="h-20 w-20 overflow-hidden rounded-full bg-white ring-1 ring-gray-200"><img id="fotografia-preview" src="{{ jogador.fotografia if jogador and jogador.fotografia else '/static/img/avatar-jogador.svg' }}" alt="Pré-visualização" class="h-full w-full object-cover" onerror="this.style.display='none'"></div>
+            <div class="flex-1"><label class="block text-sm font-medium text-gray-700">Fotografia</label><input id="fotografia" type="file" name="fotografia" accept="image/png,image/jpeg" class="mt-2 block w-full text-sm text-gray-500"><p class="mt-1 text-xs text-gray-400">PNG ou JPEG, máximo 5 MB.</p>{% if jogador and jogador.fotografia %}<label class="mt-2 flex items-center gap-2 text-xs text-red-700"><input type="checkbox" name="remover_fotografia" value="true"> Remover fotografia atual</label>{% endif %}</div>
+        </div>
+
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
-            <input type="text" name="nome" placeholder="Nome do jogador"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
-                   required>
+            <input type="text" name="nome" required
+                   value="{{ jogador.nome if jogador else '' }}"
+                   placeholder="Nome do jogador"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Data de nascimento</label>
                 <input type="date" name="data_nascimento"
+                       value="{{ jogador.data_nascimento|data_iso if jogador and jogador.data_nascimento else '' }}"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Naturalidade</label>
-                <input type="text" name="naturalidade" placeholder="Cidade"
+                <input type="text" name="naturalidade"
+                       value="{{ jogador.naturalidade if jogador and jogador.naturalidade else '' }}"
+                       placeholder="Cidade"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
         </div>
 
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Morada</label>
-            <input type="text" name="morada" placeholder="Rua, número, cidade"
+            <input type="text" name="morada"
+                   value="{{ jogador.morada if jogador and jogador.morada else '' }}"
+                   placeholder="Rua, número, cidade"
                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Nº Camisola</label>
-                <input type="number" name="numero_camisola" placeholder="Ex: 10"
+                <input type="number" name="numero_camisola"
+                       value="{{ jogador.numero_camisola if jogador and jogador.numero_camisola else '' }}"
+                       placeholder="Ex: 10"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Posição</label>
-                <select name="posicao"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <select name="posicao" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
                     <option value="">Selecciona</option>
-                    <option value="Base">Base</option>
-                    <option value="Extremo">Extremo</option>
-                    <option value="Poste">Poste</option>
+                    {% for pos in ["Base", "Extremo", "Poste"] %}
+                    <option value="{{ pos }}" {% if jogador and jogador.posicao == pos %}selected{% endif %}>{{ pos }}</option>
+                    {% endfor %}
                 </select>
             </div>
         </div>
 
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Equipa</label>
-            <select name="equipa_id"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            <select name="equipa_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
                 <option value="">Sem equipa</option>
                 {% for equipa in equipas %}
-                <option value="{{ equipa.id }}">{{ equipa.nome }} — {{ equipa.escalao.value }}</option>
+                <option value="{{ equipa.id }}" {% if jogador and jogador.equipa_id == equipa.id %}selected{% endif %}>
+                    {{ equipa.nome }} — {{ equipa.escalao.value }}
+                </option>
                 {% endfor %}
             </select>
         </div>
@@ -78,52 +89,61 @@
 
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-            <input type="text" name="telefone" placeholder="912 345 678"
+            <input type="text" name="telefone"
+                   value="{{ jogador.telefone if jogador and jogador.telefone else '' }}"
+                   placeholder="912 345 678"
                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
-
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input type="email" name="email" placeholder="email@exemplo.com"
+            <input type="email" name="email"
+                   value="{{ jogador.email if jogador and jogador.email else '' }}"
+                   placeholder="email@exemplo.com"
                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
 
         <h3 class="font-medium text-gray-600 mb-3 pt-3 border-t border-gray-100">Contacto do Pai</h3>
-
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Nome do pai</label>
-            <input type="text" name="nome_pai" placeholder="Nome completo"
+            <input type="text" name="nome_pai"
+                   value="{{ jogador.nome_pai if jogador and jogador.nome_pai else '' }}"
+                   placeholder="Nome completo"
                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
         <div class="grid grid-cols-2 gap-4">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
                 <input type="text" name="telefone_pai"
+                       value="{{ jogador.telefone_pai if jogador and jogador.telefone_pai else '' }}"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input type="email" name="email_pai"
+                       value="{{ jogador.email_pai if jogador and jogador.email_pai else '' }}"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
         </div>
 
         <h3 class="font-medium text-gray-600 mb-3 pt-3 border-t border-gray-100">Contacto da Mãe</h3>
-
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Nome da mãe</label>
-            <input type="text" name="nome_mae" placeholder="Nome completo"
+            <input type="text" name="nome_mae"
+                   value="{{ jogador.nome_mae if jogador and jogador.nome_mae else '' }}"
+                   placeholder="Nome completo"
                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
         <div class="grid grid-cols-2 gap-4">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
                 <input type="text" name="telefone_mae"
+                       value="{{ jogador.telefone_mae if jogador and jogador.telefone_mae else '' }}"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input type="email" name="email_mae"
+                       value="{{ jogador.email_mae if jogador and jogador.email_mae else '' }}"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
         </div>
@@ -131,18 +151,17 @@
 
 </div>
 
-<!-- Botões fora das colunas -->
 <div class="flex gap-3 mt-6">
     <button type="submit"
             class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
-        Registar Jogador
+        {{ "Guardar alterações" if jogador else "Registar Jogador" }}
     </button>
-    <a href="/jogadores"
+    <a href="{{ '/jogadores/' ~ jogador.id if jogador else '/jogadores' }}"
        class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition">
         Cancelar
     </a>
 </div>
 
 </form>
-
+<script>document.getElementById('fotografia')?.addEventListener('change',function(){const ficheiro=this.files[0];if(ficheiro)document.getElementById('fotografia-preview').src=URL.createObjectURL(ficheiro);});</script>
 {% endblock %}

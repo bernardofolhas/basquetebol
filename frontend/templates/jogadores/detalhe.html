@@ -6,18 +6,76 @@
 
 <div class="mb-6">
     <a href="/jogadores" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar aos jogadores</a>
-    <div class="flex items-center gap-3 mt-2">
+    <div class="flex items-center gap-4 mt-2">
+        <span class="h-20 w-20 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">{% if jogador.fotografia %}<img src="{{ jogador.fotografia }}" alt="Fotografia de {{ jogador.nome }}" class="h-full w-full object-cover">{% else %}<span class="flex h-full items-center justify-center text-2xl text-slate-400">{{ jogador.nome[:1]|upper }}</span>{% endif %}</span>
+        <div class="flex items-center gap-3">
         {% if jogador.numero_camisola %}
         <span class="bg-orange-500 text-white text-lg font-bold px-3 py-1 rounded-full">
             #{{ jogador.numero_camisola }}
         </span>
         {% endif %}
-        <h1 class="text-2xl font-bold text-gray-800">{{ jogador.nome }}</h1>
+        <h1 class="text-2xl font-bold text-gray-800">{{ jogador.nome }}</h1></div>
     </div>
     {% if jogador.equipa %}
-    <p class="text-gray-500 mt-1">{{ jogador.equipa.nome }} — {{ jogador.equipa.escalao.value }}</p>
+    <div class="flex flex-wrap items-center gap-3 mt-1">
+        <p class="text-gray-500">{{ jogador.equipa.nome }} — {{ jogador.equipa.escalao.value }}</p>
+        <a href="/jogadores/{{ jogador.id }}/evolucao/pdf" class="text-sm font-medium text-orange-600 hover:underline">Exportar ficha PDF →</a>
+    </div>
     {% endif %}
 </div>
+
+<!-- Ficha integrada de evolução: leitura rápida antes dos históricos detalhados. -->
+<section class="mb-6 rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-white p-5 shadow-sm">
+    <div class="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-orange-500">Acompanhamento desportivo</p>
+            <h2 class="text-xl font-bold text-gray-800 mt-1">Ficha de evolução</h2>
+            <p class="text-sm text-gray-500 mt-1">Um ponto de situação com a informação mais recente da jogadora.</p>
+        </div>
+        {% if jogador.equipa %}
+        <a href="/assiduidade/equipas/{{ jogador.equipa.id }}" class="text-sm font-medium text-orange-600 hover:underline">Ver relatório da equipa →</a>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+        <div class="rounded-xl border border-white bg-white p-4 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-gray-400">Assiduidade</p>
+            <p class="text-3xl font-bold mt-2 {% if evolucao.assiduidade.percentagem >= 75 %}text-green-600{% elif evolucao.assiduidade.percentagem >= 50 %}text-amber-600{% else %}text-red-600{% endif %}">{{ evolucao.assiduidade.percentagem }}%</p>
+            <p class="text-sm text-gray-500 mt-1">{{ evolucao.assiduidade.presentes }} participações em {{ evolucao.assiduidade.total }} registos</p>
+            <div class="flex flex-wrap gap-2 mt-3 text-xs">
+                <span class="rounded-full bg-green-100 px-2 py-1 text-green-700">{{ evolucao.assiduidade.por_estado.presente }} presentes</span>
+                <span class="rounded-full bg-amber-100 px-2 py-1 text-amber-700">{{ evolucao.assiduidade.por_estado.atrasada }} atrasadas</span>
+                <span class="rounded-full bg-red-100 px-2 py-1 text-red-700">{{ evolucao.assiduidade.por_estado.ausente }} ausentes</span>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-white bg-white p-4 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-gray-400">Última avaliação corporal</p>
+            {% if evolucao.antropometria_atual %}
+            <p class="text-sm font-semibold text-gray-800 mt-2">{{ evolucao.antropometria_atual.data }}</p>
+            <div class="grid grid-cols-3 gap-2 mt-3 text-sm">
+                <div><span class="block text-xs text-gray-400">Altura</span><strong>{{ evolucao.antropometria_atual.altura or '—' }} cm</strong></div>
+                <div><span class="block text-xs text-gray-400">Peso</span><strong>{{ evolucao.antropometria_atual.peso or '—' }} kg</strong></div>
+                <div><span class="block text-xs text-gray-400">Enverg.</span><strong>{{ evolucao.antropometria_atual.envergadura or '—' }} cm</strong></div>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400 mt-3">Ainda não existe uma avaliação corporal.</p>
+            {% endif %}
+        </div>
+
+        <div class="rounded-xl border border-white bg-white p-4 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-gray-400">Último teste físico</p>
+            {% if evolucao.teste_recente %}
+            <p class="text-sm font-semibold text-gray-800 mt-2">{{ evolucao.teste_recente.tipo_teste }}</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1">{{ evolucao.teste_recente.resultado or '—' }} <span class="text-sm font-medium text-gray-500">{{ evolucao.teste_recente.unidade or '' }}</span></p>
+            <p class="text-xs text-gray-400 mt-1">{{ evolucao.teste_recente.data }}</p>
+            {% else %}
+            <p class="text-sm text-gray-400 mt-3">Ainda não existem testes físicos.</p>
+            {% endif %}
+            <a href="/fisico/jogadores/{{ jogador.id }}" class="inline-block mt-3 text-sm font-medium text-orange-600 hover:underline">Histórico de testes →</a>
+        </div>
+    </div>
+</section>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -29,6 +87,7 @@
                 <span class="text-gray-500">Data de nascimento</span>
                 <span class="font-medium text-gray-800">{{ jogador.data_nascimento if jogador.data_nascimento else "—" }}</span>
             </div>
+            <div class="flex justify-between gap-4"><span class="text-gray-500">Idade</span><span class="font-medium text-gray-800">{{ idade ~ ' anos' if idade is not none else '—' }}</span></div>
             <div class="flex justify-between">
                 <span class="text-gray-500">Naturalidade</span>
                 <span class="font-medium text-gray-800">{{ jogador.naturalidade if jogador.naturalidade else "—" }}</span>
@@ -129,7 +188,7 @@
         <div class="space-y-2">
             {% for registo in jogador.registos_antropometricos | sort(attribute='data', reverse=True) %}
             <div class="flex items-center justify-between text-sm p-2 bg-gray-50 rounded-lg">
-                <span class="text-gray-500">{{ registo.data }}</span>
+                <span class="text-gray-500">{{ registo.data|data_pt }}</span>
                 <span class="text-gray-700">{{ registo.altura if registo.altura else "—" }} cm</span>
                 <span class="text-gray-700">{{ registo.peso if registo.peso else "—" }} kg</span>
                 <span class="text-gray-700">{{ registo.envergadura if registo.envergadura else "—" }} cm env.</span>
@@ -161,5 +220,144 @@
     </div>
 
 </div>
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="font-semibold text-gray-700">Testes Físicos</h2>
+            <p class="text-gray-400 text-sm mt-1">{{ evolucao.teste_recente.tipo_teste if evolucao.teste_recente else 'Sem testes registados' }}{% if evolucao.teste_recente %} · {{ evolucao.teste_recente.data }}{% endif %}</p>
+        </div>
+        <a href="/fisico/jogadores/{{ jogador.id }}"
+           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            Ver testes →
+        </a>
+    </div>
+</div>
+<!-- Documentos administrativos do processo. -->
+<div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
+    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+            <h2 class="font-semibold text-gray-700">Documentos do processo</h2>
+            <p class="text-sm text-gray-400 mt-1">Validades e estado administrativo numa só área.</p>
+        </div>
+        {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}
+        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Gestão de secretaria</span>
+        {% endif %}
+    </div>
+    {% if jogador.documentos %}
+    <div class="mt-4 overflow-x-auto"><table class="min-w-full text-sm"><thead class="text-left text-xs uppercase text-gray-400"><tr><th class="py-2 pr-4">Documento</th><th class="py-2 pr-4">Tipo</th><th class="py-2 pr-4">Validade</th><th class="py-2 pr-4">Estado</th><th class="py-2 text-right">Ação</th></tr></thead><tbody class="divide-y divide-gray-100">
+    {% for documento in jogador.documentos | sort(attribute='validade') %}<tr><td class="py-3 pr-4 font-medium text-gray-800">{{ documento.nome }}</td><td class="py-3 pr-4 text-gray-500">{{ documento.tipo }}</td><td class="py-3 pr-4 text-gray-500">{{ documento.validade|data_pt if documento.validade else 'Sem validade' }}</td><td class="py-3 pr-4"><span class="rounded-full px-2 py-1 text-xs font-semibold {% if documento.estado == 'válido' %}bg-green-100 text-green-700{% elif documento.estado == 'expirado' %}bg-red-100 text-red-700{% else %}bg-amber-100 text-amber-700{% endif %}">{{ documento.estado | capitalize }}</span></td><td class="py-3 text-right">{% if utilizador.perfil.value in ['administrador', 'coordenador'] %}<form method="POST" action="/secretaria/documentos/{{ documento.id }}/apagar"><button class="text-xs text-red-600 hover:underline">Remover</button></form>{% else %}—{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% else %}<p class="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-400">Ainda não existem documentos associados.</p>{% endif %}
+    {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}
+    <form method="POST" action="/secretaria/jogadores/{{ jogador.id }}/documentos" class="mt-5 grid grid-cols-1 gap-3 rounded-xl bg-gray-50 p-4 md:grid-cols-6">
+        <input name="tipo" required placeholder="Tipo" class="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+        <input name="nome" required placeholder="Nome do documento" class="rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2">
+        <input type="date" name="validade" class="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+        <select name="estado" class="rounded-lg border border-gray-200 px-3 py-2 text-sm"><option value="pendente">Pendente</option><option value="válido">Válido</option><option value="expirado">Expirado</option><option value="dispensado">Dispensado</option></select>
+        <button class="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600">Adicionar</button>
+        <input name="observacoes" placeholder="Observação opcional" class="rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-6">
+    </form>
+    {% endif %}
+</div>
+<!-- Inscrições e Exames Médicos -->
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
+    <h2 class="font-semibold text-gray-700 mb-4">Inscrições e Exames Médicos</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
+        <!-- Estado actual -->
+        <div class="space-y-3 text-sm">
+            <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-gray-500">Inscrição</span>
+                {% if jogador.inscricao_estado %}
+                <span class="px-2 py-1 rounded-full text-xs font-medium
+                    {% if jogador.inscricao_estado == 'completa' %}bg-green-100 text-green-700
+                    {% elif jogador.inscricao_estado == 'pendente' %}bg-yellow-100 text-yellow-700
+                    {% else %}bg-red-100 text-red-700{% endif %}">
+                    {{ jogador.inscricao_estado | capitalize }}
+                </span>
+                {% else %}
+                <span class="text-gray-400">Não definido</span>
+                {% endif %}
+            </div>
+            <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-gray-500">Exame Médico</span>
+                {% if jogador.exame_medico_estado %}
+                <span class="px-2 py-1 rounded-full text-xs font-medium
+                    {% if jogador.exame_medico_estado == 'válido' %}bg-green-100 text-green-700
+                    {% elif jogador.exame_medico_estado == 'pendente' %}bg-yellow-100 text-yellow-700
+                    {% else %}bg-red-100 text-red-700{% endif %}">
+                    {{ jogador.exame_medico_estado | capitalize }}
+                </span>
+                {% else %}
+                <span class="text-gray-400">Não definido</span>
+                {% endif %}
+            </div>
+            {% if jogador.exame_medico_validade %}
+            <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-gray-500">Validade do Exame</span>
+                <span class="font-medium text-gray-800">{{ jogador.exame_medico_validade }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Formulário de actualização -->
+        <form method="POST" action="/jogadores/{{ jogador.id }}/inscricao">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Estado da Inscrição</label>
+                    <select name="inscricao_estado"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        <option value="">Não definido</option>
+                        <option value="pendente" {% if jogador.inscricao_estado == 'pendente' %}selected{% endif %}>Pendente</option>
+                        <option value="completa" {% if jogador.inscricao_estado == 'completa' %}selected{% endif %}>Completa</option>
+                        <option value="rejeitada" {% if jogador.inscricao_estado == 'rejeitada' %}selected{% endif %}>Rejeitada</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Data do Exame</label>
+                        <input type="date" name="exame_medico_data"
+                               value="{{ jogador.exame_medico_data|data_iso if jogador.exame_medico_data else '' }}"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Validade do Exame</label>
+                        <input type="date" name="exame_medico_validade"
+                               value="{{ jogador.exame_medico_validade|data_iso if jogador.exame_medico_validade else '' }}"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Estado do Exame</label>
+                    <select name="exame_medico_estado"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        <option value="">Não definido</option>
+                        <option value="válido" {% if jogador.exame_medico_estado == 'válido' %}selected{% endif %}>Válido</option>
+                        <option value="pendente" {% if jogador.exame_medico_estado == 'pendente' %}selected{% endif %}>Pendente</option>
+                        <option value="expirado" {% if jogador.exame_medico_estado == 'expirado' %}selected{% endif %}>Expirado</option>
+                    </select>
+                </div>
+                <button type="submit"
+                        class="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                    Guardar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="flex gap-3 mt-6">
+    <a href="/jogadores/{{ jogador.id }}/editar"
+       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+        ✏️ Editar
+    </a>
+    {% if utilizador.perfil.value == 'administrador' %}
+    <form method="POST" action="/jogadores/{{ jogador.id }}/apagar">
+        <button type="button"
+                onclick="if(confirm('Tens a certeza que queres apagar este jogador?')) this.closest('form').submit()"
+                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            🗑️ Apagar
+        </button>
+    </form>
+    {% endif %}
+</div>
 {% endblock %}

@@ -25,6 +25,7 @@ class Equipa(Base):
     __tablename__ = "equipas"
 
     id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
     nome = Column(String, nullable=False)
     escalao = Column(Enum(EscalaoEnum), nullable=False)
     genero = Column(Enum(GeneroEnum), nullable=False)
@@ -32,3 +33,8 @@ class Equipa(Base):
 
     # Relação com treinadores — uma equipa pode ter vários treinadores
     # Vamos definir isto melhor quando criarmos o modelo de treinador
+    eventos_globais = relationship(
+        "EventoPlaneamentoClube",
+        secondary="evento_planeamento_clube_equipa",
+        back_populates="equipas",
+    )

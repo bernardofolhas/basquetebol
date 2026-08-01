@@ -1,0 +1,104 @@
+{% macro agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda=[], equipas_agenda=[], csrf_token='') %}
+<dialog id="agenda-modal" class="agenda-modal rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-900/40">
+    <form id="agenda-form" method="POST" action="/agenda/atividades" class="w-[min(94vw,620px)] bg-white p-6">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <p class="ds-section-label">Agenda comum</p>
+                <h2 id="agenda-modal-titulo" class="mt-1 text-xl font-bold text-slate-900">Nova atividade</h2>
+                <p class="mt-1 text-sm text-slate-500">Cria ou ajusta a atividade sem sair do planeamento.</p>
+            </div>
+            <button type="button" onclick="document.getElementById('agenda-modal').close()" class="text-xl text-slate-400 hover:text-slate-700" aria-label="Fechar">×</button>
+        </div>
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="retorno" value="{{ agenda_contexto.retorno|default('') }}">
+        {% if agenda_contexto.global %}
+        <label class="mt-5 block text-sm font-medium text-slate-700">Equipa
+            <select id="agenda-equipa" name="equipa_id" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+                <option value="">Escolher uma equipa</option>
+                {% for equipa in equipas_agenda %}
+                <option value="{{ equipa.id }}">{{ equipa.nome }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="mt-3 flex items-center gap-2 text-sm text-slate-700">
+            <input id="agenda-aplica-todas" type="checkbox" name="aplica_a_todas_equipas" value="true" class="rounded border-slate-300">
+            Aplicar a todas as equipas
+        </label>
+        {% else %}
+        <input type="hidden" name="equipa_id" value="{{ agenda_contexto.equipa_id|default('') }}">
+        <label class="mt-3 flex items-center gap-2 text-sm text-slate-700">
+            <input id="agenda-aplica-todas" type="checkbox" name="aplica_a_todas_equipas" value="true" class="rounded border-slate-300">
+            Aplicar a todas as equipas
+        </label>
+        {% endif %}
+        <input type="hidden" name="macrociclo_id" value="{{ agenda_contexto.macrociclo_id|default('') }}">
+        <input type="hidden" name="mesociclo_id" value="{{ agenda_contexto.mesociclo_id|default('') }}">
+        <input type="hidden" name="microciclo_id" value="{{ agenda_contexto.microciclo_id|default('') }}">
+        <input type="hidden" id="agenda-evento-id" value="">
+
+        <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label class="text-sm font-medium text-slate-700">Tipo
+                <select id="agenda-tipo" name="tipo" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" required>
+                    {% for tipo in agenda_tipos %}
+                    <option value="{{ tipo.value }}">{{ tipo.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="text-sm font-medium text-slate-700">Título
+                <input id="agenda-titulo" name="titulo" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" required>
+            </label>
+            <label class="text-sm font-medium text-slate-700">Data
+                <input id="agenda-data" type="date" name="data_evento" min="{{ agenda_contexto.data_inicio|default('')|data_iso }}" max="{{ agenda_contexto.data_fim|default('')|data_iso }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" required>
+            </label>
+            <label class="text-sm font-medium text-slate-700">Data final
+                <input id="agenda-data-fim" type="date" name="data_fim" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+            </label>
+            <label class="text-sm font-medium text-slate-700">Programação
+                <select id="agenda-recorrencia" name="recorrencia" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"><option value="unica">Atividade única</option><option value="diaria">Diária</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option></select>
+            </label>
+            <label class="text-sm font-medium text-slate-700">Repetir a cada
+                <input id="agenda-intervalo" type="number" min="1" max="12" value="1" name="recorrencia_intervalo" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+            </label>
+            <label class="text-sm font-medium text-slate-700">Espaço
+                <select id="agenda-espaco" name="espaco_id" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+                    <option value="">Sem espaço definido</option>
+                    {% for espaco in espacos_agenda %}
+                    <option value="{{ espaco.id }}">{{ espaco.nome }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="text-sm font-medium text-slate-700">Hora de início
+                <input id="agenda-hora-inicio" type="time" name="hora_inicio" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+            </label>
+            <label class="text-sm font-medium text-slate-700">Hora de término
+                <input id="agenda-hora-fim" type="time" name="hora_fim" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+            </label>
+        </div>
+
+        <label class="mt-4 block text-sm font-medium text-slate-700">Descrição ou observações
+            <textarea id="agenda-descricao" name="descricao" rows="3" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"></textarea>
+        </label>
+
+        <div class="mt-6 flex flex-wrap justify-end gap-2">
+            <label id="agenda-escopo-wrap" class="mr-auto hidden text-sm text-slate-600">Aplicar a <select id="agenda-escopo" name="escopo_recorrencia" class="ml-1 rounded-lg border border-slate-200 px-2 py-1"><option value="ocorrencia">esta ocorrência</option><option value="futuro">esta e seguintes</option><option value="serie">toda a série</option></select></label>
+            <button type="button" id="agenda-apagar" onclick="apagarAgenda()" class="hidden rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Apagar</button>
+            <button type="button" id="agenda-duplicar" onclick="duplicarAgenda()" class="hidden rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Duplicar</button>
+            <button type="button" onclick="document.getElementById('agenda-modal').close()" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600">Cancelar</button>
+            <button id="agenda-submit" type="submit" class="ds-primary rounded-xl px-4 py-2 text-sm font-semibold">Criar atividade</button>
+        </div>
+    </form>
+</dialog>
+<script src="/static/js/agenda.js"></script>
+{% endmacro %}
+
+{% macro agenda_legenda(agenda_tipos) %}
+<div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500" aria-label="Legenda da agenda">
+    {% for tipo in agenda_tipos %}
+    <span class="inline-flex items-center gap-1">
+        <span class="h-2 w-2 rounded-full {% if tipo.cor == 'emerald' %}bg-emerald-500{% elif tipo.cor in ['rose', 'red'] %}bg-rose-500{% elif tipo.cor == 'amber' %}bg-amber-500{% elif tipo.cor == 'sky' %}bg-sky-500{% elif tipo.cor == 'violet' %}bg-violet-500{% elif tipo.cor == 'indigo' %}bg-indigo-500{% else %}bg-slate-400{% endif %}"></span>
+        {{ tipo.label }}
+    </span>
+    {% endfor %}
+</div>
+{% endmacro %}

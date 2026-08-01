@@ -1,62 +1,39 @@
 {% extends "base.html" %}
-
 {% block titulo %}Jogadores{% endblock %}
-
 {% block conteudo %}
-
-<div class="flex items-center justify-between mb-6">
-    <div>
-        <h1 class="text-2xl font-bold text-gray-800">Jogadores</h1>
-        <p class="text-gray-500 mt-1">Gerir os jogadores do clube</p>
-    </div>
-    <a href="/jogadores/novo"
-       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
-        + Novo Jogador
-    </a>
+<div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div><p class="ds-section-label">Jogadores</p><h1 class="mt-1 text-2xl font-bold text-slate-900">Lista do clube</h1><p class="mt-1 text-sm text-slate-500">Pesquisa, filtra e abre rapidamente cada ficha individual.</p></div>
+    <a href="/jogadores/novo" class="ds-button ds-button-primary">+ Novo jogador</a>
 </div>
+
+<form method="GET" class="mb-5 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-5">
+    <input name="nome" value="{{ filtros.nome }}" placeholder="Pesquisar por nome" class="rounded-xl border border-slate-200 px-3 py-2 text-sm">
+    <select name="equipa_id" class="rounded-xl border border-slate-200 px-3 py-2 text-sm"><option value="">Todas as equipas</option>{% for equipa in equipas %}<option value="{{ equipa.id }}" {% if filtros.equipa_id == equipa.id|string %}selected{% endif %}>{{ equipa.nome }}</option>{% endfor %}</select>
+    <select name="escalao" class="rounded-xl border border-slate-200 px-3 py-2 text-sm"><option value="">Todos os escalões</option>{% for valor in ['Sub-8','Sub-10','Sub-12','Sub-14','Sub-16','Sub-18','Sénior','Masters'] %}<option value="{{ valor }}" {% if filtros.escalao == valor %}selected{% endif %}>{{ valor }}</option>{% endfor %}</select>
+    <select name="estado" class="rounded-xl border border-slate-200 px-3 py-2 text-sm"><option value="">Todos os estados</option>{% for valor,label in [('completa','Completa'),('pendente','Pendente'),('rejeitada','Rejeitada')] %}<option value="{{ valor }}" {% if filtros.estado == valor %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <div class="flex gap-2"><button class="ds-button ds-button-primary flex-1">Filtrar</button><a href="/jogadores" class="ds-button ds-button-secondary">Limpar</a></div>
+</form>
 
 {% if jogadores %}
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    {% for jogador in jogadores %}
-    <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hover:shadow-md transition">
-        <div class="flex items-start justify-between">
-            <div>
-                <div class="flex items-center gap-2">
-                    {% if jogador.numero_camisola %}
-                    <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">
-                        #{{ jogador.numero_camisola }}
-                    </span>
-                    {% endif %}
-                    <h2 class="font-bold text-gray-800">{{ jogador.nome }}</h2>
-                </div>
-                {% if jogador.posicao %}
-                <p class="text-gray-500 text-sm mt-1">{{ jogador.posicao }}</p>
-                {% endif %}
-                {% if jogador.equipa %}
-                <p class="text-gray-400 text-sm">{{ jogador.equipa.nome }}</p>
-                {% endif %}
-            </div>
-            <span class="text-3xl">🏃</span>
-        </div>
-        <div class="mt-4 pt-4 border-t border-gray-100">
-            <a href="/jogadores/{{ jogador.id }}"
-               class="text-orange-500 hover:text-orange-600 text-sm font-medium">
-                Ver ficha →
-            </a>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-
-{% else %}
-<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
-    <span class="text-5xl">🏃</span>
-    <p class="text-gray-500 mt-4">Ainda não há jogadores registados.</p>
-    <a href="/jogadores/novo"
-       class="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
-        Registar primeiro jogador
-    </a>
+<form id="jogadores-massa" method="POST" action="/jogadores/eliminar-selecionados">
+{% if utilizador.perfil.value == 'administrador' %}
+<div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm">
+    <span><strong id="total-selecionados">0</strong> selecionado(s)</span>
+    <div class="flex gap-2"><button type="button" onclick="eliminarSelecionados()" class="ds-button ds-button-danger">Eliminar selecionados</button><button type="button" onclick="eliminarTodos()" class="ds-button ds-button-secondary text-red-700">Eliminar todos</button></div>
 </div>
 {% endif %}
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+<table class="min-w-full text-sm"><thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr>{% if utilizador.perfil.value == 'administrador' %}<th class="px-4 py-3"><input id="selecionar-todos" type="checkbox" aria-label="Selecionar todos"></th>{% endif %}<th class="px-4 py-3">Jogador</th><th class="px-4 py-3">Equipa</th><th class="px-4 py-3">Nascimento</th><th class="px-4 py-3">Altura</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3 text-right">Ações</th></tr></thead>
+<tbody class="divide-y divide-slate-100">{% for jogador in jogadores %}<tr class="hover:bg-slate-50">{% if utilizador.perfil.value == 'administrador' %}<td class="px-4 py-3"><input class="jogador-check" type="checkbox" name="jogador_ids" value="{{ jogador.id }}" aria-label="Selecionar {{ jogador.nome }}"></td>{% endif %}<td class="px-4 py-3"><a href="/jogadores/{{ jogador.id }}" class="flex items-center gap-3 font-semibold text-slate-900"><span class="h-11 w-11 overflow-hidden rounded-full bg-slate-100">{% if jogador.fotografia %}<img src="{{ jogador.fotografia }}" alt="Fotografia de {{ jogador.nome }}" class="h-full w-full object-cover">{% else %}<span class="flex h-full items-center justify-center text-lg text-slate-400">{{ jogador.nome[:1]|upper }}</span>{% endif %}</span>{{ jogador.nome }}</a></td><td class="px-4 py-3 text-slate-600">{{ jogador.equipa.nome if jogador.equipa else 'Sem equipa' }}</td><td class="px-4 py-3 text-slate-600">{{ jogador.data_nascimento|data_pt if jogador.data_nascimento else '—' }}</td><td class="px-4 py-3 text-slate-600">{{ jogador.altura_atual ~ ' cm' if jogador.altura_atual else '—' }}</td><td class="px-4 py-3"><span class="ds-status ds-status-{{ 'confirmed' if jogador.inscricao_estado == 'completa' else 'pending' }}">{{ jogador.inscricao_estado|capitalize if jogador.inscricao_estado else 'Por definir' }}</span></td><td class="px-4 py-3 text-right"><a href="/jogadores/{{ jogador.id }}/editar" class="font-medium text-blue-700 hover:underline">Editar</a>{% if utilizador.perfil.value == 'administrador' %}<button type="submit" formaction="/jogadores/{{ jogador.id }}/apagar" formmethod="POST" onclick="return confirm('Eliminar {{ jogador.nome|e }} e os registos dependentes?')" class="ml-3 font-medium text-red-700 hover:underline">Eliminar</button>{% endif %}</td></tr>{% endfor %}</tbody></table>
+</div></form>
+{% else %}<div class="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">Não existem jogadores para os filtros selecionados.</div>{% endif %}
 
+{% if utilizador.perfil.value == 'administrador' %}
+<form id="eliminar-todos-form" method="POST" action="/jogadores/eliminar-todos" class="hidden"><input name="confirmar_total" value="{{ jogadores|length }}"></form>
+<script>
+const checks=()=>Array.from(document.querySelectorAll('.jogador-check')); const atualizar=()=>document.getElementById('total-selecionados').textContent=checks().filter(c=>c.checked).length;
+document.getElementById('selecionar-todos')?.addEventListener('change',e=>{checks().forEach(c=>c.checked=e.target.checked);atualizar();}); checks().forEach(c=>c.addEventListener('change',atualizar));
+function eliminarSelecionados(){const total=checks().filter(c=>c.checked).length;if(!total)return alert('Seleciona pelo menos um jogador.');if(confirm(`Eliminar ${total} jogador(es) e os registos dependentes?`)){const i=document.createElement('input');i.type='hidden';i.name='confirmar_total';i.value=total;document.getElementById('jogadores-massa').appendChild(i);document.getElementById('jogadores-massa').submit();}}
+function eliminarTodos(){const total={{ jogadores|length }};if(confirm(`Eliminar todos os ${total} jogadores do clube? Esta ação não pode ser anulada.`))document.getElementById('eliminar-todos-form').submit();}
+</script>{% endif %}
 {% endblock %}

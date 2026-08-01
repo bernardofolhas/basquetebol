@@ -1,130 +1,235 @@
 {% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% from "partials/agenda_modal.html" import agenda_modal, agenda_legenda %}
 
 {% block titulo %}Macrociclo {{ macrociclo.numero }}{% endblock %}
 
 {% block conteudo %}
 
-<div class="mb-6">
-    <a href="/planeamento/equipas/{{ macrociclo.equipa_id }}/macrociclos"
-       class="text-orange-500 hover:text-orange-600 text-sm">
-        ← Voltar aos macrociclos
-    </a>
-    <div class="flex items-center gap-3 mt-2">
-        <span class="bg-orange-500 text-white font-bold px-3 py-1 rounded-full">
-            Macro {{ macrociclo.numero }}
-        </span>
-        <h1 class="text-2xl font-bold text-gray-800">
-            {{ macrociclo.data_inicio }} → {{ macrociclo.data_fim }}
-        </h1>
+{% call equipa_contexto(
+    macrociclo.equipa,
+    "Macrociclo " ~ macrociclo.numero,
+    (macrociclo.data_inicio|data_pt) ~ " → " ~ (macrociclo.data_fim|data_pt),
+    "planeamento",
+    "/planeamento/equipas/" ~ macrociclo.equipa_id ~ "/macrociclos",
+    "Voltar aos macrociclos"
+) %}
+    <a href="/planeamento/macrociclos/{{ macrociclo.id }}/pdf"
+       class="bg-white hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">📄 PDF</a>
+    <a href="/partilha/macrociclos/{{ macrociclo.id }}/pdf" class="bg-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-emerald-200 transition hover:bg-emerald-100">PDF para partilhar</a>
+    <a href="/planeamento/macrociclos/{{ macrociclo.id }}/editar"
+       class="bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">✏️ Editar</a>
+    <form method="POST" action="/planeamento/macrociclos/{{ macrociclo.id }}/eliminar" class="inline"
+          onsubmit="return confirm('Eliminar este macrociclo? Todos os mesociclos e microciclos serao apagados.')">
+        <button type="submit" class="bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">🗑️ Eliminar</button>
+    </form>
+{% endcall %}
+
+<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+    <div class="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-indigo-600">Mesociclos</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ mesociclos | length }}</p>
+    </div>
+    <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-emerald-600">Treinos</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.total_treinos }}</p>
+    </div>
+    <div class="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-rose-600">Jogos</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.total_jogos }}</p>
+    </div>
+    <div class="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-amber-600">Atividades</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.total_atividades }}</p>
+    </div>
+    <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-slate-600">Dias Ativos</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.dias_com_atividade }}</p>
     </div>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-
-    <!-- Objetivos técnicos/táticos -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 class="font-semibold text-gray-700 mb-4">Objetivos Técnicos/Táticos</h2>
-        <div class="space-y-3 text-sm">
-
-            <!-- Macro para mostrar cada objetivo só se estiver preenchido -->
+<div class="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-6 mb-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-gray-800">Objetivos do Macrociclo</h2>
+            <span class="text-xs text-gray-400">Visao global da epoca</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             {% for label, valor, cor in [
-                ('Técnica Individual Ofensiva', macrociclo.obj_tecnica_individual_ofensiva, 'blue'),
-                ('Técnica Individual Defensiva', macrociclo.obj_tecnica_individual_defensiva, 'blue'),
-                ('Tática Individual Ofensiva', macrociclo.obj_tatica_individual_ofensiva, 'green'),
-                ('Tática Individual Defensiva', macrociclo.obj_tatica_individual_defensiva, 'green'),
-                ('Tática Coletiva Ofensiva', macrociclo.obj_tatica_coletiva_ofensiva, 'orange'),
-                ('Tática Coletiva Defensiva', macrociclo.obj_tatica_coletiva_defensiva, 'orange')
+                ('Tecnica Individual Ofensiva', macrociclo.obj_tecnica_individual_ofensiva, 'blue'),
+                ('Tecnica Individual Defensiva', macrociclo.obj_tecnica_individual_defensiva, 'blue'),
+                ('Tatica Individual Ofensiva', macrociclo.obj_tatica_individual_ofensiva, 'emerald'),
+                ('Tatica Individual Defensiva', macrociclo.obj_tatica_individual_defensiva, 'emerald'),
+                ('Tatica Coletiva Ofensiva', macrociclo.obj_tatica_coletiva_ofensiva, 'orange'),
+                ('Tatica Coletiva Defensiva', macrociclo.obj_tatica_coletiva_defensiva, 'orange'),
+                ('Fisicos', macrociclo.obj_fisicos, 'violet'),
+                ('Psicologicos', macrociclo.obj_psicologicos, 'amber')
             ] %}
             {% if valor %}
-            <div class="border-l-4 border-{{ cor }}-400 pl-3">
-                <p class="text-xs font-semibold text-gray-400 uppercase">{{ label }}</p>
-                <p class="text-gray-700 mt-1">{{ valor }}</p>
+            <div class="rounded-xl border border-{{ cor }}-100 bg-{{ cor }}-50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-{{ cor }}-600">{{ label }}</p>
+                <p class="text-gray-700 mt-2 whitespace-pre-line">{{ valor }}</p>
             </div>
             {% endif %}
             {% endfor %}
-
             {% if not macrociclo.obj_tecnica_individual_ofensiva and
                   not macrociclo.obj_tecnica_individual_defensiva and
                   not macrociclo.obj_tatica_individual_ofensiva and
                   not macrociclo.obj_tatica_individual_defensiva and
                   not macrociclo.obj_tatica_coletiva_ofensiva and
-                  not macrociclo.obj_tatica_coletiva_defensiva %}
-            <p class="text-gray-400">Sem objetivos definidos.</p>
+                  not macrociclo.obj_tatica_coletiva_defensiva and
+                  not macrociclo.obj_fisicos and
+                  not macrociclo.obj_psicologicos %}
+            <div class="md:col-span-2 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-400">
+                Ainda nao existem objetivos definidos para este macrociclo.
+            </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Objetivos físicos e psicológicos -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 class="font-semibold text-gray-700 mb-4">Outros Objetivos</h2>
-        <div class="space-y-4 text-sm">
-            {% if macrociclo.obj_fisicos %}
-            <div class="border-l-4 border-purple-400 pl-3">
-                <p class="text-xs font-semibold text-gray-400 uppercase">Físicos</p>
-                <p class="text-gray-700 mt-1">{{ macrociclo.obj_fisicos }}</p>
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-gray-800">Feed Integrado</h2>
+            <span class="text-xs text-gray-400">{{ dashboard_planeamento.periodo.label }}</span>
+        </div>
+        {% if dashboard_planeamento.itens_recentes %}
+        <div class="space-y-3">
+            {% for item in dashboard_planeamento.itens_recentes %}
+            <div class="rounded-xl border {{ item.card_classes }} p-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="{{ item.pill_classes }} text-[11px] font-semibold px-2 py-1 rounded-full">{{ item.badge }}</span>
+                            <span class="text-[11px] text-gray-400">{{ item.dia_semana }} · {{ item.data|data_pt }}</span>
+                        </div>
+                        <p class="font-medium text-gray-800 mt-2">{{ item.titulo }}</p>
+                        <p class="text-xs text-gray-500 mt-1">{{ item.horario }} · {{ item.local }}</p>
+                        {% if item.detalhe %}
+                        <p class="text-xs text-gray-500 mt-1">{{ item.detalhe }}</p>
+                        {% endif %}
+                    </div>
+                    {% if item.link %}
+                    <a href="{{ item.link }}" class="text-orange-500 hover:text-orange-600 text-xs font-medium">Ver →</a>
+                    {% endif %}
+                </div>
             </div>
-            {% endif %}
-            {% if macrociclo.obj_psicologicos %}
-            <div class="border-l-4 border-yellow-400 pl-3">
-                <p class="text-xs font-semibold text-gray-400 uppercase">Psicológicos</p>
-                <p class="text-gray-700 mt-1">{{ macrociclo.obj_psicologicos }}</p>
-            </div>
-            {% endif %}
-            {% if not macrociclo.obj_fisicos and not macrociclo.obj_psicologicos %}
-            <p class="text-gray-400">Sem objetivos definidos.</p>
-            {% endif %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">Sem treinos, jogos ou atividades ligados a este periodo.</p>
+        {% endif %}
+
+        <div class="mt-5 pt-5 border-t border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-700 mb-2">Reflexao</h3>
+            <p class="text-sm text-gray-600 whitespace-pre-line">{{ macrociclo.reflexao or "Sem reflexao registada." }}</p>
         </div>
     </div>
-
 </div>
 
-<!-- Mesociclos deste macrociclo -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-gray-800">Calendario Integrado do Macrociclo</h2>
+        <span class="text-sm text-gray-400">Treinos, jogos e atividades com a mesma leitura</span>
+    </div>
+    <div class="mb-4">{{ agenda_legenda(agenda_tipos) }}</div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        {% for mes in dashboard_planeamento.meses %}
+        <div class="rounded-2xl border border-gray-100 bg-slate-50 p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h3 class="font-semibold text-gray-800">{{ mes.label }}</h3>
+                    <p class="text-xs text-gray-400 mt-1">
+                        {{ mes.estatisticas.treinos }} treinos · {{ mes.estatisticas.jogos }} jogos · {{ mes.estatisticas.atividades }} atividades
+                    </p>
+                </div>
+                <span class="bg-white text-gray-600 text-xs px-2 py-1 rounded-full border border-gray-200">{{ mes.estatisticas.itens }} itens</span>
+            </div>
+
+            <div class="grid grid-cols-7 gap-2 mb-2 text-[11px] font-semibold text-gray-400">
+                {% for nome in ['Seg','Ter','Qua','Qui','Sex','Sab','Dom'] %}
+                <div class="px-1">{{ nome }}</div>
+                {% endfor %}
+            </div>
+            <div class="space-y-2">
+                {% for semana in mes.semanas %}
+                <div class="grid grid-cols-7 gap-2">
+                    {% for dia in semana %}
+                    <div class="min-h-24 rounded-xl border {% if dia.do_mes_atual and dia.no_periodo %}border-gray-200 bg-white{% else %}border-gray-100 bg-slate-100 text-gray-400{% endif %} p-2">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[11px] font-semibold">{{ dia.dia }}</span>
+                            <div class="flex items-center gap-1">
+                                {% if dia.itens %}<span class="text-[10px] text-gray-400">{{ dia.itens | length }}</span>{% endif %}
+                                {% if dia.do_mes_atual and dia.no_periodo %}<button type="button" data-agenda-new-date="{{ dia.data|data_iso }}" class="rounded-full px-1.5 text-xs text-orange-500 hover:bg-orange-50" title="Criar atividade">+</button>{% endif %}
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            {% for item in dia.itens[:2] %}
+                            {% if item.link %}
+                            <a href="{{ item.link }}" {% if item.agenda_editavel %}data-agenda-event-id="{{ item.agenda_id }}" data-agenda-tipo="{{ item.agenda_tipo }}" data-agenda-titulo="{{ item.agenda_titulo|e }}" data-agenda-data="{{ item.data|data_iso }}" data-agenda-hora-inicio="{{ item.hora_inicio or '' }}" data-agenda-hora-fim="{{ item.hora_fim or '' }}" data-agenda-descricao="{{ item.agenda_descricao|e }}" data-agenda-espaco-id="{{ item.agenda_espaco_id }}" data-agenda-equipa-id="{{ item.agenda_equipa_id }}" data-agenda-aplica-todas="{{ 'true' if item.agenda_equipa_id == '' else 'false' }}"{% endif %} class="block rounded-lg px-1.5 py-1 text-[10px] leading-tight {{ item.pill_classes }} transition hover:opacity-85" title="{{ item.titulo }}">
+                                {{ item.badge }} · {{ item.titulo }}
+                            </a>
+                            {% else %}
+                            <div class="rounded-lg px-1.5 py-1 text-[10px] leading-tight {{ item.pill_classes }}">
+                                {{ item.badge }} · {{ item.titulo }}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                            {% if dia.itens | length > 2 %}
+                            <div class="text-[10px] text-gray-400">+{{ dia.itens | length - 2 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, equipas_agenda|default([]), request.session.get('_csrf', '')) }}
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
     <div class="flex items-center justify-between mb-4">
         <h2 class="font-semibold text-gray-700">
             Mesociclos
-            <span class="text-gray-400 font-normal text-sm ml-1">
-                ({{ mesociclos | length }})
-            </span>
+            <span class="text-gray-400 font-normal text-sm ml-1">({{ mesociclos | length }})</span>
         </h2>
     </div>
 
     {% if mesociclos %}
     <div class="space-y-3 mb-6">
         {% for meso in mesociclos %}
-        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div class="flex items-center gap-3">
-                <span class="bg-blue-100 text-blue-700 text-sm font-bold px-2 py-1 rounded-full">
-                    Meso {{ meso.numero }}
-                </span>
-                <span class="text-gray-600 text-sm">
-                    {{ meso.data_inicio }} → {{ meso.data_fim }}
-                </span>
-                <span class="text-gray-400 text-xs">
-                    {{ meso.microciclos | length }} microciclo(s)
-                </span>
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-slate-50 p-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="bg-blue-100 text-blue-700 text-sm font-bold px-2 py-1 rounded-full">Meso {{ meso.numero }}</span>
+                <span class="text-gray-600 text-sm">{{ meso.data_inicio|data_pt }} → {{ meso.data_fim|data_pt }}</span>
+                <span class="text-gray-400 text-xs">{{ meso.microciclos | length }} microciclo(s)</span>
             </div>
-            <a href="/planeamento/mesociclos/{{ meso.id }}"
-               class="text-orange-500 hover:text-orange-600 text-sm">
-                Ver →
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="/planeamento/mesociclos/{{ meso.id }}" class="text-orange-500 hover:text-orange-600 text-sm">Ver →</a>
+                <a href="/planeamento/mesociclos/{{ meso.id }}/editar" class="text-gray-400 hover:text-blue-600 text-sm">✏️</a>
+                <form method="POST" action="/planeamento/mesociclos/{{ meso.id }}/eliminar" class="inline"
+                      onsubmit="return confirm('Eliminar Meso {{ meso.numero }}? Os microciclos associados serao apagados.')">
+                    <button type="submit" class="text-gray-400 hover:text-red-600 text-sm">🗑️</button>
+                </form>
+            </div>
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <p class="text-gray-400 text-sm mb-4">Ainda não há mesociclos criados.</p>
+    <p class="text-gray-400 text-sm mb-4">Ainda nao ha mesociclos criados.</p>
     {% endif %}
 
-    <!-- Formulário inline para criar mesociclo rapidamente -->
     <div class="border-t border-gray-100 pt-4">
-        <p class="text-sm font-medium text-gray-600 mb-3">
-            Adicionar Mesociclo {{ proximo_numero_meso }}
-        </p>
+        <p class="text-sm font-medium text-gray-600 mb-3">Adicionar Mesociclo {{ proximo_numero_meso }}</p>
         <form method="POST"
               action="/planeamento/macrociclos/{{ macrociclo.id }}/mesociclos/novo"
-              class="grid grid-cols-2 gap-3">
+              class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-                <label class="block text-xs text-gray-500 mb-1">Data de início *</label>
+                <label class="block text-xs text-gray-500 mb-1">Data de inicio *</label>
                 <input type="date" name="data_inicio" required
                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
@@ -133,7 +238,7 @@
                 <input type="date" name="data_fim" required
                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
-            <div class="col-span-2">
+            <div class="md:col-span-2">
                 <button type="submit"
                         class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
                     + Criar Mesociclo

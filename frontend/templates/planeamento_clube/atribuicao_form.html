@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ "Editar" if modo == "editar" else "Nova" }} Atribuição{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/planeamento-clube/semanal/{{ semanal.id }}" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar ao plano semanal</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">{{ "Editar Atribuição de Espaço" if modo == "editar" else "Nova Atribuição de Espaço" }}</h1>
+    <p class="text-gray-500 mt-1">Reserva operacional semanal de espaços do clube</p>
+</div>
+
+{% if erro %}
+<div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {{ erro }}
+</div>
+{% endif %}
+
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 max-w-4xl">
+    <form method="POST"
+          action="{{ '/planeamento-clube/atribuicoes/' ~ atribuicao.id ~ '/editar' if modo == 'editar' else '/planeamento-clube/semanal/' ~ semanal.id ~ '/atribuicoes/nova' }}"
+          class="space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Espaço *</label>
+                <select name="espaco_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    {% set espaco_selecionado = dados_formulario.get('espaco_id', atribuicao.espaco_id if atribuicao else '') %}
+                    {% for espaco in espacos %}
+                    <option value="{{ espaco.id }}" {% if espaco_selecionado|string == espaco.id|string %}selected{% endif %}>{{ espaco.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data *</label>
+                <input type="date" name="data_atribuicao" required
+                       value="{{ dados_formulario.get('data_atribuicao', atribuicao.data if atribuicao else semanal.data_inicio)|data_iso }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Hora de início *</label>
+                <input type="time" name="hora_inicio" required
+                       value="{{ dados_formulario.get('hora_inicio', atribuicao.hora_inicio if atribuicao else '') }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Hora de fim *</label>
+                <input type="time" name="hora_fim" required
+                       value="{{ dados_formulario.get('hora_fim', atribuicao.hora_fim if atribuicao else '') }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de ocupação *</label>
+                <select name="tipo_ocupacao" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    {% set tipo_ocupacao_selecionado = dados_formulario.get('tipo_ocupacao', atribuicao.tipo_ocupacao.value if atribuicao else 'treino_equipa') %}
+                    {% for tipo in tipos_ocupacao %}
+                    <option value="{{ tipo.value }}" {% if tipo_ocupacao_selecionado == tipo.value %}selected{% endif %}>{{ tipo.value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Estado *</label>
+                {% set estado_selecionado = dados_formulario.get('estado', atribuicao.estado.value if atribuicao else 'rascunho') %}
+                <select name="estado" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    {% for estado_item in estados_atribuicao %}
+                    <option value="{{ estado_item.value }}" {% if estado_selecionado == estado_item.value %}selected{% endif %}>{{ estado_item.value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Equipa</label>
+                {% set equipa_selecionada = dados_formulario.get('equipa_id', atribuicao.equipa_id if atribuicao else '') %}
+                <select name="equipa_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Sem equipa associada</option>
+                    {% for equipa in equipas %}
+                    <option value="{{ equipa.id }}" {% if equipa_selecionada|string == equipa.id|string %}selected{% endif %}>{{ equipa.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Evento global</label>
+                {% set evento_selecionado = dados_formulario.get('evento_id', atribuicao.evento_id if atribuicao else '') %}
+                <select name="evento_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Sem evento associado</option>
+                    {% for evento in eventos_globais %}
+                    <option value="{{ evento.id }}" {% if evento_selecionado|string == evento.id|string %}selected{% endif %}>{{ evento.data|data_pt }} • {{ evento.titulo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Origem *</label>
+                {% set origem_selecionada = dados_formulario.get('origem', atribuicao.origem.value if atribuicao else 'manual') %}
+                <select name="origem" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    {% for origem_item in origens_atribuicao %}
+                    <option value="{{ origem_item.value }}" {% if origem_selecionada == origem_item.value %}selected{% endif %}>{{ origem_item.value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+            <textarea name="observacoes" rows="4"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">{{ dados_formulario.get('observacoes', atribuicao.observacoes if atribuicao and atribuicao.observacoes else '') }}</textarea>
+        </div>
+
+        <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+            {{ "Guardar Alterações" if modo == "editar" else "Criar Atribuição" }}
+        </button>
+    </form>
+</div>
+
+{% endblock %}

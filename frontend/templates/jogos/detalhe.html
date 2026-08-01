@@ -1,24 +1,36 @@
 {% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
 
-{% block titulo %}{{ jogo.adversario }} — {{ jogo.data }}{% endblock %}
+{% block titulo %}{{ jogo.adversario }} — {{ jogo.data|data_pt }}{% endblock %}
 
 {% block conteudo %}
 
-<div class="mb-6">
-    <a href="/jogos/equipas/{{ jogo.equipa_id }}" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar ao calendário</a>
-    <div class="flex items-center gap-3 mt-2">
-        <h1 class="text-2xl font-bold text-gray-800">vs {{ jogo.adversario }}</h1>
-        <span class="{% if jogo.em_casa %}bg-green-100 text-green-700{% else %}bg-blue-100 text-blue-700{% endif %} text-sm px-3 py-1 rounded-full font-medium">
-            {% if jogo.em_casa %}Casa{% else %}Fora{% endif %}
-        </span>
-    </div>
-    <p class="text-gray-500 mt-1">
-        {{ jogo.data }}
-        {% if jogo.hora %} — {{ jogo.hora }}{% endif %}
-        {% if jogo.local %} — {{ jogo.local }}{% endif %}
-        {% if jogo.competicao %} — {{ jogo.competicao }}{% endif %}
-    </p>
-</div>
+{% call equipa_contexto(
+    jogo.equipa,
+    "Jogo contra " ~ jogo.adversario,
+    (jogo.data|string) ~
+    ((" · " ~ jogo.hora) if jogo.hora else "") ~
+    ((" · " ~ jogo.local) if jogo.local else "") ~
+    ((" · " ~ jogo.competicao) if jogo.competicao else ""),
+    "jogos",
+    "/jogos/equipas/" ~ jogo.equipa_id,
+    "Voltar ao calendário"
+) %}
+    <span class="{% if jogo.em_casa %}bg-green-100 text-green-700{% else %}bg-blue-100 text-blue-700{% endif %} px-4 py-2 rounded-full text-sm font-medium">
+        {% if jogo.em_casa %}Casa{% else %}Fora{% endif %}
+    </span>
+    <a href="/jogos/{{ jogo.id }}/editar"
+       class="bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">
+        ✏️ Editar Jogo
+    </a>
+    <form method="POST" action="/jogos/{{ jogo.id }}/eliminar">
+        <button type="submit"
+                class="bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition"
+                onclick="return confirm('Tens a certeza que queres eliminar este jogo?')">
+            🗑️ Eliminar Jogo
+        </button>
+    </form>
+{% endcall %}
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -120,6 +132,17 @@
                 Guardar convocatória
             </button>
         </form>
+        {% if jogos_anteriores %}
+        <form method="POST" action="/jogos/{{ jogo.id }}/convocatoria/copiar/{{ jogos_anteriores[0].id }}" class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label for="jogo-origem-convocatoria" class="sr-only">Copiar convocatória de</label>
+            <select id="jogo-origem-convocatoria" name="origem_id" class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" onchange="this.form.action='/jogos/{{ jogo.id }}/convocatoria/copiar/' + this.value">
+                {% for jogo_anterior in jogos_anteriores %}
+                <option value="{{ jogo_anterior.id }}">{{ jogo_anterior.data|data_pt }} · vs {{ jogo_anterior.adversario }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100">Copiar convocatória</button>
+        </form>
+        {% endif %}
     </div>
 
 </div>
@@ -127,6 +150,16 @@
     <a href="/jogos/{{ jogo.id }}/plano"
        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition">
         📋 Plano de Jogo
+    </a>
+</div>
+<div class="mt-4">
+    <a href="/jogos/{{ jogo.id }}/convocatoria/print" target="_blank"
+       class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+        🖨️ Imprimir Convocatória
+    </a>
+    <a href="/jogos/{{ jogo.id }}/convocatoria/pdf"
+       class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+        📄 PDF Convocatória
     </a>
 </div>
 {% endblock %}

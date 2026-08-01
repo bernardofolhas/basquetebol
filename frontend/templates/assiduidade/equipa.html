@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block titulo %}Assiduidade — {{ equipa.nome }}{% endblock %}
+
+{% block conteudo %}
+<div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+        <a href="/equipas/{{ equipa.id }}" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar à equipa</a>
+        <p class="text-xs font-semibold uppercase tracking-widest text-orange-500 mt-4">Área operacional</p>
+        <h1 class="text-3xl font-bold text-gray-800 mt-1">Assiduidade</h1>
+        <p class="text-gray-500 mt-1">Resumo por jogadora, com estados claros e histórico registado.</p>
+    </div>
+    <a href="/assiduidade/equipas/{{ equipa.id }}/pdf{% if data_inicio %}?inicio={{ data_inicio|data_iso }}{% if data_fim %}&amp;fim={{ data_fim|data_iso }}{% endif %}{% elif data_fim %}?fim={{ data_fim|data_iso }}{% endif %}"
+       class="inline-flex items-center justify-center rounded-xl bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-900">
+        Exportar relatório PDF
+    </a>
+</div>
+
+<form method="get" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-end">
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Data inicial</label>
+            <input type="date" name="inicio" value="{{ data_inicio|data_iso }}" class="rounded-lg border-gray-200 text-sm focus:border-orange-400 focus:ring-orange-400">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Data final</label>
+            <input type="date" name="fim" value="{{ data_fim|data_iso }}" class="rounded-lg border-gray-200 text-sm focus:border-orange-400 focus:ring-orange-400">
+        </div>
+        <button class="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600">Aplicar filtro</button>
+        <a href="/assiduidade/equipas/{{ equipa.id }}" class="px-3 py-2 text-sm text-gray-500 hover:text-orange-600">Limpar</a>
+    </div>
+</form>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p class="text-xs uppercase tracking-wide text-gray-400">Sessões no período</p>
+        <p class="text-3xl font-bold text-gray-800 mt-2">{{ sessoes_total }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ sessoes_com_registo }} com registos</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p class="text-xs uppercase tracking-wide text-gray-400">Presenças registadas</p>
+        <p class="text-3xl font-bold text-green-600 mt-2">{{ resumo.presentes }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ resumo.percentagem }}% do total registado</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p class="text-xs uppercase tracking-wide text-gray-400">Faltas justificadas</p>
+        <p class="text-3xl font-bold text-blue-600 mt-2">{{ resumo.por_estado.justificada }}</p>
+        <p class="text-xs text-gray-500 mt-1">Com motivo administrativo</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p class="text-xs uppercase tracking-wide text-gray-400">Lesionadas</p>
+        <p class="text-3xl font-bold text-purple-600 mt-2">{{ resumo.por_estado.lesionada }}</p>
+        <p class="text-xs text-gray-500 mt-1">Acompanhar no perfil</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="flex flex-col gap-2 border-b border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <div>
+            <h2 class="font-semibold text-gray-800">Resumo por jogadora</h2>
+            <p class="text-sm text-gray-500">Só entram no cálculo os registos efetivamente guardados.</p>
+        </div>
+        <a href="/jogadores" class="text-sm font-medium text-orange-600 hover:underline">Abrir plantel →</a>
+    </div>
+    {% if linhas %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-400">
+                <tr>
+                    <th class="px-5 py-3">Jogadora</th>
+                    <th class="px-3 py-3 text-center">Registos</th>
+                    <th class="px-3 py-3 text-center">Presenças</th>
+                    <th class="px-3 py-3 text-center">Atrasadas</th>
+                    <th class="px-3 py-3 text-center">Ausências</th>
+                    <th class="px-5 py-3 text-right">Taxa</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for linha in linhas %}
+                <tr class="hover:bg-orange-50/40">
+                    <td class="px-5 py-3">
+                        <a href="/jogadores/{{ linha.jogador.id }}" class="font-semibold text-gray-800 hover:text-orange-600">{{ linha.jogador.nome }}</a>
+                        {% if linha.jogador.numero_camisola %}<span class="ml-2 text-xs text-gray-400">#{{ linha.jogador.numero_camisola }}</span>{% endif %}
+                    </td>
+                    <td class="px-3 py-3 text-center text-gray-600">{{ linha.total }}</td>
+                    <td class="px-3 py-3 text-center font-semibold text-green-700">{{ linha.presentes }}</td>
+                    <td class="px-3 py-3 text-center text-amber-700">{{ linha.por_estado.atrasada }}</td>
+                    <td class="px-3 py-3 text-center text-red-700">{{ linha.por_estado.ausente + linha.por_estado.justificada + linha.por_estado.lesionada + linha.por_estado.dispensada }}</td>
+                    <td class="px-5 py-3 text-right">
+                        <span class="font-bold {% if linha.percentagem >= 75 %}text-green-600{% elif linha.percentagem >= 50 %}text-amber-600{% else %}text-red-600{% endif %}">{{ linha.percentagem }}%</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-5 py-12 text-center text-gray-500">Ainda não existem jogadoras nesta equipa.</div>
+    {% endif %}
+</div>
+
+<div class="mt-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+    <strong>Leitura do relatório:</strong> a taxa considera Presente e Atrasada como participação. Registos em falta não são convertidos automaticamente em ausências.
+</div>
+{% endblock %}

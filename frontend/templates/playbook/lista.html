@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% block titulo %}Playbook — {{ equipa.nome }}{% endblock %}
+
+{% block conteudo %}
+
+{{ equipa_contexto(
+    equipa,
+    "Playbook",
+    "Jogadas, setplays e esquemas táticos organizados para a equipa.",
+    "playbook",
+    "/equipas/" ~ equipa.id,
+    "Voltar à equipa"
+) }}
+
+<!-- Formulário criar setplay -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+    <h2 class="font-semibold text-gray-700 mb-4">Novo Setplay</h2>
+    <form method="POST" action="/playbook/equipas/{{ equipa.id }}/setplays/novo"
+          class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="md:col-span-2">
+            <label class="block text-xs text-gray-500 mb-1">Nome *</label>
+            <input type="text" name="nome" required placeholder="Ex: 1-4 Flat, Horns, Box..."
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Categoria</label>
+            <select name="categoria" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <option value="">— Seleciona —</option>
+                {% for cat in categorias %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="flex items-end">
+            <button type="submit"
+                    class="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                + Criar Setplay
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Lista de setplays por categoria -->
+{% if setplays %}
+{% set cats_presentes = setplays | map(attribute='categoria') | unique | list %}
+
+<!-- Filtro por categoria -->
+<div class="flex flex-wrap gap-2 mb-4">
+    <button onclick="filtrarCategoria('todas')"
+            class="filtro-btn bg-orange-500 text-white text-xs font-medium px-3 py-1.5 rounded-full" data-cat="todas">
+        Todos ({{ setplays | length }})
+    </button>
+    {% for cat in categorias %}
+    {% set count = setplays | selectattr('categoria', 'equalto', cat) | list | length %}
+    {% if count > 0 %}
+    <button onclick="filtrarCategoria('{{ cat }}')"
+            class="filtro-btn bg-gray-100 text-gray-600 hover:bg-orange-100 text-xs font-medium px-3 py-1.5 rounded-full" data-cat="{{ cat }}">
+        {{ cat }} ({{ count }})
+    </button>
+    {% endif %}
+    {% endfor %}
+    {% if setplays | selectattr('categoria', 'none') | list | length > 0 %}
+    <button onclick="filtrarCategoria('sem_categoria')"
+            class="filtro-btn bg-gray-100 text-gray-600 hover:bg-orange-100 text-xs font-medium px-3 py-1.5 rounded-full" data-cat="sem_categoria">
+        Sem categoria ({{ setplays | selectattr('categoria', 'none') | list | length }})
+    </button>
+    {% endif %}
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="grid-setplays">
+    {% for setplay in setplays %}
+    <div class="setplay-card bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition overflow-hidden"
+         data-cat="{{ setplay.categoria or 'sem_categoria' }}">
+        <!-- Preview do primeiro passo (se tiver desenho) -->
+        {% if setplay.passos and setplay.passos[0].desenho %}
+        <div class="relative bg-gray-50 h-40 overflow-hidden">
+            <img src="/static/campos/campo_meio.png" class="absolute inset-0 w-full h-full object-cover opacity-60">
+            <img src="{{ setplay.passos[0].desenho }}" class="absolute inset-0 w-full h-full object-cover">
+            <div class="absolute top-2 right-2">
+                <span class="bg-black bg-opacity-50 text-white text-xs px-2 py-0.5 rounded-full">
+                    {{ setplay.passos | length }} passo(s)
+                </span>
+            </div>
+        </div>
+        {% else %}
+        <div class="h-40 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center">
+            <span class="text-5xl opacity-30">📋</span>
+        </div>
+        {% endif %}
+
+        <div class="p-4">
+            <div class="flex items-start justify-between gap-2">
+                <div>
+                    <h3 class="font-semibold text-gray-800">{{ setplay.nome }}</h3>
+                    {% if setplay.categoria %}
+                    <span class="inline-block mt-1 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{{ setplay.categoria }}</span>
+                    {% endif %}
+                    {% if setplay.descricao %}
+                    <p class="text-xs text-gray-400 mt-1 line-clamp-2">{{ setplay.descricao }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex items-center gap-2 mt-3">
+                <a href="/playbook/setplays/{{ setplay.id }}"
+                   class="flex-1 text-center bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition">
+                    Abrir / Editar →
+                </a>
+                <a href="/playbook/setplays/{{ setplay.id }}/pdf"
+                   class="bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-700 text-xs px-3 py-1.5 rounded-lg transition">📄</a>
+                <form method="POST" action="/playbook/setplays/{{ setplay.id }}/eliminar" class="inline"
+                      onsubmit="return confirm('Eliminar «{{ setplay.nome }}»?')">
+                    <button type="submit" class="bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 text-xs px-3 py-1.5 rounded-lg transition">🗑️</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 p-12 text-center">
+    <span class="text-5xl">📋</span>
+    <p class="text-gray-500 mt-4">Ainda não há setplays criados.</p>
+    <p class="text-gray-400 text-sm mt-1">Usa o formulário acima para adicionar o primeiro.</p>
+</div>
+{% endif %}
+
+<script>
+function filtrarCategoria(cat) {
+    document.querySelectorAll('.filtro-btn').forEach(btn => {
+        btn.className = btn.className.replace('bg-orange-500 text-white', 'bg-gray-100 text-gray-600');
+    });
+    const btn = document.querySelector(`.filtro-btn[data-cat="${cat}"]`);
+    if (btn) btn.className = btn.className.replace('bg-gray-100 text-gray-600', 'bg-orange-500 text-white');
+
+    document.querySelectorAll('.setplay-card').forEach(card => {
+        if (cat === 'todas') { card.style.display = ''; return; }
+        card.style.display = card.dataset.cat === cat ? '' : 'none';
+    });
+}
+</script>
+
+{% endblock %}

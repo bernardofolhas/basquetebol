@@ -18,6 +18,7 @@ class Treinador(Base):
     __tablename__ = "treinadores"
 
     id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
     nome = Column(String, nullable=False)
     data_nascimento = Column(Date, nullable=True)
     morada = Column(String, nullable=True)

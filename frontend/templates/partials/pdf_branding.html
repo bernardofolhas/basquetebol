@@ -1,0 +1,64 @@
+{% macro estilo_pdf() %}
+<style>
+    :root {
+        --pdf-primary: {{ identidade.cor_principal|default('#f97316') }};
+        --pdf-primary-dark: {{ identidade.cor_principal_escura|default('#c2410c') }};
+        --pdf-primary-light: {{ identidade.cor_principal_clara|default('#fff7ed') }};
+        --pdf-primary-border: {{ identidade.cor_borda_marca|default('#fed7aa') }};
+        --pdf-secondary: {{ identidade.cor_secundaria|default('#1f2937') }};
+        --pdf-accent: {{ identidade.cor_destaque|default('#0ea5e9') }};
+        --pdf-on-primary: {{ identidade.texto_sobre_principal|default('#ffffff') }};
+    }
+    .pdf-brand-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 3px solid var(--pdf-primary);
+        padding: 0 0 8px;
+        margin: 0 0 8px;
+        page-break-inside: avoid;
+    }
+    .pdf-brand-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .pdf-brand-logo { width: 42px; height: 42px; object-fit: contain; }
+    .pdf-brand-copy { min-width: 0; }
+    .pdf-brand-name { color: var(--pdf-secondary); font-size: 11px; font-weight: 700; }
+    .pdf-brand-title { color: var(--pdf-primary-dark); font-size: 16px; font-weight: 800; line-height: 1.1; }
+    .pdf-brand-subtitle { color: #64748b; font-size: 8px; margin-top: 3px; }
+    .pdf-brand-meta { color: #64748b; font-size: 8px; text-align: right; }
+    .pdf-brand-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border-top: 1px solid #cbd5e1;
+        color: #64748b;
+        font-size: 8px;
+        margin-top: 10px;
+        padding-top: 5px;
+    }
+</style>
+{% endmacro %}
+
+{% macro cabecalho_pdf(titulo, subtitulo='', meta='') %}
+<div class="pdf-brand-header">
+    <div class="pdf-brand-main">
+        {% if identidade.logo_principal %}<img class="pdf-brand-logo" src="{{ identidade.logo_principal }}" alt="Logotipo">{% endif %}
+        <div class="pdf-brand-copy">
+            <div class="pdf-brand-name">{{ identidade.nome_oficial|default('Clube de Basquetebol') }}</div>
+            <div class="pdf-brand-title">{{ titulo }}</div>
+            {% if subtitulo %}<div class="pdf-brand-subtitle">{{ subtitulo }}</div>{% endif %}
+        </div>
+    </div>
+    <div class="pdf-brand-meta">
+        {% if identidade.logo_secundario %}<img class="pdf-brand-logo" src="{{ identidade.logo_secundario }}" alt="Logotipo secundário"><br>{% endif %}
+        {{ meta or ('Exportado em ' ~ (data_exportacao or hoje)) }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro rodape_pdf(detalhe='') %}
+<div class="pdf-brand-footer">
+    <span>{{ identidade.texto_rodape|default('Plataforma de Gestão de Basquetebol') }}</span>
+    <span>{{ detalhe }}</span>
+</div>
+{% endmacro %}

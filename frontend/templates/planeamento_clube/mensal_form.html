@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ "Editar" if modo == "editar" else "Novo" }} Planeamento Mensal{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/planeamento-clube/anual/{{ mensal.planeamento_anual_id if mensal else '' }}" class="text-orange-500 text-sm">← Voltar ao planeamento anual</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">{{ "Editar Planeamento Mensal" if modo == "editar" else "Novo Planeamento Mensal" }}</h1>
+    <p class="text-gray-500 mt-1">Ajustar a estrutura mensal do clube</p>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 max-w-3xl">
+    <form method="POST"
+          action="{{ '/planeamento-clube/mensal/' ~ mensal.id ~ '/editar' if modo == 'editar' else '' }}"
+          class="space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ano *</label>
+                <input type="number" name="ano" required min="2000" max="2100"
+                       value="{{ mensal.ano if mensal else '' }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Mês *</label>
+                <input type="number" name="mes" required min="1" max="12"
+                       value="{{ mensal.mes if mensal else '' }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Título *</label>
+                <input type="text" name="titulo" required
+                       value="{{ mensal.titulo if mensal else '' }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Objetivos do mês</label>
+            <textarea name="objetivos_mes" rows="4"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">{{ mensal.objetivos_mes if mensal and mensal.objetivos_mes else '' }}</textarea>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+            <textarea name="observacoes" rows="4"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">{{ mensal.observacoes if mensal and mensal.observacoes else '' }}</textarea>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+            <select name="estado" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                {% for estado in estados_mensal %}
+                <option value="{{ estado }}" {% if mensal and mensal.estado == estado %}selected{% endif %}>{{ estado }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+            Guardar Alterações
+        </button>
+    </form>
+</div>
+
+{% endblock %}

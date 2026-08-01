@@ -1,0 +1,218 @@
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from template_config import Jinja2Templates
+from sqlalchemy.orm import Session
+
+from auth import encriptar_password
+from auth_deps import exigir_admin
+from database import get_db
+from flash import set_flash
+from models.treinador import Treinador
+from models.utilizador import PerfilEnum, Utilizador
+from paths import TEMPLATES_DIR
+from models.auditoria import RegistoAuditoria
+
+router = APIRouter(prefix="/admin")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+@router.get("/auditoria", response_class=HTMLResponse)
+def listar_auditoria(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_admin),
+):
+    registos = db.query(RegistoAuditoria).order_by(RegistoAuditoria.criado_em.desc()).limit(250).all()
+    return templates.TemplateResponse(request, "admin/auditoria.html", {
+        "utilizador": utilizador,
+        "registos": registos,
+    })
+
+
+@router.get("/utilizadores", response_class=HTMLResponse)
+def listar_utilizadores(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_admin),
+):
+    utilizadores = db.query(Utilizador).order_by(Utilizador.nome).all()
+    return templates.TemplateResponse(request, "admin/utilizadores_lista.html", {
+        "utilizador": utilizador,
+        "utilizadores": utilizadores,
+    })
+
+
+@router.get("/utilizadores/novo", response_class=HTMLResponse)
+def form_novo_utilizador(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_admin),
+):
+    treinadores = db.query(Treinador).order_by(Treinador.nome).all()
+    return templates.TemplateResponse(request, "admin/utilizadores_form.html", {
+        "utilizador": utilizador,
+        "perfis": [p for p in PerfilEnum if p != PerfilEnum.superadministrador],
+        "treinadores": treinadores,
+        "erro": None,
+    })
+
+
+@router.post("/utilizadores/novo")
+async def criar_utilizador(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_admin),
+    username: str = Form(...),
+    password: str = Form(...),
+    nome: str = Form(...),
+    email: str = Form(...),
+    perfil: str = Form(...),
+    treinador_id: str = Form(""),
+):
+    existe_username = db.query(Utilizador).filter(Utilizador.username == username).first()
+    if existe_username:
+        treinadores = db.query(Treinador).order_by(Treinador.nome).all()
+        return templates.TemplateResponse(request, "admin/utilizadores_form.html", {
+            "utilizador": utilizador,
+            "perfis": [p for p in PerfilEnum if p != PerfilEnum.superadministrador],
+            "treinadores": treinadores,
+            "erro": "Já existe um utilizador com esse username.",
+        })
+
+    existe_email = db.query(Utilizador).filter(Utilizador.email == email).first()
+    if existe_email:
+        treinadores = db.query(Treinador).order_by(Treinador.nome).all()
+        return templates.TemplateResponse(request, "admin/utilizadores_form.html", {
+            "utilizador": utilizador,
+            "perfis": [p for p in PerfilEnum if p != PerfilEnum.superadministrador],
+            "treinadores": treinadores,
+            "erro": "Já existe um utilizador com esse email.",
+        })
+
+    novo_utilizador = Utilizador(
+        username=username,
+        password_hash=encriptar_password(password),
+        nome=nome,
+        email=email,
+        perfil=perfil,
+        treinador_id=int(treinador_id) if treinador_id else None,
+    )
+
+    db.add(novo_utilizador)
+    from services.auditoria_service import registar_auditoria
+    registar_auditoria(db, utilizador, "criar", "utilizador", None, f"Username: {username}", request)
+    db.commit()
+    set_flash(request, f"Utilizador '{username}' criado com sucesso.")
+    return RedirectResponse(url="/admin/utilizadores", status_code=303)
+
+
+@router.get("/utilizadores/{utilizador_id}/editar", response_class=HTMLResponse)
+def form_editar_utilizador(
+    utilizador_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_admin),
+):
+    utilizador_editar = db.query(Utilizador).filter(Utilizador.id == utilizador_id).first()
+    if not utilizador_editar:
+        return RedirectResponse(url="/admin/utilizadores", status_code=303)
+
+    treinadores = db.query(Treinador).order_by(Treinador.nome).all()
+    return templates.TemplateResponse(request, "admin/utilizadores_form.html", {
+        "utilizador": utilizador,
+        "utilizador_editar": utilizador_editar,
+        "perfis": [p for p in PerfilEnum if p != PerfilEnum.superadministrador],
+        "treinadores": treinadores,
+        "erro": None,
+        "modo": "editar",
+    })
+
+
+@router.post("/utilizadores/{utilizador_id}/editar")
+async def editar_utilizador(
+    utilizador_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin=Depends(exigir_admin),
+    username: str = Form(...),
+    nome: str = Form(...),
+    email: str = Form(...),
+    perfil: str = Form(...),
+    treinador_id: str = Form(""),
+    ativo: str = Form("true"),
+    password: str = Form(""),
+):
+    utilizador_editar = db.query(Utilizador).filter(Utilizador.id == utilizador_id).first()
+    if not utilizador_editar:
+        return RedirectResponse(url="/admin/utilizadores", status_code=303)
+
+    existe_username = db.query(Utilizador).filter(
+        Utilizador.username == username,
+        Utilizador.id != utilizador_id,
+    ).first()
+    if existe_username:
+        treinadores = db.query(Treinador).order_by(Treinador.nome).all()
+        return templates.TemplateResponse(request, "admin/utilizadores_form.html", {
+            "utilizador": admin,
+            "utilizador_editar": utilizador_editar,
+            "perfis": [p for p in PerfilEnum if p != PerfilEnum.superadministrador],
+            "treinadores": treinadores,
+            "erro": "Já existe outro utilizador com esse username.",
+            "modo": "editar",
+        })
+
+    existe_email = db.query(Utilizador).filter(
+        Utilizador.email == email,
+        Utilizador.id != utilizador_id,
+    ).first()
+    if existe_email:
+        treinadores = db.query(Treinador).order_by(Treinador.nome).all()
+        return templates.TemplateResponse(request, "admin/utilizadores_form.html", {
+            "utilizador": admin,
+            "utilizador_editar": utilizador_editar,
+            "perfis": [p for p in PerfilEnum if p != PerfilEnum.superadministrador],
+            "treinadores": treinadores,
+            "erro": "Já existe outro utilizador com esse email.",
+            "modo": "editar",
+        })
+
+    utilizador_editar.username = username
+    utilizador_editar.nome = nome
+    utilizador_editar.email = email
+    utilizador_editar.perfil = perfil
+    utilizador_editar.ativo = (ativo == "true")
+    utilizador_editar.treinador_id = int(treinador_id) if treinador_id else None
+
+    if password and password.strip():
+        utilizador_editar.password_hash = encriptar_password(password)
+
+    from services.auditoria_service import registar_auditoria
+    registar_auditoria(db, admin, "editar", "utilizador", utilizador_id, f"Username: {username}", request)
+    db.commit()
+    set_flash(request, f"Utilizador '{username}' atualizado com sucesso.")
+    return RedirectResponse(url="/admin/utilizadores", status_code=303)
+
+
+@router.post("/utilizadores/{utilizador_id}/apagar")
+async def apagar_utilizador(
+    utilizador_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin=Depends(exigir_admin),
+):
+    utilizador_apagar = db.query(Utilizador).filter(Utilizador.id == utilizador_id).first()
+
+    if not utilizador_apagar:
+        return RedirectResponse(url="/admin/utilizadores", status_code=303)
+
+    if utilizador_apagar.id == admin.id:
+        set_flash(request, "Não podes apagar a tua própria conta.", tipo="error")
+        return RedirectResponse(url="/admin/utilizadores", status_code=303)
+
+    nome = utilizador_apagar.username
+    from services.auditoria_service import registar_auditoria
+    registar_auditoria(db, admin, "apagar", "utilizador", utilizador_id, f"Username: {nome}", request)
+    db.delete(utilizador_apagar)
+    db.commit()
+    set_flash(request, f"Utilizador '{nome}' apagado.")
+    return RedirectResponse(url="/admin/utilizadores", status_code=303)

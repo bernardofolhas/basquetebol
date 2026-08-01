@@ -1,78 +1,62 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block titulo %}Plataforma de Basquetebol{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block titulo %}Plataforma de Basquetebol{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  {% set identidade = request.state.identidade_clube|default({}, true) %}
+  {% set modo_plataforma = utilizador is defined and utilizador.perfil.value == 'superadministrador' and not request.state.clube_atual %}
+  <link rel="stylesheet" href="/static/css/design-system.css">
+  <style>:root{--clube-primary:{{ '#334155' if modo_plataforma else identidade.cor_principal|default('#f97316') }};--clube-secondary:{{ '#0f172a' if modo_plataforma else identidade.cor_secundaria|default('#1f2937') }};--clube-accent:{{ '#64748b' if modo_plataforma else identidade.cor_destaque|default('#0ea5e9') }};--clube-primary-light:{{ '#f1f5f9' if modo_plataforma else identidade.cor_principal_clara|default('#fff7ed') }};--clube-primary-dark:{{ '#1e293b' if modo_plataforma else identidade.cor_principal_escura|default('#c2410c') }};--clube-primary-hover:{{ '#475569' if modo_plataforma else identidade.cor_principal_hover|default('#ea580c') }};--clube-primary-surface:{{ '#f8fafc' if modo_plataforma else identidade.cor_principal_superficie|default('#fff7ed') }};--clube-primary-border:{{ '#cbd5e1' if modo_plataforma else identidade.cor_borda_marca|default('#fed7aa') }};--clube-on-primary:{{ '#fff' if modo_plataforma else identidade.texto_sobre_principal|default('#fff') }}}</style>
+  <meta name="csrf-token" content="{{ request.session.get('_csrf', '') }}">
+  <script>
+    document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("form:not([method='get']):not([method='GET'])").forEach(function(form){if(form.querySelector("input[name='csrf_token']"))return;var input=document.createElement("input");input.type="hidden";input.name="csrf_token";input.value=document.querySelector("meta[name='csrf-token']").content;form.appendChild(input)})});
+    document.addEventListener("htmx:configRequest",function(evt){evt.detail.headers["X-CSRF-Token"]=document.querySelector("meta[name='csrf-token']").content});
+  </script>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="min-h-screen bg-slate-100 {% if modo_plataforma %}modo-plataforma{% endif %}">
+  {% set perfil = utilizador.perfil.value %}
+  {% set p = request.url.path %}
+  {% set equipa_contexto_id = none %}{% set equipa_contexto_nome = none %}
+  {% if equipa is defined and equipa %}{% set equipa_contexto_id = equipa.id %}{% set equipa_contexto_nome = equipa.nome %}
+  {% elif jogo is defined and jogo %}{% set equipa_contexto_id = jogo.equipa_id %}{% if jogo.equipa %}{% set equipa_contexto_nome = jogo.equipa.nome %}{% endif %}
+  {% elif macrociclo is defined and macrociclo %}{% set equipa_contexto_id = macrociclo.equipa_id %}{% if macrociclo.equipa %}{% set equipa_contexto_nome = macrociclo.equipa.nome %}{% endif %}
+  {% elif mesociclo is defined and mesociclo and mesociclo.macrociclo %}{% set equipa_contexto_id = mesociclo.macrociclo.equipa_id %}{% if mesociclo.macrociclo.equipa %}{% set equipa_contexto_nome = mesociclo.macrociclo.equipa.nome %}{% endif %}
+  {% elif microciclo is defined and microciclo and microciclo.mesociclo and microciclo.mesociclo.macrociclo %}{% set equipa_contexto_id = microciclo.mesociclo.macrociclo.equipa_id %}{% if microciclo.mesociclo.macrociclo.equipa %}{% set equipa_contexto_nome = microciclo.mesociclo.macrociclo.equipa.nome %}{% endif %}
+  {% elif sessao is defined and sessao and sessao.microciclo and sessao.microciclo.mesociclo and sessao.microciclo.mesociclo.macrociclo %}{% set equipa_contexto_id = sessao.microciclo.mesociclo.macrociclo.equipa_id %}{% if sessao.microciclo.mesociclo.macrociclo.equipa %}{% set equipa_contexto_nome = sessao.microciclo.mesociclo.macrociclo.equipa.nome %}{% endif %}
+  {% elif jogador is defined and jogador and jogador.equipa_id %}{% set equipa_contexto_id = jogador.equipa_id %}{% if jogador.equipa %}{% set equipa_contexto_nome = jogador.equipa.nome %}{% endif %}{% endif %}
 
-    <!-- NAVBAR -->
-    <nav class="bg-orange-600 text-white px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-10 shadow-md">
-        <div class="flex items-center gap-3">
-            <span class="text-2xl">🏀</span>
-            <span class="font-bold text-lg">Plataforma de Basquetebol</span>
-        </div>
-        <div class="flex items-center gap-4">
-            <span class="text-sm text-orange-100">{{ utilizador.perfil.value }}</span>
-            <span class="font-medium">{{ utilizador.nome }}</span>
-            <a href="/logout" class="bg-orange-700 hover:bg-orange-800 px-3 py-1 rounded-lg text-sm transition">
-                Sair
-            </a>
-        </div>
-    </nav>
+  {% include "partials/navbar_global.html" %}
+  <div id="sidebar-overlay" class="fixed inset-0 top-16 z-30 hidden bg-slate-950/45 lg:hidden" aria-hidden="true"></div>
+  {% include "partials/sidebar_contextual.html" %}
 
-    <!-- LAYOUT PRINCIPAL -->
-    <div class="flex pt-14">
+  <main id="conteudo-principal" class="relative z-0 min-w-0 px-4 pb-8 pt-20 transition-[margin] sm:px-6 lg:ml-64">
+    {% if equipa_contexto_id %}
+    <section class="ds-context-bar mb-4">
+      <div class="flex min-w-0 items-center gap-3"><span class="ds-context-mark">EQ</span><div class="min-w-0"><p class="text-[0.66rem] font-bold uppercase tracking-[.16em] text-slate-400">Equipa selecionada</p><p class="truncate font-bold text-slate-900">{{ equipa_contexto_nome or 'Equipa' }}</p></div></div>
+      <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+        {% if identidade.epoca_predefinida %}<span class="ds-context-pill">Época {{ identidade.epoca_predefinida }}</span>{% endif %}
+        {% if sessao is defined and sessao %}<span class="ds-context-pill">Sessão · {{ sessao.estado|default('planeada')|replace('_',' ')|title }}</span>{% elif microciclo is defined and microciclo %}<span class="ds-context-pill">Microciclo {{ microciclo.numero }}</span>{% elif mesociclo is defined and mesociclo %}<span class="ds-context-pill">Mesociclo {{ mesociclo.numero }}</span>{% elif macrociclo is defined and macrociclo %}<span class="ds-context-pill">Macrociclo {{ macrociclo.numero }}</span>{% endif %}
+        <a href="/calendario?equipa_id={{ equipa_contexto_id }}" class="ds-context-action">Calendário</a>
+      </div>
+    </section>
+    {% endif %}
+    {% if request.state.flash %}<div id="flash-msg" class="mb-4 flex items-center justify-between rounded-xl border px-4 py-3 {% if request.state.flash.tipo == 'error' %}border-red-200 bg-red-50 text-red-800{% else %}border-emerald-200 bg-emerald-50 text-emerald-800{% endif %}"><span>{{ request.state.flash.mensagem }}</span><button onclick="this.parentElement.remove()" class="ml-4 text-xl opacity-60" aria-label="Fechar">&times;</button></div>{% endif %}
+    {% block conteudo %}{% endblock %}
+  </main>
 
-        <!-- SIDEBAR -->
-        <aside class="w-64 bg-white min-h-screen shadow-sm fixed left-0 top-14 overflow-y-auto">
-            <nav class="p-4">
-                <div class="mb-6">
-                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Clube</p>
-                    <a href="/dashboard" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition">
-                        <span>🏠</span> Dashboard
-                    </a>
-                    <a href="/equipas" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition">
-                        <span>🏀</span> Equipas
-                    </a>
-                    <a href="/calendario-clube" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition">
-                        <span>📅</span> Calendário
-                    </a>
-                </div>
-
-                {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}
-                <div class="mb-6">
-                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Gestão</p>
-                    <a href="/treinadores" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition">
-                        <span>👤</span> Treinadores
-                    </a>
-                    <a href="/jogadores" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition">
-                        <span>🏃</span> Jogadores
-                    </a>
-                </div>
-                {% endif %}
-
-                {% if utilizador.perfil.value == 'administrador' %}
-                <div class="mb-6">
-                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Administração</p>
-                    <a href="/admin/utilizadores" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition">
-                        <span>⚙️</span> Utilizadores
-                    </a>
-                </div>
-                {% endif %}
-
-            </nav>
-        </aside>
-
-        <!-- CONTEÚDO PRINCIPAL -->
-        <main class="ml-64 flex-1 p-6">
-            {% block conteudo %}{% endblock %}
-        </main>
-
-    </div>
-
+  <script>
+    document.addEventListener("DOMContentLoaded",function(){
+      var menu=document.getElementById("menu-mobile"),sidebar=document.getElementById("sidebar-principal"),overlay=document.getElementById("sidebar-overlay"),collapse=document.getElementById("sidebar-collapse");
+      function closeMenu(){sidebar.classList.add("-translate-x-full");overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}
+      function openMenu(){sidebar.classList.remove("-translate-x-full");overlay.classList.remove("hidden");if(menu)menu.setAttribute("aria-expanded","true")}
+      if(menu)menu.addEventListener("click",function(){sidebar.classList.contains("-translate-x-full")?openMenu():closeMenu()});if(overlay)overlay.addEventListener("click",closeMenu);sidebar.querySelectorAll("[data-sidebar-link]").forEach(function(link){link.addEventListener("click",closeMenu)});
+      var collapsed=localStorage.getItem("sidebar-collapsed")==="1";function applyCollapse(){document.body.classList.toggle("sidebar-is-collapsed",collapsed);if(collapse){collapse.setAttribute("aria-label",collapsed?"Expandir menu":"Recolher menu");collapse.title=collapsed?"Expandir menu":"Recolher menu"}}applyCollapse();if(collapse)collapse.addEventListener("click",function(){collapsed=!collapsed;localStorage.setItem("sidebar-collapsed",collapsed?"1":"0");applyCollapse()});
+      document.querySelectorAll(".ds-menu").forEach(function(menuDetails){menuDetails.addEventListener("toggle",function(){if(menuDetails.open)document.querySelectorAll(".ds-menu[open]").forEach(function(other){if(other!==menuDetails)other.removeAttribute("open")})})});
+      window.addEventListener("resize",function(){if(window.innerWidth>=1024){overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}});
+    });
+  </script>
 </body>
 </html>

@@ -1,17 +1,19 @@
 {% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
 
 {% block titulo %}Planeamento — {{ equipa.nome }}{% endblock %}
 
 {% block conteudo %}
 
 <!-- Cabeçalho com navegação -->
-<div class="mb-6">
-    <a href="/equipas/{{ equipa.id }}" class="text-orange-500 hover:text-orange-600 text-sm">
-        ← Voltar à equipa
-    </a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-2">Planeamento — {{ equipa.nome }}</h1>
-    <p class="text-gray-500 mt-1">Macrociclos da época</p>
-</div>
+{{ equipa_contexto(
+    equipa,
+    "Planeamento da Equipa",
+    "Macrociclos da época e acessos rápidos ao trabalho mais recente.",
+    "planeamento",
+    "/equipas/" ~ equipa.id,
+    "Voltar à equipa"
+) }}
 
 <!-- Botão para criar novo macrociclo -->
 <div class="flex justify-end mb-6">
@@ -34,7 +36,7 @@
                         Macro {{ macro.numero }}
                     </span>
                     <span class="text-gray-500 text-sm">
-                        {{ macro.data_inicio }} → {{ macro.data_fim }}
+                        {{ macro.data_inicio|data_pt }} → {{ macro.data_fim|data_pt }}
                     </span>
                 </div>
 
@@ -63,10 +65,16 @@
                 </p>
             </div>
 
-            <a href="/planeamento/macrociclos/{{ macro.id }}"
-               class="text-orange-500 hover:text-orange-600 text-sm font-medium">
-                Ver →
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="/planeamento/macrociclos/{{ macro.id }}"
+                   class="text-orange-500 hover:text-orange-600 text-sm font-medium">Ver →</a>
+                <a href="/planeamento/macrociclos/{{ macro.id }}/editar"
+                   class="text-gray-400 hover:text-blue-600 text-sm">✏️</a>
+                <form method="POST" action="/planeamento/macrociclos/{{ macro.id }}/eliminar" class="inline"
+                      onsubmit="return confirm('Eliminar Macro {{ macro.numero }}? Todos os mesos e micros serão apagados.')">
+                    <button type="submit" class="text-gray-400 hover:text-red-600 text-sm">🗑️</button>
+                </form>
+            </div>
         </div>
     </div>
     {% endfor %}
@@ -83,5 +91,89 @@
     </a>
 </div>
 {% endif %}
+
+{% if mesociclos_recentes or microciclos_recentes or sessoes_recentes %}
+<div class="mt-8">
+    <h2 class="font-semibold text-gray-700 mb-3">Acesso Rápido</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <!-- Mesociclos -->
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+            <h3 class="text-sm font-semibold text-indigo-700 mb-3">🗂 Mesociclos Recentes</h3>
+            {% if mesociclos_recentes %}
+            <div class="space-y-2">
+                {% for meso in mesociclos_recentes %}
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">Meso {{ meso.numero }}</span>
+                        <span class="text-gray-400 text-xs ml-1">{{ meso.data_inicio|data_pt }}</span>
+                    </div>
+                    <a href="/planeamento/mesociclos/{{ meso.id }}" class="text-orange-500 hover:text-orange-600 text-xs font-medium">Ver →</a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-400 text-xs">Sem mesociclos criados.</p>
+            {% endif %}
+        </div>
+
+        <!-- Microciclos -->
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+            <h3 class="text-sm font-semibold text-green-700 mb-3">🗓 Microciclos Recentes</h3>
+            {% if microciclos_recentes %}
+            <div class="space-y-2">
+                {% for micro in microciclos_recentes %}
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">Micro {{ micro.numero }}</span>
+                        <span class="text-gray-400 text-xs ml-1">{{ micro.data_inicio|data_pt }}</span>
+                        {% if micro.tipo %}
+                        <span class="text-gray-400 text-xs bg-gray-100 px-1.5 py-0.5 rounded-full ml-1">{{ micro.tipo }}</span>
+                        {% endif %}
+                    </div>
+                    <a href="/planeamento/microciclos/{{ micro.id }}" class="text-orange-500 hover:text-orange-600 text-xs font-medium">Ver →</a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-400 text-xs">Sem microciclos criados.</p>
+            {% endif %}
+        </div>
+
+        <!-- Planos de Treino -->
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+            <h3 class="text-sm font-semibold text-orange-700 mb-3">🏋️ Planos de Treino Recentes</h3>
+            {% if sessoes_recentes %}
+            <div class="space-y-2">
+                {% for sessao in sessoes_recentes %}
+                <div class="flex items-center justify-between">
+                    <div>
+                        {% if sessao.numero_treino %}
+                        <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">T{{ sessao.numero_treino }}</span>
+                        {% endif %}
+                        <span class="text-gray-500 text-xs ml-1">{{ sessao.data|data_pt }}</span>
+                        {% if sessao.e_jogo %}
+                        <span class="text-red-400 text-xs ml-1">🏀 Jogo</span>
+                        {% endif %}
+                    </div>
+                    <a href="/treino/sessoes/{{ sessao.id }}" class="text-orange-500 hover:text-orange-600 text-xs font-medium">Ver →</a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-400 text-xs">Sem planos de treino registados.</p>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endif %}
+
+<div class="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-100 flex flex-wrap gap-3 items-center">
+    <span class="text-sm font-medium text-blue-700">Planeamento do Clube:</span>
+    <a href="/planeamento-clube/mensal" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">📅 Planeamentos Mensais</a>
+    <a href="/planeamento-clube/semanal" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">🗓️ Planos Semanais</a>
+    <a href="/planeamento-clube/anual" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">📘 Planeamento Anual</a>
+</div>
 
 {% endblock %}

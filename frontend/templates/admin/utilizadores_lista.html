@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block titulo %}Administração — Utilizadores{% endblock %}
+
+{% block conteudo %}
+
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">Utilizadores</h1>
+        <p class="text-gray-500 mt-1">Gerir contas de acesso à plataforma</p>
+    </div>
+    <a href="/admin/utilizadores/novo"
+       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
+        + Novo Utilizador
+    </a>
+</div>
+
+{% if utilizadores %}
+<div class="overflow-x-auto">
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-100">
+        <tr>
+        <th class="text-left px-4 py-3 font-semibold text-gray-600">Nome</th>
+        <th class="text-left px-4 py-3 font-semibold text-gray-600">Username</th>
+        <th class="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
+        <th class="text-left px-4 py-3 font-semibold text-gray-600">Perfil</th>
+        <th class="text-left px-4 py-3 font-semibold text-gray-600">Treinador</th>
+        <th class="text-left px-4 py-3 font-semibold text-gray-600">Estado</th>
+        <th class="text-left px-4 py-3 font-semibold text-gray-600">Ações</th>
+        </tr>
+        </thead>
+        <tbody>
+            {% for u in utilizadores %}
+            <tr class="border-b border-gray-100 hover:bg-orange-50/30 transition">
+                <td class="px-4 py-3 font-medium text-gray-800">{{ u.nome }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ u.username }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ u.email }}</td>
+                <td class="px-4 py-3">
+                    <span class="inline-block bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full">
+                        {{ u.perfil.value }}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-gray-600">
+                    {% if u.treinador %}
+                        {{ u.treinador.nome }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    {% if u.ativo %}
+                    <span class="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
+                        Ativo
+                    </span>
+                    {% else %}
+                    <span class="inline-block bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full">
+                        Inativo
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                    <a href="/admin/utilizadores/{{ u.id }}/editar"
+                    class="bg-orange-100 hover:bg-orange-200 text-orange-700 text-xs px-3 py-1 rounded-lg font-medium transition">
+                        Editar
+                    </a>
+
+                    {% if u.id != utilizador.id %}
+                    <form method="POST" action="/admin/utilizadores/{{ u.id }}/apagar"
+                        onsubmit="return confirm('Tens a certeza que queres apagar este utilizador?');">
+                        <button type="submit"
+                                class="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1 rounded-lg font-medium transition">
+                            Apagar
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</div>
+{% else %}
+<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+    <span class="text-5xl">👤</span>
+    <p class="text-gray-500 mt-4">Ainda não há utilizadores criados.</p>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,47 @@
+<section class="mb-8 rounded-[28px] border border-orange-100 bg-white p-5 shadow-sm md:p-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-orange-500">Centro de ação</p>
+            <h2 class="mt-2 text-xl font-bold text-gray-900">O que precisa de atenção</h2>
+            <p class="mt-1 text-sm text-gray-500">Ações prioritárias e agenda operacional sem sair do dashboard.</p>
+        </div>
+        <a href="/calendario" class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700">Abrir calendário →</a>
+    </div>
+
+    <div class="mt-5 grid grid-cols-3 gap-3">
+        <div class="rounded-2xl bg-orange-50 p-3"><p class="text-xs text-orange-700">Tarefas</p><p class="mt-1 text-2xl font-bold text-orange-900">{{ resumo_agenda.tarefas }}</p></div>
+        <div class="rounded-2xl bg-slate-50 p-3"><p class="text-xs text-slate-600">Hoje</p><p class="mt-1 text-2xl font-bold text-slate-900">{{ resumo_agenda.hoje }}</p></div>
+        <div class="rounded-2xl bg-blue-50 p-3"><p class="text-xs text-blue-700">7 dias</p><p class="mt-1 text-2xl font-bold text-blue-900">{{ resumo_agenda.proximos_7_dias }}</p></div>
+    </div>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div>
+            <div class="mb-3 flex items-center justify-between"><h3 class="font-semibold text-gray-800">Tarefas pendentes</h3><span class="text-xs text-gray-400">Até {{ agenda_proxima[-1].data if agenda_proxima else '—' }}</span></div>
+            {% if tarefas %}
+            <div class="space-y-2">
+                {% for tarefa in tarefas[:5] %}
+                <a href="{{ tarefa.link or '/calendario' }}" class="flex items-center justify-between gap-3 rounded-xl border {% if tarefa.urgente %}border-orange-200 bg-orange-50{% else %}border-gray-100 bg-gray-50{% endif %} px-3 py-3 hover:border-orange-300">
+                    <div class="min-w-0"><p class="text-xs text-gray-400">{{ tarefa.item.data }} · {{ tarefa.item.equipa_nome or 'Global' }}</p><p class="truncate text-sm font-semibold text-gray-800">{{ tarefa.titulo }} · {{ tarefa.item.titulo }}</p></div>
+                    <span class="shrink-0 text-sm font-semibold text-orange-600">Abrir →</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}<p class="rounded-xl bg-emerald-50 px-3 py-4 text-sm text-emerald-800">Não há tarefas pendentes para os próximos 7 dias.</p>{% endif %}
+        </div>
+
+        <div>
+            <div class="mb-3 flex items-center justify-between"><h3 class="font-semibold text-gray-800">Agenda próxima</h3><span class="text-xs text-gray-400">Hoje + 7 dias</span></div>
+            {% if agenda_proxima %}
+            <div class="space-y-2">
+                {% for item in agenda_proxima[:6] %}
+                <a href="{{ item.acao_link or item.link or '/calendario' }}" class="flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-2 hover:border-orange-300 hover:bg-orange-50">
+                    <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ item.dot_classes }}"></span>
+                    <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-gray-800">{{ item.titulo }}</p><p class="text-xs text-gray-400">{{ item.data|data_pt }} · {{ item.horario }} · {{ item.equipa_nome or 'Global' }}</p></div>
+                    {% if item.estado_label %}<span class="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold {{ item.estado_classes }}">{{ item.estado_label }}</span>{% endif %}
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}<p class="rounded-xl bg-gray-50 px-3 py-4 text-sm text-gray-400">Sem itens na agenda próxima.</p>{% endif %}
+        </div>
+    </div>
+</section>

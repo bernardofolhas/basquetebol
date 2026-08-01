@@ -1,0 +1,114 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+{% from "partials/pdf_agenda.html" import estilos_agenda_pdf, agenda_grelha_pdf %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Macrociclo {{ macrociclo.numero }} - {{ macrociclo.equipa.nome }}</title>
+    <style>
+        * { box-sizing: border-box; }
+        @page { size: A4 landscape; margin: 10mm; }
+        body { margin: 0; font-family: Arial, sans-serif; color: #172033; font-size: 9px; }
+        .header { display: flex; justify-content: space-between; gap: 16px; padding: 12px 14px; background: {{ identidade.cor_principal|default('#d90416') }}; color: white; border: 1px solid {{ identidade.cor_secundaria|default('#8e0010') }}; }
+        h1 { margin: 0; font-size: 22px; letter-spacing: .08em; text-transform: uppercase; }
+        .muted { color: #64748b; }
+        .header .muted { color: #fee2e2; margin-top: 4px; }
+        .header-right { text-align: right; font-size: 9px; }
+        .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin: 10px 0; }
+        .stat { border: 1px solid #cbd5e1; padding: 8px; text-align: center; background: #f8fafc; }
+        .stat strong { display: block; font-size: 16px; color: var(--pdf-primary-dark); }
+        .stat span { display: block; margin-top: 3px; text-transform: uppercase; font-size: 7px; color: #64748b; }
+        .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+        .panel { border: 1px solid #cbd5e1; padding: 8px; margin-bottom: 10px; }
+        .panel-title { margin: 0 0 6px; padding: 4px 6px; background: #e5e7eb; color: #172033; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+        .objective { border: 1px solid #dbeafe; margin: 4px 0; padding: 5px; background: #f8fbff; }
+        .objective strong { display: block; color: var(--pdf-accent); font-size: 7px; text-transform: uppercase; margin-bottom: 2px; }
+        .objective p { margin: 0; white-space: pre-line; line-height: 1.35; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #334155; color: white; font-size: 8px; text-align: left; padding: 5px; }
+        td { border: 1px solid #cbd5e1; padding: 5px; vertical-align: top; }
+        tr:nth-child(even) td { background: #f8fafc; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+        .legacy-agenda { display: none; }
+        .badge { display: inline-block; padding: 2px 5px; border-radius: 8px; background: var(--pdf-primary-light); color: var(--pdf-primary-dark); font-size: 7px; font-weight: bold; }
+        .micro-list { margin: 0; padding-left: 14px; line-height: 1.6; }
+        .footer { border-top: 1px solid #cbd5e1; margin-top: 10px; padding-top: 5px; display: flex; justify-content: space-between; color: #64748b; font-size: 8px; }
+        .document-page { break-after: page; }
+        .document-page:last-child { break-after: auto; }
+        .macro-agenda .pdf-agenda-day { min-height: 48px; }
+        .macro-agenda .pdf-agenda-week { margin-bottom: 5px; }
+    </style>
+    {{ estilo_pdf() }}
+    {{ estilos_agenda_pdf() }}
+</head>
+<body>
+    {{ cabecalho_pdf('Macrociclo ' ~ macrociclo.numero, macrociclo.equipa.nome ~ ' · ' ~ (macrociclo.data_inicio|data_pt) ~ ' → ' ~ (macrociclo.data_fim|data_pt), 'Planeamento integrado · ' ~ data_exportacao) }}
+
+    <div class="stats">
+        <div class="stat"><strong>{{ mesociclos | length }}</strong><span>Mesociclos</span></div>
+        <div class="stat"><strong>{{ dashboard_planeamento.estatisticas.total_treinos }}</strong><span>Treinos</span></div>
+        <div class="stat"><strong>{{ dashboard_planeamento.estatisticas.total_jogos }}</strong><span>Jogos</span></div>
+        <div class="stat"><strong>{{ dashboard_planeamento.estatisticas.total_atividades }}</strong><span>Atividades</span></div>
+        <div class="stat"><strong>{{ dashboard_planeamento.estatisticas.dias_com_atividade }}</strong><span>Dias ativos</span></div>
+    </div>
+
+    <section class="document-page">
+    <div class="columns">
+        <div>
+            <div class="panel">
+                <h2 class="panel-title">Objetivos do macrociclo</h2>
+                {% for label, valor in [
+                    ('Técnica individual ofensiva', macrociclo.obj_tecnica_individual_ofensiva),
+                    ('Técnica individual defensiva', macrociclo.obj_tecnica_individual_defensiva),
+                    ('Tática individual ofensiva', macrociclo.obj_tatica_individual_ofensiva),
+                    ('Tática individual defensiva', macrociclo.obj_tatica_individual_defensiva),
+                    ('Tática coletiva ofensiva', macrociclo.obj_tatica_coletiva_ofensiva),
+                    ('Tática coletiva defensiva', macrociclo.obj_tatica_coletiva_defensiva),
+                    ('Físicos', macrociclo.obj_fisicos),
+                    ('Psicológicos', macrociclo.obj_psicologicos)
+                ] %}
+                {% if valor %}<div class="objective"><strong>{{ label }}</strong><p>{{ valor }}</p></div>{% endif %}
+                {% endfor %}
+                {% if not macrociclo.obj_tecnica_individual_ofensiva and not macrociclo.obj_tecnica_individual_defensiva and not macrociclo.obj_tatica_individual_ofensiva and not macrociclo.obj_tatica_individual_defensiva and not macrociclo.obj_tatica_coletiva_ofensiva and not macrociclo.obj_tatica_coletiva_defensiva and not macrociclo.obj_fisicos and not macrociclo.obj_psicologicos %}
+                <p class="muted">Sem objetivos registados.</p>
+                {% endif %}
+            </div>
+            <div class="panel">
+                <h2 class="panel-title">Mesociclos</h2>
+                {% if mesociclos %}
+                <ul class="micro-list">
+                    {% for meso in mesociclos %}
+                    <li><strong>Meso {{ meso.numero }}</strong> · {{ meso.data_inicio|data_pt }} → {{ meso.data_fim|data_pt }} · {{ meso.microciclos | length }} microciclo(s)</li>
+                    {% endfor %}
+                </ul>
+                {% else %}<p class="muted">Sem mesociclos criados.</p>{% endif %}
+            </div>
+        </div>
+
+        <div>
+            {% if macrociclo.reflexao %}<div class="panel"><h2 class="panel-title">Reflexão</h2><p style="white-space:pre-line;margin:0">{{ macrociclo.reflexao }}</p></div>{% endif %}
+            <div class="panel">
+                <h2 class="panel-title">Leitura do período</h2>
+                <p style="margin:0;line-height:1.5">A agenda das páginas seguintes reúne treinos, jogos e restantes atividades do clube, organizados cronologicamente por semana.</p>
+            </div>
+        </div>
+    </div>
+    {{ rodape_pdf(macrociclo.equipa.nome ~ ' · Macrociclo ' ~ macrociclo.numero ~ ' · Síntese') }}
+    </section>
+
+    {% for grupo_semanas in dashboard_planeamento.semanas|batch(10) %}
+    <section class="document-page macro-agenda">
+        {{ cabecalho_pdf('Macrociclo ' ~ macrociclo.numero, 'Agenda integrada · ' ~ (macrociclo.data_inicio|data_pt) ~ ' → ' ~ (macrociclo.data_fim|data_pt), 'Semanas ' ~ (loop.index0 * 10 + 1) ~ '–' ~ (loop.index0 * 10 + grupo_semanas|length)) }}
+        {{ agenda_grelha_pdf(grupo_semanas, 'Calendário semanal') }}
+        {{ rodape_pdf(macrociclo.equipa.nome ~ ' · Macrociclo ' ~ macrociclo.numero ~ ' · Agenda ' ~ loop.index) }}
+    </section>
+    {% else %}
+    <section class="document-page">
+        {{ cabecalho_pdf('Macrociclo ' ~ macrociclo.numero, 'Agenda integrada', 'Sem atividades no período') }}
+        <div class="panel"><p class="muted">Sem treinos, jogos ou atividades no período.</p></div>
+        {{ rodape_pdf(macrociclo.equipa.nome ~ ' · Macrociclo ' ~ macrociclo.numero) }}
+    </section>
+    {% endfor %}
+</body>
+</html>

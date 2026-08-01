@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block titulo %}Identidade do clube{% endblock %}
+
+{% block conteudo %}
+<div class="mb-6">
+    <p class="ds-section-label">Administração</p>
+    <h1 class="mt-2 text-2xl font-bold text-gray-800">Identidade do clube</h1>
+    <p class="mt-1 text-gray-500">Define a aparência usada na plataforma e nos documentos oficiais.</p>
+</div>
+
+<form method="POST" enctype="multipart/form-data" class="space-y-6">
+    <section class="ds-card p-6">
+        <h2 class="text-lg font-semibold text-gray-800">Nome e época</h2>
+        <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <label class="text-sm text-gray-600 md:col-span-2">Nome oficial
+                <input name="nome_oficial" required value="{{ identidade.nome_oficial or '' }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2">
+            </label>
+            <label class="text-sm text-gray-600">Nome curto
+                <input name="nome_curto" value="{{ identidade.nome_curto or '' }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2">
+            </label>
+            <label class="text-sm text-gray-600">Época predefinida
+                <input name="epoca_predefinida" placeholder="2026/2027" value="{{ identidade.epoca_predefinida or '' }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2">
+            </label>
+            <label class="text-sm text-gray-600 md:col-span-2">Texto do rodapé
+                <input name="texto_rodape" value="{{ identidade.texto_rodape or '' }}" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2">
+            </label>
+        </div>
+    </section>
+
+    <section class="ds-card p-6">
+        <h2 class="text-lg font-semibold text-gray-800">Cores</h2>
+        <p class="mt-1 text-sm text-gray-500">Usa cores com contraste suficiente para texto e impressão.</p>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <label class="text-sm text-gray-600">Principal
+                <input type="color" name="cor_principal" value="{{ identidade.cor_principal }}" class="mt-1 h-11 w-full rounded-xl border border-gray-300 bg-white p-1">
+            </label>
+            <label class="text-sm text-gray-600">Secundária
+                <input type="color" name="cor_secundaria" value="{{ identidade.cor_secundaria }}" class="mt-1 h-11 w-full rounded-xl border border-gray-300 bg-white p-1">
+            </label>
+            <label class="text-sm text-gray-600">Destaque
+                <input type="color" name="cor_destaque" value="{{ identidade.cor_destaque }}" class="mt-1 h-11 w-full rounded-xl border border-gray-300 bg-white p-1">
+            </label>
+        </div>
+    </section>
+
+    <section class="ds-card p-6">
+        <h2 class="text-lg font-semibold text-gray-800">Logótipos</h2>
+        <p class="mt-1 text-sm text-gray-500">PNG ou JPEG, até 2 MB e 4000 px. O sistema otimiza a imagem e não aceita SVG direto.</p>
+        <div class="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
+            {% for campo, titulo, atual, remover in [('logo_principal', 'Logótipo principal', identidade.logo_principal, 'remover_logo_principal'), ('logo_secundario', 'Logótipo secundário', identidade.logo_secundario, 'remover_logo_secundario')] %}
+            <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <p class="font-semibold text-gray-700">{{ titulo }}</p>
+                <div class="mt-3 flex min-h-20 items-center gap-4">
+                    {% if atual %}<img src="{{ atual }}" alt="{{ titulo }}" class="h-16 w-28 rounded-xl bg-white object-contain p-2">{% else %}<span class="text-sm text-gray-400">Ainda não definido</span>{% endif %}
+                    <input type="file" name="{{ campo }}" accept="image/png,image/jpeg" class="min-w-0 text-sm text-gray-600">
+                </div>
+                <label class="mt-3 flex items-center gap-2 text-xs text-gray-500"><input type="checkbox" name="{{ remover }}" value="true"> Remover este logótipo</label>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="flex justify-end">
+        <button type="submit" class="ds-primary rounded-xl px-5 py-2.5 text-sm font-semibold">Guardar identidade</button>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ espaco.nome }}{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/planeamento-clube/espacos" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar aos espaços</a>
+    <div class="flex items-center gap-2 mt-2">
+        <span class="bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full">{{ espaco.tipo.value }}</span>
+        {% if espaco.ativo %}
+        <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">ativo</span>
+        {% else %}
+        <span class="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">inativo</span>
+        {% endif %}
+    </div>
+    <h1 class="text-2xl font-bold text-gray-800 mt-3">{{ espaco.nome }}</h1>
+    <p class="text-gray-500 mt-1">{{ espaco.localizacao or "Sem localização definida" }}</p>
+</div>
+
+{% if erro %}
+<div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {{ erro }}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-3">Detalhes</h2>
+        <div class="space-y-2 text-sm text-gray-700">
+            <p><span class="font-medium">Capacidade:</span> {{ espaco.capacidade if espaco.capacidade is not none else "—" }}</p>
+            <p><span class="font-medium">Observações:</span> {{ espaco.observacoes or "—" }}</p>
+        </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-3">Ocupação recente</h2>
+        {% if ocupacao_recente %}
+        <div class="space-y-2 text-sm text-gray-700">
+            {% for atribuicao in ocupacao_recente %}
+            <p>{{ atribuicao.data|data_pt }} • {{ atribuicao.hora_inicio }}-{{ atribuicao.hora_fim }} • {{ atribuicao.tipo_ocupacao.value }}</p>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">Sem ocupação passada registada para este espaço.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-gray-700">Atribuições associadas</h2>
+    </div>
+
+    {% if atribuicoes_associadas %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead>
+                <tr class="text-left text-gray-500 border-b border-gray-200">
+                    <th class="py-2 pr-4">Data</th>
+                    <th class="py-2 pr-4">Hora</th>
+                    <th class="py-2 pr-4">Equipa</th>
+                    <th class="py-2 pr-4">Tipo</th>
+                    <th class="py-2 pr-4">Evento</th>
+                    <th class="py-2 pr-4">Estado</th>
+                    <th class="py-2">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for atribuicao in atribuicoes_associadas %}
+                <tr class="border-b border-gray-100 text-gray-700">
+                    <td class="py-3 pr-4">{{ atribuicao.data|data_pt }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.hora_inicio }}-{{ atribuicao.hora_fim }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.equipa.nome if atribuicao.equipa else "—" }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.tipo_ocupacao.value }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.evento.titulo if atribuicao.evento else "—" }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.estado.value }}</td>
+                    <td class="py-3">
+                        <a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}" class="text-orange-500 hover:text-orange-600">Ver</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400">Ainda não há ocupações atuais ou futuras para este espaço.</p>
+    {% endif %}
+</div>
+
+<div class="flex items-center gap-4">
+    <a href="/planeamento-clube/espacos/{{ espaco.id }}/editar"
+       class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition">
+        Editar Espaço
+    </a>
+    <form method="POST" action="/planeamento-clube/espacos/{{ espaco.id }}/eliminar">
+        <button type="submit"
+                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition"
+                onclick="return confirm('Tens a certeza que queres eliminar este espaço?')">
+            Eliminar Espaço
+        </button>
+    </form>
+</div>
+
+{% endblock %}

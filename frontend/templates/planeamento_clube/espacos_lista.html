@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block titulo %}{% if semanal %}Ocupação Semanal de Espaços{% else %}Espaços de Treino{% endif %}{% endblock %}
+
+{% block conteudo %}
+
+{% if semanal %}
+<div class="mb-6">
+    <a href="/planeamento-clube/semanal/{{ semanal.id }}" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar ao plano semanal</a>
+    <div class="flex items-center justify-between gap-4 mt-2">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Ocupação Semanal de Espaços</h1>
+            <p class="text-gray-500 mt-1">{{ semanal.titulo }} • {{ semanal.data_inicio|data_pt }} → {{ semanal.data_fim|data_pt }}</p>
+        </div>
+        <a href="/planeamento-clube/semanal/{{ semanal.id }}/atribuicoes/nova"
+           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
+            + Nova Atribuição
+        </a>
+    </div>
+</div>
+{% else %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">Espaços de Treino</h1>
+        <p class="text-gray-500 mt-1">Gestão operacional dos espaços disponíveis do clube</p>
+    </div>
+    <a href="/planeamento-clube/espacos/novo"
+       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
+        + Novo Espaço
+    </a>
+</div>
+{% endif %}
+
+{% if semanal %}
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <h2 class="font-semibold text-gray-700 mb-4">Atribuições da semana</h2>
+    {% if atribuicoes_semanais %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead>
+                <tr class="text-left text-gray-500 border-b border-gray-200">
+                    <th class="py-2 pr-4">Data</th>
+                    <th class="py-2 pr-4">Espaço</th>
+                    <th class="py-2 pr-4">Início</th>
+                    <th class="py-2 pr-4">Fim</th>
+                    <th class="py-2 pr-4">Tipo</th>
+                    <th class="py-2 pr-4">Equipa</th>
+                    <th class="py-2 pr-4">Evento</th>
+                    <th class="py-2 pr-4">Estado</th>
+                    <th class="py-2">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for atribuicao in atribuicoes_semanais %}
+                <tr class="border-b border-gray-100 text-gray-700">
+                    <td class="py-3 pr-4">{{ atribuicao.data|data_pt }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.espaco.nome }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.hora_inicio }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.hora_fim }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.tipo_ocupacao.value }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.equipa.nome if atribuicao.equipa else "—" }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.evento.titulo if atribuicao.evento else "—" }}</td>
+                    <td class="py-3 pr-4">{{ atribuicao.estado.value }}</td>
+                    <td class="py-3">
+                        <div class="flex items-center gap-3">
+                            <a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}" class="text-orange-500 hover:text-orange-600">Ver</a>
+                            <a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/editar" class="text-blue-500 hover:text-blue-600">Editar</a>
+                            <form method="POST" action="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/eliminar">
+                                <button type="submit"
+                                        class="text-red-500 hover:text-red-600"
+                                        onclick="return confirm('Tens a certeza que queres eliminar esta atribuição?')">
+                                    Eliminar
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400">Ainda não há ocupação registada para esta semana.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {% for espaco in espacos %}
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-2">
+                    <h2 class="font-bold text-gray-800 text-lg">{{ espaco.nome }}</h2>
+                    {% if espaco.ativo %}
+                    <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">ativo</span>
+                    {% else %}
+                    <span class="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">inativo</span>
+                    {% endif %}
+                </div>
+                <p class="text-sm text-gray-500 mt-2">Tipo: {{ espaco.tipo.value }}</p>
+                <p class="text-sm text-gray-500">Localização: {{ espaco.localizacao or "—" }}</p>
+                <p class="text-sm text-gray-500">Capacidade: {{ espaco.capacidade if espaco.capacidade is not none else "—" }}</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="/planeamento-clube/espacos/{{ espaco.id }}" class="text-orange-500 hover:text-orange-600 text-sm font-medium">Ver</a>
+                <a href="/planeamento-clube/espacos/{{ espaco.id }}/editar" class="text-blue-500 hover:text-blue-600 text-sm font-medium">Editar</a>
+                <form method="POST" action="/planeamento-clube/espacos/{{ espaco.id }}/eliminar">
+                    <button type="submit"
+                            class="text-red-500 hover:text-red-600 text-sm font-medium"
+                            onclick="return confirm('Tens a certeza que queres eliminar este espaço?')">
+                        Eliminar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100 md:col-span-2">
+        <p class="text-gray-500">Ainda não há espaços de treino registados.</p>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

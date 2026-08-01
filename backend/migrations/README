@@ -1,0 +1,11 @@
+Alembic migrations for the basketball club platform.
+
+The `0001_baseline` revision records the existing schema without changing it.
+The application still runs its compatibility updater at startup so existing
+databases remain supported. New schema changes must be added as explicit,
+idempotent revisions under `versions/` and tested against SQLite and the
+production database dialect before deployment.
+
+From the `backend` directory:
+
+    alembic upgrade head

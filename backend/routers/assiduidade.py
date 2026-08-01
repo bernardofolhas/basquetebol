@@ -1,95 +1,147 @@
-# ─────────────────────────────────────────────────────────────
-# ROUTER DE ASSIDUIDADE
-# Gere o registo de presenças nas sessões de treino
-# ─────────────────────────────────────────────────────────────
+from datetime import date
 
-from fastapi import APIRouter, Request, Depends, Form
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from template_config import Jinja2Templates
 from sqlalchemy.orm import Session
+
+from auth_deps import AcessoNegado, exigir_autenticacao, verificar_ou_negar_equipa
 from database import get_db
+from flash import set_flash
 from models.assiduidade import RegistoAssiduidade
-from models.planeamento import SessaoTreino
+from models.equipa import Equipa
 from models.jogador import Jogador
+from models.planeamento import SessaoTreino
+from paths import TEMPLATES_DIR
+from services.sincronizacao_ui import enriquecer_sessao_para_ui
+from services.pdf_service import renderizar_pdf
+from services.assiduidade_service import (
+    ESTADOS_ASSIDUIDADE,
+    ESTADOS_ASSIDUIDADE_VISUAL,
+    calcular_resumo_assiduidade,
+    estado_assiduidade_visual,
+    estado_para_presenca,
+    normalizar_estado_assiduidade,
+    obter_relatorio_assiduidade_equipa,
+)
+from services.sessao_workflow import normalizar_estado_sessao
 
-# prefix="/assiduidade" — todas as rotas começam com /assiduidade
 router = APIRouter(prefix="/assiduidade")
-templates = Jinja2Templates(directory="../frontend/templates")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
-def obter_utilizador_atual(request: Request, db: Session):
-    from auth import verificar_token
-    from models.utilizador import Utilizador
-    token = request.session.get("token")
-    if not token:
+def _data_query(valor: str | None) -> date | None:
+    try:
+        return date.fromisoformat(valor) if valor else None
+    except ValueError:
         return None
-    payload = verificar_token(token)
-    if not payload:
-        return None
-    return db.query(Utilizador).filter(
-        Utilizador.username == payload.get("sub")
-    ).first()
 
 
-# ─────────────────────────────────────────
-# PÁGINA DE ASSIDUIDADE DE UMA SESSÃO
-# URL: GET /assiduidade/sessoes/{sessao_id}
-# ─────────────────────────────────────────
+def _contexto_relatorio_equipa(request: Request, equipa, relatorio: dict, utilizador) -> dict:
+    return {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        **relatorio,
+        "estados_assiduidade": ESTADOS_ASSIDUIDADE,
+        "estados_assiduidade_visual": ESTADOS_ASSIDUIDADE_VISUAL,
+        "request": request,
+    }
+
+
+@router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
+def relatorio_assiduidade_equipa(
+    equipa_id: int,
+    request: Request,
+    inicio: str = "",
+    fim: str = "",
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas")
+
+    relatorio = obter_relatorio_assiduidade_equipa(
+        db,
+        equipa_id,
+        _data_query(inicio),
+        _data_query(fim),
+    )
+    return templates.TemplateResponse(
+        request,
+        "assiduidade/equipa.html",
+        _contexto_relatorio_equipa(request, equipa, relatorio, utilizador),
+    )
+
+
+@router.get("/equipas/{equipa_id}/pdf")
+def exportar_pdf_assiduidade_equipa(
+    equipa_id: int,
+    request: Request,
+    inicio: str = "",
+    fim: str = "",
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas")
+
+    relatorio = obter_relatorio_assiduidade_equipa(
+        db,
+        equipa_id,
+        _data_query(inicio),
+        _data_query(fim),
+    )
+    contexto = _contexto_relatorio_equipa(request, equipa, relatorio, utilizador)
+    pdf_bytes = renderizar_pdf(request, "assiduidade/equipa_pdf.html", contexto)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=assiduidade_{equipa.id}.pdf"},
+    )
+
+
 @router.get("/sessoes/{sessao_id}", response_class=HTMLResponse)
-def pagina_assiduidade(sessao_id: int, request: Request, db: Session = Depends(get_db)):
-    utilizador = obter_utilizador_atual(request, db)
-    if not utilizador:
-        return RedirectResponse(url="/login")
-
-    # Procura a sessão de treino pelo ID
+def pagina_assiduidade(
+    sessao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
     sessao = db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
     if not sessao:
         return RedirectResponse(url="/equipas")
+    sessao = enriquecer_sessao_para_ui(sessao)
 
-    # Obtém a equipa através da hierarquia:
-    # sessao → microciclo → mesociclo → macrociclo → equipa
-    # Cada ponto acede à relação definida nos modelos
     equipa = sessao.microciclo.mesociclo.macrociclo.equipa
+    verificar_ou_negar_equipa(utilizador, equipa.id, db)
 
-    # Obtém todos os jogadores da equipa
     jogadores = db.query(Jogador).filter(
         Jogador.equipa_id == equipa.id
     ).order_by(Jogador.nome).all()
 
-    # Verifica se já existem registos de assiduidade para esta sessão
-    # Se não existirem, cria-os automaticamente para todos os jogadores
     registos_existentes = db.query(RegistoAssiduidade).filter(
         RegistoAssiduidade.sessao_id == sessao_id
     ).all()
 
-    # Se ainda não há registos, cria um por cada jogador
-    # com presente=False por defeito
-    if not registos_existentes and jogadores:
-        for jogador in jogadores:
-            registo = RegistoAssiduidade(
-                sessao_id=sessao_id,
-                jogador_id=jogador.id,
-                presente=False
-            )
-            # db.add() prepara o objecto para inserção
-            db.add(registo)
-        # db.commit() confirma todos os registos de uma vez
-        db.commit()
-
-    # Recarrega os registos após a criação
     registos = db.query(RegistoAssiduidade).filter(
         RegistoAssiduidade.sessao_id == sessao_id
     ).all()
-
-    # Cria um dicionário {jogador_id: registo} para acesso rápido no template
-    # Isto evita múltiplas pesquisas à base de dados no template
     registos_dict = {r.jogador_id: r for r in registos}
 
-    # Calcula estatísticas de presença
-    total_jogadores = len(jogadores)
-    total_presentes = sum(1 for r in registos if r.presente)
-    # Evita divisão por zero com o operador ternário
-    percentagem = round((total_presentes / total_jogadores) * 100) if total_jogadores > 0 else 0
+    resumo = calcular_resumo_assiduidade(registos)
+    resumo["registados"] = len(registos)
+    resumo["por_registar"] = max(len(jogadores) - len(registos), 0)
+    resumo["por_estado"]["por_registar"] = resumo["por_registar"]
+    resumo["percentagem_esperada"] = round(
+        (resumo["presentes"] / len(jogadores)) * 100,
+        1,
+    ) if jogadores else 0
+    for registo in registos:
+        registo.estado_visual = estado_assiduidade_visual(registo.estado, registo.presente)
 
     return templates.TemplateResponse(request, "assiduidade/sessao.html", {
         "utilizador": utilizador,
@@ -97,48 +149,62 @@ def pagina_assiduidade(sessao_id: int, request: Request, db: Session = Depends(g
         "equipa": equipa,
         "jogadores": jogadores,
         "registos_dict": registos_dict,
-        "total_presentes": total_presentes,
-        "total_jogadores": total_jogadores,
-        "percentagem": percentagem
+        "total_presentes": resumo["presentes"],
+        "total_jogadores": len(jogadores),
+        "percentagem": resumo["percentagem"],
+        "resumo_assiduidade": resumo,
+        "estados_assiduidade": ESTADOS_ASSIDUIDADE,
+        "estados_assiduidade_visual": ESTADOS_ASSIDUIDADE_VISUAL,
     })
 
 
-# ─────────────────────────────────────────
-# GUARDAR ASSIDUIDADE
-# URL: POST /assiduidade/sessoes/{sessao_id}
-# ─────────────────────────────────────────
 @router.post("/sessoes/{sessao_id}")
 async def guardar_assiduidade(
     sessao_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
 ):
-    utilizador = obter_utilizador_atual(request, db)
-    if not utilizador:
-        return RedirectResponse(url="/login")
+    sessao_check = db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
+    if sessao_check:
+        equipa_check = sessao_check.microciclo.mesociclo.macrociclo.equipa
+        verificar_ou_negar_equipa(utilizador, equipa_check.id, db)
 
-    # Lê os dados do formulário manualmente
-    # porque temos campos dinâmicos (um por jogador)
     dados = await request.form()
 
-    # Procura todos os registos desta sessão
     registos = db.query(RegistoAssiduidade).filter(
         RegistoAssiduidade.sessao_id == sessao_id
     ).all()
+    registos_por_jogador = {registo.jogador_id: registo for registo in registos}
+    jogadores = []
+    if sessao_check:
+        equipa = sessao_check.microciclo.mesociclo.macrociclo.equipa
+        jogadores = db.query(Jogador).filter(Jogador.equipa_id == equipa.id).all()
 
-    # Para cada registo, verifica se o checkbox do jogador foi marcado
-    for registo in registos:
-        # O checkbox envia "on" se marcado, nada se não marcado
-        # f"presente_{registo.jogador_id}" é o nome do campo no formulário
-        presente = dados.get(f"presente_{registo.jogador_id}") == "on"
-        motivo = dados.get(f"motivo_{registo.jogador_id}", "")
+    for jogador in jogadores:
+        registo = registos_por_jogador.get(jogador.id)
+        if not registo:
+            registo = RegistoAssiduidade(
+                sessao_id=sessao_id,
+                jogador_id=jogador.id,
+            )
+            db.add(registo)
+        estado_form = dados.get(f"estado_{jogador.id}")
+        checkbox_presente = dados.get(f"presente_{jogador.id}") == "on"
+        estado = normalizar_estado_assiduidade(estado_form, checkbox_presente)
+        motivo = dados.get(f"motivo_{jogador.id}", "")
+        registo.estado = estado
+        registo.presente = estado_para_presenca(estado)
+        registo.motivo_falta = motivo if not registo.presente and motivo else None
 
-        # Actualiza o registo existente
-        registo.presente = presente
-        registo.motivo_falta = motivo if not presente and motivo else None
-
-    # Guarda todas as alterações de uma vez
+    if sessao_check and normalizar_estado_sessao(sessao_check.estado) == "executada" and all(
+        normalizar_estado_assiduidade(
+            dados.get(f"estado_{jogador.id}"),
+            dados.get(f"presente_{jogador.id}") == "on",
+        ) != "por_registar"
+        for jogador in jogadores
+    ):
+        sessao_check.estado = "registada"
     db.commit()
-
-    # Redireciona de volta para a página de assiduidade
+    set_flash(request, "Assiduidade guardada com sucesso.")
     return RedirectResponse(url=f"/assiduidade/sessoes/{sessao_id}", status_code=303)

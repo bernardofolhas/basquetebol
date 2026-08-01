@@ -1,13 +1,22 @@
 {% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
 
 {% block titulo %}Calendário — {{ equipa.nome }}{% endblock %}
 
 {% block conteudo %}
 
-<div class="mb-6">
-    <a href="/equipas/{{ equipa.id }}" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar à equipa</a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-2">Calendário de Jogos</h1>
-    <p class="text-gray-500 mt-1">{{ equipa.nome }} — {{ equipa.escalao.value }}</p>
+{{ equipa_contexto(
+    equipa,
+    "Calendário de Jogos",
+    "Resultados, convocatórias e preparação competitiva da equipa.",
+    "jogos",
+    "/equipas/" ~ equipa.id,
+    "Voltar à equipa"
+) }}
+
+<div class="mb-6 flex flex-wrap gap-2">
+    <a href="/jogos/equipas/{{ equipa.id }}/pdf" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">📄 Exportar calendário PDF</a>
+    <a href="/partilha/equipas/{{ equipa.id }}/jogos/pdf" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100">PDF para partilhar</a>
 </div>
 
 <!-- Formulário para adicionar jogo -->
@@ -22,7 +31,7 @@
             </div>
             <div>
                 <label class="block text-xs text-gray-500 mb-1">Hora</label>
-                <input type="text" name="hora" placeholder="Ex: 15:00"
+                <input type="time" name="hora"
                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
             <div>
@@ -66,8 +75,7 @@
 
                 <!-- Data -->
                 <div class="text-center min-w-16">
-                    <p class="text-2xl font-bold text-gray-800">{{ jogo.data.strftime('%d') }}</p>
-                    <p class="text-xs text-gray-400 uppercase">{{ jogo.data.strftime('%b %Y') }}</p>
+                    <p class="text-base font-bold text-gray-800">{{ jogo.data|data_pt }}</p>
                 </div>
 
                 <!-- Separador -->
@@ -111,6 +119,17 @@
                    class="text-orange-500 hover:text-orange-600 text-xs font-medium mt-1 block">
                     Ver jogo →
                 </a>
+                <a href="/jogos/{{ jogo.id }}/editar"
+                   class="text-blue-500 hover:text-blue-600 text-xs font-medium mt-1 block">
+                    Editar
+                </a>
+                <form method="POST" action="/jogos/{{ jogo.id }}/eliminar" class="mt-1">
+                    <button type="submit"
+                            class="text-red-500 hover:text-red-600 text-xs font-medium"
+                            onclick="return confirm('Tens a certeza que queres eliminar este jogo?')">
+                        Eliminar
+                    </button>
+                </form>
             </div>
         </div>
     </div>

@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block titulo %}Dashboard — Coordenador{% endblock %}
+{% block conteudo %}
+
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
+    <p class="text-gray-500 mt-1">Bem-vindo, {{ utilizador.nome }}! — Coordenador Técnico</p>
+</div>
+
+{% if alertas %}
+<div class="mb-6 space-y-2">
+    {% for alerta in alertas %}
+    <div class="flex items-center gap-3 p-4 rounded-xl border {% if alerta.urgente %}bg-red-50 border-red-200{% else %}bg-yellow-50 border-yellow-200{% endif %}">
+        <span class="text-xl">{% if alerta.urgente %}🚨{% else %}⚠️{% endif %}</span>
+        <p class="text-sm {% if alerta.urgente %}text-red-700{% else %}text-yellow-700{% endif %}">{{ alerta.mensagem }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% include "partials/painel_operacional.html" %}
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between">
+            <div><p class="text-sm text-gray-500">Equipas</p><p class="text-3xl font-bold text-gray-800 mt-1">{{ total_equipas }}</p></div>
+            <span class="text-4xl">🏀</span>
+        </div>
+        <a href="/equipas" class="text-orange-500 text-sm mt-3 block hover:underline">Ver equipas →</a>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between">
+            <div><p class="text-sm text-gray-500">Treinadores</p><p class="text-3xl font-bold text-gray-800 mt-1">{{ total_treinadores }}</p></div>
+            <span class="text-4xl">👤</span>
+        </div>
+        <a href="/treinadores" class="text-orange-500 text-sm mt-3 block hover:underline">Ver treinadores →</a>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between">
+            <div><p class="text-sm text-gray-500">Jogadores</p><p class="text-3xl font-bold text-gray-800 mt-1">{{ total_jogadores }}</p></div>
+            <span class="text-4xl">🏃</span>
+        </div>
+        <a href="/jogadores" class="text-orange-500 text-sm mt-3 block hover:underline">Ver jogadores →</a>
+    </div>
+</div>
+
+<section id="planeamento-mensal-atual" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <div class="flex items-center justify-between gap-4 mb-4">
+        <div>
+            <h2 class="font-semibold text-gray-700">Planeamento do Mês ({{ mes_atual_label }})</h2>
+            <p class="text-sm text-gray-400 mt-1">Vista operacional das equipas para o mês atual.</p>
+        </div>
+        {% if planeamento_mensal %}
+        <a href="/planeamento-clube/mensal/{{ planeamento_mensal.id }}" class="text-orange-500 text-sm font-medium hover:underline">
+            Ver mensal →
+        </a>
+        {% endif %}
+    </div>
+
+    {% if planeamento_mensal %}
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {% for item in resumo_equipas %}
+        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+            <div class="flex items-start justify-between gap-3 mb-3">
+                <div>
+                    <h3 class="font-bold text-gray-800">{{ item.equipa.nome }}</h3>
+                    <p class="text-xs text-gray-400 mt-1">{{ item.equipa.escalao.value }} — {{ item.equipa.genero.value }}</p>
+                </div>
+                <a href="/equipas/{{ item.equipa.id }}" class="text-orange-500 text-xs font-medium hover:underline">Ver equipa →</a>
+            </div>
+
+            <p class="text-sm text-gray-600 mb-3">
+                Treinador:
+                <span class="font-medium text-gray-800">{{ item.treinador_principal.nome if item.treinador_principal else "Por definir" }}</span>
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="bg-white rounded-lg border border-gray-100 p-3">
+                    <p class="text-sm font-semibold text-gray-700 mb-2">Próximos Treinos</p>
+                    {% if item.proximos_treinos %}
+                    <ul class="space-y-2">
+                        {% for treino in item.proximos_treinos[:3] %}
+                        <li class="text-sm text-gray-600">
+                            <span class="font-medium text-gray-800">{{ treino.data|data_pt }}</span>
+                            às {{ treino.hora }}
+                            <span class="text-gray-400">— {{ treino.espaco }}</span>
+                            <span class="block text-xs text-gray-400">{{ treino.tipo }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-sm text-gray-400">Sem treinos operacionais definidos.</p>
+                    {% endif %}
+                </div>
+
+                <div class="bg-white rounded-lg border border-gray-100 p-3">
+                    <p class="text-sm font-semibold text-gray-700 mb-2">Próximos Jogos</p>
+                    {% if item.proximos_jogos %}
+                    <ul class="space-y-2">
+                        {% for jogo in item.proximos_jogos[:2] %}
+                        <li class="text-sm text-gray-600">
+                            <span class="font-medium text-gray-800">{{ jogo.data|data_pt }}</span>
+                            {% if jogo.hora %} às {{ jogo.hora }}{% endif %}
+                            <span class="block text-xs text-gray-400">vs {{ jogo.adversario }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-sm text-gray-400">Sem jogos previstos neste mês.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-500 text-sm">Sem planeamento mensal definido para este mês.</p>
+    {% endif %}
+</section>
+
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <h2 class="font-semibold text-gray-700 mb-4">Equipas do Clube</h2>
+    {% if dados_equipas %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for item in dados_equipas %}
+        <div class="border border-gray-100 rounded-lg p-4 hover:shadow-sm transition">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <p class="font-bold text-gray-800">{{ item.equipa.nome }}</p>
+                    <p class="text-xs text-gray-400">{{ item.equipa.escalao.value }} — {{ item.equipa.genero.value }}</p>
+                </div>
+                <a href="/equipas/{{ item.equipa.id }}" class="text-orange-500 text-xs hover:underline">Ver →</a>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="bg-blue-50 rounded-lg p-2">
+                    <p class="text-gray-400 mb-1">Próximo jogo</p>
+                    {% if item.proximo_jogo %}
+                    <p class="font-medium text-gray-700">vs {{ item.proximo_jogo.adversario }}</p>
+                    <p class="text-gray-400">{{ item.proximo_jogo.data }}</p>
+                    {% else %}
+                    <p class="text-gray-400">Sem jogos agendados</p>
+                    {% endif %}
+                </div>
+                <div class="bg-gray-50 rounded-lg p-2">
+                    <p class="text-gray-400 mb-1">Último resultado</p>
+                    {% if item.ultimo_resultado %}
+                    <p class="font-medium {% if item.ultimo_resultado.pontos_nos > item.ultimo_resultado.pontos_adversario %}text-green-600{% else %}text-red-600{% endif %}">
+                        {{ item.ultimo_resultado.pontos_nos }} — {{ item.ultimo_resultado.pontos_adversario }}
+                    </p>
+                    {% else %}
+                    <p class="text-gray-400">Sem resultados</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm">Ainda não há equipas criadas.</p>
+    {% endif %}
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Próximos Jogos</h2>
+        {% if proximos_jogos %}
+        <div class="space-y-3">
+            {% for jogo in proximos_jogos %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                    <p class="font-medium text-gray-800 text-sm">{{ jogo.equipa.nome }} vs {{ jogo.adversario }}</p>
+                    <p class="text-xs text-gray-400">{{ jogo.data|data_pt }}{% if jogo.hora %} — {{ jogo.hora }}{% endif %}</p>
+                </div>
+                <span class="{% if jogo.em_casa %}bg-green-100 text-green-700{% else %}bg-blue-100 text-blue-700{% endif %} text-xs px-2 py-0.5 rounded-full">
+                    {% if jogo.em_casa %}Casa{% else %}Fora{% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-400 text-sm">Sem jogos agendados.</p>
+        {% endif %}
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">Últimos Resultados</h2>
+        {% if ultimos_resultados %}
+        <div class="space-y-3">
+            {% for jogo in ultimos_resultados %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                    <p class="font-medium text-gray-800 text-sm">{{ jogo.equipa.nome }} vs {{ jogo.adversario }}</p>
+                    <p class="text-xs text-gray-400">{{ jogo.data|data_pt }}</p>
+                </div>
+                <p class="font-bold {% if jogo.pontos_nos > jogo.pontos_adversario %}text-green-600{% else %}text-red-600{% endif %}">
+                    {{ jogo.pontos_nos }} — {{ jogo.pontos_adversario }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-400 text-sm">Sem resultados registados.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

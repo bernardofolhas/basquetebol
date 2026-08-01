@@ -1,0 +1,236 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+{% from "partials/pdf_agenda.html" import estilos_agenda_pdf, agenda_grelha_pdf %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Mesociclo {{ mesociclo.numero }} — {{ equipa.nome }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; font-size: 10px; color: #111; background: white; }
+
+        /* ── PAGE ── */
+        @page { size: A4 landscape; margin: 12mm; }
+        @media print { body { padding: 0; } }
+
+        /* ── HEADER ── */
+        .header { border-bottom: 3px solid #4f46e5; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .header-left h1 { font-size: 16px; font-weight: bold; color: #1e1b4b; }
+        .header-left p { font-size: 10px; color: #555; margin-top: 2px; }
+        .header-right { text-align: right; font-size: 9px; color: #888; }
+        .badge { display: inline-block; background: #4f46e5; color: white; font-weight: bold; padding: 3px 10px; border-radius: 20px; font-size: 10px; margin-right: 6px; }
+
+        /* ── SECTION ── */
+        .section { margin-bottom: 14px; page-break-inside: avoid; }
+        .section-title { font-size: 11px; font-weight: bold; color: #4f46e5; border-bottom: 1px solid #e0e7ff; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* ── STATS ── */
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .stat-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px; text-align: center; }
+        .stat-value { font-size: 16px; font-weight: bold; color: var(--pdf-primary-dark); }
+        .stat-label { font-size: 8px; color: #9ca3af; margin-top: 1px; }
+
+        /* ── OBJECTIVES ── */
+        .obj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .obj-box { border: 1px solid #e5e7eb; border-radius: 5px; padding: 6px; }
+        .obj-label { font-size: 8px; font-weight: bold; color: var(--pdf-primary-dark); margin-bottom: 2px; text-transform: uppercase; }
+        .obj-label.green { color: #16a34a; }
+        .obj-label.orange { color: #ea580c; }
+        .obj-label.purple { color: #9333ea; }
+        .obj-label.yellow { color: #ca8a04; }
+        .obj-text { font-size: 9px; color: #374151; }
+
+        /* ── MICROCICLOS TABLE ── */
+        table { width: 100%; border-collapse: collapse; font-size: 9px; }
+        th { background: #ede9fe; color: #4f46e5; text-align: left; padding: 4px 6px; font-weight: bold; border: 1px solid #c4b5fd; }
+        td { padding: 4px 6px; border: 1px solid #e5e7eb; vertical-align: top; }
+        tr:nth-child(even) td { background: #f9fafb; }
+        .badge-micro { display: inline-block; background: #d1fae5; color: #065f46; font-weight: bold; padding: 1px 6px; border-radius: 10px; font-size: 8px; }
+        .badge-tipo { display: inline-block; background: #f3f4f6; color: #6b7280; padding: 1px 5px; border-radius: 10px; font-size: 8px; margin-left: 3px; }
+        .badge-jogo { display: inline-block; background: #fee2e2; color: #991b1b; padding: 1px 5px; border-radius: 10px; font-size: 8px; }
+
+        /* ── GAMES ── */
+        .games-table th { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+        .home-away { font-size: 9px; }
+
+        /* ── VOLUME TABLE ── */
+        .vol-bar-bg { background: #e0e7ff; border-radius: 3px; height: 6px; width: 100%; }
+        .vol-bar { background: var(--pdf-primary); border-radius: 3px; height: 6px; }
+
+        /* ── REFLEXAO ── */
+        .reflexao-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; min-height: 40px; font-size: 9px; color: #374151; white-space: pre-wrap; }
+
+        /* ── FOOTER ── */
+        .footer { border-top: 1px solid #e5e7eb; padding-top: 6px; margin-top: 14px; font-size: 8px; color: #9ca3af; display: flex; justify-content: space-between; }
+    </style>
+    {{ estilo_pdf() }}
+    {{ estilos_agenda_pdf() }}
+</head>
+<body>
+
+<!-- HEADER -->
+{{ cabecalho_pdf('Mesociclo ' ~ mesociclo.numero, equipa.nome ~ ' · ' ~ (mesociclo.data_inicio|data_pt) ~ ' → ' ~ (mesociclo.data_fim|data_pt) ~ ' · Macrociclo ' ~ mesociclo.macrociclo.numero, 'Planeamento integrado · ' ~ data_exportacao) }}
+
+<!-- STATS -->
+<div class="section">
+    <div class="section-title">Resumo</div>
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div class="stat-value">{{ microciclos | length }}</div>
+            <div class="stat-label">Microciclos</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value">{{ total_sessoes }}</div>
+            <div class="stat-label">Sessões de Treino</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" style="color:#dc2626">{{ jogos_periodo | length }}</div>
+            <div class="stat-label">Jogos no Período</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" style="color:#16a34a">{{ vol_total_h }}</div>
+            <div class="stat-label">Volume Total</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" style="color:#ea580c">{{ media_rpe or '—' }}</div>
+            <div class="stat-label">RPE Médio</div>
+        </div>
+    </div>
+</div>
+
+<!-- OBJETIVOS -->
+{% set tem_obj = mesociclo.obj_tecnica_individual_ofensiva or mesociclo.obj_tecnica_individual_defensiva or mesociclo.obj_tatica_individual_ofensiva or mesociclo.obj_tatica_individual_defensiva or mesociclo.obj_tatica_coletiva_ofensiva or mesociclo.obj_tatica_coletiva_defensiva or mesociclo.obj_fisicos or mesociclo.obj_psicologicos %}
+{% if tem_obj %}
+<div class="section">
+    <div class="section-title">Objetivos</div>
+    <div class="obj-grid">
+        {% if mesociclo.obj_tecnica_individual_ofensiva %}
+        <div class="obj-box"><div class="obj-label">TIO — Técnica Individual Ofensiva</div><div class="obj-text">{{ mesociclo.obj_tecnica_individual_ofensiva }}</div></div>
+        {% endif %}
+        {% if mesociclo.obj_tecnica_individual_defensiva %}
+        <div class="obj-box"><div class="obj-label">TID — Técnica Individual Defensiva</div><div class="obj-text">{{ mesociclo.obj_tecnica_individual_defensiva }}</div></div>
+        {% endif %}
+        {% if mesociclo.obj_tatica_individual_ofensiva %}
+        <div class="obj-box"><div class="obj-label green">TaIO — Tática Individual Ofensiva</div><div class="obj-text">{{ mesociclo.obj_tatica_individual_ofensiva }}</div></div>
+        {% endif %}
+        {% if mesociclo.obj_tatica_individual_defensiva %}
+        <div class="obj-box"><div class="obj-label green">TaID — Tática Individual Defensiva</div><div class="obj-text">{{ mesociclo.obj_tatica_individual_defensiva }}</div></div>
+        {% endif %}
+        {% if mesociclo.obj_tatica_coletiva_ofensiva %}
+        <div class="obj-box"><div class="obj-label orange">TCO — Tática Coletiva Ofensiva</div><div class="obj-text">{{ mesociclo.obj_tatica_coletiva_ofensiva }}</div></div>
+        {% endif %}
+        {% if mesociclo.obj_tatica_coletiva_defensiva %}
+        <div class="obj-box"><div class="obj-label orange">TCD — Tática Coletiva Defensiva</div><div class="obj-text">{{ mesociclo.obj_tatica_coletiva_defensiva }}</div></div>
+        {% endif %}
+        {% if mesociclo.obj_fisicos %}
+        <div class="obj-box"><div class="obj-label purple">Físicos</div><div class="obj-text">{{ mesociclo.obj_fisicos }}</div></div>
+        {% endif %}
+        {% if mesociclo.obj_psicologicos %}
+        <div class="obj-box"><div class="obj-label yellow">Psicológicos</div><div class="obj-text">{{ mesociclo.obj_psicologicos }}</div></div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{{ agenda_grelha_pdf(dashboard_planeamento.semanas, 'Calendário semanal do mesociclo') }}
+
+<!-- MICROCICLOS -->
+<div class="section">
+    <div class="section-title">Microciclos e Volume</div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width:70px">Microciclo</th>
+                <th style="width:130px">Período</th>
+                <th style="width:70px">Tipo</th>
+                <th style="width:50px">Treinos</th>
+                <th style="width:50px">Jogos</th>
+                <th style="width:60px">Volume</th>
+                <th style="width:50px">RPE méd.</th>
+                <th>Progressão</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for micro in microciclos %}
+            {% set sessoes_ativas = micro.sessoes | selectattr('ativa') | list %}
+            {% set jogos_m = sessoes_ativas | selectattr('e_jogo') | list %}
+            {% set treinos_m = sessoes_ativas | rejectattr('e_jogo') | list %}
+            {% set vol_m = namespace(v=0) %}
+            {% set rpe_m = namespace(soma=0, n=0) %}
+            {% for s in sessoes_ativas %}
+                {% set vol_m.v = vol_m.v + (s.volume_minutos or 0) %}
+                {% if s.intensidade_rpe %}{% set rpe_m.soma = rpe_m.soma + s.intensidade_rpe %}{% set rpe_m.n = rpe_m.n + 1 %}{% endif %}
+            {% endfor %}
+            <tr>
+                <td><span class="badge-micro">Micro {{ micro.numero }}</span></td>
+                <td>{{ micro.data_inicio|data_pt }}<br>{{ micro.data_fim|data_pt }}</td>
+                <td>{% if micro.tipo %}<span class="badge-tipo">{{ micro.tipo }}</span>{% else %}—{% endif %}</td>
+                <td style="text-align:center">{{ treinos_m | length }}</td>
+                <td style="text-align:center">{% if jogos_m %}<span class="badge-jogo">{{ jogos_m | length }}</span>{% else %}0{% endif %}</td>
+                <td style="text-align:center">{{ vol_m.v }}min</td>
+                <td style="text-align:center">{% if rpe_m.n > 0 %}{{ (rpe_m.soma / rpe_m.n) | round(1) }}{% else %}—{% endif %}</td>
+                <td>
+                    {% if vol_max > 0 %}
+                    <div class="vol-bar-bg"><div class="vol-bar" style="width:{{ [(vol_m.v * 100 / vol_max), 100] | min | int }}%"></div></div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- JOGOS -->
+{% if jogos_periodo %}
+<div class="section">
+    <div class="section-title">Jogos no Período</div>
+    <table class="games-table">
+        <thead>
+            <tr>
+                <th style="width:80px">Data</th>
+                <th style="width:50px">Hora</th>
+                <th>Adversário</th>
+                <th style="width:80px">Competição</th>
+                <th style="width:50px">Local</th>
+                <th style="width:70px">Resultado</th>
+                <th style="width:60px">Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for jogo in jogos_periodo %}
+            {% set importado = jogo.data not in jogos_nao_importados_datas %}
+            <tr>
+                <td>{{ jogo.data|data_pt }}</td>
+                <td>{{ jogo.hora or '—' }}</td>
+                <td>{{ jogo.adversario }}</td>
+                <td>{{ jogo.competicao or '—' }}</td>
+                <td class="home-away">{% if jogo.em_casa %}Casa{% else %}Fora{% endif %}</td>
+                <td>
+                    {% if jogo.pontos_nos is not none %}
+                        {{ jogo.pontos_nos }}–{{ jogo.pontos_adversario }}
+                        {% if jogo.pontos_nos > jogo.pontos_adversario %}(V){% elif jogo.pontos_nos < jogo.pontos_adversario %}(D){% else %}(E){% endif %}
+                    {% else %}—{% endif %}
+                </td>
+                <td style="color:{% if importado %}#16a34a{% else %}#92400e{% endif %}">
+                    {% if importado %}✓ Importado{% else %}Pendente{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- REFLEXÃO -->
+{% if mesociclo.reflexao %}
+<div class="section">
+    <div class="section-title">Reflexão</div>
+    <div class="reflexao-box">{{ mesociclo.reflexao }}</div>
+</div>
+{% endif %}
+
+<!-- FOOTER -->
+{{ rodape_pdf(equipa.nome ~ ' · Mesociclo ' ~ mesociclo.numero ~ ' · ' ~ (mesociclo.data_inicio|data_pt) ~ ' → ' ~ (mesociclo.data_fim|data_pt)) }}
+
+</body>
+</html>

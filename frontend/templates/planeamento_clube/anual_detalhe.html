@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ planeamento.titulo }}{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/planeamento-clube/anual" class="text-orange-500 hover:text-orange-600 text-sm">
+        ← Voltar aos planeamentos anuais
+    </a>
+    <div class="flex flex-wrap items-center gap-3 mt-2">
+        <span class="bg-orange-500 text-white font-bold px-3 py-1 rounded-full">{{ planeamento.epoca }}</span>
+        {% if planeamento.ativo %}
+        <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Ativo</span>
+        {% endif %}
+        <span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded-full">{{ dashboard_planeamento.periodo.label }}</span>
+    </div>
+    <h1 class="text-2xl font-bold text-gray-800 mt-3">{{ planeamento.titulo }}</h1>
+    <p class="text-gray-500 mt-1">Planeamento anual interligado com treino, jogo e atividade em toda a aplicacao.</p>
+</div>
+
+{% if erro %}
+<div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {{ erro }}
+</div>
+{% endif %}
+
+<div class="flex flex-wrap items-center gap-3 mb-6">
+    <a href="/planeamento-clube/anual/{{ planeamento.id }}/editar"
+       class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition">
+        Editar Planeamento
+    </a>
+    <form method="POST" action="/planeamento-clube/anual/{{ planeamento.id }}/eliminar">
+        <button type="submit"
+                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition"
+                onclick="return confirm('Tens a certeza que queres eliminar este planeamento anual?')">
+            Eliminar Planeamento
+        </button>
+    </form>
+    <a href="/planeamento-clube/eventos"
+       class="bg-white border border-gray-300 hover:border-orange-400 text-gray-700 px-4 py-2 rounded-lg font-medium transition">
+        Ver Eventos Globais
+    </a>
+    <a href="/planeamento-clube/anual/{{ planeamento.id }}/calendario"
+       class="bg-white border border-gray-300 hover:border-orange-400 text-gray-700 px-4 py-2 rounded-lg font-medium transition">
+        Ver Calendario Anual
+    </a>
+    <a href="/planeamento-clube/eventos/novo"
+       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
+        + Novo Evento Global
+    </a>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+    <div class="rounded-2xl border border-orange-100 bg-orange-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-orange-500">Mensais</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ mensais | length }}</p>
+    </div>
+    <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-emerald-600">Treinos</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.total_treinos }}</p>
+    </div>
+    <div class="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-rose-600">Jogos</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.total_jogos }}</p>
+    </div>
+    <div class="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-amber-600">Atividades</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.total_atividades }}</p>
+    </div>
+    <div class="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-sky-600">Dias Ativos</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.dias_com_atividade }}</p>
+    </div>
+    <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-slate-600">Equipas</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.total_equipas }}</p>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-2">
+        <a href="/planeamento-clube/anual/{{ planeamento.id }}/pdf" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">📄 Exportar PDF completo</a>
+        <a href="/planeamento-clube/anual/{{ planeamento.id }}/calendario/pdf" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:border-orange-400">🗓️ PDF do calendário</a>
+        <a href="/partilha/anual/{{ planeamento.id }}/pdf" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100">PDF para partilhar</a>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr_1fr] gap-6 mb-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-gray-800">Objetivos Gerais</h2>
+            <span class="text-xs text-gray-400">Base do clube</span>
+        </div>
+        <p class="text-sm text-gray-700 whitespace-pre-line">{{ planeamento.objetivos_gerais or "Sem objetivos definidos." }}</p>
+        <div class="mt-5 pt-5 border-t border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-700 mb-2">Observacoes</h3>
+            <p class="text-sm text-gray-600 whitespace-pre-line">{{ planeamento.observacoes or "Sem observacoes." }}</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-gray-800">Feed Integrado</h2>
+            <span class="text-xs text-gray-400">{{ dashboard_planeamento.itens | length }} item(ns)</span>
+        </div>
+        {% if dashboard_planeamento.itens_recentes %}
+        <div class="space-y-3">
+            {% for item in dashboard_planeamento.itens_recentes %}
+            <div class="rounded-xl border {{ item.card_classes }} p-3">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="{{ item.pill_classes }} text-[11px] font-semibold px-2 py-1 rounded-full">{{ item.badge }}</span>
+                            {% if item.equipa_nome %}
+                            <span class="text-[11px] text-gray-500">{{ item.equipa_nome }}</span>
+                            {% endif %}
+                        </div>
+                        <p class="font-medium text-gray-800 mt-2">{{ item.titulo }}</p>
+                        <p class="text-xs text-gray-500 mt-1">{{ item.dia_semana }} · {{ item.data|data_pt }} · {{ item.horario }}</p>
+                        <p class="text-xs text-gray-500">{{ item.local }}</p>
+                        {% if item.detalhe %}
+                        <p class="text-xs text-gray-500 mt-1">{{ item.detalhe }}</p>
+                        {% endif %}
+                    </div>
+                    {% if item.link %}
+                    <a href="{{ item.link }}" class="text-orange-500 hover:text-orange-600 text-xs font-medium">Ver →</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">Ainda nao existem itens integrados neste periodo.</p>
+        {% endif %}
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-gray-800">Cobertura das Equipas</h2>
+            <span class="text-xs text-gray-400">Macro, meso e micro</span>
+        </div>
+        {% if dashboard_planeamento.resumo_equipas %}
+        <div class="space-y-3">
+            {% for item in dashboard_planeamento.resumo_equipas %}
+            <div class="rounded-xl bg-slate-50 border border-slate-100 p-3">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="font-medium text-gray-800">{{ item.equipa.nome }}</p>
+                    <a href="/equipas/{{ item.equipa.id }}" class="text-xs text-orange-500 hover:text-orange-600">Abrir equipa →</a>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-3 text-xs text-gray-600">
+                    <div>Macros: <span class="font-semibold text-gray-800">{{ item.total_macros }}</span></div>
+                    <div>Mesos: <span class="font-semibold text-gray-800">{{ item.total_mesos }}</span></div>
+                    <div>Micros: <span class="font-semibold text-gray-800">{{ item.total_micros }}</span></div>
+                    <div>Treinos: <span class="font-semibold text-gray-800">{{ item.total_treinos }}</span></div>
+                    <div class="col-span-2">Jogos: <span class="font-semibold text-gray-800">{{ item.total_jogos }}</span></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">Sem equipas com planeamento associado neste intervalo.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-gray-800">Calendario Integrado do Ano</h2>
+        <span class="text-sm text-gray-400">Treinos, jogos e atividades no mesmo quadro</span>
+    </div>
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        {% for mes in dashboard_planeamento.meses %}
+        <div class="rounded-2xl border border-gray-100 bg-slate-50 p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h3 class="font-semibold text-gray-800">{{ mes.label }}</h3>
+                    <p class="text-xs text-gray-400 mt-1">
+                        {{ mes.estatisticas.treinos }} treinos · {{ mes.estatisticas.jogos }} jogos · {{ mes.estatisticas.atividades }} atividades
+                    </p>
+                </div>
+                <span class="bg-white text-gray-600 text-xs px-2 py-1 rounded-full border border-gray-200">{{ mes.estatisticas.itens }} itens</span>
+            </div>
+
+            <div class="grid grid-cols-7 gap-2 mb-2 text-[11px] font-semibold text-gray-400">
+                {% for nome in ['Seg','Ter','Qua','Qui','Sex','Sab','Dom'] %}
+                <div class="px-1">{{ nome }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="space-y-2">
+                {% for semana in mes.semanas %}
+                <div class="grid grid-cols-7 gap-2">
+                    {% for dia in semana %}
+                    <div class="min-h-24 rounded-xl border {% if dia.do_mes_atual and dia.no_periodo %}border-gray-200 bg-white{% else %}border-gray-100 bg-slate-100 text-gray-400{% endif %} p-2">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[11px] font-semibold">{{ dia.dia }}</span>
+                            {% if dia.itens %}
+                            <span class="text-[10px] text-gray-400">{{ dia.itens | length }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="space-y-1">
+                            {% for item in dia.itens[:2] %}
+                            {% if item.link %}
+                            <a href="{{ item.link }}" class="block rounded-lg px-1.5 py-1 text-[10px] leading-tight {{ item.pill_classes }} transition hover:opacity-85" title="{{ item.titulo }}">
+                                {{ item.badge }} · {{ item.titulo }}
+                            </a>
+                            {% else %}
+                            <div class="rounded-lg px-1.5 py-1 text-[10px] leading-tight {{ item.pill_classes }}">
+                                {{ item.badge }} · {{ item.titulo }}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                            {% if dia.itens | length > 2 %}
+                            <div class="text-[10px] text-gray-400">+{{ dia.itens | length - 2 }} itens</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-[1fr_1.1fr] gap-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-gray-800">
+                Eventos Associados
+                <span class="text-gray-400 font-normal text-sm ml-1">({{ eventos | length }})</span>
+            </h2>
+        </div>
+
+        {% if eventos %}
+        <div class="space-y-3">
+            {% for evento in eventos %}
+            <div class="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-slate-50 p-4">
+                <div>
+                    <p class="font-medium text-gray-800">{{ evento.titulo }}</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {{ evento.tipo.value }} · {{ evento.data|data_pt }}
+                        {% if evento.hora_inicio %} · {{ evento.hora_inicio }}{% endif %}
+                    </p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="/planeamento-clube/eventos/{{ evento.id }}" class="text-orange-500 hover:text-orange-600 text-sm">Ver</a>
+                    <a href="/planeamento-clube/eventos/{{ evento.id }}/editar" class="text-blue-500 hover:text-blue-600 text-sm">Editar</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">Ainda nao ha eventos associados diretamente a este anual.</p>
+        {% endif %}
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-gray-800">
+                Planeamentos Mensais
+                <span class="text-gray-400 font-normal text-sm ml-1">({{ mensais | length }})</span>
+            </h2>
+        </div>
+
+        {% if mensais %}
+        <div class="space-y-3 mb-6">
+            {% for mensal in mensais %}
+            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-slate-50 p-4">
+                <div>
+                    <p class="font-medium text-gray-800">{{ mensal.titulo }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ mensal.mes }}/{{ mensal.ano }} · {{ mensal.estado }}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="/planeamento-clube/mensal/{{ mensal.id }}" class="text-orange-500 hover:text-orange-600 text-sm">Ver</a>
+                    <a href="/planeamento-clube/mensal/{{ mensal.id }}/editar" class="text-blue-500 hover:text-blue-600 text-sm">Editar</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-400 text-sm mb-4">Ainda nao ha planeamentos mensais criados.</p>
+        {% endif %}
+
+        <div class="border-t border-gray-100 pt-4">
+            <p class="text-sm font-medium text-gray-600 mb-3">Adicionar planeamento mensal</p>
+            <form method="POST" action="/planeamento-clube/anual/{{ planeamento.id }}/mensal/novo" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Ano *</label>
+                    <input type="number" name="ano" required min="2000" max="2100"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Mes *</label>
+                    <input type="number" name="mes" required min="1" max="12"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs text-gray-500 mb-1">Titulo *</label>
+                    <input type="text" name="titulo" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs text-gray-500 mb-1">Objetivos do mes</label>
+                    <textarea name="objetivos_mes" rows="3"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs text-gray-500 mb-1">Observacoes</label>
+                    <textarea name="observacoes" rows="2"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Estado</label>
+                    <select name="estado" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        <option value="rascunho">rascunho</option>
+                        <option value="ativo">ativo</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <button type="submit"
+                            class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                        + Criar Planeamento Mensal
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+    <h2 class="font-semibold text-gray-800 mb-4">Histórico do planeamento</h2>
+    {% if historico %}
+    <div class="space-y-3">
+        {% for item in historico %}
+        <div class="flex flex-col gap-1 rounded-xl bg-slate-50 px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">
+            <span class="font-semibold text-gray-800">{{ item.acao | replace('_', ' ') | capitalize }}</span>
+            <span class="text-gray-500">{{ item.detalhes or '—' }}</span>
+            <span class="text-xs text-gray-400">{{ item.utilizador_username or 'Sistema' }} · {{ item.criado_em.strftime('%d/%m/%Y %H:%M') if item.criado_em else '—' }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400">Ainda não existem alterações registadas.</p>
+    {% endif %}
+</div>
+
+{% endblock %}

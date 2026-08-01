@@ -1,18 +1,66 @@
 {% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
 
 {% block titulo %}{{ equipa.nome }}{% endblock %}
 
 {% block conteudo %}
 
-<div class="mb-6">
-    <a href="/equipas" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar às equipas</a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-2">{{ equipa.nome }}</h1>
-    <p class="text-gray-500 mt-1">{{ equipa.escalao.value }} — {{ equipa.genero.value }}</p>
+{% call equipa_contexto(
+    equipa,
+    "Resumo da Equipa",
+    "Vista geral da equipa com acessos rápidos ao trabalho diário.",
+    "resumo",
+    "/equipas",
+    "Voltar às equipas"
+) %}
+    {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}
+    <a href="/equipas/{{ equipa.id }}/editar"
+       class="bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">
+        ✏️ Editar
+    </a>
+    {% endif %}
+    {% if utilizador.perfil.value == 'administrador' %}
+    <form method="POST" action="/equipas/{{ equipa.id }}/apagar">
+        <button type="button"
+                onclick="if(confirm('Tens a certeza que queres apagar esta equipa? Esta acção é irreversível.')) this.closest('form').submit()"
+                class="bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">
+            🗑️ Apagar
+        </button>
+    </form>
+    {% endif %}
+{% endcall %}
+
+{% if erro %}
+<div class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {{ erro }}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Jogadores</p>
+        <p class="mt-2 text-3xl font-bold text-gray-800">{{ equipa.jogadores | length }}</p>
+        <p class="mt-1 text-sm text-gray-500">Plantel associado à equipa</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Treinadores</p>
+        <p class="mt-2 text-3xl font-bold text-gray-800">{{ equipa.treinadores | length }}</p>
+        <p class="mt-1 text-sm text-gray-500">Equipa técnica atualmente ligada</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Eventos Globais</p>
+        <p class="mt-2 text-3xl font-bold text-gray-800">{{ eventos_globais | length }}</p>
+        <p class="mt-1 text-sm text-gray-500">Eventos do clube visíveis para esta equipa</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Atalhos</p>
+        <p class="mt-2 text-3xl font-bold text-gray-800">5</p>
+        <p class="mt-1 text-sm text-gray-500">Planeamento, assiduidade, jogos, playbook e físico</p>
+    </div>
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-    <!-- Informações básicas -->
     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 class="font-semibold text-gray-700 mb-4">Informações da Equipa</h2>
         <div class="space-y-3 text-sm">
@@ -28,102 +76,172 @@
                 <span class="text-gray-500">Género</span>
                 <span class="font-medium text-gray-800">{{ equipa.genero.value }}</span>
             </div>
-            <div class="flex justify-between">
-                <span class="text-gray-500">Seccionista</span>
-                <span class="font-medium text-gray-800">
-                    {{ equipa.seccionista if equipa.seccionista else "Não definido" }}
-                </span>
-            </div>
         </div>
     </div>
 
-    <!-- Treinadores -->
     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 class="font-semibold text-gray-700 mb-4">
-            Treinadores
-            <span class="text-gray-400 font-normal text-sm ml-1">({{ equipa.treinadores | length }})</span>
-        </h2>
-        {% if equipa.treinadores %}
-        <div class="space-y-3">
-            {% for treinador in equipa.treinadores %}
-            <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-gray-700 mb-4">Navegação da Equipa</h2>
+        <p class="text-sm text-gray-500 mb-4">Cada área principal abre agora numa página própria, para evitares percorrer o resumo à procura da informação certa.</p>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <a href="/equipas/{{ equipa.id }}/equipa-tecnica" class="rounded-xl bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-orange-50 hover:text-orange-600 hover:ring-orange-200">🧑‍🏫 Equipa Técnica</a>
+            <a href="/equipas/{{ equipa.id }}/eventos" class="rounded-xl bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-orange-50 hover:text-orange-600 hover:ring-orange-200">📍 Eventos</a>
+            <a href="/equipas/{{ equipa.id }}/plantel" class="rounded-xl bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-orange-50 hover:text-orange-600 hover:ring-orange-200">👥 Plantel</a>
+            <a href="/planeamento/equipas/{{ equipa.id }}/macrociclos" class="rounded-xl bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-orange-50 hover:text-orange-600 hover:ring-orange-200">🗂️ Planeamento</a>
+            <a href="/assiduidade/equipas/{{ equipa.id }}" class="rounded-xl bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-orange-50 hover:text-orange-600 hover:ring-orange-200">✅ Assiduidade</a>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6 mb-6">
+    <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <p class="text-sm font-semibold text-gray-800">Equipa Técnica</p>
+                <p class="mt-1 text-sm text-gray-500">{{ equipa.treinadores | length }} treinador(es) ligado(s) à equipa.</p>
+            </div>
+            <span class="rounded-full bg-orange-50 px-3 py-2 text-xl">🧑‍🏫</span>
+        </div>
+        <div class="mt-4 space-y-2">
+            {% if equipa.treinadores %}
+            {% for treinador in equipa.treinadores[:3] %}
+            <div class="rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-700 ring-1 ring-gray-100">
+                <p class="font-medium text-gray-800">{{ treinador.nome }}</p>
+                {% if treinador.telefone %}
+                <p class="text-xs text-gray-400">{{ treinador.telefone }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="rounded-xl bg-gray-50 px-3 py-3 text-sm text-gray-400 ring-1 ring-gray-100">Sem treinadores associados.</p>
+            {% endif %}
+        </div>
+        <a href="/equipas/{{ equipa.id }}/equipa-tecnica" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-orange-500 hover:text-orange-600">
+            Abrir página da equipa técnica →
+        </a>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <p class="text-sm font-semibold text-gray-800">Eventos</p>
+                <p class="mt-1 text-sm text-gray-500">{{ eventos_globais | length }} evento(s) visível(eis) para esta equipa.</p>
+            </div>
+            <span class="rounded-full bg-orange-50 px-3 py-2 text-xl">📍</span>
+        </div>
+        <div class="mt-4 space-y-2">
+            {% if eventos_globais %}
+            {% for evento in eventos_globais[:3] %}
+            <div class="rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-700 ring-1 ring-gray-100">
+                <span class="inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">Planeamento Global do Clube</span>
+                <p class="font-medium text-gray-800">{{ evento.titulo }}</p>
+                <p class="text-xs text-gray-400">
+                    {{ evento.data|data_pt }}
+                    {% if evento.hora_inicio %} · {{ evento.hora_inicio }}{% endif %}
+                </p>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="rounded-xl bg-gray-50 px-3 py-3 text-sm text-gray-400 ring-1 ring-gray-100">Sem eventos visíveis para a equipa.</p>
+            {% endif %}
+        </div>
+        <a href="/equipas/{{ equipa.id }}/eventos" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-orange-500 hover:text-orange-600">
+            Abrir página de eventos →
+        </a>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <p class="text-sm font-semibold text-gray-800">Plantel</p>
+                <p class="mt-1 text-sm text-gray-500">{{ equipa.jogadores | length }} jogador(es) associado(s) à equipa.</p>
+            </div>
+            <span class="rounded-full bg-orange-50 px-3 py-2 text-xl">👥</span>
+        </div>
+        <div class="mt-4 space-y-2">
+            {% if equipa.jogadores %}
+            {% for jogador in equipa.jogadores[:4] %}
+            <div class="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-700 ring-1 ring-gray-100">
+                {% if jogador.numero_camisola %}
+                <span class="rounded-full bg-white px-2 py-1 text-xs font-bold text-orange-700 ring-1 ring-orange-100">#{{ jogador.numero_camisola }}</span>
+                {% endif %}
                 <div>
-                    <p class="font-medium text-gray-800 text-sm">{{ treinador.nome }}</p>
-                    {% if treinador.telefone %}
-                    <p class="text-gray-400 text-xs">{{ treinador.telefone }}</p>
+                    <p class="font-medium text-gray-800">{{ jogador.nome }}</p>
+                    {% if jogador.posicao %}
+                    <p class="text-xs text-gray-400">{{ jogador.posicao }}</p>
                     {% endif %}
                 </div>
-                <a href="/treinadores/{{ treinador.id }}"
-                   class="text-orange-500 hover:text-orange-600 text-xs">
-                    Ver →
-                </a>
             </div>
             {% endfor %}
+            {% else %}
+            <p class="rounded-xl bg-gray-50 px-3 py-3 text-sm text-gray-400 ring-1 ring-gray-100">Sem jogadores associados.</p>
+            {% endif %}
         </div>
-        {% else %}
-        <p class="text-gray-400 text-sm">Sem treinadores associados.</p>
-        {% endif %}
-    </div>
-
-    <!-- Jogadores -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2">
-        <h2 class="font-semibold text-gray-700 mb-4">
-            Jogadores
-            <span class="text-gray-400 font-normal text-sm ml-1">({{ equipa.jogadores | length }})</span>
-        </h2>
-        {% if equipa.jogadores %}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {% for jogador in equipa.jogadores %}
-            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div class="flex items-center gap-2">
-                    {% if jogador.numero_camisola %}
-                    <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">
-                        #{{ jogador.numero_camisola }}
-                    </span>
-                    {% endif %}
-                    <div>
-                        <p class="font-medium text-gray-800 text-sm">{{ jogador.nome }}</p>
-                        {% if jogador.posicao %}
-                        <p class="text-gray-400 text-xs">{{ jogador.posicao }}</p>
-                        {% endif %}
-                    </div>
-                </div>
-                <a href="/jogadores/{{ jogador.id }}"
-                   class="text-orange-500 hover:text-orange-600 text-xs">
-                    Ver →
-                </a>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-gray-400 text-sm">Sem jogadores associados.</p>
-        {% endif %}
-    </div>
-
-</div>
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
-    <div class="flex items-center justify-between">
-        <div>
-            <h2 class="font-semibold text-gray-700">Planeamento</h2>
-            <p class="text-gray-400 text-sm mt-1">Macrociclos, mesociclos e microciclos da equipa</p>
-        </div>
-        <a href="/planeamento/equipas/{{ equipa.id }}/macrociclos"
-           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-            Ver planeamento →
+        <a href="/equipas/{{ equipa.id }}/plantel" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-orange-500 hover:text-orange-600">
+            Abrir página do plantel →
         </a>
     </div>
 </div>
-<!-- Calendário de jogos -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
-    <div class="flex items-center justify-between">
+
+<div class="mt-6">
+    <div class="flex items-center justify-between mb-4">
         <div>
-            <h2 class="font-semibold text-gray-700">Calendário de Jogos</h2>
-            <p class="text-gray-400 text-sm mt-1">Jogos, resultados e convocatórias</p>
+            <h2 class="text-lg font-semibold text-gray-800">Áreas de Trabalho</h2>
+            <p class="text-sm text-gray-500">Os quatro fluxos principais da equipa, organizados para entrares logo no sítio certo.</p>
         </div>
-        <a href="/jogos/equipas/{{ equipa.id }}"
-           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-            Ver calendário →
-        </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-sm font-semibold text-orange-600">🗂️ Planeamento</p>
+                    <p class="mt-2 text-sm text-gray-600">Macrociclos, mesociclos, microciclos e sessões de treino.</p>
+                </div>
+                <a href="/planeamento/equipas/{{ equipa.id }}/macrociclos"
+                   class="inline-flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600">
+                    Abrir
+                </a>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-sm font-semibold text-indigo-600">📚 Playbook</p>
+                    <p class="mt-2 text-sm text-gray-600">Setplays, jogadas e esquemas desenhados passo a passo.</p>
+                </div>
+                <a href="/playbook/equipas/{{ equipa.id }}"
+                   class="inline-flex items-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-600">
+                    Abrir
+                </a>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-sm font-semibold text-emerald-600">📅 Jogos</p>
+                    <p class="mt-2 text-sm text-gray-600">Calendário competitivo, resultados, convocatórias e plano de jogo.</p>
+                </div>
+                <a href="/jogos/equipas/{{ equipa.id }}"
+                   class="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600">
+                    Abrir
+                </a>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-sm font-semibold text-sky-600">💪 Físico</p>
+                    <p class="mt-2 text-sm text-gray-600">Planeamento físico semanal ou mensal e acompanhamento do trabalho físico.</p>
+                </div>
+                <a href="/fisico/equipas/{{ equipa.id }}"
+                   class="inline-flex items-center gap-2 rounded-full bg-sky-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-600">
+                    Abrir
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -1,26 +1,54 @@
 {% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% from "partials/agenda_modal.html" import agenda_modal, agenda_legenda %}
 
 {% block titulo %}Microciclo {{ microciclo.numero }}{% endblock %}
 
 {% block conteudo %}
 
-<div class="mb-6">
-    <a href="/planeamento/mesociclos/{{ microciclo.mesociclo_id }}"
-       class="text-orange-500 hover:text-orange-600 text-sm">
-        ← Voltar ao Mesociclo {{ microciclo.mesociclo.numero }}
-    </a>
-    <div class="flex items-center gap-3 mt-2">
-        <span class="bg-green-500 text-white font-bold px-3 py-1 rounded-full">
-            Micro {{ microciclo.numero }}
-        </span>
-        <h1 class="text-2xl font-bold text-gray-800">
-            {{ microciclo.data_inicio }} → {{ microciclo.data_fim }}
-        </h1>
-        {% if microciclo.tipo %}
-        <span class="bg-gray-100 text-gray-600 text-sm px-3 py-1 rounded-full">
-            {{ microciclo.tipo }}
-        </span>
-        {% endif %}
+{% call equipa_contexto(
+    microciclo.mesociclo.macrociclo.equipa,
+    "Microciclo " ~ microciclo.numero,
+    (microciclo.data_inicio|data_pt) ~ " → " ~ (microciclo.data_fim|data_pt) ~ ((" · " ~ microciclo.tipo) if microciclo.tipo else ""),
+    "planeamento",
+    "/planeamento/mesociclos/" ~ microciclo.mesociclo_id,
+    "Voltar ao mesociclo"
+) %}
+    <a href="/planeamento/microciclos/{{ microciclo.id }}/calendario/pdf"
+       class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-medium transition">🗓️ Calendário PDF</a>
+    <a href="/planeamento/microciclos/{{ microciclo.id }}/pdf"
+       class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-medium transition">📄 Microciclo PDF</a>
+    <a href="/partilha/microciclos/{{ microciclo.id }}/pdf" class="bg-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-emerald-200 transition hover:bg-emerald-100">PDF para partilhar</a>
+    <a href="/planeamento/microciclos/{{ microciclo.id }}/excel"
+       class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full text-sm font-medium transition">📊 Excel</a>
+    <a href="/planeamento/microciclos/{{ microciclo.id }}/editar"
+       class="bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">✏️ Editar</a>
+    <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/eliminar" class="inline"
+          onsubmit="return confirm('Eliminar este microciclo? As sessões de treino serão apagadas.')">
+        <button type="submit" class="bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">🗑️ Eliminar</button>
+    </form>
+{% endcall %}
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-emerald-600">Treinos</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.treinos_realizados }}</p>
+    </div>
+    <div class="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-rose-600">Jogos</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.jogos_realizados }}</p>
+    </div>
+    <div class="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-amber-600">Atividades</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ dashboard_planeamento.estatisticas.total_atividades }}</p>
+    </div>
+    <div class="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-sky-600">Volume</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.volume_total }}</p>
+    </div>
+    <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <p class="text-xs uppercase tracking-[0.2em] text-slate-600">Media RPE</p>
+        <p class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.media_rpe }}</p>
     </div>
 </div>
 
@@ -41,93 +69,81 @@
 
 </div>
 
-<!-- Sessões de treino -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
-    <h2 class="font-semibold text-gray-700 mb-4">Sessões de Treino</h2>
+{% if objetivos_superiores.macrociclo or objetivos_superiores.mesociclo or objetivos_por_categoria %}
+<details class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 mb-6 group">
+    <summary class="cursor-pointer list-none flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+        <span class="font-semibold text-gray-700">Objetivos e prioridades do microciclo</span>
+        <span class="text-xs text-gray-400 group-open:hidden">Abrir contexto de trabalho</span>
+        <span class="text-xs text-gray-400 hidden group-open:inline">Fechar contexto</span>
+    </summary>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        {% for nivel, titulo in [('macrociclo', 'Prioridades do macrociclo'), ('mesociclo', 'Prioridades do mesociclo')] %}
+        {% if objetivos_superiores[nivel] %}
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-4">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">{{ titulo }}</h3>
+            <div class="space-y-2">
+                {% for objetivo in objetivos_superiores[nivel] %}
+                <p class="text-xs text-slate-700"><span class="font-semibold text-slate-500">{{ objetivo.label }}:</span> {{ objetivo.texto }}</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% if objetivos_por_categoria %}
+        <div class="rounded-lg bg-emerald-50 border border-emerald-100 p-4 {% if objetivos_superiores.macrociclo or objetivos_superiores.mesociclo %}lg:col-span-1{% else %}lg:col-span-3{% endif %}">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-3">Objetivos desta semana</h3>
+            <div class="space-y-2">
+                {% for objetivo in objetivos_por_categoria %}
+                <p class="text-xs text-emerald-900"><span class="font-semibold text-emerald-700">{{ objetivo.label }}:</span> {{ objetivo.texto }}</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</details>
+{% endif %}
 
-    {% if sessoes %}
-    <div class="space-y-3 mb-6">
-        {% for sessao in sessoes %}
-        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div class="flex items-center gap-3">
-                {% if sessao.e_jogo %}
-                <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">
-                    JOGO
-                </span>
-                {% else %}
-                <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">
-                    TREINO {{ sessao.numero_treino }}
-                </span>
-                {% endif %}
-                <span class="text-gray-600 text-sm">{{ sessao.data }}</span>
-                {% if sessao.local %}
-                <span class="text-gray-400 text-xs">📍 {{ sessao.local }}</span>
-                {% endif %}
-                {% if sessao.volume_minutos %}
-                <span class="text-gray-400 text-xs">⏱ {{ sessao.volume_minutos }} min</span>
-                {% endif %}
-                {% if sessao.intensidade_rpe %}
-                <span class="text-gray-400 text-xs">RPE {{ sessao.intensidade_rpe }}</span>
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+        <div>
+            <h2 class="font-semibold text-gray-700">Agenda Integrada da Semana</h2>
+            <p class="text-sm text-gray-400 mt-1">Quadro único com treinos, jogos e atividades, sempre com acesso direto ao detalhe correspondente.</p>
+            <div class="mt-3">{{ agenda_legenda(agenda_tipos) }}</div>
+        </div>
+        <span class="text-sm text-gray-400">{{ dashboard_planeamento.estatisticas.total_itens }} item(ns)</span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-7 gap-4">
+        {% for dia in dashboard_planeamento.dias %}
+        <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 min-h-44">
+            <div class="mb-3 flex items-start justify-between">
+                <div><p class="text-xs text-gray-500">{{ dia.dia_semana }}</p><p class="font-semibold text-gray-800">{{ dia.data|data_pt }}</p></div>
+                <button type="button" data-agenda-new-date="{{ dia.data|data_iso }}" class="rounded-full px-1.5 text-xs text-orange-500 hover:bg-orange-50" title="Criar atividade">+</button>
+            </div>
+            <div class="space-y-2">
+                {% for item in dia.itens %}
+                <div class="rounded-lg border {{ item.card_classes }} px-2 py-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="{{ item.pill_classes }} text-[10px] font-semibold px-1.5 py-0.5 rounded-full">{{ item.badge }}</span>
+                        <span class="text-[10px] text-gray-400">{{ item.horario }}</span>
+                    </div>
+                    <p class="text-xs font-medium text-gray-700 mt-1">{{ item.titulo }}</p>
+                    <p class="text-[10px] text-gray-500 mt-1">{{ item.local }}</p>
+                    {% if item.link %}
+                    <a href="{{ item.link }}" {% if item.agenda_editavel %}data-agenda-event-id="{{ item.agenda_id }}" data-agenda-tipo="{{ item.agenda_tipo }}" data-agenda-titulo="{{ item.agenda_titulo|e }}" data-agenda-data="{{ item.data|data_iso }}" data-agenda-hora-inicio="{{ item.hora_inicio or '' }}" data-agenda-hora-fim="{{ item.hora_fim or '' }}" data-agenda-descricao="{{ item.agenda_descricao|e }}" data-agenda-espaco-id="{{ item.agenda_espaco_id }}" data-agenda-equipa-id="{{ item.agenda_equipa_id }}" data-agenda-aplica-todas="{{ 'true' if item.agenda_equipa_id == '' else 'false' }}"{% endif %} class="inline-block mt-1 text-[10px] text-orange-500 hover:text-orange-600">Abrir →</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% if not dia.itens %}
+                <p class="text-xs text-gray-400">Sem atividade.</p>
                 {% endif %}
             </div>
-             <!-- Link para a página de assiduidade desta sessão -->
-            <<div class="flex items-center gap-3">
-        <a href="/treino/sessoes/{{ sessao.id }}"
-           class="text-blue-500 hover:text-blue-600 text-xs font-medium">
-            Plano →
-        </a>
-        <a href="/assiduidade/sessoes/{{ sessao.id }}"
-           class="text-orange-500 hover:text-orange-600 text-xs font-medium">
-            Assiduidade →
-        </a>
-    </div>
+        </div>
         {% endfor %}
     </div>
-    {% else %}
-    <p class="text-gray-400 text-sm mb-4">Ainda não há sessões planeadas.</p>
-    {% endif %}
-
-    <!-- Formulário para adicionar sessão -->
-    <div class="border-t border-gray-100 pt-4">
-        <p class="text-sm font-medium text-gray-600 mb-3">Adicionar Sessão</p>
-        <form method="POST"
-              action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/nova"
-              class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div>
-                <label class="block text-xs text-gray-500 mb-1">Data *</label>
-                <input type="date" name="data" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-500 mb-1">Local</label>
-                <input type="text" name="local" placeholder="Pavilhão..."
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-500 mb-1">Volume (min)</label>
-                <input type="number" name="volume_minutos" placeholder="90"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-500 mb-1">RPE (1-10)</label>
-                <input type="number" name="intensidade_rpe" placeholder="7"
-                       min="1" max="10" step="0.5"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-            </div>
-            <div class="flex items-center gap-2">
-                <input type="checkbox" name="e_jogo" id="e_jogo" value="true"
-                       class="w-4 h-4 text-orange-500 rounded">
-                <label for="e_jogo" class="text-sm text-gray-600">É jogo?</label>
-            </div>
-            <div class="col-span-2 md:col-span-3 flex items-end">
-                <button type="submit"
-                        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                    + Adicionar Sessão
-                </button>
-            </div>
-        </form>
-    </div>
 </div>
+
+{{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, equipas_agenda|default([]), request.session.get('_csrf', '')) }}
 
 <!-- Reflexão do microciclo -->
 <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
@@ -305,6 +321,45 @@
             }
         }
     });
+</script>
+
+<script>
+// ── ESPAÇOS DE TREINO ATRIBUÍDOS ──────────────────────────────
+const _EQUIPA_ID = {{ microciclo.mesociclo.macrociclo.equipa_id }};
+const _INPUT_CLASSES = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400";
+
+function carregarEspacosNovaSessao(data) {
+    if (!data) return;
+    const container = document.getElementById('local_nova_sessao_container');
+    fetch(`/api/espacos/disponiveis?equipa_id=${_EQUIPA_ID}&data=${encodeURIComponent(data)}`)
+        .then(r => r.json())
+        .then(espacos => {
+            if (espacos.length > 0) {
+                const opts = espacos.map(e =>
+                    `<option value="${e.nome}">${e.nome} (${e.hora_inicio}–${e.hora_fim})</option>`
+                ).join('');
+                container.innerHTML = `
+                    <label class="block text-xs text-gray-500 mb-1">
+                        Local <span class="ml-1 bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded-full font-normal">atribuído</span>
+                    </label>
+                    <select name="local" class="${_INPUT_CLASSES}">
+                        <option value="">— Seleccionar espaço —</option>
+                        ${opts}
+                    </select>`;
+            } else {
+                container.innerHTML = `
+                    <label class="block text-xs text-gray-500 mb-1">Local</label>
+                    <input type="text" name="local" placeholder="Pavilhão..."
+                           class="${_INPUT_CLASSES}">`;
+            }
+        })
+        .catch(() => {
+            container.innerHTML = `
+                <label class="block text-xs text-gray-500 mb-1">Local</label>
+                <input type="text" name="local" placeholder="Pavilhão..."
+                       class="${_INPUT_CLASSES}">`;
+        });
+}
 </script>
 
 {% endblock %}

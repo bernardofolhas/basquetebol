@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block titulo %}Calendário Anual{% endblock %}
+
+{% block conteudo %}
+<div class="flex flex-col gap-4 mb-6 md:flex-row md:items-end md:justify-between">
+    <div>
+        <a href="/planeamento-clube/anual/{{ planeamento.id }}" class="text-sm font-medium text-orange-600">← Voltar ao planeamento anual</a>
+        <h1 class="mt-2 text-2xl font-bold text-gray-900">Calendário da época</h1>
+        <p class="mt-1 text-gray-500">{{ planeamento.titulo }} · {{ planeamento.epoca }} · clique num dia para criar uma atividade.</p>
+    </div>
+    <a href="/planeamento-clube/anual/{{ planeamento.id }}/calendario/pdf" class="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700">Exportar PDF</a>
+</div>
+
+<div class="mb-5 flex flex-wrap gap-2 text-xs">
+    {% for tipo in agenda_tipos|default([]) %}
+    <span class="rounded-full border px-3 py-1" style="border-color:{{ tipo.cor }}55;background:{{ tipo.cor }}12;color:{{ tipo.cor }}">{{ tipo.label }}</span>
+    {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+    {% for mes in calendario_anual.meses %}
+    <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <header class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+            <h2 class="font-bold text-gray-900">{{ mes.nome_mes }}</h2><span class="text-xs text-gray-400">{{ mes.ano }}</span>
+        </header>
+        <div class="grid grid-cols-7 bg-gray-50 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+            {% for nome in calendario_anual.dias_semana %}<div class="border-b border-r border-gray-200 px-1 py-2 last:border-r-0">{{ nome }}</div>{% endfor %}
+        </div>
+        {% for semana in mes.semanas %}
+        <div class="grid grid-cols-7">
+            {% for dia in semana %}
+            <a href="/planeamento-clube/eventos/novo?data={{ dia.data|data_iso }}&planeamento_anual_id={{ planeamento.id }}"
+               class="group min-h-24 border-b border-r border-gray-100 p-1.5 hover:bg-orange-50 {% if not dia.do_mes_atual %}bg-gray-50 text-gray-300{% elif dia.fim_semana %}bg-slate-50{% endif %}">
+                <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold group-hover:bg-orange-500 group-hover:text-white">{{ dia.dia }}</span>
+                <div class="mt-1 space-y-1">
+                    {% for evento in dia.eventos[:3] %}
+                    {% set meta = metadados_tipo_agenda(evento.tipo) %}
+                    <span onclick="event.preventDefault();location.href='/planeamento-clube/eventos/{{ evento.id }}/editar'" class="block truncate rounded px-1.5 py-1 text-[10px] font-semibold" style="background:{{ meta.cor }}18;color:{{ meta.cor }}" title="{{ evento.titulo }}">{{ evento.hora_inicio or '' }} {{ evento.titulo }}</span>
+                    {% endfor %}
+                    {% if dia.eventos|length > 3 %}<span class="block text-[10px] text-gray-500">+ {{ dia.eventos|length - 3 }} atividades</span>{% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </section>
+    {% endfor %}
+</div>
+{% endblock %}

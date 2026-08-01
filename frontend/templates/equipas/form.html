@@ -1,70 +1,102 @@
 {% extends "base.html" %}
-
-{% block titulo %}Nova Equipa{% endblock %}
-
+{% block titulo %}{{ "Editar" if equipa else "Nova" }} Equipa{% endblock %}
 {% block conteudo %}
 
 <div class="mb-6">
-    <a href="/equipas" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar às equipas</a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-2">Nova Equipa</h1>
+    <a href="/equipas" class="inline-flex items-center gap-2 text-sm font-medium text-orange-500 hover:text-orange-600">← Voltar às equipas</a>
+    <div class="mt-3 overflow-hidden rounded-[28px] border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-amber-50 shadow-sm">
+        <div class="flex flex-col gap-4 p-6 lg:flex-row lg:items-start lg:justify-between">
+            <div class="max-w-3xl">
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-orange-500">Configuração da Equipa</p>
+                <h1 class="mt-2 text-2xl font-bold text-gray-800">{{ "Editar Equipa" if equipa else "Nova Equipa" }}</h1>
+                <p class="mt-1 text-sm text-gray-500">
+                    {% if equipa %}
+                    Atualiza a identidade da equipa e os dados base usados no planeamento, jogos e restante navegação.
+                    {% else %}
+                    Cria a equipa com os dados essenciais para começar a trabalhar no resumo, planeamento, jogos, playbook e físico.
+                    {% endif %}
+                </p>
+            </div>
+            {% if equipa %}
+            <div class="flex flex-wrap gap-2">
+                <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 shadow-sm ring-1 ring-orange-100">🏀 {{ equipa.nome }}</span>
+                <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 shadow-sm ring-1 ring-orange-100">{{ equipa.escalao.value }}</span>
+                <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 shadow-sm ring-1 ring-orange-100">{{ equipa.genero.value }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 max-w-2xl">
-    <form method="POST" action="/equipas/nova">
+<div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_320px]">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <form method="POST" action="{{ '/equipas/' ~ equipa.id ~ '/editar' if equipa else '/equipas/nova' }}">
 
-        <!-- Nome -->
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Nome da equipa *</label>
-            <input type="text" name="nome" placeholder="Ex: Masculinos Sub-14"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
-                   required>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nome da equipa *</label>
+                    <input type="text" name="nome" required
+                           value="{{ equipa.nome if equipa else '' }}"
+                           placeholder="Ex: Masculinos Sub-14"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Escalão *</label>
+                    <select name="escalao" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        <option value="">Selecciona um escalão</option>
+                        {% for e in escaloes %}
+                        <option value="{{ e.value }}" {% if equipa and equipa.escalao.value == e.value %}selected{% endif %}>
+                            {{ e.value }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Género *</label>
+                    <select name="genero" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        <option value="">Selecciona o género</option>
+                        {% for g in generos %}
+                        <option value="{{ g.value }}" {% if equipa and equipa.genero.value == g.value %}selected{% endif %}>
+                            {{ g.value }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <input type="hidden" name="seccionista" value="{{ equipa.seccionista if equipa and equipa.seccionista else '' }}">
+            </div>
+
+            <div class="mt-6 flex flex-wrap gap-3">
+                <button type="submit"
+                        class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+                    {{ "Guardar alterações" if equipa else "Criar Equipa" }}
+                </button>
+                <a href="{{ '/equipas/' ~ equipa.id if equipa else '/equipas' }}"
+                   class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition">
+                    Cancelar
+                </a>
+            </div>
+
+        </form>
+    </div>
+
+    <aside class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-4">O que este formulário influencia</h2>
+        <div class="space-y-3 text-sm text-gray-600">
+            <div class="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100">
+                <p class="font-medium text-gray-800">Identidade da equipa</p>
+                <p class="mt-1">O nome, escalão e género aparecem em todos os menus e documentos da equipa.</p>
+            </div>
+            <div class="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100">
+                <p class="font-medium text-gray-800">Planeamento e jogos</p>
+                <p class="mt-1">Estes dados servem de contexto no planeamento, calendários, PDFs e playbook.</p>
+            </div>
         </div>
-
-        <!-- Escalão -->
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Escalão *</label>
-            <select name="escalao"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
-                    required>
-                <option value="">Selecciona um escalão</option>
-                {% for escalao in escaloes %}
-                <option value="{{ escalao.value }}">{{ escalao.value }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Género -->
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Género *</label>
-            <select name="genero"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
-                    required>
-                <option value="">Selecciona o género</option>
-                {% for genero in generos %}
-                <option value="{{ genero.value }}">{{ genero.value }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Seccionista -->
-        <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Seccionista</label>
-            <input type="text" name="seccionista" placeholder="Nome do seccionista (opcional)"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-        </div>
-
-        <div class="flex gap-3">
-            <button type="submit"
-                    class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
-                Criar Equipa
-            </button>
-            <a href="/equipas"
-               class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition">
-                Cancelar
-            </a>
-        </div>
-
-    </form>
+    </aside>
 </div>
 
 {% endblock %}

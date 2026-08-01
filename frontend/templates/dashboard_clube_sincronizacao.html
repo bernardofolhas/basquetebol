@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block titulo %}Dashboard de Sincronização{% endblock %}
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/dashboard/clube" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar ao dashboard do clube</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">Dashboard de Sincronização</h1>
+    <p class="text-gray-500 mt-1">Estado das sessões do planeamento global para {{ periodo.label }}</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <p class="text-sm text-gray-500">Sincronizadas</p>
+        <p class="text-3xl font-bold text-emerald-600 mt-2">{{ estatisticas.sincronizadas }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <p class="text-sm text-gray-500">Alteradas Manualmente</p>
+        <p class="text-3xl font-bold text-amber-600 mt-2">{{ estatisticas.alteradas_manual }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <p class="text-sm text-gray-500">Desatualizadas</p>
+        <p class="text-3xl font-bold text-red-600 mt-2">{{ estatisticas.desatualizadas }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <p class="text-sm text-gray-500">Desativadas</p>
+        <p class="text-3xl font-bold text-gray-800 mt-2">{{ estatisticas.desativadas }}</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-3">Última Sincronização</h2>
+        <div class="space-y-2 text-sm text-gray-700">
+            <p><span class="font-medium">Data/Hora:</span>
+                {% if ultima_sincronizacao.em %}
+                {{ ultima_sincronizacao.em.strftime("%d/%m/%Y %H:%M") }}
+                {% else %}
+                Ainda não registada
+                {% endif %}
+            </p>
+            <p><span class="font-medium">Utilizador:</span> {{ ultima_sincronizacao.por or "—" }}</p>
+            <p><span class="font-medium">Resumo:</span> {{ ultima_sincronizacao.resumo or "Sem resumo guardado." }}</p>
+        </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h2 class="font-semibold text-gray-700 mb-3">Plano Semanal Operacional</h2>
+        <div class="space-y-2 text-sm text-gray-700">
+            <p><span class="font-medium">Período:</span> {{ periodo.label }}</p>
+            <p><span class="font-medium">Plano:</span> {{ plano_semanal.titulo if plano_semanal else "Sem plano semanal associado" }}</p>
+            {% if plano_semanal %}
+            <p><a href="/planeamento-clube/semanal/{{ plano_semanal.id }}" class="text-orange-500 hover:text-orange-600">Abrir detalhe do plano semanal →</a></p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <h2 class="font-semibold text-gray-700 mb-4">Estado por Equipa</h2>
+    {% if resumo_equipas %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead>
+                <tr class="text-left text-gray-500 border-b border-gray-200">
+                    <th class="py-2 pr-4">Equipa</th>
+                    <th class="py-2 pr-4">Sincronizadas</th>
+                    <th class="py-2 pr-4">Manuais</th>
+                    <th class="py-2 pr-4">Desatualizadas</th>
+                    <th class="py-2">Desativadas</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in resumo_equipas %}
+                <tr class="border-b border-gray-100 text-gray-700">
+                    <td class="py-3 pr-4 font-medium">{{ item.equipa.nome }}</td>
+                    <td class="py-3 pr-4">{{ item.sincronizadas }}</td>
+                    <td class="py-3 pr-4">{{ item.alteradas_manual }}</td>
+                    <td class="py-3 pr-4">{{ item.desatualizadas }}</td>
+                    <td class="py-3">{{ item.desativadas }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400">Sem sessões globais sincronizadas neste período.</p>
+    {% endif %}
+</div>
+
+{% endblock %}

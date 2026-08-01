@@ -1,0 +1,93 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Convocatória — {{ jogo.adversario }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        @page { size: A4 portrait; margin: 12mm; }
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #000; padding: 20px; }
+        .toolbar { text-align: center; padding: 10px; background: #f5f5f5; border-bottom: 1px solid #ddd; margin-bottom: 20px; }
+        .btn-print { background: #e25a1c; color: white; border: none; padding: 10px 20px; font-size: 14px; cursor: pointer; border-radius: 6px; }
+        h1 { font-size: 20px; text-align: center; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .info-jogo { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; }
+        .info-jogo table { width: 100%; border-collapse: collapse; }
+        .info-jogo td { padding: 5px 8px; border: 1px solid #eee; }
+        .info-jogo td:first-child { font-weight: bold; width: 30%; background: #f5f5f5; font-size: 10px; text-transform: uppercase; }
+        .encontro { border: 2px solid #e25a1c; padding: 10px; margin-bottom: 15px; text-align: center; }
+        .encontro h2 { color: #e25a1c; font-size: 13px; margin-bottom: 8px; }
+        .encontro p { font-size: 13px; font-weight: bold; }
+        .jogadores h2 { font-size: 13px; text-transform: uppercase; margin-bottom: 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+        .jogador { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-bottom: 1px solid #eee; }
+        .jogador:nth-child(even) { background: #f9f9f9; }
+        .numero { background: #e25a1c; color: white; font-weight: bold; font-size: 11px; padding: 2px 6px; border-radius: 3px; min-width: 28px; text-align: center; }
+        .obs { border: 1px solid #ccc; padding: 8px; margin-top: 15px; min-height: 50px; }
+        .obs h2 { font-size: 11px; text-transform: uppercase; color: #666; margin-bottom: 6px; }
+        .rodape { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .rodape-item { border: 1px solid #ccc; padding: 8px; }
+        .rodape-item label { font-size: 10px; color: #666; text-transform: uppercase; display: block; margin-bottom: 4px; }
+        @media print { body { padding: 0; } .toolbar { display: none; } }
+        .modo-pdf .toolbar { display: none; }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body class="{% if modo_pdf %}modo-pdf{% endif %}">
+
+<div class="toolbar">
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+    <a href="/jogos/{{ jogo.id }}" style="margin-left: 15px; color: #666; font-size: 12px;">← Voltar</a>
+</div>
+
+{{ cabecalho_pdf('Convocatória', jogo.equipa.nome ~ ' · vs ' ~ jogo.adversario ~ ' · ' ~ (jogo.data|data_pt), 'Jogo · ' ~ data_exportacao) }}
+
+<div class="info-jogo">
+    <table>
+        <tr><td>Equipa</td><td>{{ jogo.equipa.nome }}</td></tr>
+        <tr><td>Adversário</td><td>{{ jogo.adversario }}</td></tr>
+        <tr><td>Competição</td><td>{{ jogo.competicao if jogo.competicao else "—" }}</td></tr>
+        <tr><td>Data</td><td>{{ jogo.data|data_pt }}{% if jogo.hora %} — {{ jogo.hora }}{% endif %}</td></tr>
+        <tr><td>Local do Jogo</td><td>{{ jogo.local if jogo.local else "—" }}</td></tr>
+        <tr><td>Casa/Fora</td><td>{% if jogo.em_casa %}Casa{% else %}Fora{% endif %}</td></tr>
+    </table>
+</div>
+
+{% if jogo.convocados %}
+<div class="encontro">
+    <h2>📍 Ponto de Encontro</h2>
+    <p>{{ jogo.convocados[0].hora_encontro if jogo.convocados[0].hora_encontro else "—" }} — {{ jogo.convocados[0].local_encontro if jogo.convocados[0].local_encontro else "—" }}</p>
+</div>
+{% endif %}
+
+<div class="jogadores">
+    <h2>Jogadores Convocados ({{ jogadores_convocados | length }})</h2>
+    {% for jogador in jogadores_convocados %}
+    <div class="jogador">
+        <span class="numero">{% if jogador.numero_camisola %}#{{ jogador.numero_camisola }}{% else %}—{% endif %}</span>
+        <span style="flex:1; font-weight: bold;">{{ jogador.nome }}</span>
+        {% if jogador.posicao %}<span style="color: #666; font-size: 11px;">{{ jogador.posicao }}</span>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+{% if jogo.convocados and jogo.convocados[0].observacoes %}
+<div class="obs">
+    <h2>Informações Importantes</h2>
+    {{ jogo.convocados[0].observacoes }}
+</div>
+{% endif %}
+
+<div class="rodape">
+    <div class="rodape-item">
+        <label>Treinador Principal</label>
+        {% if jogo.equipa.treinadores %}
+        {{ jogo.equipa.treinadores[0].nome }}
+        {% if jogo.equipa.treinadores[0].telefone %} — {{ jogo.equipa.treinadores[0].telefone }}{% endif %}
+        {% else %}—{% endif %}
+    </div>
+</div>
+
+{{ rodape_pdf(jogo.equipa.nome ~ ' · Convocatória') }}
+
+</body>
+</html>

@@ -1,0 +1,21 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Calendário - {{ equipa.nome }}</title>
+    <style>
+        * { box-sizing: border-box; } @page { size: A4 portrait; margin: 12mm; }
+        body { margin: 0; font-family: Arial, sans-serif; color: #172033; font-size: 10px; }
+        .header { background: #e25a1c; color: white; padding: 13px 15px; display: flex; justify-content: space-between; } h1 { margin: 0; font-size: 20px; } .sub { margin-top: 4px; color: #ffedd5; } .right { text-align: right; font-size: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; } th { background: #7c2d12; color: white; padding: 6px; text-align: left; } td { border: 1px solid #cbd5e1; padding: 6px; vertical-align: top; } tr:nth-child(even) td { background: #fff7ed; } thead { display: table-header-group; } tr { page-break-inside: avoid; }
+        .home { color: #15803d; font-weight: bold; } .away { color: #1d4ed8; font-weight: bold; } .footer { border-top: 1px solid #cbd5e1; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; color: #64748b; font-size: 8px; }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body>
+    {{ cabecalho_pdf('Calendário de jogos', equipa.nome ~ ' · ' ~ (jogos | length) ~ ' jogo(s)', 'Jogos · ' ~ data_exportacao) }}
+    {% if jogos %}<table><thead><tr><th style="width:16%">Data</th><th style="width:12%">Hora</th><th style="width:24%">Adversário</th><th style="width:19%">Competição</th><th style="width:13%">Casa/Fora</th><th>Local / resultado</th></tr></thead><tbody>{% for jogo in jogos %}<tr><td>{{ jogo.data|data_pt }}</td><td>{{ jogo.hora or ' ' }}</td><td><strong>vs {{ jogo.adversario }}</strong></td><td>{{ jogo.competicao or ' ' }}</td><td class="{% if jogo.em_casa %}home{% else %}away{% endif %}">{% if jogo.em_casa %}Casa{% else %}Fora{% endif %}</td><td>{{ jogo.local or 'Local por definir' }}{% if jogo.pontos_nos is not none and jogo.pontos_adversario is not none %} · {{ jogo.pontos_nos }}-{{ jogo.pontos_adversario }}{% endif %}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Não existem jogos marcados.</p>{% endif %}
+    {{ rodape_pdf(equipa.nome ~ ' · Calendário de jogos') }}
+</body>
+</html>

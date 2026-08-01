@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% block titulo %}{{ setplay.nome }} — Playbook{% endblock %}
+
+{% block conteudo %}
+
+<!-- ── CABEÇALHO ─────────────────────────────────────────────────── -->
+{% call equipa_contexto(
+    equipa,
+    setplay.nome,
+    (setplay.descricao if setplay.descricao else "Editor detalhado do setplay.") ~ " · " ~ passos|length ~ " passo(s)",
+    "playbook",
+    "/playbook/equipas/" ~ equipa.id,
+    "Voltar ao Playbook"
+) %}
+    {% if setplay.categoria %}
+    <span class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full text-sm font-medium">{{ setplay.categoria }}</span>
+    {% endif %}
+    <a href="/playbook/setplays/{{ setplay.id }}/pdf"
+       class="bg-white hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">📄 PDF</a>
+    <button onclick="document.getElementById('modal-editar').classList.remove('hidden')"
+            class="bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">✏️ Editar</button>
+    <form method="POST" action="/playbook/setplays/{{ setplay.id }}/eliminar" class="inline"
+          onsubmit="return confirm('Eliminar «{{ setplay.nome }}»?')">
+        <button type="submit" class="bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">🗑️ Eliminar</button>
+    </form>
+{% endcall %}
+
+<!-- ── PASSOS ────────────────────────────────────────────────────── -->
+{% if passos %}
+<div class="space-y-6 mb-6">
+{% for passo in passos %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" id="passo-{{ passo.id }}">
+
+    <!-- Header do passo -->
+    <div class="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-100">
+        <div class="flex items-center gap-2">
+            <span class="bg-indigo-600 text-white font-bold text-sm px-3 py-0.5 rounded-full">Passo {{ loop.index }}</span>
+        </div>
+        <div class="flex items-center gap-1">
+            {% if not loop.first %}
+            <form method="POST" action="/playbook/passos/{{ passo.id }}/mover/cima" class="inline">
+                <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-500 px-2 py-1 rounded text-xs" title="Mover para cima">▲</button>
+            </form>
+            {% endif %}
+            {% if not loop.last %}
+            <form method="POST" action="/playbook/passos/{{ passo.id }}/mover/baixo" class="inline">
+                <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-500 px-2 py-1 rounded text-xs" title="Mover para baixo">▼</button>
+            </form>
+            {% endif %}
+            <form method="POST" action="/playbook/passos/{{ passo.id }}/eliminar" class="inline"
+                  onsubmit="return confirm('Eliminar Passo {{ loop.index }}?')">
+                <button type="submit" class="bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 px-2 py-1 rounded text-xs">🗑️</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-0">
+
+        <!-- CANVAS MEIO-CAMPO -->
+        <div class="p-4 border-b lg:border-b-0 lg:border-r border-gray-100">
+            <!-- Toolbar -->
+            <div id="toolbar_canvas_{{ passo.id }}" class="flex flex-wrap gap-1 mb-2">
+                {% set ferramentas = [
+                    ('jogador_ataque', '⬤ Ataque', 'orange'),
+                    ('jogador_defesa', '▲ Defesa', 'gray'),
+                    ('coach', '⊙ Coach', 'gray'),
+                    ('cone', '○ Cone', 'gray'),
+                    ('bola', '🏀 Bola', 'gray'),
+                    ('seta', '→ Seta', 'gray'),
+                    ('seta_tracejada', '⇢ Tracejada', 'gray'),
+                    ('seta_zigzag', '≋ Drible', 'gray'),
+                    ('seta_curva', '⌒ Curva', 'gray'),
+                    ('bloqueio', '⊣ Bloqueio', 'gray'),
+                    ('linha', '— Linha', 'gray'),
+                    ('seleccionar', '✥ Mover', 'gray'),
+                    ('apagar', '✕ Apagar', 'gray'),
+                ] %}
+                {% for ferramenta, label, cor in ferramentas %}
+                <button data-ferramenta="{{ ferramenta }}"
+                        onclick="definirFerramenta('canvas_{{ passo.id }}', '{{ ferramenta }}')"
+                        class="text-xs px-2 py-1 rounded border border-gray-200 {% if loop.first %}bg-orange-500 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %} transition">
+                    {{ label }}
+                </button>
+                {% endfor %}
+                <button onclick="desfazer('canvas_{{ passo.id }}')"
+                        class="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200">↩ Desfazer</button>
+                <button onclick="limparTudo('canvas_{{ passo.id }}')"
+                        class="text-xs px-2 py-1 rounded bg-red-50 text-red-500 hover:bg-red-100 border border-red-200">🗑 Limpar</button>
+            </div>
+
+            <!-- Campo de jogo -->
+            <div class="relative select-none">
+                <img src="/static/campos/campo_meio.png" class="w-full rounded-lg border border-gray-200" alt="Meio campo"
+                     id="img_campo_{{ passo.id }}">
+                <canvas id="canvas_{{ passo.id }}"
+                        class="absolute top-0 left-0 w-full h-full"
+                        style="cursor:crosshair"></canvas>
+                {% if passo.desenho %}
+                <img id="overlay_{{ passo.id }}" src="{{ passo.desenho }}"
+                     class="absolute top-0 left-0 w-full h-full pointer-events-none hidden" alt="">
+                {% endif %}
+            </div>
+
+            <!-- Botão guardar -->
+            <div class="flex items-center gap-2 mt-2">
+                <button onclick="guardarDesenhoPasso('canvas_{{ passo.id }}', {{ passo.id }})"
+                        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition"
+                        id="btn_guardar_{{ passo.id }}">
+                    💾 Guardar desenho
+                </button>
+                {% if passo.desenho %}
+                <span class="text-xs text-green-600 font-medium">✓ Desenho guardado</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- OBSERVAÇÃO -->
+        <div class="p-4 flex flex-col">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">📝 Observação / Descrição do passo</label>
+            <form method="POST" action="/playbook/passos/{{ passo.id }}/observacao" class="flex flex-col flex-1">
+                <textarea name="observacao" rows="8"
+                          placeholder="Descreve o movimento, a posição dos jogadores, o objetivo tático deste passo..."
+                          class="flex-1 w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none">{{ passo.observacao or '' }}</textarea>
+                <button type="submit"
+                        class="mt-3 self-end bg-orange-500 hover:bg-orange-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition">
+                    Guardar nota
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-10 text-center mb-6">
+    <p class="text-gray-400">Ainda não há passos. Clica em "+ Adicionar Passo" para começar.</p>
+</div>
+{% endif %}
+
+<!-- Botão adicionar passo -->
+<form method="POST" action="/playbook/setplays/{{ setplay.id }}/passos/novo">
+    <button type="submit"
+            class="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-xl font-medium transition text-sm">
+        + Adicionar Passo {{ passos | length + 1 }}
+    </button>
+</form>
+
+
+<!-- ── MODAL EDITAR SETPLAY ─────────────────────────────────────── -->
+<div id="modal-editar" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-gray-800">Editar Setplay</h3>
+            <button onclick="document.getElementById('modal-editar').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+        <form method="POST" action="/playbook/setplays/{{ setplay.id }}/editar" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                <input type="text" name="nome" required value="{{ setplay.nome }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                <select name="categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">— Sem categoria —</option>
+                    {% for cat in categorias %}
+                    <option value="{{ cat }}" {% if setplay.categoria == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                <textarea name="descricao" rows="3"
+                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">{{ setplay.descricao or '' }}</textarea>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                        class="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-medium transition">
+                    Guardar
+                </button>
+                <button type="button" onclick="document.getElementById('modal-editar').classList.add('hidden')"
+                        class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-medium transition">
+                    Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ── DRAWING ENGINE (same as plano.html) ──────────────────────── -->
+<script>
+const CANVAS_ESTADO = {};
+
+function inicializarDesenho(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const configurarCanvas = () => {
+        const imgEl = canvas.parentElement.querySelector('img');
+        if (imgEl && imgEl.offsetWidth > 0) { canvas.width = imgEl.offsetWidth; canvas.height = imgEl.offsetHeight; }
+        else { canvas.width = 400; canvas.height = 300; }
+    };
+    setTimeout(configurarCanvas, 100);
+    const ctx = canvas.getContext('2d');
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 2, corLinha: '#333333' };
+    canvas.addEventListener('mousedown', (e) => aoPremir(canvasId, e));
+    canvas.addEventListener('mousemove', (e) => aoMover(canvasId, e));
+    canvas.addEventListener('mouseup', (e) => aoSoltar(canvasId, e));
+    canvas.addEventListener('mouseleave', () => { if (CANVAS_ESTADO[canvasId]) CANVAS_ESTADO[canvasId].aDesconhar = false; });
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); aoPremir(canvasId, simularMouse(e)); });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); aoMover(canvasId, simularMouse(e)); });
+    canvas.addEventListener('touchend', (e) => { e.preventDefault(); aoSoltar(canvasId, simularMouse(e)); });
+}
+
+function simularMouse(e) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY, button: 0 }; }
+function obterPos(canvas, e) { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; }
+
+function aoPremir(canvasId, e) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    const pos = obterPos(est.canvas, e);
+    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    if (e.button === 2) { e.preventDefault(); if (est.linhaMultipla) { if (est.linhaMultipla.pontos.length >= 2) est.objectos.push({...est.linhaMultipla}); est.linhaMultipla = null; redesenhar(canvasId); } return; }
+    if (est.ferramenta === 'apagar') { est.objectos = est.objectos.filter(o => !estaNoObj(o, pos)); redesenhar(canvasId); return; }
+    if (est.ferramenta === 'seleccionar') {
+        est.objectoSeleccionado = null;
+        for (let i = est.objectos.length - 1; i >= 0; i--) { if (estaNoObj(est.objectos[i], pos)) { est.objectoSeleccionado = est.objectos[i]; if (simbolos.includes(est.objectos[i].tipo)) est.offsetMover = { x: pos.x - est.objectos[i].x, y: pos.y - est.objectos[i].y }; else est.offsetMover = { x: pos.x - est.objectos[i].pontos[0].x, y: pos.y - est.objectos[i].pontos[0].y }; est.aDesconhar = true; break; } }
+        redesenhar(canvasId); if (est.objectoSeleccionado) desenharSeleccao(est.ctx, est.objectoSeleccionado); return;
+    }
+    if (simbolos.includes(est.ferramenta)) { est.objectos.push({ tipo: est.ferramenta, x: pos.x, y: pos.y, tamanho: 1, numero: est.ferramenta === 'jogador_ataque' ? est.contadores.ataque++ : est.ferramenta === 'jogador_defesa' ? est.contadores.defesa++ : null }); redesenhar(canvasId); return; }
+    if (!est.linhaMultipla) est.linhaMultipla = { tipo: est.ferramenta, pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 };
+    else est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
+    redesenhar(canvasId); if (est.posicaoCursor) desenharLinhaMultipla(est.ctx, est.linhaMultipla, est.posicaoCursor);
+}
+
+function aoMover(canvasId, e) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    const pos = obterPos(est.canvas, e); const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    est.posicaoCursor = pos;
+    if (est.ferramenta === 'seleccionar' && est.aDesconhar && est.objectoSeleccionado) {
+        const obj = est.objectoSeleccionado;
+        if (simbolos.includes(obj.tipo)) { obj.x = pos.x - est.offsetMover.x; obj.y = pos.y - est.offsetMover.y; }
+        else if (obj.pontos) { const dx = pos.x - est.offsetMover.x - obj.pontos[0].x, dy = pos.y - est.offsetMover.y - obj.pontos[0].y; obj.pontos.forEach(p => { p.x += dx; p.y += dy; }); est.offsetMover.x = pos.x - obj.pontos[0].x; est.offsetMover.y = pos.y - obj.pontos[0].y; }
+        redesenhar(canvasId); desenharSeleccao(est.ctx, est.objectoSeleccionado); return;
+    }
+    if (est.linhaMultipla) { redesenhar(canvasId); desenharLinhaMultipla(est.ctx, est.linhaMultipla, pos); }
+}
+
+function aoSoltar(canvasId, e) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    if (est.ferramenta === 'seleccionar') { est.aDesconhar = false; if (est.objectoSeleccionado) mostrarPainelTamanho(canvasId, est.objectoSeleccionado); }
+}
+
+function redesenhar(canvasId) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    est.ctx.clearRect(0, 0, est.canvas.width, est.canvas.height);
+    est.objectos.forEach(obj => { if (simbolos.includes(obj.tipo)) desenharSimbolo(est.ctx, obj); else desenharLinhaMultipla(est.ctx, obj, null); });
+}
+
+function desenharSimbolo(ctx, obj) {
+    ctx.save(); const t = obj.tamanho || 1;
+    if (obj.tipo === 'jogador_ataque') { ctx.beginPath(); ctx.arc(obj.x, obj.y, 14*t, 0, Math.PI*2); ctx.fillStyle = '#E25A1C'; ctx.fill(); ctx.strokeStyle = '#B34010'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(11*t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y); }
+    else if (obj.tipo === 'jogador_defesa') { const h = 16*t; ctx.beginPath(); ctx.moveTo(obj.x, obj.y-h); ctx.lineTo(obj.x+h*0.9, obj.y+h*0.7); ctx.lineTo(obj.x-h*0.9, obj.y+h*0.7); ctx.closePath(); ctx.fillStyle = '#888888'; ctx.fill(); ctx.strokeStyle = '#555555'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(10*t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y+2*t); }
+    else if (obj.tipo === 'cone') { ctx.beginPath(); ctx.arc(obj.x, obj.y, 10*t, 0, Math.PI*2); ctx.strokeStyle = '#333333'; ctx.lineWidth = 2; ctx.stroke(); }
+    else if (obj.tipo === 'bola') { ctx.beginPath(); ctx.arc(obj.x, obj.y, 10*t, 0, Math.PI*2); ctx.fillStyle = '#E8731A'; ctx.fill(); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 1; ctx.stroke(); ctx.beginPath(); ctx.moveTo(obj.x-10*t, obj.y); ctx.lineTo(obj.x+10*t, obj.y); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 0.8; ctx.stroke(); }
+    else if (obj.tipo === 'coach') { const r = 14*t; ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI*2); ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#111111'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.beginPath(); ctx.arc(obj.x, obj.y, r*0.75, 0, Math.PI*2); ctx.strokeStyle = '#111111'; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = '#111111'; ctx.font = `bold ${Math.round(12*t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C', obj.x, obj.y); }
+    ctx.restore();
+}
+
+function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
+    if (!linha.pontos || linha.pontos.length === 0) return;
+    ctx.save(); ctx.strokeStyle = linha.cor || '#333333'; ctx.lineWidth = linha.largura || 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.setLineDash(linha.tipo === 'seta_tracejada' ? [8, 4] : []);
+    const todosPontos = [...linha.pontos]; if (posicaoCursor) todosPontos.push(posicaoCursor);
+    if (todosPontos.length < 2) { ctx.restore(); return; }
+    ctx.beginPath();
+    if (linha.tipo === 'seta_curva') { ctx.moveTo(todosPontos[0].x, todosPontos[0].y); for (let i = 0; i < todosPontos.length-1; i++) { const mx=(todosPontos[i].x+todosPontos[i+1].x)/2, my=(todosPontos[i].y+todosPontos[i+1].y)/2; ctx.quadraticCurveTo(todosPontos[i].x, todosPontos[i].y, mx, my); } ctx.lineTo(todosPontos[todosPontos.length-1].x, todosPontos[todosPontos.length-1].y); }
+    else if (linha.tipo === 'seta_zigzag') { ctx.moveTo(todosPontos[0].x, todosPontos[0].y); for (let i = 0; i < todosPontos.length-1; i++) { const p1=todosPontos[i], p2=todosPontos[i+1]; const ang=Math.atan2(p2.y-p1.y, p2.x-p1.x); const dist=Math.hypot(p2.x-p1.x, p2.y-p1.y); const n=Math.max(1,Math.floor(dist/15)); const stepX=(p2.x-p1.x)/(n*2), stepY=(p2.y-p1.y)/(n*2); const perpX=-Math.sin(ang)*6, perpY=Math.cos(ang)*6; for (let j=0; j<n; j++) { ctx.lineTo(p1.x+stepX*(j*2+1)+(j%2===0?perpX:-perpX), p1.y+stepY*(j*2+1)+(j%2===0?perpY:-perpY)); ctx.lineTo(p1.x+stepX*(j*2+2), p1.y+stepY*(j*2+2)); } } }
+    else { ctx.moveTo(todosPontos[0].x, todosPontos[0].y); for (let i=1; i<todosPontos.length; i++) ctx.lineTo(todosPontos[i].x, todosPontos[i].y); }
+    ctx.stroke();
+    const ultimo=todosPontos[todosPontos.length-1], penultimo=todosPontos[todosPontos.length-2];
+    const ang=Math.atan2(ultimo.y-penultimo.y, ultimo.x-penultimo.x); const tp=12;
+    ctx.setLineDash([]);
+    if (linha.tipo === 'bloqueio') { const perpX=-Math.sin(ang)*10, perpY=Math.cos(ang)*10; ctx.beginPath(); ctx.moveTo(ultimo.x-perpX, ultimo.y-perpY); ctx.lineTo(ultimo.x+perpX, ultimo.y+perpY); ctx.lineWidth=(linha.largura||2)+1; ctx.stroke(); }
+    else if (linha.tipo !== 'linha') { ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x-tp*Math.cos(ang-Math.PI/6), ultimo.y-tp*Math.sin(ang-Math.PI/6)); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x-tp*Math.cos(ang+Math.PI/6), ultimo.y-tp*Math.sin(ang+Math.PI/6)); ctx.stroke(); }
+    ctx.restore();
+}
+
+function estaNoObj(obj, pos) {
+    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x-obj.x, pos.y-obj.y) < 18;
+    if (!obj.pontos || obj.pontos.length < 2) return false;
+    for (let i=0; i<obj.pontos.length-1; i++) { const p1=obj.pontos[i], p2=obj.pontos[i+1]; const dx=p2.x-p1.x, dy=p2.y-p1.y, len2=dx*dx+dy*dy; if (len2===0) { if (Math.hypot(pos.x-p1.x, pos.y-p1.y)<10) return true; continue; } const t=Math.max(0,Math.min(1,((pos.x-p1.x)*dx+(pos.y-p1.y)*dy)/len2)); if (Math.hypot(pos.x-(p1.x+t*dx), pos.y-(p1.y+t*dy))<10) return true; }
+    return false;
+}
+
+function desenharSeleccao(ctx, obj) {
+    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    ctx.save(); ctx.strokeStyle = '#3B82F6'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+    if (simbolos.includes(obj.tipo)) { ctx.beginPath(); ctx.arc(obj.x, obj.y, 20*(obj.tamanho||1), 0, Math.PI*2); ctx.stroke(); }
+    else if (obj.pontos && obj.pontos.length >= 2) { ctx.beginPath(); ctx.moveTo(obj.pontos[0].x, obj.pontos[0].y); obj.pontos.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#3B82F6'; obj.pontos.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill(); }); }
+    ctx.restore();
+}
+
+function mostrarPainelTamanho(canvasId, obj) {
+    const painelAnterior = document.getElementById('painel_tamanho_' + canvasId); if (painelAnterior) painelAnterior.remove();
+    const canvas = document.getElementById(canvasId); const container = canvas.closest('.relative').parentElement;
+    const painel = document.createElement('div'); painel.id = 'painel_tamanho_' + canvasId;
+    painel.className = 'flex items-center gap-2 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs';
+    painel.innerHTML = `<span class="text-blue-600 font-medium">Tamanho:</span><button onclick="ajustarTamanho('${canvasId}', -0.2)" class="bg-white border border-blue-300 text-blue-600 px-2 py-1 rounded hover:bg-blue-50 font-bold">−</button><span id="valor_tamanho_${canvasId}" class="text-blue-700 font-medium w-8 text-center">${Math.round((obj.tamanho||1)*100)}%</span><button onclick="ajustarTamanho('${canvasId}', 0.2)" class="bg-white border border-blue-300 text-blue-600 px-2 py-1 rounded hover:bg-blue-50 font-bold">+</button><button onclick="fecharPainelTamanho('${canvasId}')" class="ml-2 text-gray-400 hover:text-gray-600">✕</button>`;
+    container.appendChild(painel);
+}
+
+function ajustarTamanho(canvasId, delta) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est || !est.objectoSeleccionado) return;
+    const obj = est.objectoSeleccionado; obj.tamanho = Math.max(0.3, Math.min(3, (obj.tamanho||1) + delta));
+    const valorEl = document.getElementById('valor_tamanho_' + canvasId); if (valorEl) valorEl.textContent = Math.round(obj.tamanho*100) + '%';
+    redesenhar(canvasId); desenharSeleccao(est.ctx, obj);
+}
+
+function fecharPainelTamanho(canvasId) {
+    const est = CANVAS_ESTADO[canvasId]; if (est) { est.objectoSeleccionado = null; redesenhar(canvasId); }
+    const painel = document.getElementById('painel_tamanho_' + canvasId); if (painel) painel.remove();
+}
+
+function definirFerramenta(canvasId, ferramenta) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    est.ferramenta = ferramenta;
+    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'not-allowed' : 'crosshair';
+    const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
+    if (toolbar) { toolbar.querySelectorAll('button[data-ferramenta]').forEach(btn => { const activo = btn.dataset.ferramenta === ferramenta; btn.className = btn.className.replace(/bg-orange-500 text-white|bg-gray-100 text-gray-700/g, '').trim(); btn.className += activo ? ' bg-orange-500 text-white' : ' bg-gray-100 text-gray-700'; }); }
+}
+
+function limparTudo(canvasId) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    est.objectos = []; est.contadores = { ataque: 1, defesa: 1 }; redesenhar(canvasId);
+}
+
+function desfazer(canvasId) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est || est.objectos.length === 0) return;
+    const u = est.objectos.pop();
+    if (u.tipo === 'jogador_ataque' && est.contadores.ataque > 1) est.contadores.ataque--;
+    if (u.tipo === 'jogador_defesa' && est.contadores.defesa > 1) est.contadores.defesa--;
+    redesenhar(canvasId);
+}
+
+function guardarDesenhoPasso(canvasId, passoId) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    const btn = document.getElementById('btn_guardar_' + passoId);
+    fetch(`/playbook/passos/${passoId}/desenho`, {
+        method: 'POST',
+        body: JSON.stringify({ dados: est.canvas.toDataURL('image/png') }),
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '' }
+    }).then(r => r.json()).then(data => {
+        if (data.sucesso && btn) {
+            btn.textContent = '✓ Guardado'; btn.classList.add('bg-green-500'); btn.classList.remove('bg-orange-500');
+            setTimeout(() => { btn.textContent = '💾 Guardar desenho'; btn.classList.remove('bg-green-500'); btn.classList.add('bg-orange-500'); }, 2500);
+        }
+    });
+}
+
+// Inicializar todos os canvas ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('canvas[id^="canvas_"]').forEach(c => {
+        inicializarDesenho(c.id);
+        setTimeout(() => definirFerramenta(c.id, 'jogador_ataque'), 200);
+    });
+});
+</script>
+
+{% endblock %}

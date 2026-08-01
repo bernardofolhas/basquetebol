@@ -1,175 +1,247 @@
-# ─────────────────────────────────────────────────────────────
-# ROUTER DE JOGOS
-# Gere o calendário de jogos, resultados e convocatórias
-# ─────────────────────────────────────────────────────────────
+from datetime import date
 
-from fastapi import APIRouter, Request, Depends, Form
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from template_config import Jinja2Templates
 from sqlalchemy.orm import Session
+
+from auth_deps import exigir_autenticacao, verificar_ou_negar_equipa
 from database import get_db
-from models.jogo import Jogo, Convocado
+from flash import set_flash
 from models.equipa import Equipa
 from models.jogador import Jogador
+from models.jogo import Convocado, Jogo, PlanoJogo
+from paths import TEMPLATES_DIR
+from services.pdf_service import renderizar_pdf
 
 router = APIRouter(prefix="/jogos")
-templates = Jinja2Templates(directory="../frontend/templates")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
-def obter_utilizador_atual(request: Request, db: Session):
-    from auth import verificar_token
-    from models.utilizador import Utilizador
-    token = request.session.get("token")
-    if not token:
-        return None
-    payload = verificar_token(token)
-    if not payload:
-        return None
-    return db.query(Utilizador).filter(
-        Utilizador.username == payload.get("sub")
-    ).first()
+def _obter_jogo(db: Session, jogo_id: int):
+    return db.query(Jogo).filter(Jogo.id == jogo_id).first()
 
 
-# ─────────────────────────────────────────
-# CALENDÁRIO DE JOGOS DE UMA EQUIPA
-# URL: GET /jogos/equipas/{equipa_id}
-# ─────────────────────────────────────────
+def _atualizar_campos_jogo(jogo: Jogo, data: str, hora: str, local: str,
+                            adversario: str, competicao: str, em_casa: str, observacoes: str) -> None:
+    jogo.data = date.fromisoformat(data)
+    jogo.hora = hora or None
+    jogo.local = local or None
+    jogo.adversario = adversario
+    jogo.competicao = competicao or None
+    jogo.em_casa = em_casa == "true"
+    jogo.observacoes = observacoes or None
+
+
 @router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
-def calendario_jogos(equipa_id: int, request: Request, db: Session = Depends(get_db)):
-    utilizador = obter_utilizador_atual(request, db)
-    if not utilizador:
-        return RedirectResponse(url="/login")
+def calendario_jogos(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
 
     equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
     if not equipa:
         return RedirectResponse(url="/equipas")
 
-    # Ordena os jogos por data
-    jogos = db.query(Jogo).filter(
-        Jogo.equipa_id == equipa_id
-    ).order_by(Jogo.data).all()
+    jogos = db.query(Jogo).filter(Jogo.equipa_id == equipa_id).order_by(Jogo.data).all()
 
     return templates.TemplateResponse(request, "jogos/calendario.html", {
         "utilizador": utilizador,
         "equipa": equipa,
-        "jogos": jogos
+        "jogos": jogos,
     })
 
 
-# ─────────────────────────────────────────
-# CRIAR JOGO
-# URL: POST /jogos/equipas/{equipa_id}/novo
-# ─────────────────────────────────────────
+@router.get("/equipas/{equipa_id}/pdf")
+def exportar_pdf_calendario_equipa(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas")
+    jogos = db.query(Jogo).filter(Jogo.equipa_id == equipa_id).order_by(Jogo.data, Jogo.hora).all()
+    pdf_bytes = renderizar_pdf(request, "jogos/calendario_pdf.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "jogos": jogos,
+        "hoje": date.today(),
+    })
+    nome = f"calendario_{equipa.nome}_{equipa.id}.pdf".replace(" ", "_")
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nome}"})
+
+
 @router.post("/equipas/{equipa_id}/novo")
 async def criar_jogo(
     equipa_id: int,
     request: Request,
     db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
     data: str = Form(...),
     hora: str = Form(""),
     local: str = Form(""),
     adversario: str = Form(...),
     competicao: str = Form(""),
     em_casa: str = Form("true"),
-    observacoes: str = Form("")
+    observacoes: str = Form(""),
 ):
-    utilizador = obter_utilizador_atual(request, db)
-    if not utilizador:
-        return RedirectResponse(url="/login")
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
 
-    from datetime import date
     jogo = Jogo(
         data=date.fromisoformat(data),
         hora=hora or None,
         local=local or None,
         adversario=adversario,
         competicao=competicao or None,
-        # em_casa vem como string "true" ou "false" do formulário
         em_casa=em_casa == "true",
         observacoes=observacoes or None,
-        equipa_id=equipa_id
+        equipa_id=equipa_id,
     )
-
     db.add(jogo)
     db.commit()
-
+    set_flash(request, f"Jogo contra '{adversario}' criado.")
     return RedirectResponse(url=f"/jogos/equipas/{equipa_id}", status_code=303)
 
 
-# ─────────────────────────────────────────
-# DETALHE DE UM JOGO
-# URL: GET /jogos/{jogo_id}
-# ─────────────────────────────────────────
 @router.get("/{jogo_id}", response_class=HTMLResponse)
-def detalhe_jogo(jogo_id: int, request: Request, db: Session = Depends(get_db)):
-    utilizador = obter_utilizador_atual(request, db)
-    if not utilizador:
-        return RedirectResponse(url="/login")
-
-    jogo = db.query(Jogo).filter(Jogo.id == jogo_id).first()
+def detalhe_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
     if not jogo:
         return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
 
-    # Jogadores da equipa para a convocatória
     jogadores = db.query(Jogador).filter(
         Jogador.equipa_id == jogo.equipa_id
     ).order_by(Jogador.nome).all()
-
-    # IDs dos jogadores já convocados
     convocados_ids = {c.jogador_id for c in jogo.convocados}
+    jogos_anteriores = db.query(Jogo).filter(
+        Jogo.equipa_id == jogo.equipa_id,
+        Jogo.id != jogo.id,
+        Jogo.data <= jogo.data,
+    ).order_by(Jogo.data.desc(), Jogo.id.desc()).limit(5).all()
 
     return templates.TemplateResponse(request, "jogos/detalhe.html", {
         "utilizador": utilizador,
         "jogo": jogo,
         "jogadores": jogadores,
-        "convocados_ids": convocados_ids
+        "convocados_ids": convocados_ids,
+        "jogos_anteriores": jogos_anteriores,
     })
 
 
-# ─────────────────────────────────────────
-# REGISTAR RESULTADO
-# URL: POST /jogos/{jogo_id}/resultado
-# ─────────────────────────────────────────
+@router.get("/{jogo_id}/editar", response_class=HTMLResponse)
+def form_editar_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+
+    return templates.TemplateResponse(request, "jogos/form.html", {
+        "utilizador": utilizador,
+        "jogo": jogo,
+        "modo": "editar",
+    })
+
+
+@router.post("/{jogo_id}/editar")
+async def editar_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    data: str = Form(...),
+    hora: str = Form(""),
+    local: str = Form(""),
+    adversario: str = Form(...),
+    competicao: str = Form(""),
+    em_casa: str = Form("true"),
+    observacoes: str = Form(""),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+
+    _atualizar_campos_jogo(jogo, data, hora, local, adversario, competicao, em_casa, observacoes)
+    db.commit()
+    set_flash(request, "Jogo atualizado.")
+    return RedirectResponse(url=f"/jogos/{jogo.id}", status_code=303)
+
+
+@router.post("/{jogo_id}/eliminar")
+async def eliminar_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+
+    equipa_id = jogo.equipa_id
+    plano = db.query(PlanoJogo).filter(PlanoJogo.jogo_id == jogo.id).first()
+    if plano:
+        db.delete(plano)
+    db.delete(jogo)
+    db.commit()
+    set_flash(request, "Jogo eliminado.")
+    return RedirectResponse(url=f"/jogos/equipas/{equipa_id}", status_code=303)
+
+
 @router.post("/{jogo_id}/resultado")
 async def registar_resultado(
     jogo_id: int,
     request: Request,
     db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
     pontos_nos: str = Form(""),
-    pontos_adversario: str = Form("")
+    pontos_adversario: str = Form(""),
 ):
-    utilizador = obter_utilizador_atual(request, db)
-    if not utilizador:
-        return RedirectResponse(url="/login")
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
 
-    jogo = db.query(Jogo).filter(Jogo.id == jogo_id).first()
-    if jogo:
-        jogo.pontos_nos = int(pontos_nos) if pontos_nos else None
-        jogo.pontos_adversario = int(pontos_adversario) if pontos_adversario else None
-        db.commit()
-
+    jogo.pontos_nos = int(pontos_nos) if pontos_nos else None
+    jogo.pontos_adversario = int(pontos_adversario) if pontos_adversario else None
+    db.commit()
+    set_flash(request, "Resultado registado.")
     return RedirectResponse(url=f"/jogos/{jogo_id}", status_code=303)
 
 
-# ─────────────────────────────────────────
-# GUARDAR CONVOCATÓRIA
-# URL: POST /jogos/{jogo_id}/convocatoria
-# ─────────────────────────────────────────
 @router.post("/{jogo_id}/convocatoria")
 async def guardar_convocatoria(
     jogo_id: int,
     request: Request,
     db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
     hora_encontro: str = Form(""),
     local_encontro: str = Form(""),
-    observacoes: str = Form("")
+    observacoes: str = Form(""),
 ):
-    utilizador = obter_utilizador_atual(request, db)
-    if not utilizador:
-        return RedirectResponse(url="/login")
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
 
-    # Lê os jogadores seleccionados manualmente
-    # porque são checkboxes com nome dinâmico
     dados = await request.form()
     jogadores_ids = [
         int(k.replace("jogador_", ""))
@@ -177,47 +249,89 @@ async def guardar_convocatoria(
         if k.startswith("jogador_")
     ]
 
-    # Remove convocados anteriores e recria
     db.query(Convocado).filter(Convocado.jogo_id == jogo_id).delete()
 
     for jogador_id in jogadores_ids:
-        convocado = Convocado(
+        jogador = db.query(Jogador).filter(Jogador.id == jogador_id).first()
+        if not jogador or jogador.equipa_id != jogo.equipa_id:
+            continue
+        db.add(Convocado(
             jogo_id=jogo_id,
             jogador_id=jogador_id,
             hora_encontro=hora_encontro or None,
             local_encontro=local_encontro or None,
-            observacoes=observacoes if observacoes and observacoes.strip() else None
-        )
-        db.add(convocado)
+            observacoes=observacoes if observacoes and observacoes.strip() else None,
+        ))
 
     db.commit()
+    set_flash(request, "Convocatória atualizada.")
     return RedirectResponse(url=f"/jogos/{jogo_id}", status_code=303)
 
 
-from models.jogo import Jogo, Convocado, PlanoJogo
+@router.post("/{jogo_id}/convocatoria/copiar/{origem_id}")
+async def copiar_convocatoria(
+    jogo_id: int,
+    origem_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Reutiliza a última convocatória da equipa sem obrigar a marcar jogadoras uma a uma."""
+    jogo = _obter_jogo(db, jogo_id)
+    origem = _obter_jogo(db, origem_id)
+    if not jogo or not origem or jogo.equipa_id != origem.equipa_id:
+        return RedirectResponse(url=f"/jogos/{jogo_id}", status_code=303)
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+
+    db.query(Convocado).filter(Convocado.jogo_id == jogo_id).delete()
+    for convocado in origem.convocados:
+        db.add(Convocado(
+            jogo_id=jogo.id,
+            jogador_id=convocado.jogador_id,
+            hora_encontro=convocado.hora_encontro,
+            local_encontro=convocado.local_encontro,
+            observacoes=convocado.observacoes,
+        ))
+    db.commit()
+    set_flash(request, f"Convocatória copiada de {origem.data}.")
+    return RedirectResponse(url=f"/jogos/{jogo_id}", status_code=303)
+
 
 @router.get("/{jogo_id}/plano", response_class=HTMLResponse)
-def pagina_plano_jogo(jogo_id: int, request: Request, db: Session = Depends(get_db)):
-    utilizador = obter_utilizador_atual(request, db)
-    if not utilizador:
-        return RedirectResponse(url="/login")
-    jogo = db.query(Jogo).filter(Jogo.id == jogo_id).first()
+def pagina_plano_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
     if not jogo:
         return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+
     jogadores = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).order_by(Jogador.nome).all()
     plano = db.query(PlanoJogo).filter(PlanoJogo.jogo_id == jogo_id).first()
+
     return templates.TemplateResponse(request, "jogos/plano_jogo.html", {
         "utilizador": utilizador,
         "jogo": jogo,
         "jogadores": jogadores,
-        "plano": plano
+        "plano": plano,
     })
 
+
 @router.post("/{jogo_id}/plano")
-async def guardar_plano_jogo(jogo_id: int, request: Request, db: Session = Depends(get_db)):
-    utilizador = obter_utilizador_atual(request, db)
-    if not utilizador:
-        return RedirectResponse(url="/login")
+async def guardar_plano_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+
     dados = await request.form()
 
     plano = db.query(PlanoJogo).filter(PlanoJogo.jogo_id == jogo_id).first()
@@ -225,16 +339,108 @@ async def guardar_plano_jogo(jogo_id: int, request: Request, db: Session = Depen
         plano = PlanoJogo(jogo_id=jogo_id)
         db.add(plano)
 
-    campos = ['rotacoes','chaves_ataque','chaves_defesa','movimentos_ofensivos',
-              'bloqueio_direto_lateral','bloqueio_direto_central','handoff',
-              'indiretos_entrada','indiretos_saida','bola_dentro','situacoes_especiais','reflexao']
-
-    for campo in campos:
+    campos_texto = [
+        "rotacoes", "chaves_ataque", "chaves_defesa", "movimentos_ofensivos",
+        "bloqueio_direto_lateral", "bloqueio_direto_central", "handoff",
+        "indiretos_entrada", "indiretos_saida", "bola_dentro",
+        "situacoes_especiais", "reflexao",
+    ]
+    for campo in campos_texto:
         setattr(plano, campo, dados.get(campo) or None)
 
     for i in range(1, 6):
-        val = dados.get(f'titular_{i}')
-        setattr(plano, f'titular_{i}', int(val) if val else None)
+        val = dados.get(f"titular_{i}")
+        setattr(plano, f"titular_{i}", int(val) if val else None)
 
     db.commit()
+    set_flash(request, "Plano de jogo guardado.")
     return RedirectResponse(url=f"/jogos/{jogo_id}/plano", status_code=303)
+
+
+@router.get("/{jogo_id}/convocatoria/print", response_class=HTMLResponse)
+def imprimir_convocatoria(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+
+    return templates.TemplateResponse(request, "jogos/convocatoria_print.html", {
+        "utilizador": utilizador,
+        "jogo": jogo,
+        "jogadores_convocados": [c.jogador for c in jogo.convocados],
+        "identidade": getattr(request.state, "identidade_clube", {}),
+    })
+
+
+@router.get("/{jogo_id}/convocatoria/pdf")
+def exportar_pdf_convocatoria(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    pdf_bytes = renderizar_pdf(request, "jogos/convocatoria_print.html", {
+        "utilizador": utilizador,
+        "jogo": jogo,
+        "jogadores_convocados": [c.jogador for c in jogo.convocados],
+        "modo_pdf": True,
+    })
+    nome = f"convocatoria_{jogo.equipa.nome}_{jogo.data}.pdf".replace(" ", "_")
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nome}"})
+
+
+@router.get("/{jogo_id}/plano/print", response_class=HTMLResponse)
+def imprimir_plano_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+
+    jogadores = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).all()
+    jogadores_dict = {j.id: j for j in jogadores}
+
+    return templates.TemplateResponse(request, "jogos/plano_jogo_print.html", {
+        "utilizador": utilizador,
+        "jogo": jogo,
+        "plano": jogo.plano,
+        "jogadores_dict": jogadores_dict,
+        "identidade": getattr(request.state, "identidade_clube", {}),
+    })
+
+
+@router.get("/{jogo_id}/plano/pdf")
+def exportar_pdf_plano_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    jogadores = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).all()
+    jogadores_dict = {j.id: j for j in jogadores}
+    pdf_bytes = renderizar_pdf(request, "jogos/plano_jogo_print.html", {
+        "utilizador": utilizador,
+        "jogo": jogo,
+        "plano": jogo.plano,
+        "jogadores_dict": jogadores_dict,
+        "modo_pdf": True,
+    })
+    nome = f"plano_jogo_{jogo.equipa.nome}_{jogo.adversario}_{jogo.data}.pdf".replace(" ", "_")
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nome}"})

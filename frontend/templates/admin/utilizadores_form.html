@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% if modo == "editar" %}
+    {% set titulo_pagina = "Editar Utilizador" %}
+    {% set acao_form = "/admin/utilizadores/" ~ utilizador_editar.id ~ "/editar" %}
+{% else %}
+    {% set titulo_pagina = "Novo Utilizador" %}
+    {% set acao_form = "/admin/utilizadores/novo" %}
+{% endif %}
+
+{% block titulo %}{{ titulo_pagina }}{% endblock %}
+
+{% block conteudo %}
+
+<div class="mb-6">
+    <a href="/admin/utilizadores" class="text-orange-500 hover:text-orange-600 text-sm">
+        ← Voltar aos utilizadores
+    </a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">{{ titulo_pagina }}</h1>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 max-w-2xl">
+    {% if erro %}
+    <div class="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-4">
+        {{ erro }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ acao_form }}">
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
+            <input type="text" name="nome" required
+                   value="{{ utilizador_editar.nome if modo == 'editar' else '' }}"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                <input type="text" name="username" required
+                       value="{{ utilizador_editar.username if modo == 'editar' else '' }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Password {% if modo != "editar" %}*{% endif %}
+                </label>
+                <input type="password" name="password" {% if modo != "editar" %}required{% endif %}
+                       placeholder="{% if modo == 'editar' %}Deixa vazio para manter a atual{% endif %}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+            <input type="email" name="email" required
+                   value="{{ utilizador_editar.email if modo == 'editar' else '' }}"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Perfil *</label>
+                <select name="perfil" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Seleciona um perfil</option>
+                    {% for p in perfis %}
+                    <option value="{{ p.value }}"
+                        {% if modo == "editar" and utilizador_editar.perfil.value == p.value %}selected{% endif %}>
+                        {{ p.value }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Treinador associado</label>
+                <select name="treinador_id"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    <option value="">Nenhum</option>
+                    {% for treinador in treinadores %}
+                    <option value="{{ treinador.id }}"
+                        {% if modo == "editar" and utilizador_editar.treinador_id == treinador.id %}selected{% endif %}>
+                        {{ treinador.nome }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        {% if modo == "editar" %}
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+            <select name="ativo"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <option value="true" {% if utilizador_editar.ativo %}selected{% endif %}>Ativo</option>
+                <option value="false" {% if not utilizador_editar.ativo %}selected{% endif %}>Inativo</option>
+            </select>
+        </div>
+        {% endif %}
+
+        <div class="flex gap-3">
+            <button type="submit"
+                    class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+                {% if modo == "editar" %}Guardar Alterações{% else %}Criar Utilizador{% endif %}
+            </button>
+
+            <a href="/admin/utilizadores"
+               class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition">
+                Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

@@ -1,0 +1,2846 @@
+import calendar
+import re
+from datetime import date, datetime, timedelta
+
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from template_config import Jinja2Templates
+from sqlalchemy.orm import Session
+
+from auth import verificar_perfil
+from auth_deps import exigir_autenticacao, exigir_coordenacao
+from flash import set_flash
+from database import get_db
+from horarios import hora_eh_anterior, hora_valida, normalizar_hora
+from models.atividade import Atividade
+from models.atribuicao_espaco_semanal import (
+    AtribuicaoEspacoSemanal,
+    EstadoAtribuicaoEspacoEnum,
+    OrigemAtribuicaoEspacoEnum,
+    TipoOcupacaoEspacoEnum,
+)
+from models.equipa import Equipa
+from models.espaco_treino import EspacoTreino, TipoEspacoTreinoEnum
+from models.jogo import Jogo
+from models.historico_planeamento import HistoricoPlaneamentoClube
+from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
+from models.planeamento_clube import (
+    EventoPlaneamentoClube,
+    OrigemEventoPlaneamentoClubeEnum,
+    PlaneamentoClubeAnual,
+    PlaneamentoClubeMensal,
+    PlanoSemanalClube,
+    TipoEventoPlaneamentoClubeEnum,
+)
+from models.treinador import Treinador
+from paths import TEMPLATES_DIR
+from services.operacao_clube_service import (
+    construir_mapa_espacos_semanal,
+    obter_resumo_operacional_mensal,
+)
+from services.auditoria_service import registar_auditoria
+from services.agenda_service import metadados_tipo_agenda, tipos_agenda_formulario
+from services.historico_planeamento_service import registar_historico_planeamento
+from services.planeamento_integrado_service import obter_dashboard_planeamento_anual
+from services.pdf_service import renderizar_pdf
+from services.sincronizacao_ui import (
+    construir_resumo_sincronizacao_texto,
+    formatar_data_hora,
+    preparar_sessoes_para_ui,
+)
+
+router = APIRouter(prefix="/planeamento-clube")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+MENSAGENS_ERRO_ELIMINACAO = {
+    "anual_com_mensais": "Não é possível eliminar este planeamento anual porque existem planeamentos mensais associados.",
+    "anual_com_eventos": "Não é possível eliminar este planeamento anual porque existem eventos globais associados diretamente.",
+    "mensal_com_semanais": "Não é possível eliminar este planeamento mensal porque existem planos semanais associados.",
+    "mensal_com_eventos": "Não é possível eliminar este planeamento mensal porque existem eventos globais associados diretamente.",
+    "semanal_com_dependencias": "Não é possível eliminar este plano semanal porque existem eventos ou atribuições de espaço associados.",
+    "espaco_com_atribuicoes": "Não é possível eliminar este espaço porque existem atribuições semanais associadas.",
+}
+
+ESTADOS_PLANEAMENTO = {"rascunho", "ativo"}
+
+
+def _obter_conflitos_publicacao(db: Session, semanal: PlanoSemanalClube) -> list[dict]:
+    atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.plano_semanal_id == semanal.id,
+        AtribuicaoEspacoSemanal.estado != EstadoAtribuicaoEspacoEnum.cancelado,
+    ).all()
+    return construir_mapa_espacos_semanal(atribuicoes)["conflitos"]
+
+
+def _normalizar_estado_planeamento(estado: str | None) -> str:
+    valor = (estado or "rascunho").strip().lower()
+    if valor not in ESTADOS_PLANEAMENTO:
+        raise ValueError("O estado do planeamento deve ser rascunho ou ativo.")
+    return valor
+
+
+def _converter_data(valor: str | None, nome: str) -> date:
+    try:
+        return date.fromisoformat((valor or "").strip())
+    except (TypeError, ValueError):
+        raise ValueError(f"{nome} inválida. Indica uma data válida.") from None
+
+
+def _validar_intervalo_datas(
+    data_inicio: str | None,
+    data_fim: str | None,
+    nome: str,
+) -> tuple[date, date]:
+    inicio = _converter_data(data_inicio, f"Data de início do {nome}")
+    fim = _converter_data(data_fim, f"Data de fim do {nome}")
+    if inicio > fim:
+        raise ValueError(f"A data de início do {nome} não pode ser posterior à data de fim.")
+    return inicio, fim
+
+
+def _validar_ano_mes(ano: str | int, mes: str | int) -> tuple[int, int]:
+    try:
+        ano_convertido = int(ano)
+        mes_convertido = int(mes)
+    except (TypeError, ValueError):
+        raise ValueError("Ano e mês têm de ser valores numéricos válidos.") from None
+    if ano_convertido < 1 or ano_convertido > 9999:
+        raise ValueError("O ano indicado não é válido.")
+    if mes_convertido < 1 or mes_convertido > 12:
+        raise ValueError("O mês indicado deve estar entre 1 e 12.")
+    return ano_convertido, mes_convertido
+
+
+def _normalizar_horas_evento(
+    hora_inicio: str | None,
+    hora_fim: str | None,
+) -> tuple[str | None, str | None]:
+    inicio = normalizar_hora(hora_inicio) if hora_inicio else None
+    fim = normalizar_hora(hora_fim) if hora_fim else None
+    if hora_inicio and inicio is None:
+        raise ValueError("A hora de início não é válida. Usa o formato HH:MM.")
+    if hora_fim and fim is None:
+        raise ValueError("A hora de término não é válida. Usa o formato HH:MM.")
+    if inicio and fim and not hora_eh_anterior(inicio, fim):
+        raise ValueError("A hora de início deve ser anterior à hora de término.")
+    return inicio, fim
+
+
+def _normalizar_enum(valor: str | None, enum_cls, nome: str) -> str:
+    valor_normalizado = (valor or "").strip()
+    permitidos = {item.value for item in enum_cls}
+    if valor_normalizado not in permitidos:
+        opcoes = ", ".join(sorted(permitidos))
+        raise ValueError(f"{nome} inválido. Valores permitidos: {opcoes}.")
+    return valor_normalizado
+
+
+def _normalizar_capacidade(capacidade: str | int | None) -> int | None:
+    if capacidade in (None, ""):
+        return None
+    try:
+        valor = int(capacidade)
+    except (TypeError, ValueError):
+        raise ValueError("A capacidade deve ser um número inteiro.") from None
+    if valor < 1:
+        raise ValueError("A capacidade deve ser superior a zero.")
+    return valor
+
+
+def _converter_id(valor: str | int | None, nome: str, *, obrigatorio: bool = False) -> int | None:
+    if valor in (None, ""):
+        if obrigatorio:
+            raise ValueError(f"{nome} é obrigatório.")
+        return None
+    try:
+        convertido = int(valor)
+    except (TypeError, ValueError):
+        raise ValueError(f"{nome} inválido.") from None
+    if convertido < 1:
+        raise ValueError(f"{nome} inválido.")
+    return convertido
+
+
+def _responder_pdf(request: Request, nome_template: str, contexto: dict, nome_ficheiro: str) -> Response:
+    """Renderiza um template de impressão como PDF A4."""
+    pdf_bytes = renderizar_pdf(request, nome_template, contexto)
+    nome_seguro = re.sub(r"[^A-Za-z0-9._-]+", "_", nome_ficheiro)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={nome_seguro}"},
+    )
+
+
+
+
+def _obter_estado_visual_plano_semanal(semanal: PlanoSemanalClube) -> dict[str, str]:
+    """Traduz o estado do plano semanal para um badge simples."""
+    if semanal.estado == "ativo":
+        return {"label": "Ativo", "classes": "bg-emerald-100 text-emerald-800"}
+    return {"label": "Rascunho", "classes": "bg-amber-100 text-amber-800"}
+
+
+def _formatar_intervalo_calendario(hora_inicio: str | None, hora_fim: str | None) -> str:
+    """Gera um texto curto de horário para os cartões do calendário."""
+    if hora_inicio and hora_fim:
+        return f"{hora_inicio}-{hora_fim}"
+    if hora_inicio:
+        return hora_inicio
+    if hora_fim:
+        return f"até {hora_fim}"
+    return "Dia inteiro"
+
+
+def _listar_eventos_ordenados(db: Session):
+    """Obtém os eventos do planeamento global ordenados por data e hora."""
+    return db.query(EventoPlaneamentoClube).order_by(
+        EventoPlaneamentoClube.data.desc(),
+        EventoPlaneamentoClube.hora_inicio.desc(),
+    ).all()
+
+
+def _obter_contexto_form_evento(db: Session):
+    """Reúne dados auxiliares para o formulário de evento."""
+    return {
+        "tipos_evento": TipoEventoPlaneamentoClubeEnum,
+        "tipos_evento_agenda": tipos_agenda_formulario(),
+        "origens_evento": OrigemEventoPlaneamentoClubeEnum,
+        "planeamentos_anuais": db.query(PlaneamentoClubeAnual).order_by(PlaneamentoClubeAnual.data_inicio.desc()).all(),
+        "planeamentos_mensais": db.query(PlaneamentoClubeMensal).order_by(
+            PlaneamentoClubeMensal.ano.desc(),
+            PlaneamentoClubeMensal.mes.desc(),
+        ).all(),
+        "planos_semanais": db.query(PlanoSemanalClube).order_by(PlanoSemanalClube.data_inicio.desc()).all(),
+        "equipas": db.query(Equipa).order_by(Equipa.nome).all(),
+        "espacos": db.query(EspacoTreino).order_by(EspacoTreino.nome).all(),
+        "treinadores": db.query(Treinador).order_by(Treinador.nome).all(),
+        "jogos": db.query(Jogo).order_by(Jogo.data.desc()).all(),
+        "atividades": db.query(Atividade).order_by(Atividade.data.desc()).all(),
+    }
+
+
+def _obter_contexto_form_espaco():
+    """Reúne dados auxiliares para o formulário de espaço."""
+    return {
+        "tipos_espaco": TipoEspacoTreinoEnum,
+    }
+
+
+def _obter_contexto_form_anual():
+    """Reúne dados auxiliares para o formulário anual."""
+    return {}
+
+
+def _obter_contexto_form_mensal():
+    """Reúne dados auxiliares para o formulário mensal."""
+    return {
+        "estados_mensal": ["rascunho", "ativo"],
+    }
+
+
+def _obter_contexto_form_semanal():
+    """Reúne dados auxiliares para o formulário semanal."""
+    return {
+        "estados_semanal": ["rascunho", "ativo"],
+    }
+
+
+def _obter_contexto_form_atribuicao(db: Session, semanal_id: int | None = None):
+    """Reúne dados auxiliares para o formulário de atribuição semanal."""
+    query_semanais = db.query(PlanoSemanalClube).order_by(PlanoSemanalClube.data_inicio.desc())
+    if semanal_id:
+        query_semanais = query_semanais.filter(PlanoSemanalClube.id == semanal_id)
+
+    return {
+        "tipos_ocupacao": TipoOcupacaoEspacoEnum,
+        "estados_atribuicao": EstadoAtribuicaoEspacoEnum,
+        "origens_atribuicao": OrigemAtribuicaoEspacoEnum,
+        "espacos": db.query(EspacoTreino).order_by(EspacoTreino.nome).all(),
+        "equipas": db.query(Equipa).order_by(Equipa.nome).all(),
+        "eventos_globais": db.query(EventoPlaneamentoClube).order_by(
+            EventoPlaneamentoClube.data.desc(),
+            EventoPlaneamentoClube.hora_inicio.desc(),
+        ).all(),
+        "planos_semanais": query_semanais.all(),
+    }
+
+
+def _criar_espaco(
+    nome: str,
+    tipo: str,
+    localizacao: str,
+    capacidade: str,
+    ativo: str,
+    observacoes: str,
+):
+    """Constrói um espaço de treino a partir do formulário."""
+    return EspacoTreino(
+        nome=nome,
+        tipo=_normalizar_enum(tipo, TipoEspacoTreinoEnum, "Tipo de espaço"),
+        localizacao=localizacao or None,
+        capacidade=_normalizar_capacidade(capacidade),
+        ativo=ativo == "true",
+        observacoes=observacoes or None,
+    )
+
+
+def _criar_planeamento_anual(
+    epoca: str,
+    titulo: str,
+    data_inicio: str,
+    data_fim: str,
+    objetivos_gerais: str,
+    observacoes: str,
+    ativo: str,
+):
+    """Constrói um planeamento anual a partir do formulário."""
+    inicio, fim = _validar_intervalo_datas(data_inicio, data_fim, "planeamento anual")
+    return PlaneamentoClubeAnual(
+        epoca=epoca,
+        titulo=titulo,
+        data_inicio=inicio,
+        data_fim=fim,
+        objetivos_gerais=objetivos_gerais or None,
+        observacoes=observacoes or None,
+        ativo=ativo == "true",
+    )
+
+
+def _atualizar_planeamento_anual(
+    planeamento: PlaneamentoClubeAnual,
+    epoca: str,
+    titulo: str,
+    data_inicio: str,
+    data_fim: str,
+    objetivos_gerais: str,
+    observacoes: str,
+    ativo: str,
+):
+    """Actualiza os campos editáveis de um planeamento anual."""
+    inicio, fim = _validar_intervalo_datas(data_inicio, data_fim, "planeamento anual")
+    planeamento.epoca = epoca
+    planeamento.titulo = titulo
+    planeamento.data_inicio = inicio
+    planeamento.data_fim = fim
+    planeamento.objetivos_gerais = objetivos_gerais or None
+    planeamento.observacoes = observacoes or None
+    planeamento.ativo = ativo == "true"
+
+
+def _criar_planeamento_mensal(
+    anual_id: int,
+    ano: str,
+    mes: str,
+    titulo: str,
+    objetivos_mes: str,
+    observacoes: str,
+    estado: str,
+):
+    """Constrói um planeamento mensal a partir do formulário."""
+    ano_convertido, mes_convertido = _validar_ano_mes(ano, mes)
+    return PlaneamentoClubeMensal(
+        planeamento_anual_id=anual_id,
+        ano=ano_convertido,
+        mes=mes_convertido,
+        titulo=titulo,
+        objetivos_mes=objetivos_mes or None,
+        observacoes=observacoes or None,
+        estado=_normalizar_estado_planeamento(estado),
+    )
+
+
+def _atualizar_planeamento_mensal(
+    mensal: PlaneamentoClubeMensal,
+    ano: str,
+    mes: str,
+    titulo: str,
+    objetivos_mes: str,
+    observacoes: str,
+    estado: str,
+):
+    """Actualiza os campos editáveis de um planeamento mensal."""
+    ano_convertido, mes_convertido = _validar_ano_mes(ano, mes)
+    mensal.ano = ano_convertido
+    mensal.mes = mes_convertido
+    mensal.titulo = titulo
+    mensal.objetivos_mes = objetivos_mes or None
+    mensal.observacoes = observacoes or None
+    mensal.estado = _normalizar_estado_planeamento(estado)
+
+
+def _criar_plano_semanal_modelo(
+    mensal_id: int,
+    titulo: str,
+    data_inicio: str,
+    data_fim: str,
+    observacoes: str,
+    estado: str,
+):
+    """Constrói um plano semanal a partir do formulário."""
+    inicio, fim = _validar_intervalo_datas(data_inicio, data_fim, "plano semanal")
+    return PlanoSemanalClube(
+        planeamento_mensal_id=mensal_id,
+        titulo=titulo,
+        data_inicio=inicio,
+        data_fim=fim,
+        observacoes=observacoes or None,
+        estado=_normalizar_estado_planeamento(estado),
+    )
+
+
+def _atualizar_plano_semanal_modelo(
+    semanal: PlanoSemanalClube,
+    titulo: str,
+    data_inicio: str,
+    data_fim: str,
+    observacoes: str,
+    estado: str,
+):
+    """Actualiza os campos editáveis de um plano semanal."""
+    inicio, fim = _validar_intervalo_datas(data_inicio, data_fim, "plano semanal")
+    semanal.titulo = titulo
+    semanal.data_inicio = inicio
+    semanal.data_fim = fim
+    semanal.observacoes = observacoes or None
+    semanal.estado = _normalizar_estado_planeamento(estado)
+
+
+def _atualizar_espaco(
+    espaco: EspacoTreino,
+    nome: str,
+    tipo: str,
+    localizacao: str,
+    capacidade: str,
+    ativo: str,
+    observacoes: str,
+):
+    """Actualiza os campos editáveis de um espaço."""
+    espaco.nome = nome
+    espaco.tipo = _normalizar_enum(tipo, TipoEspacoTreinoEnum, "Tipo de espaço")
+    espaco.localizacao = localizacao or None
+    espaco.capacidade = _normalizar_capacidade(capacidade)
+    espaco.ativo = ativo == "true"
+    espaco.observacoes = observacoes or None
+
+
+def _preparar_atribuicao_form(
+    db: Session,
+    utilizador,
+    modo: str,
+    semanal: PlanoSemanalClube | None,
+    atribuicao: AtribuicaoEspacoSemanal | None,
+    erro: str | None = None,
+    dados_formulario: dict | None = None,
+):
+    """Monta o contexto comum do formulário de atribuição."""
+    contexto = _obter_contexto_form_atribuicao(db, semanal.id if semanal else None)
+    contexto.update({
+        "utilizador": utilizador,
+        "modo": modo,
+        "semanal": semanal,
+        "atribuicao": atribuicao,
+        "erro": erro,
+        "dados_formulario": dados_formulario or {},
+    })
+    return contexto
+
+
+def _validar_dados_atribuicao(
+    semanal: PlanoSemanalClube,
+    data_atribuicao: str,
+    hora_inicio: str,
+    hora_fim: str,
+):
+    """Valida a coerência base dos campos temporais da atribuição."""
+    if not hora_valida(hora_inicio, permitir_vazio=False) or not hora_valida(hora_fim, permitir_vazio=False):
+        return "As horas devem estar no formato HH:MM."
+
+    hora_inicio_normalizada = normalizar_hora(hora_inicio, permitir_vazio=False)
+    hora_fim_normalizada = normalizar_hora(hora_fim, permitir_vazio=False)
+    if not hora_eh_anterior(hora_inicio_normalizada, hora_fim_normalizada):
+        return "A hora de fim deve ser posterior à hora de início."
+
+    try:
+        data_convertida = date.fromisoformat(data_atribuicao)
+    except (TypeError, ValueError):
+        return "A data da atribuição não é válida."
+    if data_convertida < semanal.data_inicio or data_convertida > semanal.data_fim:
+        return "A data da atribuição tem de estar dentro do intervalo do plano semanal."
+
+    return None
+
+
+def _obter_atribuicao_conflitante(
+    db: Session,
+    espaco_id: int,
+    data_atribuicao: date,
+    hora_inicio: str,
+    hora_fim: str,
+    atribuicao_id_excluir: int | None = None,
+):
+    """Procura outra atribuição activa sobreposta no mesmo espaço e data."""
+    query = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.espaco_id == espaco_id,
+        AtribuicaoEspacoSemanal.data == data_atribuicao,
+        AtribuicaoEspacoSemanal.estado != EstadoAtribuicaoEspacoEnum.cancelado,
+        AtribuicaoEspacoSemanal.hora_inicio < hora_fim,
+        AtribuicaoEspacoSemanal.hora_fim > hora_inicio,
+    )
+
+    if atribuicao_id_excluir:
+        query = query.filter(AtribuicaoEspacoSemanal.id != atribuicao_id_excluir)
+
+    return query.order_by(AtribuicaoEspacoSemanal.hora_inicio).first()
+
+
+def _criar_atribuicao(
+    semanal_id: int,
+    espaco_id: str,
+    equipa_id: str,
+    evento_id: str,
+    data_atribuicao: str,
+    hora_inicio: str,
+    hora_fim: str,
+    tipo_ocupacao: str,
+    estado: str,
+    origem: str,
+    observacoes: str,
+):
+    """Constrói uma atribuição semanal a partir do formulário."""
+    hora_inicio = normalizar_hora(hora_inicio, permitir_vazio=False)
+    hora_fim = normalizar_hora(hora_fim, permitir_vazio=False)
+    return AtribuicaoEspacoSemanal(
+        plano_semanal_id=semanal_id,
+        espaco_id=_converter_id(espaco_id, "Espaço", obrigatorio=True),
+        equipa_id=_converter_id(equipa_id, "Equipa"),
+        evento_id=_converter_id(evento_id, "Evento"),
+        data=_converter_data(data_atribuicao, "Data da atribuição"),
+        hora_inicio=hora_inicio,
+        hora_fim=hora_fim,
+        tipo_ocupacao=_normalizar_enum(tipo_ocupacao, TipoOcupacaoEspacoEnum, "Tipo de ocupação"),
+        estado=_normalizar_enum(estado, EstadoAtribuicaoEspacoEnum, "Estado da atribuição"),
+        origem=_normalizar_enum(origem, OrigemAtribuicaoEspacoEnum, "Origem da atribuição"),
+        observacoes=observacoes or None,
+    )
+
+
+def _atualizar_atribuicao(
+    atribuicao: AtribuicaoEspacoSemanal,
+    semanal_id: int,
+    espaco_id: str,
+    equipa_id: str,
+    evento_id: str,
+    data_atribuicao: str,
+    hora_inicio: str,
+    hora_fim: str,
+    tipo_ocupacao: str,
+    estado: str,
+    origem: str,
+    observacoes: str,
+):
+    """Actualiza os campos editáveis de uma atribuição semanal."""
+    hora_inicio = normalizar_hora(hora_inicio, permitir_vazio=False)
+    hora_fim = normalizar_hora(hora_fim, permitir_vazio=False)
+    atribuicao.plano_semanal_id = semanal_id
+    atribuicao.espaco_id = _converter_id(espaco_id, "Espaço", obrigatorio=True)
+    atribuicao.equipa_id = _converter_id(equipa_id, "Equipa")
+    atribuicao.evento_id = _converter_id(evento_id, "Evento")
+    atribuicao.data = _converter_data(data_atribuicao, "Data da atribuição")
+    atribuicao.hora_inicio = hora_inicio
+    atribuicao.hora_fim = hora_fim
+    atribuicao.tipo_ocupacao = _normalizar_enum(tipo_ocupacao, TipoOcupacaoEspacoEnum, "Tipo de ocupação")
+    atribuicao.estado = _normalizar_enum(estado, EstadoAtribuicaoEspacoEnum, "Estado da atribuição")
+    atribuicao.origem = _normalizar_enum(origem, OrigemAtribuicaoEspacoEnum, "Origem da atribuição")
+    atribuicao.observacoes = observacoes or None
+
+
+def _criar_evento_manual(
+    tipo: str,
+    titulo: str,
+    descricao: str,
+    data_evento: str,
+    hora_inicio: str,
+    hora_fim: str,
+    planeamento_anual_id: str,
+    planeamento_mensal_id: str,
+    plano_semanal_id: str,
+    equipa_id: str,
+    espaco_id: str,
+    treinador_id: str,
+    aplica_a_todas_equipas: str,
+    observacoes: str,
+):
+    """Constrói um evento manual a partir do formulário."""
+    hora_inicio, hora_fim = _normalizar_horas_evento(hora_inicio, hora_fim)
+    return EventoPlaneamentoClube(
+        tipo=_normalizar_enum(tipo, TipoEventoPlaneamentoClubeEnum, "Tipo de evento"),
+        titulo=titulo,
+        descricao=descricao or None,
+        data=_converter_data(data_evento, "Data do evento"),
+        hora_inicio=hora_inicio,
+        hora_fim=hora_fim,
+        planeamento_anual_id=_converter_id(planeamento_anual_id, "Planeamento anual"),
+        planeamento_mensal_id=_converter_id(planeamento_mensal_id, "Planeamento mensal"),
+        plano_semanal_id=_converter_id(plano_semanal_id, "Plano semanal"),
+        equipa_id=_converter_id(equipa_id, "Equipa"),
+        espaco_id=_converter_id(espaco_id, "Espaço"),
+        treinador_id=_converter_id(treinador_id, "Treinador"),
+        aplica_a_todas_equipas=aplica_a_todas_equipas == "true",
+        origem=OrigemEventoPlaneamentoClubeEnum.manual,
+        observacoes=observacoes or None,
+    )
+
+
+def _atualizar_evento(
+    evento: EventoPlaneamentoClube,
+    tipo: str,
+    titulo: str,
+    descricao: str,
+    data_evento: str,
+    hora_inicio: str,
+    hora_fim: str,
+    planeamento_anual_id: str,
+    planeamento_mensal_id: str,
+    plano_semanal_id: str,
+    equipa_id: str,
+    espaco_id: str,
+    treinador_id: str,
+    aplica_a_todas_equipas: str,
+    observacoes: str,
+):
+    """Actualiza os campos editáveis de um evento."""
+    hora_inicio, hora_fim = _normalizar_horas_evento(hora_inicio, hora_fim)
+    evento.tipo = _normalizar_enum(tipo, TipoEventoPlaneamentoClubeEnum, "Tipo de evento")
+    evento.titulo = titulo
+    evento.descricao = descricao or None
+    evento.data = _converter_data(data_evento, "Data do evento")
+    evento.hora_inicio = hora_inicio
+    evento.hora_fim = hora_fim
+    evento.planeamento_anual_id = _converter_id(planeamento_anual_id, "Planeamento anual")
+    evento.planeamento_mensal_id = _converter_id(planeamento_mensal_id, "Planeamento mensal")
+    evento.plano_semanal_id = _converter_id(plano_semanal_id, "Plano semanal")
+    evento.equipa_id = _converter_id(equipa_id, "Equipa")
+    evento.espaco_id = _converter_id(espaco_id, "Espaço")
+    evento.treinador_id = _converter_id(treinador_id, "Treinador")
+    evento.aplica_a_todas_equipas = aplica_a_todas_equipas == "true"
+    evento.observacoes = observacoes or None
+
+
+def _obter_titulo_jogo(jogo: Jogo) -> str:
+    """Gera um título simples a partir de um jogo."""
+    nome_equipa = jogo.equipa.nome if jogo.equipa else "Equipa"
+    return f"Jogo {nome_equipa} vs {jogo.adversario}"
+
+
+def _sincronizar_equipas_evento(db: Session, evento: EventoPlaneamentoClube, equipas_ids: list[str]):
+    """Sincroniza as equipas associadas ao evento e mantém o campo legado coerente."""
+    if evento.aplica_a_todas_equipas:
+        evento.equipas = []
+        evento.equipa_id = None
+        return
+
+    ids_unicos = []
+    for equipa_id in equipas_ids:
+        if equipa_id and equipa_id.isdigit():
+            ids_unicos.append(int(equipa_id))
+    ids_unicos = list(dict.fromkeys(ids_unicos))
+
+    if ids_unicos:
+        evento.equipas = db.query(Equipa).filter(Equipa.id.in_(ids_unicos)).order_by(Equipa.nome).all()
+        evento.equipa_id = ids_unicos[0]
+    else:
+        evento.equipas = []
+        evento.equipa_id = None
+
+
+def _conflitos_evento(db: Session, evento: EventoPlaneamentoClube) -> list[str]:
+    """Deteta sobreposições operacionais de equipa, treinador e espaço."""
+    if not evento.hora_inicio or not evento.hora_fim:
+        return []
+    query = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.data == evento.data)
+    if evento.id:
+        query = query.filter(EventoPlaneamentoClube.id != evento.id)
+    equipas_evento = {equipa.id for equipa in evento.equipas}
+    if evento.equipa_id:
+        equipas_evento.add(evento.equipa_id)
+    conflitos = []
+    for existente in query.all():
+        if not existente.hora_inicio or not existente.hora_fim:
+            continue
+        if evento.hora_inicio >= existente.hora_fim or evento.hora_fim <= existente.hora_inicio:
+            continue
+        motivos = []
+        equipas_existente = {equipa.id for equipa in existente.equipas}
+        if existente.equipa_id:
+            equipas_existente.add(existente.equipa_id)
+        if evento.aplica_a_todas_equipas or existente.aplica_a_todas_equipas or equipas_evento.intersection(equipas_existente):
+            motivos.append("equipa")
+        if evento.treinador_id and evento.treinador_id == existente.treinador_id:
+            motivos.append("treinador")
+        if evento.espaco_id and evento.espaco_id == existente.espaco_id:
+            motivos.append("espaço")
+        if motivos:
+            conflitos.append(f"{existente.titulo} ({', '.join(motivos)})")
+    return conflitos
+
+
+def _evento_visivel_para_equipa(evento: EventoPlaneamentoClube, equipa_id: int) -> bool:
+    """Indica se um evento global deve ser apresentado no contexto de uma equipa."""
+    if evento.aplica_a_todas_equipas:
+        return True
+
+    if evento.equipa_id == equipa_id:
+        return True
+
+    return any(equipa.id == equipa_id for equipa in evento.equipas)
+
+
+def _tipo_evento_gera_sessao(evento: EventoPlaneamentoClube) -> bool:
+    """Indica se o evento deve originar uma sessão operacional de equipa."""
+    return evento.tipo in {
+        TipoEventoPlaneamentoClubeEnum.treino_equipa,
+        TipoEventoPlaneamentoClubeEnum.treino_individual,
+    }
+
+
+def _obter_equipas_alvo_evento(db: Session, evento: EventoPlaneamentoClube) -> list[Equipa]:
+    """Resolve as equipas destino de um evento respeitando as regras de visibilidade."""
+    if evento.aplica_a_todas_equipas:
+        return db.query(Equipa).order_by(Equipa.nome).all()
+
+    equipas_por_id: dict[int, Equipa] = {}
+    if evento.equipa:
+        equipas_por_id[evento.equipa.id] = evento.equipa
+    for equipa in evento.equipas:
+        equipas_por_id[equipa.id] = equipa
+
+    return list(equipas_por_id.values())
+
+
+def _obter_intervalo_semana(data_evento: date) -> tuple[date, date]:
+    """Calcula o intervalo semanal (segunda a domingo) para uma data."""
+    data_inicio = data_evento - timedelta(days=data_evento.weekday())
+    data_fim = data_inicio + timedelta(days=6)
+    return data_inicio, data_fim
+
+
+def _obter_microciclo_existente_equipa_semana(
+    db: Session,
+    equipa_id: int,
+    data_inicio: date,
+    data_fim: date,
+) -> Microciclo | None:
+    """Procura um microciclo já existente para a mesma equipa e semana."""
+    return db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+        Microciclo.data_inicio == data_inicio,
+        Microciclo.data_fim == data_fim,
+    ).order_by(Microciclo.data_inicio.desc(), Microciclo.id.desc()).first()
+
+
+def _obter_microciclo_que_cobre_intervalo(
+    db: Session,
+    equipa_id: int,
+    data_inicio: date,
+    data_fim: date,
+) -> Microciclo | None:
+    """Procura um microciclo da equipa que já cubra todo o intervalo semanal."""
+    return db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+        Microciclo.data_inicio <= data_inicio,
+        Microciclo.data_fim >= data_fim,
+    ).order_by(Microciclo.data_inicio.desc(), Microciclo.id.desc()).first()
+
+
+def _obter_ou_criar_macrociclo_para_equipa_intervalo(
+    db: Session,
+    equipa_id: int,
+    data_inicio: date,
+    data_fim: date,
+) -> Macrociclo:
+    """Obtém um macrociclo da equipa que cobre o intervalo ou cria um novo."""
+    macrociclo = db.query(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+        Macrociclo.data_inicio <= data_inicio,
+        Macrociclo.data_fim >= data_fim,
+    ).order_by(Macrociclo.data_inicio.desc(), Macrociclo.id.desc()).first()
+    if macrociclo:
+        return macrociclo
+
+    total_macrociclos = db.query(Macrociclo).filter(Macrociclo.equipa_id == equipa_id).count()
+    macrociclo = Macrociclo(
+        numero=total_macrociclos + 1,
+        data_inicio=date(data_inicio.year, 1, 1),
+        data_fim=date(data_fim.year, 12, 31),
+        equipa_id=equipa_id,
+        reflexao="Macrociclo criado automaticamente para suportar sessões do planeamento global.",
+    )
+    db.add(macrociclo)
+    db.flush()
+    return macrociclo
+
+
+def _obter_ou_criar_mesociclo_para_intervalo(
+    db: Session,
+    macrociclo: Macrociclo,
+    data_inicio: date,
+    data_fim: date,
+) -> Mesociclo:
+    """Obtém um mesociclo que cobre o intervalo ou cria um novo com o mesmo período semanal."""
+    mesociclo = db.query(Mesociclo).filter(
+        Mesociclo.macrociclo_id == macrociclo.id,
+        Mesociclo.data_inicio <= data_inicio,
+        Mesociclo.data_fim >= data_fim,
+    ).order_by(Mesociclo.data_inicio.desc(), Mesociclo.id.desc()).first()
+    if mesociclo:
+        return mesociclo
+
+    total_mesociclos = db.query(Mesociclo).filter(Mesociclo.macrociclo_id == macrociclo.id).count()
+    mesociclo = Mesociclo(
+        numero=total_mesociclos + 1,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        macrociclo_id=macrociclo.id,
+        reflexao="Mesociclo criado automaticamente para suportar sessões do planeamento global.",
+    )
+    db.add(mesociclo)
+    db.flush()
+    return mesociclo
+
+
+def _criar_microciclo_automatico(
+    db: Session,
+    mesociclo: Mesociclo,
+    data_inicio: date,
+    data_fim: date,
+) -> Microciclo:
+    """Cria um microciclo semanal automático dentro do mesociclo indicado."""
+    total_microciclos = db.query(Microciclo).filter(Microciclo.mesociclo_id == mesociclo.id).count()
+    microciclo = Microciclo(
+        numero=total_microciclos + 1,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        tipo="automatico_planeamento_global",
+        reflexao="Microciclo criado automaticamente para integrar sessões do planeamento global.",
+        mesociclo_id=mesociclo.id,
+    )
+    db.add(microciclo)
+    db.flush()
+    return microciclo
+
+
+def _obter_ou_criar_microciclo_para_equipa_e_data(db: Session, equipa_id: int, data_evento: date) -> Microciclo:
+    """Obtém o microciclo da semana ou cria automaticamente a estrutura mínima em falta."""
+    data_inicio, data_fim = _obter_intervalo_semana(data_evento)
+
+    microciclo = _obter_microciclo_existente_equipa_semana(db, equipa_id, data_inicio, data_fim)
+    if microciclo:
+        return microciclo
+
+    microciclo = _obter_microciclo_que_cobre_intervalo(db, equipa_id, data_inicio, data_fim)
+    if microciclo:
+        return microciclo
+
+    macrociclo = _obter_ou_criar_macrociclo_para_equipa_intervalo(db, equipa_id, data_inicio, data_fim)
+    mesociclo = _obter_ou_criar_mesociclo_para_intervalo(db, macrociclo, data_inicio, data_fim)
+
+    microciclo = _obter_microciclo_existente_equipa_semana(db, equipa_id, data_inicio, data_fim)
+    if microciclo:
+        return microciclo
+
+    return _criar_microciclo_automatico(db, mesociclo, data_inicio, data_fim)
+
+
+def _combinar_local_evento(evento: EventoPlaneamentoClube) -> str | None:
+    """Resolve um texto de local simples para a sessão gerada."""
+    if evento.espaco and evento.espaco.nome:
+        return evento.espaco.nome
+    if evento.jogo and evento.jogo.local:
+        return evento.jogo.local
+    if evento.atividade and evento.atividade.local:
+        return evento.atividade.local
+    return None
+
+
+def _combinar_horario_evento(evento: EventoPlaneamentoClube) -> tuple[str | None, str | None]:
+    """Resolve o intervalo horário mais útil para a sessão gerada."""
+    hora_inicio = normalizar_hora(
+        evento.hora_inicio or (evento.jogo.hora if evento.jogo and evento.jogo.hora else None)
+    )
+    hora_fim = normalizar_hora(evento.hora_fim)
+    return hora_inicio, hora_fim
+
+
+def _combinar_reflexao_evento(evento: EventoPlaneamentoClube) -> str | None:
+    """Agrupa observações operacionais relevantes do evento num campo simples."""
+    partes = []
+    if evento.titulo:
+        partes.append(f"Evento global: {evento.titulo}")
+    if evento.descricao:
+        partes.append(evento.descricao)
+    if evento.observacoes:
+        partes.append(evento.observacoes)
+    return "\n".join(partes) if partes else None
+
+
+def _obter_sessao_existente_evento(
+    db: Session,
+    evento_id: int,
+    equipa_id: int,
+) -> SessaoTreino | None:
+    """Procura uma sessão já gerada para o mesmo evento e equipa."""
+    return db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        SessaoTreino.origem == "planeamento_global",
+        SessaoTreino.evento_planeamento_clube_id == evento_id,
+        Macrociclo.equipa_id == equipa_id,
+    ).first()
+
+
+def _obter_sessoes_sincronizadas_semanal(db: Session, semanal_id: int) -> list[SessaoTreino]:
+    """Lista as sessões geradas a partir de um plano semanal específico."""
+    return db.query(SessaoTreino).filter(
+        SessaoTreino.plano_semanal_clube_id == semanal_id,
+        SessaoTreino.origem == "planeamento_global",
+    ).all()
+
+
+def _obter_equipa_id_por_sessao(sessao: SessaoTreino) -> int | None:
+    """Resolve a equipa da sessão pela hierarquia de planeamento."""
+    if not sessao.microciclo or not sessao.microciclo.mesociclo or not sessao.microciclo.mesociclo.macrociclo:
+        return None
+    return sessao.microciclo.mesociclo.macrociclo.equipa_id
+
+
+def _calcular_numero_treino_microciclo(db: Session, microciclo_id: int, sessao_id_excluir: int | None = None) -> int:
+    """Calcula o próximo número de treino para um microciclo."""
+    query = db.query(SessaoTreino).filter(
+        SessaoTreino.microciclo_id == microciclo_id,
+        SessaoTreino.e_jogo == False,
+        SessaoTreino.ativa == True,
+    )
+    if sessao_id_excluir:
+        query = query.filter(SessaoTreino.id != sessao_id_excluir)
+    total_treinos = query.count()
+    return total_treinos + 1
+
+
+def _criar_ou_atualizar_sessao_evento(
+    db: Session,
+    semanal: PlanoSemanalClube,
+    evento: EventoPlaneamentoClube,
+    equipa: Equipa,
+) -> str:
+    """Cria ou actualiza uma sessão operacional gerada pelo planeamento global."""
+    sessao_existente = _obter_sessao_existente_evento(db, evento.id, equipa.id)
+    microciclo = _obter_ou_criar_microciclo_para_equipa_e_data(db, equipa.id, evento.data)
+
+    local = _combinar_local_evento(evento)
+    hora_inicio, hora_fim = _combinar_horario_evento(evento)
+    reflexao = _combinar_reflexao_evento(evento)
+
+    if sessao_existente:
+        if sessao_existente.alterada_manual:
+            sessao_existente.ativa = True
+            sessao_existente.sincronizada = False
+            return "ignorada_manual"
+
+        mudou_microciclo = sessao_existente.microciclo_id != microciclo.id
+        sessao_existente.data = evento.data
+        sessao_existente.local = local
+        sessao_existente.hora_inicio = hora_inicio
+        sessao_existente.hora_fim = hora_fim
+        sessao_existente.e_jogo = False
+        sessao_existente.microciclo_id = microciclo.id
+        sessao_existente.origem = "planeamento_global"
+        sessao_existente.plano_semanal_clube_id = semanal.id
+        sessao_existente.evento_planeamento_clube_id = evento.id
+        sessao_existente.reflexao = reflexao
+        sessao_existente.ativa = True
+        sessao_existente.sincronizada = True
+        if mudou_microciclo or sessao_existente.numero_treino is None:
+            sessao_existente.numero_treino = _calcular_numero_treino_microciclo(
+                db,
+                microciclo.id,
+                sessao_id_excluir=sessao_existente.id,
+            )
+        return "atualizada"
+
+    sessao = SessaoTreino(
+        data=evento.data,
+        local=local,
+        hora_inicio=hora_inicio,
+        hora_fim=hora_fim,
+        numero_treino=_calcular_numero_treino_microciclo(db, microciclo.id),
+        volume_minutos=None,
+        intensidade_rpe=None,
+        e_jogo=False,
+        reflexao=reflexao,
+        origem="planeamento_global",
+        sincronizada=True,
+        alterada_manual=False,
+        ativa=True,
+        microciclo_id=microciclo.id,
+        plano_semanal_clube_id=semanal.id,
+        evento_planeamento_clube_id=evento.id,
+    )
+    db.add(sessao)
+    return "criada"
+
+
+def _desativar_sessoes_orfas_ou_fora_de_escopo(
+    db: Session,
+    semanal_id: int,
+    pares_evento_equipa_ativos: set[tuple[int, int]],
+) -> int:
+    """Desactiva sessões cujo evento desapareceu ou deixou de se aplicar à equipa."""
+    total_inativadas = 0
+    for sessao in _obter_sessoes_sincronizadas_semanal(db, semanal_id):
+        equipa_id = _obter_equipa_id_por_sessao(sessao)
+        if not sessao.evento_planeamento_clube_id or not equipa_id:
+            continue
+        if (sessao.evento_planeamento_clube_id, equipa_id) not in pares_evento_equipa_ativos:
+            sessao.ativa = False
+            sessao.sincronizada = False
+            total_inativadas += 1
+    return total_inativadas
+
+
+def _sincronizar_plano_semanal(db: Session, semanal: PlanoSemanalClube) -> dict[str, int]:
+    """Sincroniza o plano semanal com as sessões operacionais das equipas."""
+    resumo = {
+        "eventos_operacionais": 0,
+        "geradas": 0,
+        "atualizadas": 0,
+        "ignoradas": 0,
+        "ignoradas_manuais": 0,
+        "sem_microciclo": 0,
+        "inativadas": 0,
+    }
+
+    eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.plano_semanal_id == semanal.id
+    ).order_by(EventoPlaneamentoClube.data.asc(), EventoPlaneamentoClube.hora_inicio.asc()).all()
+    pares_evento_equipa_ativos: set[tuple[int, int]] = set()
+
+    for evento in eventos:
+        if not _tipo_evento_gera_sessao(evento):
+            resumo["ignoradas"] += 1
+            continue
+
+        resumo["eventos_operacionais"] += 1
+        equipas_alvo = _obter_equipas_alvo_evento(db, evento)
+        if not equipas_alvo:
+            resumo["ignoradas"] += 1
+            continue
+
+        for equipa in equipas_alvo:
+            pares_evento_equipa_ativos.add((evento.id, equipa.id))
+            resultado = _criar_ou_atualizar_sessao_evento(db, semanal, evento, equipa)
+            if resultado == "criada":
+                resumo["geradas"] += 1
+            elif resultado == "atualizada":
+                resumo["atualizadas"] += 1
+            elif resultado == "ignorada_manual":
+                resumo["ignoradas_manuais"] += 1
+            elif resultado == "sem_microciclo":
+                resumo["sem_microciclo"] += 1
+
+    resumo["inativadas"] = _desativar_sessoes_orfas_ou_fora_de_escopo(db, semanal.id, pares_evento_equipa_ativos)
+    return resumo
+
+
+def _construir_calendario_mensal(mensal: PlaneamentoClubeMensal, eventos: list[EventoPlaneamentoClube]):
+    """Monta uma grelha mensal simples com eventos agrupados por dia."""
+    eventos_por_data = {}
+    for evento in eventos:
+        eventos_por_data.setdefault(evento.data, []).append(evento)
+
+    for lista_eventos in eventos_por_data.values():
+        lista_eventos.sort(key=lambda item: (item.hora_inicio or "", item.titulo))
+
+    semanas = []
+    for semana in calendar.Calendar(firstweekday=0).monthdatescalendar(mensal.ano, mensal.mes):
+        semanas.append([
+            {
+                "data": dia,
+                "dia": dia.day,
+                "do_mes_atual": dia.month == mensal.mes,
+                "eventos": eventos_por_data.get(dia, []),
+            }
+            for dia in semana
+        ])
+
+    return {
+        "ano": mensal.ano,
+        "mes": mensal.mes,
+        "nome_mes": calendar.month_name[mensal.mes],
+        "dias_semana": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"],
+        "semanas": semanas,
+    }
+
+
+def _construir_calendario_anual_quadros(
+    planeamento: PlaneamentoClubeAnual,
+    eventos: list[EventoPlaneamentoClube],
+):
+    """Monta os meses do período anual como grelhas de calendário estáveis."""
+    eventos_por_data = {}
+    for evento in eventos:
+        eventos_por_data.setdefault(evento.data, []).append(evento)
+
+    for lista_eventos in eventos_por_data.values():
+        lista_eventos.sort(key=lambda item: (item.hora_inicio or "", item.titulo))
+
+    meses = []
+    cursor = date(planeamento.data_inicio.year, planeamento.data_inicio.month, 1)
+    limite = date(planeamento.data_fim.year, planeamento.data_fim.month, 1)
+
+    while cursor <= limite:
+        semanas = []
+        for semana in calendar.Calendar(firstweekday=0).monthdatescalendar(cursor.year, cursor.month):
+            semanas.append([
+                {
+                    "data": dia,
+                    "dia": dia.day,
+                    "do_mes_atual": dia.month == cursor.month,
+                    "fim_semana": dia.weekday() >= 5,
+                    "eventos": eventos_por_data.get(dia, []),
+                }
+                for dia in semana
+            ])
+        meses.append({
+            "ano": cursor.year,
+            "mes": cursor.month,
+            "nome_mes": calendar.month_name[cursor.month],
+            "semanas": semanas,
+        })
+
+        if cursor.month == 12:
+            cursor = date(cursor.year + 1, 1, 1)
+        else:
+            cursor = date(cursor.year, cursor.month + 1, 1)
+
+    return {"meses": meses, "dias_semana": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]}
+
+
+def _construir_calendario_semanal(semanal: PlanoSemanalClube, eventos: list[EventoPlaneamentoClube], atribuicoes: list[AtribuicaoEspacoSemanal]):
+    """Monta a estrutura semanal com eventos e atribuições agrupados por dia."""
+    eventos_por_data = {}
+    for evento in eventos:
+        eventos_por_data.setdefault(evento.data, []).append(evento)
+
+    atribuicoes_por_data = {}
+    for atribuicao in atribuicoes:
+        atribuicoes_por_data.setdefault(atribuicao.data, []).append(atribuicao)
+
+    dias = []
+    nomes_semana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+    for indice in range(7):
+        data_dia = semanal.data_inicio + timedelta(days=indice)
+        eventos_dia = sorted(
+            eventos_por_data.get(data_dia, []),
+            key=lambda item: (item.hora_inicio or "", item.titulo),
+        )
+        atribuicoes_dia = sorted(
+            atribuicoes_por_data.get(data_dia, []),
+            key=lambda item: (item.hora_inicio, item.espaco.nome if item.espaco else ""),
+        )
+        itens_dia = []
+        for evento in eventos_dia:
+                itens_dia.append({
+                    "tipo": "evento",
+                    "titulo": evento.titulo,
+                    "detalhe": _formatar_intervalo_calendario(evento.hora_inicio, evento.hora_fim),
+                    "subtitulo": evento.tipo.value,
+                    "link": f"/planeamento-clube/eventos/{evento.id}",
+                    "pill": "Evento",
+                    "classes": "border-amber-100 bg-amber-50",
+                    "ordem": evento.hora_inicio or "99:99",
+            })
+        for atribuicao in atribuicoes_dia:
+                itens_dia.append({
+                    "tipo": "atribuicao",
+                    "titulo": atribuicao.espaco.nome if atribuicao.espaco else "Espaço por definir",
+                    "detalhe": _formatar_intervalo_calendario(atribuicao.hora_inicio, atribuicao.hora_fim),
+                    "subtitulo": atribuicao.equipa.nome if atribuicao.equipa else atribuicao.tipo_ocupacao.value,
+                    "link": f"/planeamento-clube/atribuicoes/{atribuicao.id}",
+                    "pill": "Espaço",
+                    "classes": "border-sky-100 bg-sky-50",
+                "ordem": atribuicao.hora_inicio or "99:99",
+            })
+        itens_dia.sort(key=lambda item: (item["ordem"], item["titulo"]))
+        dias.append({
+            "data": data_dia,
+            "nome_semana": nomes_semana[data_dia.weekday()],
+            "eventos": eventos_dia,
+            "atribuicoes": atribuicoes_dia,
+            "itens": itens_dia,
+        })
+
+    return {"dias": dias}
+
+
+def _obter_mensagem_erro_eliminacao(codigo: str | None):
+    """Traduz um código de erro de eliminação numa mensagem legível."""
+    return MENSAGENS_ERRO_ELIMINACAO.get(codigo)
+
+
+@router.get("/vista", response_class=HTMLResponse)
+def vista_treinador(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    hoje = date.today()
+    fim_janela = hoje + timedelta(days=30)
+
+    mensal_atual = (
+        db.query(PlaneamentoClubeMensal)
+        .filter(PlaneamentoClubeMensal.ano == hoje.year, PlaneamentoClubeMensal.mes == hoje.month)
+        .first()
+    )
+
+    planos_semanais = (
+        db.query(PlanoSemanalClube)
+        .filter(PlanoSemanalClube.data_fim >= hoje, PlanoSemanalClube.data_inicio <= fim_janela)
+        .order_by(PlanoSemanalClube.data_inicio)
+        .limit(6)
+        .all()
+    )
+
+    eventos_proximos = (
+        db.query(EventoPlaneamentoClube)
+        .filter(EventoPlaneamentoClube.data >= hoje, EventoPlaneamentoClube.data <= fim_janela)
+        .order_by(EventoPlaneamentoClube.data, EventoPlaneamentoClube.hora_inicio)
+        .all()
+    )
+
+    anual_ativo = (
+        db.query(PlaneamentoClubeAnual)
+        .filter(PlaneamentoClubeAnual.ativo == True)
+        .order_by(PlaneamentoClubeAnual.data_inicio.desc())
+        .first()
+    )
+
+    return templates.TemplateResponse(request, "planeamento_clube/vista_treinador.html", {
+        "utilizador": utilizador,
+        "hoje": hoje,
+        "mensal_atual": mensal_atual,
+        "planos_semanais": planos_semanais,
+        "eventos_proximos": eventos_proximos,
+        "anual_ativo": anual_ativo,
+    })
+
+
+@router.get("/anual", response_class=HTMLResponse)
+def listar_planeamentos_anuais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+
+    planeamentos = db.query(PlaneamentoClubeAnual).order_by(PlaneamentoClubeAnual.data_inicio.desc()).all()
+    return templates.TemplateResponse(request, "planeamento_clube/anual_lista.html", {
+        "utilizador": utilizador,
+        "planeamentos": planeamentos,
+        "erro": _obter_mensagem_erro_eliminacao(request.query_params.get("erro")),
+    })
+
+
+@router.get("/mensal", response_class=HTMLResponse)
+def listar_planeamentos_mensais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+
+    ano = request.query_params.get("ano", "").strip()
+    mes = request.query_params.get("mes", "").strip()
+    planeamento_anual_id = request.query_params.get("planeamento_anual_id", "").strip()
+
+    query = db.query(PlaneamentoClubeMensal).order_by(
+        PlaneamentoClubeMensal.ano.desc(),
+        PlaneamentoClubeMensal.mes.desc(),
+    )
+
+    if ano.isdigit():
+        query = query.filter(PlaneamentoClubeMensal.ano == int(ano))
+    if mes.isdigit():
+        query = query.filter(PlaneamentoClubeMensal.mes == int(mes))
+    if planeamento_anual_id.isdigit():
+        query = query.filter(PlaneamentoClubeMensal.planeamento_anual_id == int(planeamento_anual_id))
+
+    mensais = query.all()
+
+    return templates.TemplateResponse(request, "planeamento_clube/mensal_lista.html", {
+        "utilizador": utilizador,
+        "mensais": mensais,
+        "planeamentos_anuais": db.query(PlaneamentoClubeAnual).order_by(PlaneamentoClubeAnual.data_inicio.desc()).all(),
+        "filtros_aplicados": {
+            "ano": ano,
+            "mes": mes,
+            "planeamento_anual_id": planeamento_anual_id,
+        },
+    })
+
+
+@router.get("/semanal", response_class=HTMLResponse)
+def listar_planos_semanais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+
+    planeamento_mensal_id = request.query_params.get("planeamento_mensal_id", "").strip()
+    estado = request.query_params.get("estado", "").strip()
+
+    query = db.query(PlanoSemanalClube).order_by(PlanoSemanalClube.data_inicio.desc())
+
+    if planeamento_mensal_id.isdigit():
+        query = query.filter(PlanoSemanalClube.planeamento_mensal_id == int(planeamento_mensal_id))
+    if estado:
+        query = query.filter(PlanoSemanalClube.estado == estado)
+
+    semanais = query.all()
+
+    return templates.TemplateResponse(request, "planeamento_clube/semanal_lista.html", {
+        "utilizador": utilizador,
+        "semanais": semanais,
+        "planeamentos_mensais": db.query(PlaneamentoClubeMensal).order_by(
+            PlaneamentoClubeMensal.ano.desc(),
+            PlaneamentoClubeMensal.mes.desc(),
+        ).all(),
+        "filtros_aplicados": {
+            "planeamento_mensal_id": planeamento_mensal_id,
+            "estado": estado,
+        },
+        "estados_semanal": _obter_contexto_form_semanal()["estados_semanal"],
+    })
+
+
+@router.get("/anual/novo", response_class=HTMLResponse)
+def form_novo_planeamento_anual(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    contexto = _obter_contexto_form_anual()
+    contexto.update({
+        "utilizador": utilizador,
+        "planeamento": None,
+        "modo": "criar",
+    })
+    return templates.TemplateResponse(request, "planeamento_clube/anual_form.html", contexto)
+
+
+@router.post("/anual/novo")
+async def criar_planeamento_anual(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    epoca: str = Form(...),
+    titulo: str = Form(...),
+    data_inicio: str = Form(...),
+    data_fim: str = Form(...),
+    objetivos_gerais: str = Form(""),
+    observacoes: str = Form(""),
+    ativo: str = Form("true"),
+):
+
+    try:
+        planeamento = _criar_planeamento_anual(
+            epoca,
+            titulo,
+            data_inicio,
+            data_fim,
+            objetivos_gerais,
+            observacoes,
+            ativo,
+        )
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url="/planeamento-clube/anual/novo", status_code=303)
+    db.add(planeamento)
+    db.flush()
+    registar_historico_planeamento(db, utilizador, "planeamento_anual", planeamento.id, "criado", planeamento.titulo)
+    registar_auditoria(db, utilizador, "criar", "planeamento_anual", planeamento.id, planeamento.titulo, request)
+    db.commit()
+    db.refresh(planeamento)
+
+    return RedirectResponse(url=f"/planeamento-clube/anual/{planeamento.id}", status_code=303)
+
+
+@router.get("/anual/{anual_id}", response_class=HTMLResponse)
+def detalhe_planeamento_anual(anual_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+
+    planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    mensais = db.query(PlaneamentoClubeMensal).filter(
+        PlaneamentoClubeMensal.planeamento_anual_id == anual_id
+    ).order_by(PlaneamentoClubeMensal.ano, PlaneamentoClubeMensal.mes).all()
+    eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.planeamento_anual_id == anual_id
+    ).order_by(EventoPlaneamentoClube.data.desc(), EventoPlaneamentoClube.hora_inicio.desc()).all()
+    dashboard_planeamento = obter_dashboard_planeamento_anual(
+        db,
+        planeamento.data_inicio,
+        planeamento.data_fim,
+    )
+    historico = db.query(HistoricoPlaneamentoClube).filter(
+        HistoricoPlaneamentoClube.entidade == "planeamento_anual",
+        HistoricoPlaneamentoClube.entidade_id == anual_id,
+    ).order_by(HistoricoPlaneamentoClube.criado_em.desc()).limit(20).all()
+
+    return templates.TemplateResponse(request, "planeamento_clube/anual_detalhe.html", {
+        "utilizador": utilizador,
+        "planeamento": planeamento,
+        "mensais": mensais,
+        "eventos": eventos,
+        "dashboard_planeamento": dashboard_planeamento,
+        "historico": historico,
+        "erro": _obter_mensagem_erro_eliminacao(request.query_params.get("erro")),
+    })
+
+
+@router.get("/anual/{anual_id}/pdf")
+def exportar_pdf_planeamento_anual(
+    anual_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/planeamento-clube/anual")
+    mensais = db.query(PlaneamentoClubeMensal).filter(
+        PlaneamentoClubeMensal.planeamento_anual_id == anual_id
+    ).order_by(PlaneamentoClubeMensal.ano, PlaneamentoClubeMensal.mes).all()
+    eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.data >= planeamento.data_inicio,
+        EventoPlaneamentoClube.data <= planeamento.data_fim,
+    ).order_by(EventoPlaneamentoClube.data.asc(), EventoPlaneamentoClube.hora_inicio.asc()).all()
+    dashboard_planeamento = obter_dashboard_planeamento_anual(db, planeamento.data_inicio, planeamento.data_fim)
+    return _responder_pdf(
+        request,
+        "planeamento_clube/anual_pdf.html",
+        {
+            "utilizador": utilizador,
+            "planeamento": planeamento,
+            "mensais": mensais,
+            "eventos": eventos,
+            "dashboard_planeamento": dashboard_planeamento,
+            "hoje": date.today(),
+        },
+        f"planeamento_anual_{planeamento.epoca}_{planeamento.id}.pdf",
+    )
+
+
+@router.get("/anual/{anual_id}/calendario", response_class=HTMLResponse)
+def calendario_planeamento_anual(anual_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.data >= planeamento.data_inicio,
+        EventoPlaneamentoClube.data <= planeamento.data_fim,
+    ).order_by(EventoPlaneamentoClube.data.asc(), EventoPlaneamentoClube.hora_inicio.asc()).all()
+    calendario_anual = _construir_calendario_anual_quadros(planeamento, eventos)
+
+    return templates.TemplateResponse(request, "planeamento_clube/anual_calendario.html", {
+        "utilizador": utilizador,
+        "planeamento": planeamento,
+        "eventos": eventos,
+        "calendario_anual": calendario_anual,
+        "metadados_tipo_agenda": metadados_tipo_agenda,
+        "agenda_tipos": tipos_agenda_formulario(),
+    })
+
+
+@router.get("/anual/{anual_id}/calendario/pdf")
+def exportar_pdf_calendario_anual(
+    anual_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/planeamento-clube/anual")
+    eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.data >= planeamento.data_inicio,
+        EventoPlaneamentoClube.data <= planeamento.data_fim,
+    ).order_by(EventoPlaneamentoClube.data.asc(), EventoPlaneamentoClube.hora_inicio.asc()).all()
+    calendario_anual = _construir_calendario_anual_quadros(planeamento, eventos)
+    return _responder_pdf(
+        request,
+        "planeamento_clube/anual_calendario_pdf.html",
+        {"utilizador": utilizador, "planeamento": planeamento, "eventos": eventos, "calendario_anual": calendario_anual, "hoje": date.today()},
+        f"calendario_anual_{planeamento.epoca}_{planeamento.id}.pdf",
+    )
+
+
+@router.get("/anual/{anual_id}/editar", response_class=HTMLResponse)
+def form_editar_planeamento_anual(anual_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    contexto = _obter_contexto_form_anual()
+    contexto.update({
+        "utilizador": utilizador,
+        "planeamento": planeamento,
+        "modo": "editar",
+    })
+    return templates.TemplateResponse(request, "planeamento_clube/anual_form.html", contexto)
+
+
+@router.post("/anual/{anual_id}/editar")
+async def editar_planeamento_anual(
+    anual_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    epoca: str = Form(...),
+    titulo: str = Form(...),
+    data_inicio: str = Form(...),
+    data_fim: str = Form(...),
+    objetivos_gerais: str = Form(""),
+    observacoes: str = Form(""),
+    ativo: str = Form("true"),
+):
+
+    planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    try:
+        _atualizar_planeamento_anual(
+            planeamento,
+            epoca,
+            titulo,
+            data_inicio,
+            data_fim,
+            objetivos_gerais,
+            observacoes,
+            ativo,
+        )
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/planeamento-clube/anual/{planeamento.id}/editar", status_code=303)
+    registar_historico_planeamento(db, utilizador, "planeamento_anual", planeamento.id, "editado", planeamento.titulo)
+    registar_auditoria(db, utilizador, "editar", "planeamento_anual", planeamento.id, planeamento.titulo, request)
+    db.commit()
+
+    return RedirectResponse(url=f"/planeamento-clube/anual/{planeamento.id}", status_code=303)
+
+
+@router.post("/anual/{anual_id}/eliminar")
+async def eliminar_planeamento_anual(anual_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    planeamento = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
+    if not planeamento:
+        return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
+
+    registar_auditoria(db, utilizador, "apagar", "planeamento_anual", planeamento.id, planeamento.titulo, request)
+    db.delete(planeamento)
+    db.commit()
+
+    return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
+
+
+@router.post("/anual/{anual_id}/mensal/novo")
+async def criar_planeamento_mensal(
+    anual_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    ano: str = Form(...),
+    mes: str = Form(...),
+    titulo: str = Form(...),
+    objetivos_mes: str = Form(""),
+    observacoes: str = Form(""),
+    estado: str = Form("rascunho"),
+):
+
+    planeamento_anual = db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first()
+    if not planeamento_anual:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    try:
+        mensal = _criar_planeamento_mensal(
+            anual_id,
+            ano,
+            mes,
+            titulo,
+            objetivos_mes,
+            observacoes,
+            estado,
+        )
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/planeamento-clube/anual/{anual_id}", status_code=303)
+    db.add(mensal)
+    db.flush()
+    registar_historico_planeamento(db, utilizador, "planeamento_mensal", mensal.id, "criado", mensal.titulo)
+    registar_auditoria(db, utilizador, "criar", "planeamento_mensal", mensal.id, mensal.titulo, request)
+    db.commit()
+    db.refresh(mensal)
+
+    return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal.id}", status_code=303)
+
+
+@router.get("/mensal/{mensal_id}", response_class=HTMLResponse)
+def detalhe_planeamento_mensal(mensal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+
+    mensal = db.query(PlaneamentoClubeMensal).filter(PlaneamentoClubeMensal.id == mensal_id).first()
+    if not mensal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    semanais = db.query(PlanoSemanalClube).filter(
+        PlanoSemanalClube.planeamento_mensal_id == mensal_id
+    ).order_by(PlanoSemanalClube.data_inicio).all()
+    resumo_operacional = obter_resumo_operacional_mensal(db, mensal)
+    eventos = list(reversed(resumo_operacional["eventos"]))
+    calendario_mensal = _construir_calendario_mensal(mensal, resumo_operacional["eventos"])
+
+    historico = db.query(HistoricoPlaneamentoClube).filter(
+        HistoricoPlaneamentoClube.entidade == "planeamento_mensal",
+        HistoricoPlaneamentoClube.entidade_id == mensal_id,
+    ).order_by(HistoricoPlaneamentoClube.criado_em.desc()).limit(20).all()
+
+    return templates.TemplateResponse(request, "planeamento_clube/mensal_detalhe.html", {
+        "utilizador": utilizador,
+        "mensal": mensal,
+        "semanais": semanais,
+        "eventos": eventos,
+        "calendario_mensal": calendario_mensal,
+        "resumo_operacional_equipas": resumo_operacional["resumo_equipas"],
+        "jogos_do_mes": resumo_operacional["jogos_mes"],
+        "estatisticas_operacionais": resumo_operacional["estatisticas"],
+        "historico": historico,
+        "erro": _obter_mensagem_erro_eliminacao(request.query_params.get("erro")),
+    })
+
+
+@router.get("/mensal/{mensal_id}/pdf")
+def exportar_pdf_planeamento_mensal(
+    mensal_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    mensal = db.query(PlaneamentoClubeMensal).filter(PlaneamentoClubeMensal.id == mensal_id).first()
+    if not mensal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+    semanais = db.query(PlanoSemanalClube).filter(
+        PlanoSemanalClube.planeamento_mensal_id == mensal_id
+    ).order_by(PlanoSemanalClube.data_inicio).all()
+    resumo_operacional = obter_resumo_operacional_mensal(db, mensal)
+    eventos = list(reversed(resumo_operacional["eventos"]))
+    calendario_mensal = _construir_calendario_mensal(mensal, resumo_operacional["eventos"])
+    return _responder_pdf(
+        request,
+        "planeamento_clube/mensal_pdf.html",
+        {
+            "utilizador": utilizador,
+            "mensal": mensal,
+            "semanais": semanais,
+            "eventos": eventos,
+            "calendario_mensal": calendario_mensal,
+            "resumo_operacional_equipas": resumo_operacional["resumo_equipas"],
+            "jogos_do_mes": resumo_operacional["jogos_mes"],
+            "estatisticas_operacionais": resumo_operacional["estatisticas"],
+            "hoje": date.today(),
+        },
+        f"planeamento_mensal_{mensal.ano}_{mensal.mes}_{mensal.id}.pdf",
+    )
+
+
+@router.get("/mensal/{mensal_id}/editar", response_class=HTMLResponse)
+def form_editar_planeamento_mensal(mensal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    mensal = db.query(PlaneamentoClubeMensal).filter(PlaneamentoClubeMensal.id == mensal_id).first()
+    if not mensal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    contexto = _obter_contexto_form_mensal()
+    contexto.update({
+        "utilizador": utilizador,
+        "mensal": mensal,
+        "modo": "editar",
+    })
+    return templates.TemplateResponse(request, "planeamento_clube/mensal_form.html", contexto)
+
+
+@router.post("/mensal/{mensal_id}/editar")
+async def editar_planeamento_mensal(
+    mensal_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    ano: str = Form(...),
+    mes: str = Form(...),
+    titulo: str = Form(...),
+    objetivos_mes: str = Form(""),
+    observacoes: str = Form(""),
+    estado: str = Form("rascunho"),
+):
+
+    mensal = db.query(PlaneamentoClubeMensal).filter(PlaneamentoClubeMensal.id == mensal_id).first()
+    if not mensal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    try:
+        _atualizar_planeamento_mensal(
+            mensal,
+            ano,
+            mes,
+            titulo,
+            objetivos_mes,
+            observacoes,
+            estado,
+        )
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal.id}/editar", status_code=303)
+    registar_historico_planeamento(db, utilizador, "planeamento_mensal", mensal.id, "editado", mensal.titulo)
+    registar_auditoria(db, utilizador, "editar", "planeamento_mensal", mensal.id, mensal.titulo, request)
+    db.commit()
+
+    return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal.id}", status_code=303)
+
+
+@router.post("/mensal/{mensal_id}/eliminar")
+async def eliminar_planeamento_mensal(mensal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    mensal = db.query(PlaneamentoClubeMensal).filter(PlaneamentoClubeMensal.id == mensal_id).first()
+    if not mensal:
+        return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
+
+    if mensal.planos_semanais:
+        return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal_id}?erro=mensal_com_semanais", status_code=303)
+
+    eventos_diretos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.planeamento_mensal_id == mensal_id,
+        EventoPlaneamentoClube.plano_semanal_id.is_(None),
+    ).first()
+    if eventos_diretos:
+        return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal_id}?erro=mensal_com_eventos", status_code=303)
+
+    anual_id = mensal.planeamento_anual_id
+    registar_auditoria(db, utilizador, "apagar", "planeamento_mensal", mensal.id, mensal.titulo, request)
+    db.delete(mensal)
+    db.commit()
+
+    return RedirectResponse(url=f"/planeamento-clube/anual/{anual_id}", status_code=303)
+
+
+@router.get("/semanal/novo", response_class=HTMLResponse)
+def form_novo_plano_semanal(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+    contexto = _obter_contexto_form_semanal()
+    contexto.update({
+        "utilizador": utilizador,
+        "semanal": None,
+        "modo": "criar",
+        "planeamentos_mensais": db.query(PlaneamentoClubeMensal).order_by(
+            PlaneamentoClubeMensal.ano.desc(), PlaneamentoClubeMensal.mes.desc()
+        ).all(),
+    })
+    return templates.TemplateResponse(request, "planeamento_clube/semanal_form.html", contexto)
+
+
+@router.post("/semanal/novo")
+async def criar_plano_semanal_direto(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    planeamento_mensal_id: int = Form(...),
+    titulo: str = Form(...),
+    data_inicio: str = Form(...),
+    data_fim: str = Form(...),
+    observacoes: str = Form(""),
+    estado: str = Form("rascunho"),
+):
+    mensal = db.query(PlaneamentoClubeMensal).filter(PlaneamentoClubeMensal.id == planeamento_mensal_id).first()
+    if not mensal:
+        set_flash(request, "Seleciona um planeamento mensal válido.", "error")
+        return RedirectResponse(url="/planeamento-clube/semanal/novo", status_code=303)
+    try:
+        semanal = _criar_plano_semanal_modelo(planeamento_mensal_id, titulo, data_inicio, data_fim, observacoes, estado)
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url="/planeamento-clube/semanal/novo", status_code=303)
+    db.add(semanal)
+    db.flush()
+    registar_historico_planeamento(db, utilizador, "plano_semanal", semanal.id, "criado", "Plano criado pela gestão semanal.")
+    registar_auditoria(db, utilizador, "criar", "plano_semanal", semanal.id, semanal.titulo, request)
+    db.commit()
+    return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal.id}", status_code=303)
+
+
+@router.post("/semanal/{semanal_id}/duplicar")
+def duplicar_plano_semanal(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+    origem = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not origem:
+        return RedirectResponse(url="/planeamento-clube/semanal", status_code=303)
+    deslocamento = timedelta(days=7)
+    copia = PlanoSemanalClube(
+        planeamento_mensal_id=origem.planeamento_mensal_id,
+        titulo=f"{origem.titulo} (cópia)",
+        data_inicio=origem.data_inicio + deslocamento,
+        data_fim=origem.data_fim + deslocamento,
+        observacoes=origem.observacoes,
+        estado="rascunho",
+    )
+    db.add(copia)
+    db.flush()
+    for evento in origem.eventos:
+        novo_evento = EventoPlaneamentoClube(
+            tipo=evento.tipo, titulo=evento.titulo, descricao=evento.descricao,
+            data=evento.data + deslocamento, hora_inicio=evento.hora_inicio, hora_fim=evento.hora_fim,
+            planeamento_anual_id=evento.planeamento_anual_id, planeamento_mensal_id=evento.planeamento_mensal_id,
+            plano_semanal_id=copia.id, equipa_id=evento.equipa_id, espaco_id=evento.espaco_id,
+            treinador_id=evento.treinador_id, aplica_a_todas_equipas=evento.aplica_a_todas_equipas,
+            origem=OrigemEventoPlaneamentoClubeEnum.manual, observacoes=evento.observacoes,
+        )
+        novo_evento.equipas = list(evento.equipas)
+        db.add(novo_evento)
+    for atribuicao in origem.atribuicoes_espacos:
+        db.add(AtribuicaoEspacoSemanal(
+            plano_semanal_id=copia.id, espaco_id=atribuicao.espaco_id, equipa_id=atribuicao.equipa_id,
+            data=atribuicao.data + deslocamento, hora_inicio=atribuicao.hora_inicio, hora_fim=atribuicao.hora_fim,
+            tipo_ocupacao=atribuicao.tipo_ocupacao, estado=EstadoAtribuicaoEspacoEnum.rascunho,
+            origem=OrigemAtribuicaoEspacoEnum.manual, observacoes=atribuicao.observacoes,
+        ))
+    registar_historico_planeamento(db, utilizador, "plano_semanal", copia.id, "duplicado", f"Duplicado do plano #{origem.id}.")
+    registar_auditoria(db, utilizador, "duplicar", "plano_semanal", copia.id, origem.titulo, request)
+    db.commit()
+    set_flash(request, "Plano duplicado como rascunho. Confirma datas, equipas e espaços antes de publicar.")
+    return RedirectResponse(url=f"/planeamento-clube/semanal/{copia.id}/editar", status_code=303)
+
+
+@router.post("/mensal/{mensal_id}/semanal/novo")
+async def criar_plano_semanal(
+    mensal_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    titulo: str = Form(...),
+    data_inicio: str = Form(...),
+    data_fim: str = Form(...),
+    observacoes: str = Form(""),
+    estado: str = Form("rascunho"),
+):
+
+    mensal = db.query(PlaneamentoClubeMensal).filter(PlaneamentoClubeMensal.id == mensal_id).first()
+    if not mensal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    try:
+        semanal = _criar_plano_semanal_modelo(
+            mensal_id,
+            titulo,
+            data_inicio,
+            data_fim,
+            observacoes,
+            estado,
+        )
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal_id}", status_code=303)
+    db.add(semanal)
+    db.flush()
+    registar_historico_planeamento(
+        db,
+        utilizador,
+        "plano_semanal",
+        semanal.id,
+        "criado",
+        f"Plano criado a partir do planeamento mensal {mensal_id}.",
+    )
+    registar_auditoria(
+        db,
+        utilizador,
+        "criar",
+        "plano_semanal",
+        semanal.id,
+        "Plano semanal criado.",
+        request,
+    )
+    db.commit()
+    db.refresh(semanal)
+
+    return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal.id}", status_code=303)
+
+
+@router.get("/semanal/{semanal_id}", response_class=HTMLResponse)
+def detalhe_plano_semanal(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.plano_semanal_id == semanal_id
+    ).order_by(EventoPlaneamentoClube.data.desc(), EventoPlaneamentoClube.hora_inicio.desc()).all()
+    atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.plano_semanal_id == semanal_id
+    ).order_by(
+        AtribuicaoEspacoSemanal.data.asc(),
+        AtribuicaoEspacoSemanal.hora_inicio.asc(),
+    ).all()
+    sessoes_sincronizadas = db.query(SessaoTreino).filter(
+        SessaoTreino.plano_semanal_clube_id == semanal_id,
+        SessaoTreino.origem == "planeamento_global",
+    ).order_by(SessaoTreino.data.asc(), SessaoTreino.id.asc()).all()
+    sessoes_sincronizadas = preparar_sessoes_para_ui(sessoes_sincronizadas)
+    calendario_semanal = _construir_calendario_semanal(semanal, eventos, atribuicoes)
+    mapa_espacos = construir_mapa_espacos_semanal(atribuicoes)
+    mensagem_sincronizacao = None
+    resumo_sincronizacao = None
+    if request.query_params.get("sincronizado") == "1":
+        resumo_sincronizacao = {
+            "geradas": int(request.query_params.get("geradas", "0")),
+            "atualizadas": int(request.query_params.get("atualizadas", "0")),
+            "ignoradas": int(request.query_params.get("ignoradas", "0")),
+            "ignoradas_manuais": int(request.query_params.get("ignoradas_manuais", "0")),
+            "sem_microciclo": int(request.query_params.get("sem_microciclo", "0")),
+            "inativadas": int(request.query_params.get("inativadas", "0")),
+        }
+        mensagem_sincronizacao = construir_resumo_sincronizacao_texto(resumo_sincronizacao)
+
+    ultima_sincronizacao = {
+        "em": formatar_data_hora(semanal.ultima_sincronizacao_em),
+        "por": semanal.ultima_sincronizacao_por,
+        "resumo": semanal.ultima_sincronizacao_resumo,
+    }
+
+    return templates.TemplateResponse(request, "planeamento_clube/semanal_detalhe.html", {
+        "utilizador": utilizador,
+        "semanal": semanal,
+        "estado_visual_plano": _obter_estado_visual_plano_semanal(semanal),
+        "eventos": eventos,
+        "atribuicoes": atribuicoes,
+        "mapa_espacos_operacional": mapa_espacos["mapa"],
+        "conflitos_espacos": mapa_espacos["conflitos"],
+        "sessoes_sincronizadas": sessoes_sincronizadas,
+        "calendario_semanal": calendario_semanal,
+        "resumo_sincronizacao": resumo_sincronizacao,
+        "mensagem_sincronizacao": mensagem_sincronizacao,
+        "ultima_sincronizacao": ultima_sincronizacao,
+        "erro": _obter_mensagem_erro_eliminacao(request.query_params.get("erro")),
+    })
+
+
+@router.get("/semanal/{semanal_id}/pdf")
+def exportar_pdf_plano_semanal(
+    semanal_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+    eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.plano_semanal_id == semanal_id
+    ).order_by(EventoPlaneamentoClube.data.asc(), EventoPlaneamentoClube.hora_inicio.asc()).all()
+    atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.plano_semanal_id == semanal_id
+    ).order_by(AtribuicaoEspacoSemanal.data.asc(), AtribuicaoEspacoSemanal.hora_inicio.asc()).all()
+    sessoes_sincronizadas = db.query(SessaoTreino).filter(
+        SessaoTreino.plano_semanal_clube_id == semanal_id,
+        SessaoTreino.origem == "planeamento_global",
+    ).order_by(SessaoTreino.data.asc(), SessaoTreino.id.asc()).all()
+    sessoes_sincronizadas = preparar_sessoes_para_ui(sessoes_sincronizadas)
+    calendario_semanal = _construir_calendario_semanal(semanal, eventos, atribuicoes)
+    mapa_espacos = construir_mapa_espacos_semanal(atribuicoes)
+    historico = db.query(HistoricoPlaneamentoClube).filter(
+        HistoricoPlaneamentoClube.entidade == "plano_semanal",
+        HistoricoPlaneamentoClube.entidade_id == semanal_id,
+    ).order_by(HistoricoPlaneamentoClube.criado_em.desc()).limit(20).all()
+    return _responder_pdf(
+        request,
+        "planeamento_clube/semanal_pdf.html",
+        {
+            "utilizador": utilizador,
+            "semanal": semanal,
+            "estado_visual_plano": _obter_estado_visual_plano_semanal(semanal),
+            "eventos": eventos,
+            "atribuicoes": atribuicoes,
+            "mapa_espacos_operacional": mapa_espacos["mapa"],
+        "conflitos_espacos": mapa_espacos["conflitos"],
+        "historico": historico,
+            "sessoes_sincronizadas": sessoes_sincronizadas,
+            "calendario_semanal": calendario_semanal,
+            "hoje": date.today(),
+        },
+        f"plano_semanal_{semanal.id}_{semanal.data_inicio}.pdf",
+    )
+
+
+@router.get("/semanal/{semanal_id}/editar", response_class=HTMLResponse)
+def form_editar_plano_semanal(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    contexto = _obter_contexto_form_semanal()
+    contexto.update({
+        "utilizador": utilizador,
+        "semanal": semanal,
+        "modo": "editar",
+    })
+    return templates.TemplateResponse(request, "planeamento_clube/semanal_form.html", contexto)
+
+
+@router.post("/semanal/{semanal_id}/publicar")
+def publicar_plano_semanal(
+    semanal_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+):
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
+    conflitos = _obter_conflitos_publicacao(db, semanal)
+    if conflitos:
+        set_flash(request, f"Não é possível publicar: existem {len(conflitos)} conflito(s) de espaço.", "error")
+        return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal_id}", status_code=303)
+    semanal.estado = "ativo"
+    registar_historico_planeamento(db, utilizador, "plano_semanal", semanal_id, "publicado", "Plano publicado após validação de conflitos.")
+    registar_auditoria(db, utilizador, "publicar", "plano_semanal", semanal_id, "Plano semanal publicado.", request)
+    db.commit()
+    set_flash(request, "Plano semanal publicado e validado.")
+    return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal_id}", status_code=303)
+
+
+@router.post("/semanal/{semanal_id}/retirar-publicacao")
+def retirar_publicacao_plano_semanal(
+    semanal_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+):
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
+    semanal.estado = "rascunho"
+    registar_historico_planeamento(db, utilizador, "plano_semanal", semanal_id, "retirado_publicacao", "Plano voltou a rascunho.")
+    registar_auditoria(db, utilizador, "retirar_publicacao", "plano_semanal", semanal_id, None, request)
+    db.commit()
+    set_flash(request, "Plano semanal voltou a rascunho.")
+    return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal_id}", status_code=303)
+
+
+@router.post("/semanal/{semanal_id}/editar")
+async def editar_plano_semanal(
+    semanal_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    titulo: str = Form(...),
+    data_inicio: str = Form(...),
+    data_fim: str = Form(...),
+    observacoes: str = Form(""),
+    estado: str = Form("rascunho"),
+):
+
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    try:
+        _atualizar_plano_semanal_modelo(
+            semanal,
+            titulo,
+            data_inicio,
+            data_fim,
+            observacoes,
+            estado,
+        )
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal.id}/editar", status_code=303)
+    if semanal.estado == "ativo" and _obter_conflitos_publicacao(db, semanal):
+        set_flash(request, "Corrige os conflitos de espaço antes de manter o plano publicado.", "error")
+        return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal.id}/editar", status_code=303)
+    registar_historico_planeamento(db, utilizador, "plano_semanal", semanal.id, "editado", "Dados do plano semanal atualizados.")
+    registar_auditoria(db, utilizador, "editar", "plano_semanal", semanal.id, semanal.titulo, request)
+    db.commit()
+
+    return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal.id}", status_code=303)
+
+
+@router.post("/semanal/{semanal_id}/eliminar")
+async def eliminar_plano_semanal(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
+
+    tem_eventos = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.plano_semanal_id == semanal_id).first()
+    tem_atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(AtribuicaoEspacoSemanal.plano_semanal_id == semanal_id).first()
+    if tem_eventos or tem_atribuicoes:
+        return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal_id}?erro=semanal_com_dependencias", status_code=303)
+
+    mensal_id = semanal.planeamento_mensal_id
+    db.delete(semanal)
+    db.commit()
+
+    return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal_id}", status_code=303)
+
+
+@router.post("/semanal/{semanal_id}/sincronizar")
+async def sincronizar_plano_semanal(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
+
+    resumo = _sincronizar_plano_semanal(db, semanal)
+    semanal.ultima_sincronizacao_em = datetime.now()
+    semanal.ultima_sincronizacao_por = utilizador.username
+    semanal.ultima_sincronizacao_resumo = construir_resumo_sincronizacao_texto(resumo)
+    registar_historico_planeamento(db, utilizador, "plano_semanal", semanal.id, "sincronizado", semanal.ultima_sincronizacao_resumo)
+    registar_auditoria(db, utilizador, "sincronizar", "plano_semanal", semanal.id, semanal.ultima_sincronizacao_resumo, request)
+    db.commit()
+
+    return RedirectResponse(
+        url=(
+            f"/planeamento-clube/semanal/{semanal_id}"
+            f"?sincronizado=1"
+            f"&geradas={resumo['geradas']}"
+            f"&atualizadas={resumo['atualizadas']}"
+            f"&ignoradas={resumo['ignoradas']}"
+            f"&ignoradas_manuais={resumo['ignoradas_manuais']}"
+            f"&sem_microciclo={resumo['sem_microciclo']}"
+            f"&inativadas={resumo['inativadas']}"
+        ),
+        status_code=303,
+    )
+
+
+@router.get("/espacos", response_class=HTMLResponse)
+def listar_espacos(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    espacos = db.query(EspacoTreino).order_by(EspacoTreino.ativo.desc(), EspacoTreino.nome.asc()).all()
+    return templates.TemplateResponse(request, "planeamento_clube/espacos_lista.html", {
+        "utilizador": utilizador,
+        "espacos": espacos,
+    })
+
+
+@router.get("/espacos/novo", response_class=HTMLResponse)
+def form_novo_espaco(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    contexto = _obter_contexto_form_espaco()
+    contexto.update({
+        "utilizador": utilizador,
+        "espaco": None,
+        "modo": "criar",
+    })
+    return templates.TemplateResponse(request, "planeamento_clube/espaco_form.html", contexto)
+
+
+@router.post("/espacos/novo")
+async def criar_espaco(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    nome: str = Form(...),
+    tipo: str = Form(...),
+    localizacao: str = Form(""),
+    capacidade: str = Form(""),
+    ativo: str = Form("true"),
+    observacoes: str = Form(""),
+):
+
+    try:
+        espaco = _criar_espaco(nome, tipo, localizacao, capacidade, ativo, observacoes)
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url="/planeamento-clube/espacos/novo", status_code=303)
+    db.add(espaco)
+    db.commit()
+    db.refresh(espaco)
+
+    return RedirectResponse(url=f"/planeamento-clube/espacos/{espaco.id}", status_code=303)
+
+
+@router.get("/espacos/{espaco_id}", response_class=HTMLResponse)
+def detalhe_espaco(espaco_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+
+    espaco = db.query(EspacoTreino).filter(EspacoTreino.id == espaco_id).first()
+    if not espaco:
+        return RedirectResponse(url="/planeamento-clube/espacos")
+
+    hoje = date.today()
+    atribuicoes_associadas = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.espaco_id == espaco_id,
+        AtribuicaoEspacoSemanal.data >= hoje,
+    ).order_by(
+        AtribuicaoEspacoSemanal.data.asc(),
+        AtribuicaoEspacoSemanal.hora_inicio.asc(),
+    ).all()
+    ocupacao_recente = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.espaco_id == espaco_id,
+        AtribuicaoEspacoSemanal.data < hoje,
+    ).order_by(
+        AtribuicaoEspacoSemanal.data.desc(),
+        AtribuicaoEspacoSemanal.hora_inicio.desc(),
+    ).limit(10).all()
+
+    return templates.TemplateResponse(request, "planeamento_clube/espaco_detalhe.html", {
+        "utilizador": utilizador,
+        "espaco": espaco,
+        "atribuicoes_associadas": atribuicoes_associadas,
+        "ocupacao_recente": ocupacao_recente,
+        "erro": _obter_mensagem_erro_eliminacao(
+            "espaco_com_atribuicoes" if request.query_params.get("erro") == "nao_pode_eliminar_com_atribuicoes" else request.query_params.get("erro")
+        ),
+    })
+
+
+@router.get("/espacos/{espaco_id}/editar", response_class=HTMLResponse)
+def form_editar_espaco(espaco_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    espaco = db.query(EspacoTreino).filter(EspacoTreino.id == espaco_id).first()
+    if not espaco:
+        return RedirectResponse(url="/planeamento-clube/espacos")
+
+    contexto = _obter_contexto_form_espaco()
+    contexto.update({
+        "utilizador": utilizador,
+        "espaco": espaco,
+        "modo": "editar",
+    })
+    return templates.TemplateResponse(request, "planeamento_clube/espaco_form.html", contexto)
+
+
+@router.post("/espacos/{espaco_id}/editar")
+async def editar_espaco(
+    espaco_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    nome: str = Form(...),
+    tipo: str = Form(...),
+    localizacao: str = Form(""),
+    capacidade: str = Form(""),
+    ativo: str = Form("true"),
+    observacoes: str = Form(""),
+):
+
+    espaco = db.query(EspacoTreino).filter(EspacoTreino.id == espaco_id).first()
+    if not espaco:
+        return RedirectResponse(url="/planeamento-clube/espacos")
+
+    try:
+        _atualizar_espaco(espaco, nome, tipo, localizacao, capacidade, ativo, observacoes)
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/planeamento-clube/espacos/{espaco.id}/editar", status_code=303)
+    db.commit()
+
+    return RedirectResponse(url=f"/planeamento-clube/espacos/{espaco.id}", status_code=303)
+
+
+@router.post("/espacos/{espaco_id}/eliminar")
+async def eliminar_espaco(espaco_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    espaco = db.query(EspacoTreino).filter(EspacoTreino.id == espaco_id).first()
+    if not espaco:
+        return RedirectResponse(url="/planeamento-clube/espacos", status_code=303)
+
+    tem_atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.espaco_id == espaco_id
+    ).first()
+    if tem_atribuicoes:
+        return RedirectResponse(
+            url=f"/planeamento-clube/espacos/{espaco_id}?erro=espaco_com_atribuicoes",
+            status_code=303,
+        )
+
+    db.delete(espaco)
+    db.commit()
+
+    return RedirectResponse(url="/planeamento-clube/espacos", status_code=303)
+
+
+@router.get("/semanal/{semanal_id}/espacos", response_class=HTMLResponse)
+def listar_ocupacao_semanal_espacos(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.plano_semanal_id == semanal_id
+    ).order_by(
+        AtribuicaoEspacoSemanal.data.asc(),
+        AtribuicaoEspacoSemanal.hora_inicio.asc(),
+        AtribuicaoEspacoSemanal.espaco_id.asc(),
+    ).all()
+
+    return templates.TemplateResponse(request, "planeamento_clube/espacos_lista.html", {
+        "utilizador": utilizador,
+        "espacos": db.query(EspacoTreino).order_by(EspacoTreino.nome).all(),
+        "semanal": semanal,
+        "atribuicoes_semanais": atribuicoes,
+    })
+
+
+@router.get("/semanal/{semanal_id}/atribuicoes/nova", response_class=HTMLResponse)
+def form_nova_atribuicao(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    contexto = _preparar_atribuicao_form(db, utilizador, "criar", semanal, None)
+    return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto)
+
+
+@router.post("/semanal/{semanal_id}/atribuicoes/nova")
+async def criar_atribuicao(
+    semanal_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    espaco_id: str = Form(...),
+    equipa_id: str = Form(""),
+    evento_id: str = Form(""),
+    data_atribuicao: str = Form(...),
+    hora_inicio: str = Form(...),
+    hora_fim: str = Form(...),
+    tipo_ocupacao: str = Form(...),
+    estado: str = Form("rascunho"),
+    origem: str = Form("manual"),
+    observacoes: str = Form(""),
+):
+
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/anual")
+    hora_inicio = normalizar_hora(hora_inicio, permitir_vazio=False) or hora_inicio
+    hora_fim = normalizar_hora(hora_fim, permitir_vazio=False) or hora_fim
+
+    dados_formulario = {
+        "espaco_id": espaco_id,
+        "equipa_id": equipa_id,
+        "evento_id": evento_id,
+        "data_atribuicao": data_atribuicao,
+        "hora_inicio": hora_inicio,
+        "hora_fim": hora_fim,
+        "tipo_ocupacao": tipo_ocupacao,
+        "estado": estado,
+        "origem": origem,
+        "observacoes": observacoes,
+    }
+    erro_validacao = _validar_dados_atribuicao(semanal, data_atribuicao, hora_inicio, hora_fim)
+    if erro_validacao:
+        contexto = _preparar_atribuicao_form(db, utilizador, "criar", semanal, None, erro_validacao, dados_formulario)
+        return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
+
+    try:
+        espaco_id_convertido = _converter_id(espaco_id, "Espaço", obrigatorio=True)
+        data_convertida = _converter_data(data_atribuicao, "Data da atribuição")
+    except ValueError as erro:
+        contexto = _preparar_atribuicao_form(db, utilizador, "criar", semanal, None, str(erro), dados_formulario)
+        return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
+
+    conflito = _obter_atribuicao_conflitante(
+        db,
+        espaco_id_convertido,
+        data_convertida,
+        hora_inicio,
+        hora_fim,
+    )
+    if conflito:
+        erro = (
+            f"Já existe uma atribuição activa para este espaço em {conflito.data} "
+            f"entre {conflito.hora_inicio} e {conflito.hora_fim}."
+        )
+        contexto = _preparar_atribuicao_form(db, utilizador, "criar", semanal, None, erro, dados_formulario)
+        return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
+
+    try:
+        atribuicao = _criar_atribuicao(
+            semanal_id,
+            espaco_id,
+            equipa_id,
+            evento_id,
+            data_atribuicao,
+            hora_inicio,
+            hora_fim,
+            tipo_ocupacao,
+            estado,
+            origem,
+            observacoes,
+        )
+    except ValueError as erro:
+        contexto = _preparar_atribuicao_form(db, utilizador, "criar", semanal, None, str(erro), dados_formulario)
+        return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
+    db.add(atribuicao)
+    db.commit()
+    db.refresh(atribuicao)
+
+    return RedirectResponse(url=f"/planeamento-clube/atribuicoes/{atribuicao.id}", status_code=303)
+
+
+@router.get("/atribuicoes/{atribuicao_id}", response_class=HTMLResponse)
+def detalhe_atribuicao(atribuicao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    atribuicao = db.query(AtribuicaoEspacoSemanal).filter(AtribuicaoEspacoSemanal.id == atribuicao_id).first()
+    if not atribuicao:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    return templates.TemplateResponse(request, "planeamento_clube/atribuicao_detalhe.html", {
+        "utilizador": utilizador,
+        "atribuicao": atribuicao,
+    })
+
+
+@router.get("/atribuicoes/{atribuicao_id}/editar", response_class=HTMLResponse)
+def form_editar_atribuicao(atribuicao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    atribuicao = db.query(AtribuicaoEspacoSemanal).filter(AtribuicaoEspacoSemanal.id == atribuicao_id).first()
+    if not atribuicao:
+        return RedirectResponse(url="/planeamento-clube/anual")
+
+    contexto = _preparar_atribuicao_form(
+        db,
+        utilizador,
+        "editar",
+        atribuicao.plano_semanal,
+        atribuicao,
+    )
+    return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto)
+
+
+@router.post("/atribuicoes/{atribuicao_id}/editar")
+async def editar_atribuicao(
+    atribuicao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    espaco_id: str = Form(...),
+    equipa_id: str = Form(""),
+    evento_id: str = Form(""),
+    data_atribuicao: str = Form(...),
+    hora_inicio: str = Form(...),
+    hora_fim: str = Form(...),
+    tipo_ocupacao: str = Form(...),
+    estado: str = Form("rascunho"),
+    origem: str = Form("manual"),
+    observacoes: str = Form(""),
+):
+
+    atribuicao = db.query(AtribuicaoEspacoSemanal).filter(AtribuicaoEspacoSemanal.id == atribuicao_id).first()
+    if not atribuicao:
+        return RedirectResponse(url="/planeamento-clube/anual")
+    hora_inicio = normalizar_hora(hora_inicio, permitir_vazio=False) or hora_inicio
+    hora_fim = normalizar_hora(hora_fim, permitir_vazio=False) or hora_fim
+
+    semanal = atribuicao.plano_semanal
+    dados_formulario = {
+        "espaco_id": espaco_id,
+        "equipa_id": equipa_id,
+        "evento_id": evento_id,
+        "data_atribuicao": data_atribuicao,
+        "hora_inicio": hora_inicio,
+        "hora_fim": hora_fim,
+        "tipo_ocupacao": tipo_ocupacao,
+        "estado": estado,
+        "origem": origem,
+        "observacoes": observacoes,
+    }
+    erro_validacao = _validar_dados_atribuicao(semanal, data_atribuicao, hora_inicio, hora_fim)
+    if erro_validacao:
+        contexto = _preparar_atribuicao_form(
+            db,
+            utilizador,
+            "editar",
+            semanal,
+            atribuicao,
+            erro_validacao,
+            dados_formulario,
+        )
+        return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
+
+    try:
+        espaco_id_convertido = _converter_id(espaco_id, "Espaço", obrigatorio=True)
+        data_convertida = _converter_data(data_atribuicao, "Data da atribuição")
+    except ValueError as erro:
+        contexto = _preparar_atribuicao_form(
+            db,
+            utilizador,
+            "editar",
+            semanal,
+            atribuicao,
+            str(erro),
+            dados_formulario,
+        )
+        return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
+
+    conflito = _obter_atribuicao_conflitante(
+        db,
+        espaco_id_convertido,
+        data_convertida,
+        hora_inicio,
+        hora_fim,
+        atribuicao_id_excluir=atribuicao.id,
+    )
+    if conflito:
+        erro = (
+            f"Já existe uma atribuição activa para este espaço em {conflito.data} "
+            f"entre {conflito.hora_inicio} e {conflito.hora_fim}."
+        )
+        contexto = _preparar_atribuicao_form(
+            db,
+            utilizador,
+            "editar",
+            semanal,
+            atribuicao,
+            erro,
+            dados_formulario,
+        )
+        return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
+
+    try:
+        _atualizar_atribuicao(
+            atribuicao,
+            semanal.id,
+            espaco_id,
+            equipa_id,
+            evento_id,
+            data_atribuicao,
+            hora_inicio,
+            hora_fim,
+            tipo_ocupacao,
+            estado,
+            origem,
+            observacoes,
+        )
+    except ValueError as erro:
+        contexto = _preparar_atribuicao_form(
+            db,
+            utilizador,
+            "editar",
+            semanal,
+            atribuicao,
+            str(erro),
+            dados_formulario,
+        )
+        return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
+    db.commit()
+
+    return RedirectResponse(url=f"/planeamento-clube/atribuicoes/{atribuicao.id}", status_code=303)
+
+
+@router.post("/atribuicoes/{atribuicao_id}/eliminar")
+async def eliminar_atribuicao(atribuicao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    atribuicao = db.query(AtribuicaoEspacoSemanal).filter(AtribuicaoEspacoSemanal.id == atribuicao_id).first()
+    if not atribuicao:
+        return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
+
+    semanal_id = atribuicao.plano_semanal_id
+    db.delete(atribuicao)
+    db.commit()
+
+    return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal_id}", status_code=303)
+
+
+@router.get("/eventos", response_class=HTMLResponse)
+def listar_eventos(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    return templates.TemplateResponse(request, "planeamento_clube/eventos_lista.html", {
+        "utilizador": utilizador,
+        "eventos": _listar_eventos_ordenados(db),
+        "metadados_tipo_agenda": metadados_tipo_agenda,
+    })
+
+
+@router.get("/eventos/novo", response_class=HTMLResponse)
+def form_novo_evento(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    contexto = _obter_contexto_form_evento(db)
+    contexto.update({
+        "utilizador": utilizador,
+        "evento": None,
+        "modo": "criar",
+        "prefill": {
+            "data": request.query_params.get("data", ""),
+            "planeamento_anual_id": request.query_params.get("planeamento_anual_id", ""),
+            "planeamento_mensal_id": request.query_params.get("planeamento_mensal_id", ""),
+            "plano_semanal_id": request.query_params.get("plano_semanal_id", ""),
+        },
+    })
+    return templates.TemplateResponse(request, "planeamento_clube/eventos_form.html", contexto)
+
+
+@router.post("/eventos/novo")
+async def criar_evento(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    tipo: str = Form(...),
+    titulo: str = Form(...),
+    descricao: str = Form(""),
+    data_evento: str = Form(...),
+    hora_inicio: str = Form(""),
+    hora_fim: str = Form(""),
+    planeamento_anual_id: str = Form(""),
+    planeamento_mensal_id: str = Form(""),
+    plano_semanal_id: str = Form(""),
+    equipa_id: str = Form(""),
+    equipas_ids: list[str] = Form([]),
+    espaco_id: str = Form(""),
+    treinador_id: str = Form(""),
+    aplica_a_todas_equipas: str = Form("false"),
+    observacoes: str = Form(""),
+):
+
+    try:
+        evento = _criar_evento_manual(
+            tipo,
+            titulo,
+            descricao,
+            data_evento,
+            hora_inicio,
+            hora_fim,
+            planeamento_anual_id,
+            planeamento_mensal_id,
+            plano_semanal_id,
+            equipa_id,
+            espaco_id,
+            treinador_id,
+            aplica_a_todas_equipas,
+            observacoes,
+        )
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url="/planeamento-clube/eventos/novo", status_code=303)
+    _sincronizar_equipas_evento(db, evento, equipas_ids)
+    db.add(evento)
+    db.flush()
+    conflitos = _conflitos_evento(db, evento)
+    if conflitos:
+        db.rollback()
+        set_flash(request, "Conflito de agenda com: " + "; ".join(conflitos[:3]), "error")
+        return RedirectResponse(url="/planeamento-clube/eventos/novo", status_code=303)
+    db.commit()
+    db.refresh(evento)
+
+    return RedirectResponse(url=f"/planeamento-clube/eventos/{evento.id}", status_code=303)
+
+
+@router.post("/eventos/jogo/{jogo_id}")
+async def adicionar_jogo_ao_planeamento(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    planeamento_anual_id: str = Form(""),
+    planeamento_mensal_id: str = Form(""),
+    plano_semanal_id: str = Form(""),
+    espaco_id: str = Form(""),
+    equipas_ids: list[str] = Form([]),
+    aplica_a_todas_equipas: str = Form("false"),
+    observacoes: str = Form(""),
+):
+
+    jogo = db.query(Jogo).filter(Jogo.id == jogo_id).first()
+    if not jogo:
+        return RedirectResponse(url="/planeamento-clube/eventos")
+
+    try:
+        anual_id_convertido = _converter_id(planeamento_anual_id, "Planeamento anual")
+        mensal_id_convertido = _converter_id(planeamento_mensal_id, "Planeamento mensal")
+        semanal_id_convertido = _converter_id(plano_semanal_id, "Plano semanal")
+        espaco_id_convertido = _converter_id(espaco_id, "Espaço")
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url="/planeamento-clube/eventos", status_code=303)
+
+    evento = EventoPlaneamentoClube(
+        tipo=TipoEventoPlaneamentoClubeEnum.jogo,
+        titulo=_obter_titulo_jogo(jogo),
+        descricao=jogo.competicao or None,
+        data=jogo.data,
+        hora_inicio=normalizar_hora(jogo.hora),
+        hora_fim=None,
+        planeamento_anual_id=anual_id_convertido,
+        planeamento_mensal_id=mensal_id_convertido,
+        plano_semanal_id=semanal_id_convertido,
+        equipa_id=jogo.equipa_id,
+        espaco_id=espaco_id_convertido,
+        treinador_id=None,
+        jogo_id=jogo.id,
+        aplica_a_todas_equipas=aplica_a_todas_equipas == "true",
+        origem=OrigemEventoPlaneamentoClubeEnum.jogo_existente,
+        observacoes=observacoes or jogo.observacoes or None,
+    )
+    _sincronizar_equipas_evento(db, evento, equipas_ids or ([str(jogo.equipa_id)] if jogo.equipa_id and aplica_a_todas_equipas != "true" else []))
+    db.add(evento)
+    db.commit()
+    db.refresh(evento)
+
+    return RedirectResponse(url=f"/planeamento-clube/eventos/{evento.id}", status_code=303)
+
+
+@router.post("/eventos/atividade/{atividade_id}")
+async def adicionar_atividade_ao_planeamento(
+    atividade_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    planeamento_anual_id: str = Form(""),
+    planeamento_mensal_id: str = Form(""),
+    plano_semanal_id: str = Form(""),
+    espaco_id: str = Form(""),
+    equipas_ids: list[str] = Form([]),
+    aplica_a_todas_equipas: str = Form("false"),
+    observacoes: str = Form(""),
+):
+
+    atividade = db.query(Atividade).filter(Atividade.id == atividade_id).first()
+    if not atividade:
+        return RedirectResponse(url="/planeamento-clube/eventos")
+
+    try:
+        anual_id_convertido = _converter_id(planeamento_anual_id, "Planeamento anual")
+        mensal_id_convertido = _converter_id(planeamento_mensal_id, "Planeamento mensal")
+        semanal_id_convertido = _converter_id(plano_semanal_id, "Plano semanal")
+        espaco_id_convertido = _converter_id(espaco_id, "Espaço")
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url="/planeamento-clube/eventos", status_code=303)
+
+    evento = EventoPlaneamentoClube(
+        tipo=TipoEventoPlaneamentoClubeEnum.atividade_extra,
+        titulo=atividade.titulo,
+        descricao=atividade.descricao or atividade.tipo or None,
+        data=atividade.data,
+        hora_inicio=None,
+        hora_fim=None,
+        planeamento_anual_id=anual_id_convertido,
+        planeamento_mensal_id=mensal_id_convertido,
+        plano_semanal_id=semanal_id_convertido,
+        equipa_id=None,
+        espaco_id=espaco_id_convertido,
+        treinador_id=None,
+        atividade_id=atividade.id,
+        aplica_a_todas_equipas=aplica_a_todas_equipas == "true",
+        origem=OrigemEventoPlaneamentoClubeEnum.atividade_existente,
+        observacoes=observacoes or atividade.observacoes or None,
+    )
+    _sincronizar_equipas_evento(db, evento, equipas_ids)
+    db.add(evento)
+    db.commit()
+    db.refresh(evento)
+
+    return RedirectResponse(url=f"/planeamento-clube/eventos/{evento.id}", status_code=303)
+
+
+@router.get("/eventos/{evento_id}", response_class=HTMLResponse)
+def detalhe_evento(evento_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+
+    evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
+    if not evento:
+        return RedirectResponse(url="/planeamento-clube/eventos")
+
+    return templates.TemplateResponse(request, "planeamento_clube/evento_detalhe.html", {
+        "utilizador": utilizador,
+        "evento": evento,
+        "metadados_tipo_agenda": metadados_tipo_agenda,
+    })
+
+
+@router.get("/eventos/{evento_id}/editar", response_class=HTMLResponse)
+def form_editar_evento(evento_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
+    if not evento:
+        return RedirectResponse(url="/planeamento-clube/eventos")
+
+    contexto = _obter_contexto_form_evento(db)
+    contexto.update({
+        "utilizador": utilizador,
+        "evento": evento,
+        "modo": "editar",
+    })
+    return templates.TemplateResponse(request, "planeamento_clube/eventos_form.html", contexto)
+
+
+@router.post("/eventos/{evento_id}/editar")
+async def editar_evento(
+    evento_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    tipo: str = Form(...),
+    titulo: str = Form(...),
+    descricao: str = Form(""),
+    data_evento: str = Form(...),
+    hora_inicio: str = Form(""),
+    hora_fim: str = Form(""),
+    planeamento_anual_id: str = Form(""),
+    planeamento_mensal_id: str = Form(""),
+    plano_semanal_id: str = Form(""),
+    equipa_id: str = Form(""),
+    equipas_ids: list[str] = Form([]),
+    espaco_id: str = Form(""),
+    treinador_id: str = Form(""),
+    aplica_a_todas_equipas: str = Form("false"),
+    observacoes: str = Form(""),
+):
+
+    evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
+    if not evento:
+        return RedirectResponse(url="/planeamento-clube/eventos")
+
+    try:
+        _atualizar_evento(
+            evento,
+            tipo,
+            titulo,
+            descricao,
+            data_evento,
+            hora_inicio,
+            hora_fim,
+            planeamento_anual_id,
+            planeamento_mensal_id,
+            plano_semanal_id,
+            equipa_id,
+            espaco_id,
+            treinador_id,
+            aplica_a_todas_equipas,
+            observacoes,
+        )
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/planeamento-clube/eventos/{evento.id}/editar", status_code=303)
+    _sincronizar_equipas_evento(db, evento, equipas_ids)
+    conflitos = _conflitos_evento(db, evento)
+    if conflitos:
+        db.rollback()
+        set_flash(request, "Conflito de agenda com: " + "; ".join(conflitos[:3]), "error")
+        return RedirectResponse(url=f"/planeamento-clube/eventos/{evento.id}/editar", status_code=303)
+    db.commit()
+
+    return RedirectResponse(url=f"/planeamento-clube/eventos/{evento.id}", status_code=303)
+
+
+@router.post("/eventos/{evento_id}/eliminar")
+async def eliminar_evento(evento_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+
+    evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
+    if evento:
+        sessoes_geradas = db.query(SessaoTreino).filter(
+            SessaoTreino.evento_planeamento_clube_id == evento.id,
+            SessaoTreino.origem == "planeamento_global",
+        ).all()
+        for sessao in sessoes_geradas:
+            sessao.ativa = False
+            sessao.sincronizada = False
+            sessao.evento_planeamento_clube_id = None
+        for atribuicao in evento.atribuicoes_espaco:
+            atribuicao.evento_id = None
+            if atribuicao.origem == OrigemAtribuicaoEspacoEnum.evento_global:
+                atribuicao.origem = OrigemAtribuicaoEspacoEnum.manual
+        db.delete(evento)
+        db.commit()
+
+    return RedirectResponse(url="/planeamento-clube/eventos", status_code=303)

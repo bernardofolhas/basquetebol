@@ -1,0 +1,60 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ planeamento.titulo }}</title>
+    <style>
+        * { box-sizing: border-box; }
+        @page { size: A4 landscape; margin: 10mm; }
+        body { margin: 0; font-family: Arial, sans-serif; color: #172033; font-size: 9px; }
+        .header { background: #d90416; color: white; padding: 12px 15px; display: flex; justify-content: space-between; border: 1px solid #97000f; }
+        h1 { margin: 0; font-size: 20px; }
+        h2 { margin: 0 0 6px; font-size: 10px; text-transform: uppercase; }
+        .sub { margin-top: 4px; color: #fee2e2; }
+        .right { text-align: right; font-size: 8px; }
+        .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin: 10px 0; }
+        .stat { border: 1px solid #cbd5e1; padding: 8px; text-align: center; background: #f8fafc; }
+        .stat strong { display: block; font-size: 16px; color: #b91c1c; }
+        .stat span { color: #64748b; font-size: 7px; text-transform: uppercase; }
+        .columns { display: grid; grid-template-columns: 33% 67%; gap: 10px; align-items: start; }
+        .panel { border: 1px solid #cbd5e1; padding: 8px; margin-bottom: 9px; }
+        .panel-title { background: #e5e7eb; padding: 4px 6px; color: #172033; }
+        .objective { padding: 5px; border: 1px solid #dbeafe; background: #f8fbff; margin: 4px 0; }
+        .objective strong { display: block; color: #1d4ed8; font-size: 7px; text-transform: uppercase; }
+        .objective p { margin: 2px 0 0; white-space: pre-line; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #334155; color: white; text-align: left; padding: 5px; font-size: 8px; }
+        td { border: 1px solid #cbd5e1; padding: 5px; vertical-align: top; }
+        tr:nth-child(even) td { background: #f8fafc; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+        .badge { color: #991b1b; background: #fee2e2; border-radius: 8px; padding: 2px 5px; font-weight: bold; font-size: 7px; }
+        .footer { border-top: 1px solid #cbd5e1; margin-top: 9px; padding-top: 5px; display: flex; justify-content: space-between; color: #64748b; font-size: 8px; }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body>
+    {{ cabecalho_pdf(planeamento.titulo, 'Época ' ~ planeamento.epoca ~ ' · ' ~ (planeamento.data_inicio|data_pt) ~ ' → ' ~ (planeamento.data_fim|data_pt), 'Planeamento anual · ' ~ data_exportacao) }}
+    <div class="stats">
+        <div class="stat"><strong>{{ mensais | length }}</strong><span>Planeamentos mensais</span></div>
+        <div class="stat"><strong>{{ dashboard_planeamento.estatisticas.total_treinos }}</strong><span>Treinos</span></div>
+        <div class="stat"><strong>{{ dashboard_planeamento.estatisticas.total_jogos }}</strong><span>Jogos</span></div>
+        <div class="stat"><strong>{{ dashboard_planeamento.estatisticas.total_atividades }}</strong><span>Atividades</span></div>
+        <div class="stat"><strong>{{ dashboard_planeamento.estatisticas.total_equipas }}</strong><span>Equipas</span></div>
+    </div>
+    <div class="columns">
+        <div>
+            <div class="panel"><h2 class="panel-title">Objetivos gerais</h2><p style="white-space:pre-line;margin:0">{{ planeamento.objetivos_gerais or 'Sem objetivos gerais registados.' }}</p></div>
+            <div class="panel"><h2 class="panel-title">Planeamentos mensais</h2>
+                {% if mensais %}<table><thead><tr><th>Mês</th><th>Título</th><th>Estado</th></tr></thead><tbody>{% for mensal in mensais %}<tr><td>{{ mensal.mes }}/{{ mensal.ano }}</td><td>{{ mensal.titulo }}</td><td>{{ mensal.estado }}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Sem planeamentos mensais.</p>{% endif %}
+            </div>
+            {% if planeamento.observacoes %}<div class="panel"><h2 class="panel-title">Observações</h2><p style="white-space:pre-line;margin:0">{{ planeamento.observacoes }}</p></div>{% endif %}
+        </div>
+        <div class="panel"><h2 class="panel-title">Agenda integrada</h2>
+            {% if dashboard_planeamento.itens %}<table><thead><tr><th style="width:10%">Data</th><th style="width:9%">Dia</th><th style="width:11%">Tipo</th><th style="width:23%">Título</th><th style="width:14%">Horário</th><th style="width:16%">Equipa</th><th>Local / detalhe</th></tr></thead><tbody>{% for item in dashboard_planeamento.itens %}<tr><td>{{ item.data|data_pt }}</td><td>{{ item.dia_semana }}</td><td><span class="badge">{{ item.badge }}</span></td><td><strong>{{ item.titulo }}</strong></td><td>{{ item.horario }}</td><td>{{ item.equipa_nome or 'Clube' }}</td><td>{{ item.local }}{% if item.detalhe %} · {{ item.detalhe }}{% endif %}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Sem itens no período.</p>{% endif %}
+        </div>
+    </div>
+    {{ rodape_pdf('Planeamento anual · ' ~ planeamento.epoca) }}
+</body>
+</html>

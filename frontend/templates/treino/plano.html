@@ -1,209 +1,521 @@
 {% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
 
-{% block titulo %}Plano de Treino — {{ sessao.data }}{% endblock %}
+{% block titulo %}Plano de Treino — {{ sessao.data|data_pt }}{% endblock %}
 
 {% block conteudo %}
 
-<div class="mb-6">
-    <a href="/planeamento/microciclos/{{ sessao.microciclo_id }}" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar ao Microciclo</a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-2">Plano de Treino</h1>
-    <p class="text-gray-500 mt-1">{{ equipa.nome }} — {% if sessao.e_jogo %}Jogo{% else %}Treino {{ sessao.numero_treino }}{% endif %} — {{ sessao.data }}</p>
-</div>
-
-<!-- CABEÇALHO -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
-    <h2 class="font-semibold text-gray-700 mb-4">Cabeçalho</h2>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
-        <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-1">Equipa</p><p class="font-medium text-gray-800">{{ equipa.nome }}</p></div>
-        <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-1">Data</p><p class="font-medium text-gray-800">{{ sessao.data }}</p></div>
-        <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-1">Nº Treino</p><p class="font-medium text-gray-800">{{ sessao.numero_treino if sessao.numero_treino else "—" }}</p></div>
-        <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-1">Local</p><p class="font-medium text-gray-800">{{ sessao.local if sessao.local else "—" }}</p></div>
-    </div>
-    <form method="POST" action="/treino/planos/{{ plano.id }}/cabecalho" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-            <label class="block text-xs text-gray-500 mb-1">Hora de início</label>
-            <input type="text" name="hora_inicio" value="{{ plano.hora_inicio if plano.hora_inicio else '' }}" placeholder="Ex: 18:00" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-500 mb-1">Escalão</label>
-            <input type="text" name="escalao" value="{{ plano.escalao if plano.escalao else '' }}" placeholder="Ex: U18" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-        </div>
-        <div class="flex items-end">
-            <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">Guardar cabeçalho</button>
-        </div>
-        <div class="md:col-span-3">
-            <label class="block text-xs text-gray-500 mb-1">Objectivos do treino</label>
-            <textarea name="objectivos" rows="2" placeholder="Objectivos gerais deste treino..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.objectivos if plano.objectivos else "" }}</textarea>
-        </div>
-    </form>
-</div>
-
-<!-- MACRO PARA TOOLBAR (evita repetição de código) -->
 {% macro toolbar(canvas_id) %}
-<div id="toolbar_{{ canvas_id }}" class="flex flex-wrap gap-1 mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
-    <button type="button" data-ferramenta="seleccionar" onclick="definirFerramenta('{{ canvas_id }}', 'seleccionar')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Seleccionar/Mover">⊹</button>
-    <button type="button" data-ferramenta="jogador_ataque" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_ataque')" class="bg-orange-500 text-white text-xs px-2 py-1 rounded font-bold" title="Jogador ataque">⬤ A</button>
-    <button type="button" data-ferramenta="jogador_defesa" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_defesa')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded font-bold" title="Jogador defesa">▲ D</button>
-    <button type="button" data-ferramenta="coach" onclick="definirFerramenta('{{ canvas_id }}', 'coach')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded font-bold" title="Coach">⊙ C</button>
-    <button type="button" data-ferramenta="cone" onclick="definirFerramenta('{{ canvas_id }}', 'cone')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Cone">○</button>
-    <button type="button" data-ferramenta="bola" onclick="definirFerramenta('{{ canvas_id }}', 'bola')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Bola">🏀</button>
-    <span class="border-l border-gray-300 mx-1"></span>
-    <button type="button" data-ferramenta="seta" onclick="definirFerramenta('{{ canvas_id }}', 'seta')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Seta">→</button>
-    <button type="button" data-ferramenta="seta_tracejada" onclick="definirFerramenta('{{ canvas_id }}', 'seta_tracejada')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Seta tracejada">⇢</button>
-    <button type="button" data-ferramenta="seta_zigzag" onclick="definirFerramenta('{{ canvas_id }}', 'seta_zigzag')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Drible">≋</button>
-    <button type="button" data-ferramenta="seta_curva" onclick="definirFerramenta('{{ canvas_id }}', 'seta_curva')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Seta curva">⌒</button>
-    <button type="button" data-ferramenta="bloqueio" onclick="definirFerramenta('{{ canvas_id }}', 'bloqueio')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded font-bold" title="Bloqueio">⊣</button>
-    <button type="button" data-ferramenta="linha" onclick="definirFerramenta('{{ canvas_id }}', 'linha')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Linha">—</button>
-    <span class="border-l border-gray-300 mx-1"></span>
-    <button type="button" onclick="desfazer('{{ canvas_id }}')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Desfazer">↩</button>
-    <button type="button" data-ferramenta="apagar" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')" class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded" title="Apagar elemento">✕</button>
-    <button type="button" onclick="limparTudo('{{ canvas_id }}')" class="bg-gray-100 text-red-500 text-xs px-2 py-1 rounded" title="Limpar tudo">🗑</button>
+<div id="toolbar_{{ canvas_id }}" class="flex flex-wrap gap-1 mb-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
+    <button type="button" data-ferramenta="seleccionar" onclick="definirFerramenta('{{ canvas_id }}', 'seleccionar')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Selecionar">⊹</button>
+    <button type="button" data-ferramenta="jogador_ataque" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_ataque')" class="rounded bg-orange-500 px-2 py-1 text-xs font-bold text-white" title="Jogador ataque">⬤ A</button>
+    <button type="button" data-ferramenta="jogador_defesa" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_defesa')" class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700" title="Jogador defesa">▲ D</button>
+    <button type="button" data-ferramenta="coach" onclick="definirFerramenta('{{ canvas_id }}', 'coach')" class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700" title="Coach">⊙ C</button>
+    <button type="button" data-ferramenta="cone" onclick="definirFerramenta('{{ canvas_id }}', 'cone')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Cone">○</button>
+    <button type="button" data-ferramenta="bola" onclick="definirFerramenta('{{ canvas_id }}', 'bola')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Bola">🏀</button>
+    <span class="mx-1 border-l border-gray-300"></span>
+    <button type="button" data-ferramenta="seta" onclick="definirFerramenta('{{ canvas_id }}', 'seta')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Seta">→</button>
+    <button type="button" data-ferramenta="seta_tracejada" onclick="definirFerramenta('{{ canvas_id }}', 'seta_tracejada')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Seta tracejada">⇢</button>
+    <button type="button" data-ferramenta="seta_zigzag" onclick="definirFerramenta('{{ canvas_id }}', 'seta_zigzag')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Drible">≋</button>
+    <button type="button" data-ferramenta="seta_curva" onclick="definirFerramenta('{{ canvas_id }}', 'seta_curva')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Seta curva">⌒</button>
+    <button type="button" data-ferramenta="bloqueio" onclick="definirFerramenta('{{ canvas_id }}', 'bloqueio')" class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700" title="Bloqueio">⊣</button>
+    <button type="button" data-ferramenta="linha" onclick="definirFerramenta('{{ canvas_id }}', 'linha')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Linha">—</button>
+    <span class="mx-1 border-l border-gray-300"></span>
+    <button type="button" onclick="desfazer('{{ canvas_id }}')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Desfazer">↩</button>
+    <button type="button" data-ferramenta="apagar" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Apagar">✕</button>
+    <button type="button" onclick="limparTudo('{{ canvas_id }}')" class="rounded bg-gray-100 px-2 py-1 text-xs text-red-500" title="Limpar tudo">🗑</button>
 </div>
 {% endmacro %}
 
-<!-- MACRO PARA CAMPO DE DESENHO -->
 {% macro campo_desenho(canvas_id, imagem, ex_id, num_desenho, label, guardado) %}
 <div>
-    <p class="text-xs text-gray-400 mb-2">{{ label }}</p>
-    {{ toolbar(canvas_id) }}
-    <div class="relative border border-gray-200 rounded-lg overflow-hidden" style="background: white; min-height: 220px; max-height: 220px;">
-        <img src="/static/campos/{{ imagem }}" class="w-full object-contain" style="display: block; max-height: 220px;">
-        <canvas id="{{ canvas_id }}" class="absolute top-0 left-0 w-full h-full cursor-copy" style="touch-action: none;"></canvas>
+    <div class="mb-2 flex items-center justify-between">
+        <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">{{ label }}</p>
+        {% if guardado %}
+        <span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">Guardado</span>
+        {% endif %}
     </div>
-    <div class="flex justify-between items-center mt-1">
-        {% if guardado %}<p class="text-xs text-green-600">✓ Guardado</p>{% else %}<span></span>{% endif %}
-        <button type="button" onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ num_desenho }})" class="bg-orange-500 text-white text-xs px-3 py-1 rounded hover:bg-orange-600">Guardar</button>
+    {{ toolbar(canvas_id) }}
+    <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if imagem == 'campo_meio.png' %}144 / 112{% else %}209 / 141{% endif %};">
+        <img src="/static/campos/{{ imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
+        <canvas id="{{ canvas_id }}" class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
+    </div>
+    <div class="mt-2 flex justify-end">
+        <button type="button" onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ num_desenho }})" class="rounded-lg bg-orange-500 px-3 py-1 text-xs font-medium text-white transition hover:bg-orange-600">Guardar desenho</button>
     </div>
 </div>
 {% endmacro %}
 
-<!-- BLOCOS DE EXERCÍCIOS -->
-{% for bloco_letra in ["A", "B", "C", "D"] %}
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
-    <div class="flex items-center justify-between mb-4">
-        <h2 class="font-semibold text-gray-700">
-            <span class="{% if bloco_letra == 'A' %}bg-blue-100 text-blue-700{% elif bloco_letra == 'B' %}bg-green-100 text-green-700{% elif bloco_letra == 'C' %}bg-orange-100 text-orange-700{% else %}bg-purple-100 text-purple-700{% endif %} px-3 py-1 rounded-full text-sm font-bold mr-2">Bloco {{ bloco_letra }}</span>
-            <span class="text-gray-400 font-normal text-sm">{{ exercicios_por_bloco[bloco_letra] | length }} exercício(s)</span>
-        </h2>
-    </div>
+{% call equipa_contexto(
+    equipa,
+    "Plano de Treino",
+    "Sessão de " ~ (sessao.data|data_pt) ~ ((" · " ~ sessao.local) if sessao.local else ""),
+    "planeamento",
+    "/planeamento/microciclos/" ~ sessao.microciclo_id,
+    "Voltar ao microciclo"
+) %}
+    <span class="{{ sessao.origem_visual_classes }} rounded-full px-4 py-2 text-sm font-medium">
+        {{ sessao.origem_visual_label }}
+    </span>
+    <span class="{{ sessao.estado_visual_classes }} rounded-full px-4 py-2 text-sm font-medium">
+        {{ sessao.estado_visual_label }}
+    </span>
+    <a href="/assiduidade/sessoes/{{ sessao.id }}"
+       class="rounded-full bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50">
+        Assiduidade
+    </a>
+    <a href="/treino/sessoes/{{ sessao.id }}/print" target="_blank"
+       class="rounded-full bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50">
+        🖨️ Imprimir
+    </a>
+    <a href="/treino/sessoes/{{ sessao.id }}/pdf"
+       class="rounded-full bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600">
+        📄 Exportar PDF
+    </a>
+{% endcall %}
 
-    {% if exercicios_por_bloco[bloco_letra] %}
-    <div class="space-y-4 mb-6">
-        {% for ex in exercicios_por_bloco[bloco_letra] %}
-        <div class="border border-gray-200 rounded-lg p-4">
-            <!-- Cabeçalho do exercício -->
-            <div class="flex items-start justify-between mb-3">
-                <div class="flex items-center gap-3">
-                    <span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-full">{{ loop.index }}</span>
+<div class="mb-6 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Ciclo operacional</p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+            <span class="{{ sessao.estado_operacional_visual_classes }} rounded-full px-3 py-1 text-sm font-semibold">
+                {{ sessao.estado_operacional_visual_label }}
+            </span>
+            <span class="text-sm text-gray-500">Próxima ação: {{ sessao.proxima_acao_operacional }}</span>
+        </div>
+    </div>
+    {% if estados_sessao %}
+    <form method="POST" action="/treino/sessoes/{{ sessao.id }}/estado" class="flex flex-wrap items-center gap-2">
+        <label for="estado-sessao" class="sr-only">Novo estado da sessão</label>
+        <select id="estado-sessao" name="estado" class="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            {% for opcao in estados_sessao %}
+            <option value="{{ opcao.codigo }}">{{ opcao.label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-700">Atualizar estado</button>
+    </form>
+    {% else %}
+    <span class="text-sm font-medium text-emerald-700">Fluxo concluído</span>
+    {% endif %}
+</div>
+
+{% if sessao.origem == "planeamento_global" %}
+<div class="mb-6 rounded-2xl border {% if sessao.alterada_manual %}border-amber-200 bg-amber-50 text-amber-800{% elif not sessao.ativa %}border-slate-200 bg-slate-100 text-slate-700{% elif sessao.sincronizada %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-rose-200 bg-rose-50 text-rose-800{% endif %} p-4 text-sm">
+    Esta sessão veio do Planeamento Global do Clube, através do Plano Semanal do Clube.
+    {% if sessao.alterada_manual %}
+    Foi alterada manualmente na equipa e deixou de poder ser atualizada automaticamente.
+    {% elif not sessao.ativa %}
+    Está desativada porque o evento global deixou de existir ou deixou de se aplicar a esta equipa.
+    {% elif sessao.sincronizada %}
+    Está alinhada com a última sincronização do plano semanal do clube.
+    {% else %}
+    Está desatualizada face ao plano semanal do clube e poderá precisar de nova sincronização.
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
+    <div class="space-y-6">
+        <div class="overflow-hidden rounded-[28px] border border-orange-100 bg-white shadow-sm">
+            <div class="border-b border-orange-100 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 px-6 py-5 text-white">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <p class="font-medium text-gray-800">{{ ex.nome if ex.nome else "Exercício sem nome" }}</p>
-                        <div class="flex items-center gap-2 mt-1">
-                            {% if ex.categoria %}<span class="bg-orange-50 text-orange-600 text-xs px-2 py-0.5 rounded-full">{{ ex.categoria }}</span>{% endif %}
-                            {% if ex.hora %}<span class="text-gray-400 text-xs">🕐 {{ ex.hora }}</span>{% endif %}
-                            {% if ex.minutos %}<span class="text-gray-400 text-xs">⏱ {{ ex.minutos }} min</span>{% endif %}
+                        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-orange-100">Ficha de treino</p>
+                        <h2 class="mt-2 text-3xl font-bold">
+                            {{ equipa.nome }}
+                        </h2>
+                        <p class="mt-2 text-sm text-orange-50">
+                            {{ sessao.data|data_pt }}{% if sessao.hora_inicio or sessao.hora_fim %} · {{ sessao.hora_inicio if sessao.hora_inicio else "?" }}{% if sessao.hora_fim %} - {{ sessao.hora_fim }}{% endif %}{% endif %}
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                        <div class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-orange-100">Blocos</p>
+                            <p class="mt-2 text-2xl font-bold">{{ resumo_blocos | length }}</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-orange-100">Exercícios</p>
+                            <p class="mt-2 text-2xl font-bold">{{ total_exercicios }}</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-orange-100">Minutos</p>
+                            <p class="mt-2 text-2xl font-bold">{{ volume_planeado if volume_planeado else "—" }}</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-orange-100">RPE geral</p>
+                            <p class="mt-2 text-2xl font-bold">{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else "—" }}</p>
                         </div>
                     </div>
                 </div>
-                <form method="POST" action="/treino/exercicios/{{ ex.id }}/apagar">
-                    <button type="button" onclick="if(confirm('Apagar?')) this.closest('form').submit()" class="text-red-400 hover:text-red-600 text-xs">✕ Apagar</button>
-                </form>
             </div>
 
-            <!-- Campos de desenho base -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                {{ campo_desenho('canvas1_' ~ ex.id, 'campo_meio.png', ex.id, 1, 'Campo (meio)', ex.desenho_1) }}
-                {{ campo_desenho('canvas2_' ~ ex.id, 'campo_completo.png', ex.id, 2, 'Campo (completo)', ex.desenho_2) }}
-            </div>
-
-            <!-- Botões para campos extra -->
-            <div class="flex gap-2 mb-3">
-                <button type="button" onclick="toggleCampoExtra('extra_meio_{{ ex.id }}')" class="text-xs text-orange-500 hover:text-orange-600 border border-orange-200 px-3 py-1 rounded-lg hover:bg-orange-50 transition">+ Campo meio extra</button>
-                <button type="button" onclick="toggleCampoExtra('extra_completo_{{ ex.id }}')" class="text-xs text-orange-500 hover:text-orange-600 border border-orange-200 px-3 py-1 rounded-lg hover:bg-orange-50 transition">+ Campo completo extra</button>
-            </div>
-
-            <!-- Campos de desenho extra -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                <div id="extra_meio_{{ ex.id }}" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
-                    {{ campo_desenho('canvas3_' ~ ex.id, 'campo_meio.png', ex.id, 3, 'Campo (meio) — extra', ex.desenho_3) }}
+            <form method="POST" action="/treino/planos/{{ plano.id }}/cabecalho" class="space-y-6 px-6 py-6">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                        <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Data</label>
+                        <p class="mt-3 text-lg font-semibold text-gray-900">{{ sessao.data|data_pt }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                        <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Treino nº</label>
+                        <p class="mt-3 text-lg font-semibold text-gray-900">{{ sessao.numero_treino if sessao.numero_treino else "—" }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                        <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Origem</label>
+                        <p class="mt-3 text-lg font-semibold text-gray-900">{{ sessao.origem_visual_label }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                        <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Estado</label>
+                        <p class="mt-3 text-lg font-semibold text-gray-900">{{ sessao.estado_visual_label }}</p>
+                    </div>
                 </div>
-                <div id="extra_completo_{{ ex.id }}" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
-                    {{ campo_desenho('canvas4_' ~ ex.id, 'campo_completo.png', ex.id, 4, 'Campo (completo) — extra', ex.desenho_4) }}
-                </div>
-            </div>
 
-            <!-- Organização e Coaching Points -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">
+                            Local
+                            {% if espacos_disponiveis %}
+                            <span class="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">atribuído</span>
+                            {% endif %}
+                        </label>
+                        {% if espacos_disponiveis %}
+                        <select name="local" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                            <option value="">— Selecionar espaço —</option>
+                            {% for ag in espacos_disponiveis %}
+                            <option value="{{ ag.espaco.nome }}" {% if sessao.local == ag.espaco.nome %}selected{% endif %}>
+                                {{ ag.espaco.nome }} ({{ ag.hora_inicio }}–{{ ag.hora_fim }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
+                        <input type="text" name="local" value="{{ sessao.local if sessao.local else '' }}" placeholder="Ex: Pavilhão Municipal" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Hora de início</label>
+                        <input type="time" name="hora_inicio" value="{{ sessao.hora_inicio if sessao.hora_inicio else (plano.hora_inicio if plano.hora_inicio else '') }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Hora de término</label>
+                        <input type="time" name="hora_fim" value="{{ sessao.hora_fim if sessao.hora_fim else '' }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Escalão</label>
+                        <input type="text" name="escalao" value="{{ plano.escalao if plano.escalao else '' }}" placeholder="Ex: U18" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">RPE geral (1-10)</label>
+                        <input type="number" name="intensidade_rpe" min="1" max="10" step="0.5" value="{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else '' }}" placeholder="Ex: 7" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        <p class="mt-1 text-[11px] text-gray-400">Perceção global da sessão.</p>
+                    </div>
+                </div>
+
                 <div>
-                    <p class="text-xs text-gray-400 mb-1">Organização</p>
-                    <p class="text-gray-700">{{ ex.organizacao if ex.organizacao else "—" }}</p>
+                    <label class="mb-1 block text-xs font-medium text-gray-500">Objetivos do treino</label>
+                    <textarea name="objectivos" rows="3" placeholder="O que queres garantir nesta sessão?" class="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.objectivos if plano.objectivos else "" }}</textarea>
                 </div>
+
+                <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {% for item in resumo_blocos %}
+                    <a href="#bloco-{{ item.bloco }}" class="rounded-2xl border border-gray-200 bg-gray-50 p-4 transition hover:border-orange-300 hover:bg-orange-50">
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="rounded-full {% if item.bloco == 'A' %}bg-blue-100 text-blue-700{% elif item.bloco == 'B' %}bg-emerald-100 text-emerald-700{% elif item.bloco == 'C' %}bg-orange-100 text-orange-700{% else %}bg-violet-100 text-violet-700{% endif %} px-3 py-1 text-xs font-bold">Bloco {{ item.bloco }}</span>
+                            <span class="text-xs text-gray-400">{{ item.total }} exercício(s)</span>
+                        </div>
+                        <p class="mt-3 text-2xl font-bold text-gray-900">{{ item.minutos if item.minutos else "—" }}</p>
+                        <p class="text-xs text-gray-500">min planeados</p>
+                        <p class="mt-2 text-xs text-gray-400">
+                            {% if item.categorias %}
+                            {{ item.categorias | join(" · ") }}
+                            {% else %}
+                            Sem categoria definida
+                            {% endif %}
+                        </p>
+                    </a>
+                    {% endfor %}
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="submit" class="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600">Guardar cabeçalho</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+            <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h2 class="text-xl font-semibold text-gray-800">Blocos do treino</h2><p class="mt-1 text-sm text-gray-500">Cria apenas os blocos necessários.</p></div><form method="POST" action="/treino/planos/{{ plano.id }}/blocos" class="flex flex-wrap gap-2"><input name="nome" required placeholder="Ex: Aquecimento" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><input name="tipo" placeholder="Tipo opcional" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><button class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white">Criar bloco</button></form></div>
+            <div class="mt-4 flex flex-wrap gap-2 text-sm"><span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Previsto: {{ duracao_prevista ~ ' min' if duracao_prevista is not none else 'por definir' }}</span><span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Exercícios: {{ volume_planeado }} min</span>{% if diferenca_duracao is not none %}<span class="rounded-full px-3 py-1 font-semibold {% if diferenca_duracao == 0 %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-800{% endif %}">{% if diferenca_duracao == 0 %}Duração coerente{% elif diferenca_duracao > 0 %}+{{ diferenca_duracao }} min acima{% else %}{{ diferenca_duracao|abs }} min por preencher{% endif %}</span>{% endif %}</div>
+            {% if not blocos_ui %}<div class="mt-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500">O treino está vazio. Cria o primeiro bloco para começar.</div>{% endif %}
+        </div>
+
+        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <p class="text-xs text-gray-400 mb-1">Coaching Points</p>
-                    <p class="text-gray-700">{{ ex.coaching_points if ex.coaching_points else "—" }}</p>
+                    <h2 class="text-xl font-semibold text-gray-800">Adicionar exercício</h2>
+                    <p class="mt-1 text-sm text-gray-500">Um único formulário para alimentares qualquer bloco sem repetir campos.</p>
+                </div>
+                <button type="button" onclick="abrirBiblioteca('form_adicionar_exercicio')" class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100">
+                    📖 Usar biblioteca
+                </button>
+            </div>
+
+            <form id="form_adicionar_exercicio" method="POST" action="/treino/planos/{{ plano.id }}/exercicios" class="mt-5 space-y-4">
+                <input type="hidden" name="biblioteca_id" id="biblioteca_id_form_adicionar_exercicio" value="">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
+                        <select name="bloco_id" required class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                            <option value="">Selecionar bloco</option>{% for bloco in blocos_ui if not bloco.legado %}<option value="{{ bloco.id }}">{{ bloco.nome }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Exercício</label>
+                        <input type="text" name="nome" placeholder="Nome do exercício" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Categoria</label>
+                        <select name="categoria" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                            <option value="">Sem categoria</option>
+                            {% for categoria in categorias_exercicio %}
+                            <option value="{{ categoria }}">{{ categoria }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Hora</label>
+                        <input type="text" name="hora" placeholder="18:15" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-[140px_1fr_1fr]">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Minutos</label>
+                        <input type="number" name="minutos" placeholder="15" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">RPE (1-10)</label>
+                        <input type="number" name="rpe" min="1" max="10" step="0.5" placeholder="Ex: 7" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Organização</label>
+                        <textarea name="organizacao" rows="3" placeholder="Como montas o exercício, grupos, rotações, material..." class="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Coaching points</label>
+                        <textarea name="coaching_points" rows="3" placeholder="Pontos-chave de intervenção do treinador..." class="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="submit" class="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600">+ Adicionar exercício</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="space-y-4">
+            {% for bloco_ui in blocos_ui %}
+            {% set bloco_letra = bloco_ui.key %}
+            {% set resumo_minutos = exercicios_por_bloco[bloco_letra]|map(attribute='minutos')|select|sum %}
+            <details id="bloco-{{ bloco_letra }}" class="overflow-hidden rounded-[28px] border border-gray-100 bg-white shadow-sm" {% if exercicios_por_bloco[bloco_letra] or bloco_letra == "A" %}open{% endif %}>
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <span class="rounded-full bg-orange-100 px-3 py-1 text-sm font-bold text-orange-700">{{ bloco_ui.nome }}</span>
+                        <span class="text-sm text-gray-500">{{ exercicios_por_bloco[bloco_letra] | length }} exercício(s)</span>
+                        <span class="text-sm text-gray-400">{{ resumo_minutos }} min</span>
+                    </div>
+                    <span class="text-sm text-gray-400">Abrir / fechar</span>
+                </summary>
+
+                <div class="border-t border-gray-100 px-6 py-6">
+                    {% if not bloco_ui.legado %}<div class="mb-4 flex flex-wrap gap-3"><form method="POST" action="/treino/blocos/{{ bloco_ui.id }}/editar" class="flex flex-wrap gap-2"><input name="nome" value="{{ bloco_ui.nome }}" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><input name="tipo" value="{{ bloco_ui.tipo or '' }}" placeholder="Tipo" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><input type="hidden" name="ordem" value="{{ loop.index }}"><button class="text-xs font-semibold text-blue-700">Guardar</button></form><form method="POST" action="/treino/blocos/{{ bloco_ui.id }}/duplicar"><button class="text-xs font-semibold text-violet-700">Duplicar</button></form><form method="POST" action="/treino/blocos/{{ bloco_ui.id }}/apagar" onsubmit="return confirm('Apagar este bloco vazio?')"><button class="text-xs font-semibold text-red-700">Apagar</button></form></div>{% endif %}
+                    {% if exercicios_por_bloco[bloco_letra] %}
+                    <div class="space-y-5">
+                        {% for ex in exercicios_por_bloco[bloco_letra] %}
+                        <div class="rounded-[24px] border border-gray-200 bg-gray-50 p-5">
+                            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gray-500 ring-1 ring-gray-200">{{ bloco_letra }}{{ loop.index }}</span>
+                                        {% if ex.categoria %}
+                                        <span class="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700">{{ ex.categoria }}</span>
+                                        {% endif %}
+                                        {% if ex.hora %}
+                                        <span class="text-xs text-gray-400">🕐 {{ ex.hora }}</span>
+                                        {% endif %}
+                                        {% if ex.minutos %}
+                                        <span class="text-xs text-gray-400">⏱ {{ ex.minutos }} min</span>
+                                        {% endif %}
+                                        {% if ex.rpe is not none %}
+                                        <span class="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-700">RPE {{ ex.rpe }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <h3 class="mt-3 text-lg font-semibold text-gray-900">{{ ex.nome if ex.nome else "Exercício sem nome" }}</h3>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <form method="POST" action="/treino/exercicios/{{ ex.id }}/duplicar">
+                                        <button type="submit" class="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-50">Duplicar</button>
+                                    </form>
+                                    <form method="POST" action="/treino/exercicios/{{ ex.id }}/apagar">
+                                        <button type="button" onclick="if(confirm('Apagar este exercício?')) this.closest('form').submit()" class="rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-500 transition hover:bg-red-50">Apagar</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <details class="mt-5 rounded-2xl border border-gray-200 bg-white">
+                                <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-gray-700">Editar dados do exercício</summary>
+                                <div class="border-t border-gray-100 px-4 py-4">
+                            <form id="form_exercicio_{{ ex.id }}" method="POST" action="/treino/exercicios/{{ ex.id }}/atualizar" class="space-y-4">
+                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
+                                        <select name="bloco_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                            {% for bloco in blocos_ui if not bloco.legado %}<option value="{{ bloco.id }}" {% if ex.bloco_id == bloco.id %}selected{% endif %}>{{ bloco.nome }}</option>{% endfor %}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-500">Exercício</label>
+                                        <div class="flex gap-2">
+                                            <input type="text" name="nome" value="{{ ex.nome if ex.nome else '' }}" placeholder="Nome do exercício" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                            <button type="button" onclick="abrirBiblioteca('form_exercicio_{{ ex.id }}')" class="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100">Biblioteca</button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-500">Categoria</label>
+                                        <select name="categoria" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                            <option value="">Sem categoria</option>
+                                            {% for categoria in categorias_exercicio %}
+                                            <option value="{{ categoria }}" {% if ex.categoria == categoria %}selected{% endif %}>{{ categoria }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-500">Hora</label>
+                                        <input type="text" name="hora" value="{{ ex.hora if ex.hora else '' }}" placeholder="18:15" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-500">Minutos</label>
+                                        <input type="number" name="minutos" value="{{ ex.minutos if ex.minutos else '' }}" placeholder="15" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-500">RPE (1-10)</label>
+                                        <input type="number" name="rpe" min="1" max="10" step="0.5" value="{{ ex.rpe if ex.rpe is not none else '' }}" placeholder="Ex: 7" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-500">Organização</label>
+                                        <textarea name="organizacao" rows="4" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ ex.organizacao if ex.organizacao else "" }}</textarea>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-500">Coaching points</label>
+                                        <textarea name="coaching_points" rows="4" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ ex.coaching_points if ex.coaching_points else "" }}</textarea>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <button type="submit" class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black">Guardar exercício</button>
+                                </div>
+                            </form>
+                                </div>
+                            </details>
+
+                            <details class="mt-4 rounded-2xl border border-gray-200 bg-white" data-drawings="true" data-exercicio-id="{{ ex.id }}" ontoggle="togglePainelDesenhos('{{ ex.id }}', this.open)">
+                                <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-gray-700">Quadros táticos e desenhos</summary>
+                                <div class="border-t border-gray-100 px-4 py-4">
+                                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        {{ campo_desenho('canvas1_' ~ ex.id, 'campo_meio.png', ex.id, 1, 'Campo meio', ex.desenho_1) }}
+                                        {{ campo_desenho('canvas2_' ~ ex.id, 'campo_completo.png', ex.id, 2, 'Campo completo', ex.desenho_2) }}
+                                    </div>
+
+                                    <div class="mt-4 flex flex-wrap gap-2">
+                                        <button type="button" onclick="toggleCampoExtra('extra_meio_{{ ex.id }}')" class="rounded-lg border border-orange-200 px-3 py-1 text-xs font-medium text-orange-500 transition hover:bg-orange-50">+ Campo meio extra</button>
+                                        <button type="button" onclick="toggleCampoExtra('extra_completo_{{ ex.id }}')" class="rounded-lg border border-orange-200 px-3 py-1 text-xs font-medium text-orange-500 transition hover:bg-orange-50">+ Campo completo extra</button>
+                                    </div>
+
+                                    <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div id="extra_meio_{{ ex.id }}" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+                                            {{ campo_desenho('canvas3_' ~ ex.id, 'campo_meio.png', ex.id, 3, 'Campo meio extra', ex.desenho_3) }}
+                                        </div>
+                                        <div id="extra_completo_{{ ex.id }}" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+                                            {{ campo_desenho('canvas4_' ~ ex.id, 'campo_completo.png', ex.id, 4, 'Campo completo extra', ex.desenho_4) }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-400">
+                        Ainda não tens exercícios neste bloco.
+                    </div>
+                    {% endif %}
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+
+        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 class="text-xl font-semibold text-gray-800">Reflexão</h2>
+            <p class="mt-1 text-sm text-gray-500">Mantém aqui o que funcionou, o que queres ajustar e o que deve transitar para a próxima sessão.</p>
+            <form method="POST" action="/treino/planos/{{ plano.id }}/reflexao" class="mt-4">
+                <textarea name="reflexao" rows="5" placeholder="Reflexão sobre o treino..." class="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.reflexao if plano.reflexao else "" }}</textarea>
+                <div class="mt-3 flex justify-end">
+                    <button type="submit" class="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600">Guardar reflexão</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <aside class="space-y-6">
+        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-800">Acessos rápidos</h2>
+            <div class="mt-4 space-y-3">
+                <a href="/planeamento/microciclos/{{ sessao.microciclo_id }}" class="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:border-orange-300 hover:bg-orange-50">
+                    <span>Voltar ao microciclo</span>
+                    <span>→</span>
+                </a>
+                <a href="/assiduidade/sessoes/{{ sessao.id }}" class="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:border-orange-300 hover:bg-orange-50">
+                    <span>Assiduidade da sessão</span>
+                    <span>→</span>
+                </a>
+                <a href="/treino/sessoes/{{ sessao.id }}/print" target="_blank" class="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:border-orange-300 hover:bg-orange-50">
+                    <span>Versão de impressão</span>
+                    <span>→</span>
+                </a>
+                <a href="/treino/sessoes/{{ sessao.id }}/pdf" class="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:border-orange-300 hover:bg-orange-50">
+                    <span>PDF da ficha</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-800">Leitura rápida</h2>
+            <div class="mt-4 space-y-4">
+                <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Sessão</p>
+                    <p class="mt-2 text-sm text-gray-700">{{ sessao.data|data_pt }}</p>
+                    <p class="text-sm text-gray-700">{{ sessao.local if sessao.local else "Local por definir" }}</p>
+                    <p class="text-sm text-gray-700">{{ sessao.hora_inicio if sessao.hora_inicio else "Hora por definir" }}{% if sessao.hora_fim %} - {{ sessao.hora_fim }}{% endif %}</p>
+                </div>
+                <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Objetivos</p>
+                    <p class="mt-2 text-sm text-gray-700 whitespace-pre-line">{{ plano.objectivos if plano.objectivos else "Ainda sem objetivos registados." }}</p>
+                </div>
+                <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Distribuição</p>
+                    <div class="mt-3 space-y-2 text-sm text-gray-700">
+                        {% for item in resumo_blocos %}
+                        <div class="flex items-center justify-between gap-3">
+                            <span>Bloco {{ item.bloco }}</span>
+                            <span>{{ item.total }} ex. · {{ item.minutos if item.minutos else 0 }} min</span>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="text-gray-400 text-sm mb-4">Sem exercícios neste bloco.</p>
-    {% endif %}
-
-    <!-- Formulário para adicionar exercício -->
-    <div class="border-t border-gray-100 pt-4">
-        <p class="text-sm font-medium text-gray-600 mb-3">Adicionar exercício ao Bloco {{ bloco_letra }}</p>
-        <form method="POST" action="/treino/planos/{{ plano.id }}/exercicios">
-            <input type="hidden" name="bloco" value="{{ bloco_letra }}">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Nome</label>
-                    <input type="text" name="nome" placeholder="Nome do exercício" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Categoria</label>
-                    <select name="categoria" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                        <option value="">Selecciona</option>
-                        <option value="TIO">TIO</option>
-                        <option value="TID">TID</option>
-                        <option value="TaIO">TaIO</option>
-                        <option value="TaID">TaID</option>
-                        <option value="TCO">TCO</option>
-                        <option value="TCD">TCD</option>
-                        <option value="FIS">FÍS</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Hora</label>
-                    <input type="text" name="hora" placeholder="Ex: 18:15" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Minutos</label>
-                    <input type="number" name="minutos" placeholder="15" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Organização</label>
-                    <textarea name="organizacao" rows="3" placeholder="Descreve a organização..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Coaching Points</label>
-                    <textarea name="coaching_points" rows="3" placeholder="Pontos de coaching..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
-                </div>
-            </div>
-            <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">+ Adicionar ao Bloco {{ bloco_letra }}</button>
-        </form>
-    </div>
-</div>
-{% endfor %}
-
-<!-- REFLEXÃO -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-    <h2 class="font-semibold text-gray-700 mb-4">Reflexão</h2>
-    <form method="POST" action="/treino/planos/{{ plano.id }}/reflexao">
-        <textarea name="reflexao" rows="4" placeholder="Reflexão sobre o treino..." class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.reflexao if plano.reflexao else "" }}</textarea>
-        <button type="submit" class="mt-3 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">Guardar reflexão</button>
-    </form>
+    </aside>
 </div>
 
 <script>
@@ -214,8 +526,13 @@ function inicializarDesenho(canvasId) {
     if (!canvas) return;
     const configurarCanvas = () => {
         const imgEl = canvas.parentElement.querySelector('img');
-        if (imgEl && imgEl.offsetWidth > 0) { canvas.width = imgEl.offsetWidth; canvas.height = imgEl.offsetHeight; }
-        else { canvas.width = 400; canvas.height = 300; }
+        if (imgEl && imgEl.offsetWidth > 0) {
+            canvas.width = imgEl.offsetWidth;
+            canvas.height = imgEl.offsetHeight;
+        } else {
+            canvas.width = 400;
+            canvas.height = 300;
+        }
     };
     setTimeout(configurarCanvas, 100);
     const ctx = canvas.getContext('2d');
@@ -230,6 +547,17 @@ function inicializarDesenho(canvasId) {
     canvas.addEventListener('touchend', (e) => { e.preventDefault(); aoSoltar(canvasId, simularMouse(e)); });
 }
 
+function togglePainelDesenhos(exercicioId, aberto) {
+    if (!aberto) return;
+    ['canvas1_', 'canvas2_'].forEach((prefixo) => {
+        const canvasId = `${prefixo}${exercicioId}`;
+        if (!CANVAS_ESTADO[canvasId]) {
+            inicializarDesenho(canvasId);
+            setTimeout(() => definirFerramenta(canvasId, 'jogador_ataque'), 200);
+        }
+    });
+}
+
 function simularMouse(e) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY, button: 0 }; }
 function obterPos(canvas, e) { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; }
 
@@ -237,16 +565,21 @@ function aoPremir(canvasId, e) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
     const pos = obterPos(est.canvas, e);
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
     if (e.button === 2) {
         e.preventDefault();
         if (est.linhaMultipla) {
-            if (est.linhaMultipla.pontos.length >= 2) est.objectos.push({...est.linhaMultipla});
-            est.linhaMultipla = null; redesenhar(canvasId);
+            if (est.linhaMultipla.pontos.length >= 2) est.objectos.push({ ...est.linhaMultipla });
+            est.linhaMultipla = null;
+            redesenhar(canvasId);
         }
         return;
     }
-    if (est.ferramenta === 'apagar') { est.objectos = est.objectos.filter(o => !estaNoObj(o, pos)); redesenhar(canvasId); return; }
+    if (est.ferramenta === 'apagar') {
+        est.objectos = est.objectos.filter(o => !estaNoObj(o, pos));
+        redesenhar(canvasId);
+        return;
+    }
     if (est.ferramenta === 'seleccionar') {
         est.objectoSeleccionado = null;
         for (let i = est.objectos.length - 1; i >= 0; i--) {
@@ -254,7 +587,8 @@ function aoPremir(canvasId, e) {
                 est.objectoSeleccionado = est.objectos[i];
                 if (simbolos.includes(est.objectos[i].tipo)) est.offsetMover = { x: pos.x - est.objectos[i].x, y: pos.y - est.objectos[i].y };
                 else est.offsetMover = { x: pos.x - est.objectos[i].pontos[0].x, y: pos.y - est.objectos[i].pontos[0].y };
-                est.aDesconhar = true; break;
+                est.aDesconhar = true;
+                break;
             }
         }
         redesenhar(canvasId);
@@ -263,7 +597,8 @@ function aoPremir(canvasId, e) {
     }
     if (simbolos.includes(est.ferramenta)) {
         est.objectos.push({ tipo: est.ferramenta, x: pos.x, y: pos.y, tamanho: 1, numero: est.ferramenta === 'jogador_ataque' ? est.contadores.ataque++ : est.ferramenta === 'jogador_defesa' ? est.contadores.defesa++ : null });
-        redesenhar(canvasId); return;
+        redesenhar(canvasId);
+        return;
     }
     if (!est.linhaMultipla) est.linhaMultipla = { tipo: est.ferramenta, pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 };
     else est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
@@ -275,23 +610,31 @@ function aoMover(canvasId, e) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
     const pos = obterPos(est.canvas, e);
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
     est.posicaoCursor = pos;
     if (est.ferramenta === 'seleccionar' && est.aDesconhar && est.objectoSeleccionado) {
         const obj = est.objectoSeleccionado;
-        if (simbolos.includes(obj.tipo)) { obj.x = pos.x - est.offsetMover.x; obj.y = pos.y - est.offsetMover.y; }
-        else if (obj.pontos) {
+        if (simbolos.includes(obj.tipo)) {
+            obj.x = pos.x - est.offsetMover.x;
+            obj.y = pos.y - est.offsetMover.y;
+        } else if (obj.pontos) {
             const dx = pos.x - est.offsetMover.x - obj.pontos[0].x;
             const dy = pos.y - est.offsetMover.y - obj.pontos[0].y;
             obj.pontos.forEach(p => { p.x += dx; p.y += dy; });
-            est.offsetMover.x = pos.x - obj.pontos[0].x; est.offsetMover.y = pos.y - obj.pontos[0].y;
+            est.offsetMover.x = pos.x - obj.pontos[0].x;
+            est.offsetMover.y = pos.y - obj.pontos[0].y;
         }
-        redesenhar(canvasId); desenharSeleccao(est.ctx, est.objectoSeleccionado); return;
+        redesenhar(canvasId);
+        desenharSeleccao(est.ctx, est.objectoSeleccionado);
+        return;
     }
-    if (est.linhaMultipla) { redesenhar(canvasId); desenharLinhaMultipla(est.ctx, est.linhaMultipla, pos); }
+    if (est.linhaMultipla) {
+        redesenhar(canvasId);
+        desenharLinhaMultipla(est.ctx, est.linhaMultipla, pos);
+    }
 }
 
-function aoSoltar(canvasId, e) {
+function aoSoltar(canvasId) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
     if (est.ferramenta === 'seleccionar') {
@@ -303,7 +646,7 @@ function aoSoltar(canvasId, e) {
 function redesenhar(canvasId) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
     est.ctx.clearRect(0, 0, est.canvas.width, est.canvas.height);
     est.objectos.forEach(obj => { if (simbolos.includes(obj.tipo)) desenharSimbolo(est.ctx, obj); else desenharLinhaMultipla(est.ctx, obj, null); });
 }
@@ -312,21 +655,21 @@ function desenharSimbolo(ctx, obj) {
     ctx.save();
     const t = obj.tamanho || 1;
     if (obj.tipo === 'jogador_ataque') {
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, 14*t, 0, Math.PI*2); ctx.fillStyle = '#E25A1C'; ctx.fill(); ctx.strokeStyle = '#B34010'; ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(11*t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y);
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, 14 * t, 0, Math.PI * 2); ctx.fillStyle = '#E25A1C'; ctx.fill(); ctx.strokeStyle = '#B34010'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(11 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y);
     } else if (obj.tipo === 'jogador_defesa') {
-        const h = 16*t; ctx.beginPath(); ctx.moveTo(obj.x, obj.y-h); ctx.lineTo(obj.x+h*0.9, obj.y+h*0.7); ctx.lineTo(obj.x-h*0.9, obj.y+h*0.7); ctx.closePath();
+        const h = 16 * t; ctx.beginPath(); ctx.moveTo(obj.x, obj.y - h); ctx.lineTo(obj.x + h * 0.9, obj.y + h * 0.7); ctx.lineTo(obj.x - h * 0.9, obj.y + h * 0.7); ctx.closePath();
         ctx.fillStyle = '#888888'; ctx.fill(); ctx.strokeStyle = '#555555'; ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(10*t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y+2*t);
+        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(10 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y + 2 * t);
     } else if (obj.tipo === 'cone') {
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, 10*t, 0, Math.PI*2); ctx.strokeStyle = '#333333'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, 10 * t, 0, Math.PI * 2); ctx.strokeStyle = '#333333'; ctx.lineWidth = 2; ctx.stroke();
     } else if (obj.tipo === 'bola') {
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, 10*t, 0, Math.PI*2); ctx.fillStyle = '#E8731A'; ctx.fill(); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 1; ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(obj.x-10*t, obj.y); ctx.lineTo(obj.x+10*t, obj.y); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 0.8; ctx.stroke();
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, 10 * t, 0, Math.PI * 2); ctx.fillStyle = '#E8731A'; ctx.fill(); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(obj.x - 10 * t, obj.y); ctx.lineTo(obj.x + 10 * t, obj.y); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 0.8; ctx.stroke();
     } else if (obj.tipo === 'coach') {
-        const r = 14*t; ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI*2); ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#111111'; ctx.lineWidth = 2.5; ctx.stroke();
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, r*0.75, 0, Math.PI*2); ctx.strokeStyle = '#111111'; ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = '#111111'; ctx.font = `bold ${Math.round(12*t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C', obj.x, obj.y);
+        const r = 14 * t; ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#111111'; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, r * 0.75, 0, Math.PI * 2); ctx.strokeStyle = '#111111'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = '#111111'; ctx.font = `bold ${Math.round(12 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C', obj.x, obj.y);
     }
     ctx.restore();
 }
@@ -342,55 +685,53 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
     ctx.beginPath();
     if (linha.tipo === 'seta_curva') {
         ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
-        for (let i = 0; i < todosPontos.length-1; i++) { const mx=(todosPontos[i].x+todosPontos[i+1].x)/2, my=(todosPontos[i].y+todosPontos[i+1].y)/2; ctx.quadraticCurveTo(todosPontos[i].x, todosPontos[i].y, mx, my); }
-        ctx.lineTo(todosPontos[todosPontos.length-1].x, todosPontos[todosPontos.length-1].y);
+        for (let i = 0; i < todosPontos.length - 1; i++) { const mx = (todosPontos[i].x + todosPontos[i + 1].x) / 2, my = (todosPontos[i].y + todosPontos[i + 1].y) / 2; ctx.quadraticCurveTo(todosPontos[i].x, todosPontos[i].y, mx, my); }
+        ctx.lineTo(todosPontos[todosPontos.length - 1].x, todosPontos[todosPontos.length - 1].y);
     } else if (linha.tipo === 'seta_zigzag') {
         ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
-        for (let i = 0; i < todosPontos.length-1; i++) {
-            const p1=todosPontos[i], p2=todosPontos[i+1]; const ang=Math.atan2(p2.y-p1.y, p2.x-p1.x); const dist=Math.hypot(p2.x-p1.x, p2.y-p1.y);
-            const n=Math.max(1,Math.floor(dist/15)); const stepX=(p2.x-p1.x)/(n*2), stepY=(p2.y-p1.y)/(n*2); const perpX=-Math.sin(ang)*6, perpY=Math.cos(ang)*6;
-            for (let j=0; j<n; j++) { ctx.lineTo(p1.x+stepX*(j*2+1)+(j%2===0?perpX:-perpX), p1.y+stepY*(j*2+1)+(j%2===0?perpY:-perpY)); ctx.lineTo(p1.x+stepX*(j*2+2), p1.y+stepY*(j*2+2)); }
+        for (let i = 0; i < todosPontos.length - 1; i++) {
+            const p1 = todosPontos[i], p2 = todosPontos[i + 1]; const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x); const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+            const n = Math.max(1, Math.floor(dist / 15)); const stepX = (p2.x - p1.x) / (n * 2), stepY = (p2.y - p1.y) / (n * 2); const perpX = -Math.sin(ang) * 6, perpY = Math.cos(ang) * 6;
+            for (let j = 0; j < n; j++) { ctx.lineTo(p1.x + stepX * (j * 2 + 1) + (j % 2 === 0 ? perpX : -perpX), p1.y + stepY * (j * 2 + 1) + (j % 2 === 0 ? perpY : -perpY)); ctx.lineTo(p1.x + stepX * (j * 2 + 2), p1.y + stepY * (j * 2 + 2)); }
         }
     } else {
         ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
-        for (let i=1; i<todosPontos.length; i++) ctx.lineTo(todosPontos[i].x, todosPontos[i].y);
+        for (let i = 1; i < todosPontos.length; i++) ctx.lineTo(todosPontos[i].x, todosPontos[i].y);
     }
     ctx.stroke();
-    const ultimo=todosPontos[todosPontos.length-1], penultimo=todosPontos[todosPontos.length-2];
-    const ang=Math.atan2(ultimo.y-penultimo.y, ultimo.x-penultimo.x); const tp=12;
+    const ultimo = todosPontos[todosPontos.length - 1], penultimo = todosPontos[todosPontos.length - 2];
+    const ang = Math.atan2(ultimo.y - penultimo.y, ultimo.x - penultimo.x); const tp = 12;
     ctx.setLineDash([]);
     if (linha.tipo === 'bloqueio') {
-        const perpX=-Math.sin(ang)*10, perpY=Math.cos(ang)*10;
-        ctx.beginPath(); ctx.moveTo(ultimo.x-perpX, ultimo.y-perpY); ctx.lineTo(ultimo.x+perpX, ultimo.y+perpY); ctx.lineWidth=(linha.largura||2)+1; ctx.stroke();
+        const perpX = -Math.sin(ang) * 10, perpY = Math.cos(ang) * 10;
+        ctx.beginPath(); ctx.moveTo(ultimo.x - perpX, ultimo.y - perpY); ctx.lineTo(ultimo.x + perpX, ultimo.y + perpY); ctx.lineWidth = (linha.largura || 2) + 1; ctx.stroke();
     } else if (linha.tipo !== 'linha') {
-        ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x-tp*Math.cos(ang-Math.PI/6), ultimo.y-tp*Math.sin(ang-Math.PI/6));
-        ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x-tp*Math.cos(ang+Math.PI/6), ultimo.y-tp*Math.sin(ang+Math.PI/6)); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x - tp * Math.cos(ang - Math.PI / 6), ultimo.y - tp * Math.sin(ang - Math.PI / 6));
+        ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x - tp * Math.cos(ang + Math.PI / 6), ultimo.y - tp * Math.sin(ang + Math.PI / 6)); ctx.stroke();
     }
     ctx.restore();
 }
 
-function desenharLinha(ctx, linha) { desenharLinhaMultipla(ctx, linha, null); }
-
 function estaNoObj(obj, pos) {
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
-    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x-obj.x, pos.y-obj.y) < 18;
+    const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
+    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x - obj.x, pos.y - obj.y) < 18;
     if (!obj.pontos || obj.pontos.length < 2) return false;
-    for (let i=0; i<obj.pontos.length-1; i++) {
-        const p1=obj.pontos[i], p2=obj.pontos[i+1]; const dx=p2.x-p1.x, dy=p2.y-p1.y, len2=dx*dx+dy*dy;
-        if (len2===0) { if (Math.hypot(pos.x-p1.x, pos.y-p1.y)<10) return true; continue; }
-        const t=Math.max(0,Math.min(1,((pos.x-p1.x)*dx+(pos.y-p1.y)*dy)/len2));
-        if (Math.hypot(pos.x-(p1.x+t*dx), pos.y-(p1.y+t*dy))<10) return true;
+    for (let i = 0; i < obj.pontos.length - 1; i++) {
+        const p1 = obj.pontos[i], p2 = obj.pontos[i + 1]; const dx = p2.x - p1.x, dy = p2.y - p1.y, len2 = dx * dx + dy * dy;
+        if (len2 === 0) { if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 10) return true; continue; }
+        const t = Math.max(0, Math.min(1, ((pos.x - p1.x) * dx + (pos.y - p1.y) * dy) / len2));
+        if (Math.hypot(pos.x - (p1.x + t * dx), pos.y - (p1.y + t * dy)) < 10) return true;
     }
     return false;
 }
 
 function desenharSeleccao(ctx, obj) {
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
     ctx.save(); ctx.strokeStyle = '#3B82F6'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-    if (simbolos.includes(obj.tipo)) { ctx.beginPath(); ctx.arc(obj.x, obj.y, 20*(obj.tamanho||1), 0, Math.PI*2); ctx.stroke(); }
+    if (simbolos.includes(obj.tipo)) { ctx.beginPath(); ctx.arc(obj.x, obj.y, 20 * (obj.tamanho || 1), 0, Math.PI * 2); ctx.stroke(); }
     else if (obj.pontos && obj.pontos.length >= 2) {
         ctx.beginPath(); ctx.moveTo(obj.pontos[0].x, obj.pontos[0].y); obj.pontos.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
-        ctx.setLineDash([]); ctx.fillStyle = '#3B82F6'; obj.pontos.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill(); });
+        ctx.setLineDash([]); ctx.fillStyle = '#3B82F6'; obj.pontos.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); });
     }
     ctx.restore();
 }
@@ -402,8 +743,8 @@ function mostrarPainelTamanho(canvasId, obj) {
     const container = canvas.closest('.relative').parentElement;
     const painel = document.createElement('div');
     painel.id = 'painel_tamanho_' + canvasId;
-    painel.className = 'flex items-center gap-2 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs';
-    painel.innerHTML = `<span class="text-blue-600 font-medium">Tamanho:</span><button onclick="ajustarTamanho('${canvasId}', -0.2)" class="bg-white border border-blue-300 text-blue-600 px-2 py-1 rounded hover:bg-blue-50 font-bold">−</button><span id="valor_tamanho_${canvasId}" class="text-blue-700 font-medium w-8 text-center">${Math.round((obj.tamanho||1)*100)}%</span><button onclick="ajustarTamanho('${canvasId}', 0.2)" class="bg-white border border-blue-300 text-blue-600 px-2 py-1 rounded hover:bg-blue-50 font-bold">+</button><button onclick="fecharPainelTamanho('${canvasId}')" class="ml-2 text-gray-400 hover:text-gray-600">✕</button>`;
+    painel.className = 'mt-2 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs';
+    painel.innerHTML = `<span class="font-medium text-blue-600">Tamanho:</span><button onclick="ajustarTamanho('${canvasId}', -0.2)" class="rounded border border-blue-300 bg-white px-2 py-1 font-bold text-blue-600 hover:bg-blue-50">−</button><span id="valor_tamanho_${canvasId}" class="w-8 text-center font-medium text-blue-700">${Math.round((obj.tamanho || 1) * 100)}%</span><button onclick="ajustarTamanho('${canvasId}', 0.2)" class="rounded border border-blue-300 bg-white px-2 py-1 font-bold text-blue-600 hover:bg-blue-50">+</button><button onclick="fecharPainelTamanho('${canvasId}')" class="ml-2 text-gray-400 hover:text-gray-600">✕</button>`;
     container.appendChild(painel);
 }
 
@@ -411,10 +752,11 @@ function ajustarTamanho(canvasId, delta) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est || !est.objectoSeleccionado) return;
     const obj = est.objectoSeleccionado;
-    obj.tamanho = Math.max(0.3, Math.min(3, (obj.tamanho||1) + delta));
+    obj.tamanho = Math.max(0.3, Math.min(3, (obj.tamanho || 1) + delta));
     const valorEl = document.getElementById('valor_tamanho_' + canvasId);
-    if (valorEl) valorEl.textContent = Math.round(obj.tamanho*100) + '%';
-    redesenhar(canvasId); desenharSeleccao(est.ctx, obj);
+    if (valorEl) valorEl.textContent = Math.round(obj.tamanho * 100) + '%';
+    redesenhar(canvasId);
+    desenharSeleccao(est.ctx, obj);
 }
 
 function fecharPainelTamanho(canvasId) {
@@ -428,7 +770,7 @@ function definirFerramenta(canvasId, ferramenta) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
     est.ferramenta = ferramenta;
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
+    const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
     est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'not-allowed' : 'crosshair';
     const toolbar = document.getElementById('toolbar_' + canvasId);
     if (toolbar) {
@@ -443,7 +785,9 @@ function definirFerramenta(canvasId, ferramenta) {
 function limparTudo(canvasId) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
-    est.objectos = []; est.contadores = { ataque: 1, defesa: 1 }; redesenhar(canvasId);
+    est.objectos = [];
+    est.contadores = { ataque: 1, defesa: 1 };
+    redesenhar(canvasId);
 }
 
 function desfazer(canvasId) {
@@ -459,11 +803,25 @@ function guardarDesenho(canvasId, exercicioId, numeroDesenho) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
     fetch(`/treino/exercicios/${exercicioId}/desenho`, {
-        method: 'POST', body: JSON.stringify({ numero: numeroDesenho, dados: est.canvas.toDataURL('image/png') }), headers: { 'Content-Type': 'application/json' }
+        method: 'POST',
+        body: JSON.stringify({ numero: numeroDesenho, dados: est.canvas.toDataURL('image/png') }),
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        }
     }).then(r => r.json()).then(data => {
         if (data.sucesso) {
             const btn = document.querySelector(`[onclick="guardarDesenho('${canvasId}', ${exercicioId}, ${numeroDesenho})"]`);
-            if (btn) { btn.textContent = '✓ Guardado'; btn.classList.add('bg-green-500'); btn.classList.remove('bg-orange-500'); setTimeout(() => { btn.textContent = 'Guardar'; btn.classList.remove('bg-green-500'); btn.classList.add('bg-orange-500'); }, 2000); }
+            if (btn) {
+                btn.textContent = '✓ Guardado';
+                btn.classList.add('bg-green-500');
+                btn.classList.remove('bg-orange-500');
+                setTimeout(() => {
+                    btn.textContent = 'Guardar desenho';
+                    btn.classList.remove('bg-green-500');
+                    btn.classList.add('bg-orange-500');
+                }, 2000);
+            }
         }
     });
 }
@@ -486,12 +844,98 @@ function toggleCampoExtra(divId) {
     }
 }
 
+let _bibFormId = null;
+
+function abrirBiblioteca(formId) {
+    _bibFormId = formId;
+    document.getElementById('modal_biblioteca').classList.remove('hidden');
+    document.getElementById('bib_pesquisa').value = '';
+    document.getElementById('bib_categoria').value = '';
+    pesquisarBiblioteca();
+}
+
+function fecharBiblioteca() {
+    document.getElementById('modal_biblioteca').classList.add('hidden');
+}
+
+function pesquisarBiblioteca() {
+    const q = document.getElementById('bib_pesquisa').value;
+    const cat = document.getElementById('bib_categoria').value;
+    fetch(`/biblioteca/api/busca?q=${encodeURIComponent(q)}&categoria=${encodeURIComponent(cat)}`)
+        .then(r => r.json())
+        .then(data => {
+            const el = document.getElementById('bib_resultados');
+            if (!data.length) {
+                el.innerHTML = '<p class="py-6 text-center text-sm text-gray-400">Sem resultados.</p>';
+                return;
+            }
+            el.innerHTML = data.map(ex => `
+                <div class="cursor-pointer rounded-lg border border-gray-200 bg-gray-50 p-3 transition hover:border-orange-300 hover:bg-orange-50"
+                     onclick="selecionarDaBiblioteca(${JSON.stringify(ex).replace(/"/g, '&quot;')})">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-gray-800">${ex.nome}</p>
+                        ${ex.categoria ? `<span class="rounded-full bg-orange-50 px-2 py-0.5 text-xs text-orange-600">${ex.categoria}</span>` : ''}
+                        ${ex.organizacao ? `<p class="mt-1 truncate text-xs text-gray-500">${ex.organizacao.substring(0, 90)}</p>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function selecionarDaBiblioteca(ex) {
+    const form = document.getElementById(_bibFormId);
+    if (!form) return;
+    const nomeEl = form.querySelector('[name="nome"]');
+    if (nomeEl) nomeEl.value = ex.nome;
+    const catEl = form.querySelector('[name="categoria"]');
+    if (catEl && ex.categoria) catEl.value = ex.categoria;
+    const orgEl = form.querySelector('[name="organizacao"]');
+    if (orgEl) orgEl.value = ex.organizacao || '';
+    const cpEl = form.querySelector('[name="coaching_points"]');
+    if (cpEl) cpEl.value = ex.coaching_points || '';
+    const bibliotecaIdEl = form.querySelector('[name="biblioteca_id"]');
+    if (bibliotecaIdEl) bibliotecaIdEl.value = ex.id;
+    fecharBiblioteca();
+}
+
+let _bibDebounce = null;
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('canvas[id^="canvas1_"], canvas[id^="canvas2_"]').forEach(c => {
-        inicializarDesenho(c.id);
-        setTimeout(() => definirFerramenta(c.id, 'jogador_ataque'), 200);
+    document.querySelectorAll('details[data-drawings="true"][open]').forEach((painel) => {
+        togglePainelDesenhos(painel.dataset.exercicioId, true);
     });
+
+    const pesquisaEl = document.getElementById('bib_pesquisa');
+    if (pesquisaEl) {
+        pesquisaEl.addEventListener('input', () => {
+            clearTimeout(_bibDebounce);
+            _bibDebounce = setTimeout(pesquisarBiblioteca, 300);
+        });
+    }
 });
 </script>
+
+<div id="modal_biblioteca" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black bg-opacity-40" onclick="if(event.target===this)fecharBiblioteca()">
+    <div class="mx-4 flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl bg-white p-6 shadow-xl">
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="font-semibold text-gray-800">📖 Biblioteca de Exercícios</h2>
+            <button onclick="fecharBiblioteca()" class="text-xl leading-none text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+        <div class="mb-3 flex gap-2">
+            <input id="bib_pesquisa" type="text" placeholder="Pesquisar exercício..." class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+            <select id="bib_categoria" onchange="pesquisarBiblioteca()" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <option value="">Todas</option>
+                {% for categoria in categorias_exercicio %}
+                <option value="{{ categoria }}">{{ categoria }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div id="bib_resultados" class="flex-1 space-y-2 overflow-y-auto">
+            <p class="py-6 text-center text-sm text-gray-400">A carregar...</p>
+        </div>
+        <div class="mt-3 border-t border-gray-100 pt-3">
+            <a href="/biblioteca" target="_blank" class="text-xs text-indigo-500 hover:text-indigo-600">Gerir biblioteca →</a>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

@@ -1,6 +1,6 @@
 # Importações necessárias do SQLAlchemy e Python
 from sqlalchemy import Column, Integer, String, Date, Text, ForeignKey, Float, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from database import Base
 
 
@@ -13,6 +13,7 @@ class Macrociclo(Base):
     __tablename__ = "macrociclos"
 
     id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     # Número automático do macro dentro da equipa (ex: Macro 1, Macro 2...)
     numero = Column(Integer, nullable=False)
@@ -43,6 +44,11 @@ class Macrociclo(Base):
 
     # Um macrociclo tem vários mesociclos
     mesociclos = relationship("Mesociclo", back_populates="macrociclo", cascade="all, delete")
+    eventos_agenda = relationship(
+        "EventoPlaneamentoClube",
+        back_populates="macrociclo",
+        cascade="all, delete",
+    )
     # cascade="all, delete" significa: se apagarmos o macro, apagam-se também os mesos
 
 
@@ -53,6 +59,8 @@ class Macrociclo(Base):
 # ─────────────────────────────────────────
 class Mesociclo(Base):
     __tablename__ = "mesociclos"
+
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
 
@@ -80,6 +88,11 @@ class Mesociclo(Base):
 
     # Um mesociclo tem vários microciclos
     microciclos = relationship("Microciclo", back_populates="mesociclo", cascade="all, delete")
+    eventos_agenda = relationship(
+        "EventoPlaneamentoClube",
+        back_populates="mesociclo",
+        cascade="all, delete",
+    )
 
 
 # ─────────────────────────────────────────
@@ -89,6 +102,8 @@ class Mesociclo(Base):
 # ─────────────────────────────────────────
 class Microciclo(Base):
     __tablename__ = "microciclos"
+
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
 
@@ -119,6 +134,11 @@ class Microciclo(Base):
 
     # Um microciclo tem vários dias de treino
     sessoes = relationship("SessaoTreino", back_populates="microciclo", cascade="all, delete")
+    eventos_agenda = relationship(
+        "EventoPlaneamentoClube",
+        back_populates="microciclo",
+        cascade="all, delete",
+    )
 
 
 # ─────────────────────────────────────────
@@ -128,11 +148,15 @@ class Microciclo(Base):
 class SessaoTreino(Base):
     __tablename__ = "sessoes_treino"
 
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
+
     id = Column(Integer, primary_key=True, index=True)
 
     # Data e local do treino
     data = Column(Date, nullable=False)
     local = Column(String, nullable=True)
+    hora_inicio = Column(String, nullable=True)
+    hora_fim = Column(String, nullable=True)
 
     # Número sequencial do treino na época
     numero_treino = Column(Integer, nullable=True)
@@ -155,7 +179,30 @@ class SessaoTreino(Base):
     min_fisicos = Column(Integer, default=0)
 
     reflexao = Column(Text, nullable=True)
+    origem = Column(String, nullable=False, default="manual")
+    sincronizada = Column(Boolean, nullable=False, default=False)
+    alterada_manual = Column(Boolean, nullable=False, default=False)
+    ativa = Column(Boolean, nullable=False, default=True)
+    estado = Column(String, nullable=False, default="planeada", server_default="planeada")
 
     # Ligação ao microciclo
     microciclo_id = Column(Integer, ForeignKey("microciclos.id"), nullable=False)
+    plano_semanal_clube_id = Column(Integer, ForeignKey("planos_semanais_clube.id"), nullable=True)
+    evento_planeamento_clube_id = Column(
+        Integer,
+        ForeignKey("eventos_planeamento_clube.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     microciclo = relationship("Microciclo", back_populates="sessoes")
+    plano_semanal_clube = relationship("PlanoSemanalClube", backref="sessoes_geradas")
+    evento_planeamento_clube = relationship(
+        "EventoPlaneamentoClube",
+        backref=backref("sessoes_geradas"),
+    )
+    plano_treino = relationship(
+        "PlanoTreino",
+        back_populates="sessao",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )

@@ -1,72 +1,79 @@
 {% extends "base.html" %}
-
-{% block titulo %}Novo Treinador{% endblock %}
-
+{% block titulo %}{{ "Editar" if treinador else "Novo" }} Treinador{% endblock %}
 {% block conteudo %}
 
 <div class="mb-6">
-    <a href="/treinadores" class="text-orange-500 hover:text-orange-600 text-sm">← Voltar aos treinadores</a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-2">Novo Treinador</h1>
+    <a href="/treinadores" class="text-orange-500 text-sm">← Voltar aos treinadores</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">
+        {{ "Editar Treinador" if treinador else "Novo Treinador" }}
+    </h1>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 max-w-2xl">
-    <form method="POST" action="/treinadores/novo">
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
 
-        <!-- Nome -->
+    {% if erro %}
+    <div class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{{ erro }}</div>
+    {% endif %}
+
+    <form method="POST" action="{{ '/treinadores/' ~ treinador.id ~ '/editar' if treinador else '/treinadores/novo' }}">
+
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
-            <input type="text" name="nome" placeholder="Nome do treinador"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
-                   required>
+            <input type="text" name="nome" required
+                   value="{{ treinador.nome if treinador else '' }}"
+                   placeholder="Nome do treinador"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-            <!-- Data de nascimento -->
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Data de nascimento</label>
                 <input type="date" name="data_nascimento"
+                       value="{{ treinador.data_nascimento|data_iso if treinador and treinador.data_nascimento else '' }}"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
-
-            <!-- Telefone -->
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                <input type="text" name="telefone" placeholder="912 345 678"
+                <input type="text" name="telefone"
+                       value="{{ treinador.telefone if treinador and treinador.telefone else '' }}"
+                       placeholder="912 345 678"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
         </div>
 
-        <!-- Email -->
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input type="email" name="email" placeholder="email@exemplo.com"
+            <input type="email" name="email"
+                   value="{{ treinador.email if treinador and treinador.email else '' }}"
+                   placeholder="email@exemplo.com"
                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
 
-        <!-- Morada -->
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Morada</label>
-            <input type="text" name="morada" placeholder="Rua, número, cidade"
+            <input type="text" name="morada"
+                   value="{{ treinador.morada if treinador and treinador.morada else '' }}"
+                   placeholder="Rua, número, cidade"
                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-            <!-- Número cédula -->
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Nº Cédula</label>
-                <input type="text" name="numero_cedula" placeholder="Número de cédula"
+                <input type="text" name="numero_cedula"
+                       value="{{ treinador.numero_cedula if treinador and treinador.numero_cedula else '' }}"
+                       placeholder="Número de cédula"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
-
-            <!-- Número FPB -->
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Nº FPB</label>
-                <input type="text" name="numero_fpb" placeholder="Número FPB"
+                <input type="text" name="numero_fpb"
+                       value="{{ treinador.numero_fpb if treinador and treinador.numero_fpb else '' }}"
+                       placeholder="Número FPB"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
         </div>
 
-        <!-- Equipas -->
         {% if equipas %}
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Equipas associadas</label>
@@ -74,6 +81,7 @@
                 {% for equipa in equipas %}
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="equipas_ids" value="{{ equipa.id }}"
+                           {% if treinador and equipa in treinador.equipas %}checked{% endif %}
                            class="w-4 h-4 text-orange-500 rounded">
                     <span class="text-gray-700">{{ equipa.nome }} — {{ equipa.escalao.value }}</span>
                 </label>
@@ -82,19 +90,47 @@
         </div>
         {% endif %}
 
-        <!-- Observações -->
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
             <textarea name="observacoes" rows="3" placeholder="Notas adicionais..."
-                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">{{ treinador.observacoes if treinador and treinador.observacoes else '' }}</textarea>
         </div>
+
+        {% if not treinador %}
+        <div class="mb-6 border-t border-gray-100 pt-6">
+            <div class="flex items-center gap-2 mb-3">
+                <input type="checkbox" id="criar_login" onchange="document.getElementById('secao_login').classList.toggle('hidden', !this.checked)"
+                       class="w-4 h-4 text-orange-500 rounded cursor-pointer">
+                <label for="criar_login" class="text-sm font-medium text-gray-700 cursor-pointer">
+                    Criar login de acesso para este treinador
+                </label>
+            </div>
+            <div id="secao_login" class="hidden space-y-4 bg-orange-50 rounded-lg p-4 border border-orange-100">
+                <p class="text-xs text-orange-700">O treinador poderá aceder à plataforma com estas credenciais.</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                        <input type="text" name="login_username" autocomplete="off"
+                               placeholder="ex: joao.silva"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" name="login_password" autocomplete="new-password"
+                               placeholder="Mínimo 8 caracteres"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <div class="flex gap-3">
             <button type="submit"
                     class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
-                Registar Treinador
+                {{ "Guardar alterações" if treinador else "Registar Treinador" }}
             </button>
-            <a href="/treinadores"
+            <a href="{{ '/treinadores/' ~ treinador.id if treinador else '/treinadores' }}"
                class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition">
                 Cancelar
             </a>

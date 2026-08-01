@@ -1,0 +1,142 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Plano de Jogo — {{ jogo.adversario }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        @page { size: A4 portrait; margin: 10mm; }
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #000; padding: 15px; }
+        .toolbar { text-align: center; padding: 10px; background: #f5f5f5; margin-bottom: 15px; }
+        .btn-print { background: #e25a1c; color: white; border: none; padding: 10px 20px; font-size: 14px; cursor: pointer; border-radius: 6px; }
+        h1 { font-size: 16px; text-align: center; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid #000; padding-bottom: 8px; }
+        .info-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; margin-bottom: 12px; }
+        .info-box { border: 1px solid #ccc; padding: 4px 6px; }
+        .info-box label { font-size: 8px; color: #666; display: block; text-transform: uppercase; }
+        .info-box span { font-weight: bold; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .secao { border: 1px solid #ccc; padding: 6px; }
+        .secao h2 { font-size: 10px; text-transform: uppercase; color: #e25a1c; font-weight: bold; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 3px; }
+        .secao h2.azul { color: #2563eb; }
+        .secao h2.verde { color: #16a34a; }
+        .secao h2.cinza { color: #555; }
+        .jogador-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid #f0f0f0; }
+        .num { background: #e25a1c; color: white; font-weight: bold; font-size: 10px; padding: 1px 5px; border-radius: 2px; min-width: 20px; text-align: center; }
+        .num-pos { background: #666; color: white; font-size: 9px; padding: 1px 4px; border-radius: 2px; }
+        .texto { min-height: 30px; font-size: 10px; line-height: 1.4; }
+        .campo-label { font-size: 9px; color: #666; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; }
+        .reflexao { border: 1px solid #ccc; padding: 8px; margin-top: 8px; min-height: 50px; }
+        .reflexao label { font-size: 8px; color: #666; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; }
+        @media print { body { padding: 0; } .toolbar { display: none; } }
+        .modo-pdf .toolbar { display: none; }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body class="{% if modo_pdf %}modo-pdf{% endif %}">
+
+<div class="toolbar">
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+    <a href="/jogos/{{ jogo.id }}/plano" style="margin-left: 15px; color: #666; font-size: 12px;">← Voltar</a>
+</div>
+
+{{ cabecalho_pdf('Plano de jogo', jogo.equipa.nome ~ ' · vs ' ~ jogo.adversario ~ ' · ' ~ (jogo.data|data_pt), 'Jogo · ' ~ data_exportacao) }}
+
+<div class="info-grid">
+    <div class="info-box"><label>Equipa</label><span>{{ jogo.equipa.nome }}</span></div>
+    <div class="info-box"><label>Adversário</label><span>{{ jogo.adversario }}</span></div>
+    <div class="info-box"><label>Data</label><span>{{ jogo.data|data_pt }}{% if jogo.hora %} — {{ jogo.hora }}{% endif %}</span></div>
+    <div class="info-box"><label>Local</label><span>{{ jogo.local if jogo.local else "—" }}</span></div>
+    <div class="info-box"><label>Competição</label><span>{{ jogo.competicao if jogo.competicao else "—" }}</span></div>
+    <div class="info-box"><label>Casa/Fora</label><span>{% if jogo.em_casa %}Casa{% else %}Fora{% endif %}</span></div>
+</div>
+
+{% if plano %}
+<div class="grid-2">
+
+    <div class="secao">
+        <h2>5 Inicial + Rotações</h2>
+        {% set titulares = [plano.titular_1, plano.titular_2, plano.titular_3, plano.titular_4, plano.titular_5] %}
+        {% for tid in titulares %}
+        {% if tid and tid in jogadores_dict %}
+        <div class="jogador-row">
+            <span class="num-pos">{{ loop.index }}</span>
+            {% if jogadores_dict[tid].numero_camisola %}
+            <span class="num">#{{ jogadores_dict[tid].numero_camisola }}</span>
+            {% endif %}
+            <span>{{ jogadores_dict[tid].nome }}</span>
+            {% if jogadores_dict[tid].posicao %}
+            <span style="color:#666; font-size:9px;">{{ jogadores_dict[tid].posicao }}</span>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% if plano.rotacoes %}
+        <div style="margin-top:6px; padding-top:6px; border-top:1px solid #eee;">
+            <p class="campo-label">Rotações</p>
+            <p class="texto">{{ plano.rotacoes }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="secao">
+        <h2>Chaves — Ataque</h2>
+        <p class="texto">{{ plano.chaves_ataque if plano.chaves_ataque else "—" }}</p>
+        <h2 class="azul" style="margin-top:8px;">Chaves — Defesa</h2>
+        <p class="texto">{{ plano.chaves_defesa if plano.chaves_defesa else "—" }}</p>
+        <h2 class="verde" style="margin-top:8px;">Movimentos Ofensivos</h2>
+        <p class="texto">{{ plano.movimentos_ofensivos if plano.movimentos_ofensivos else "—" }}</p>
+    </div>
+
+</div>
+
+<div class="secao" style="margin-top:8px; margin-bottom:8px;">
+    <h2 class="cinza">Estratégias Defensivas</h2>
+    <div class="grid-3">
+        <div>
+            <p class="campo-label">Bloqueio Direto Lateral</p>
+            <p class="texto">{{ plano.bloqueio_direto_lateral if plano.bloqueio_direto_lateral else "—" }}</p>
+        </div>
+        <div>
+            <p class="campo-label">Bloqueio Direto Central</p>
+            <p class="texto">{{ plano.bloqueio_direto_central if plano.bloqueio_direto_central else "—" }}</p>
+        </div>
+        <div>
+            <p class="campo-label">Handoff</p>
+            <p class="texto">{{ plano.handoff if plano.handoff else "—" }}</p>
+        </div>
+        <div style="margin-top:6px;">
+            <p class="campo-label">Indiretos de Entrada</p>
+            <p class="texto">{{ plano.indiretos_entrada if plano.indiretos_entrada else "—" }}</p>
+        </div>
+        <div style="margin-top:6px;">
+            <p class="campo-label">Indiretos de Saída</p>
+            <p class="texto">{{ plano.indiretos_saida if plano.indiretos_saida else "—" }}</p>
+        </div>
+        <div style="margin-top:6px;">
+            <p class="campo-label">Bola Dentro</p>
+            <p class="texto">{{ plano.bola_dentro if plano.bola_dentro else "—" }}</p>
+        </div>
+    </div>
+    {% if plano.situacoes_especiais %}
+    <div style="margin-top:6px; border-top:1px solid #eee; padding-top:6px;">
+        <p class="campo-label">Situações Especiais</p>
+        <p class="texto">{{ plano.situacoes_especiais }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="reflexao">
+    <label>Reflexão</label>
+    <p>{{ plano.reflexao if plano.reflexao else "" }}</p>
+</div>
+
+{% else %}
+<p style="text-align:center; color:#999; margin-top:30px;">Plano de jogo ainda não preenchido.</p>
+{% endif %}
+
+{{ rodape_pdf(jogo.equipa.nome ~ ' · Plano de jogo') }}
+
+</body>
+</html>

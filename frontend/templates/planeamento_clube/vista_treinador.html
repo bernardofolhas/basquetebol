@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block titulo %}Planeamento do Clube{% endblock %}
+
+{% block conteudo %}
+
+{% set nomes_meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] %}
+
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">Planeamento do Clube</h1>
+    <p class="text-gray-500 mt-1">Vista geral — próximos 30 dias</p>
+</div>
+
+<!-- Plano Anual Ativo -->
+{% if anual_ativo %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6 flex items-center gap-4">
+    <span class="text-3xl">📘</span>
+    <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Época em curso</p>
+        <p class="text-lg font-bold text-gray-800">{{ anual_ativo.titulo }}</p>
+        <p class="text-sm text-gray-500">{{ anual_ativo.epoca }} &nbsp;·&nbsp; {{ anual_ativo.data_inicio|data_pt }} → {{ anual_ativo.data_fim|data_pt }}</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Planeamento do Mês Atual -->
+<div class="mb-6">
+    <h2 class="text-base font-semibold text-gray-700 mb-3">🗂️ Planeamento de {{ nomes_meses[hoje.month - 1] }}</h2>
+    {% if mensal_atual %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div class="flex items-start justify-between flex-wrap gap-3">
+            <div>
+                <p class="font-semibold text-gray-800">{{ mensal_atual.titulo }}</p>
+                {% if mensal_atual.objetivos_mes %}
+                <p class="text-sm text-gray-600 mt-1 whitespace-pre-line">{{ mensal_atual.objetivos_mes }}</p>
+                {% endif %}
+                {% if mensal_atual.observacoes %}
+                <p class="text-xs text-gray-400 mt-2 italic">{{ mensal_atual.observacoes }}</p>
+                {% endif %}
+            </div>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
+                {% if mensal_atual.estado == 'ativo' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                {{ mensal_atual.estado | capitalize }}
+            </span>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-center text-gray-400 text-sm">
+        Sem planeamento mensal definido para este mês.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Planos Semanais Próximos -->
+<div class="mb-6">
+    <h2 class="text-base font-semibold text-gray-700 mb-3">🗓️ Planos Semanais</h2>
+    {% if planos_semanais %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for semanal in planos_semanais %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div class="flex items-center justify-between mb-2">
+                <p class="font-semibold text-gray-800 text-sm">{{ semanal.titulo }}</p>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                    {% if semanal.estado == 'ativo' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                    {{ semanal.estado | capitalize }}
+                </span>
+            </div>
+            <p class="text-xs text-gray-500">{{ semanal.data_inicio|data_pt }} → {{ semanal.data_fim|data_pt }}</p>
+            {% if semanal.observacoes %}
+            <p class="text-xs text-gray-400 mt-2 italic line-clamp-2">{{ semanal.observacoes }}</p>
+            {% endif %}
+            {% if semanal.eventos %}
+            <p class="text-xs text-orange-500 mt-2 font-medium">{{ semanal.eventos | length }} evento(s)</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-center text-gray-400 text-sm">
+        Sem planos semanais nos próximos 30 dias.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Eventos Próximos -->
+<div class="mb-6">
+    <h2 class="text-base font-semibold text-gray-700 mb-3">📍 Eventos nos próximos 30 dias</h2>
+    {% if eventos_proximos %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <ul class="divide-y divide-gray-100">
+            {% for evento in eventos_proximos %}
+            {% set tipo_cor = {
+                'treino_equipa': 'bg-blue-100 text-blue-700',
+                'treino_individual': 'bg-sky-100 text-sky-700',
+                'jogo': 'bg-red-100 text-red-700',
+                'atividade_extra': 'bg-purple-100 text-purple-700',
+                'evento_clube': 'bg-orange-100 text-orange-700'
+            } %}
+            {% set tipo_icone = {
+                'treino_equipa': '🏋️',
+                'treino_individual': '🏃',
+                'jogo': '🏀',
+                'atividade_extra': '🎯',
+                'evento_clube': '📣'
+            } %}
+            <li class="px-5 py-3 flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 text-center mt-0.5">
+                    <p class="text-xs font-bold text-gray-600">{{ evento.data|data_pt }}</p>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-base">{{ tipo_icone.get(evento.tipo.value, '📌') }}</span>
+                        <p class="font-medium text-gray-800 text-sm">{{ evento.titulo }}</p>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ tipo_cor.get(evento.tipo.value, 'bg-gray-100 text-gray-700') }}">
+                            {{ evento.tipo.value | replace('_', ' ') | title }}
+                        </span>
+                    </div>
+                    {% if evento.hora_inicio %}
+                    <p class="text-xs text-gray-500 mt-0.5">{{ evento.hora_inicio }}{% if evento.hora_fim %} – {{ evento.hora_fim }}{% endif %}</p>
+                    {% endif %}
+                    {% if evento.descricao %}
+                    <p class="text-xs text-gray-400 mt-0.5 line-clamp-1">{{ evento.descricao }}</p>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% else %}
+    <div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-center text-gray-400 text-sm">
+        Sem eventos agendados nos próximos 30 dias.
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
