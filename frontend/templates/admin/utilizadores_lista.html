@@ -65,6 +65,7 @@
                     class="bg-orange-100 hover:bg-orange-200 text-orange-700 text-xs px-3 py-1 rounded-lg font-medium transition">
                         Editar
                     </a>
+                    {% if u.id != utilizador.id %}<form method="POST" action="/admin/utilizadores/{{ u.id }}/recuperacao-temporaria"><button class="bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs px-3 py-1 rounded-lg font-medium transition">Acesso temporário</button></form>{% endif %}
 
                     {% if u.id != utilizador.id %}
                     <form method="POST" action="/admin/utilizadores/{{ u.id }}/apagar"

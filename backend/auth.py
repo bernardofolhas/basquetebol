@@ -57,6 +57,8 @@ def obter_utilizador_atual(request, db):
     ).first()
     if not utilizador:
         return None
+    if int(payload.get("sv", 0)) != int(utilizador.sessao_versao or 0):
+        return None
     if utilizador.perfil.value != "superadministrador":
         from clube_contexto import clube_atual_id
         if clube_atual_id() != utilizador.clube_id:

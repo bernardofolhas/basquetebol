@@ -25,6 +25,7 @@ class Utilizador(Base):
     ativo = Column(Boolean, default=True)
     clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=True, index=True)
     deve_alterar_password = Column(Boolean, nullable=False, default=False)
+    sessao_versao = Column(Integer, nullable=False, default=0, server_default="0")
 
     # Ligação opcional ao treinador
     treinador_id = Column(Integer, ForeignKey("treinadores.id"), nullable=True)

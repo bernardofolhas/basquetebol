@@ -21,6 +21,9 @@ class ClubeContextoMiddleware(BaseHTTPMiddleware):
                 db = SessionLocal()
                 try:
                     utilizador = db.query(Utilizador).filter(Utilizador.username == payload.get("sub")).first()
+                    if utilizador and int(payload.get("sv", 0)) != int(utilizador.sessao_versao or 0):
+                        request.session.clear()
+                        utilizador = None
                     clube_id = None
                     if utilizador:
                         if utilizador.perfil == PerfilEnum.superadministrador:

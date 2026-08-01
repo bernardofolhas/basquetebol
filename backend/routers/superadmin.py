@@ -18,6 +18,9 @@ from models.utilizador import PerfilEnum, Utilizador
 from paths import TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
 from services.identidade_clube_service import normalizar_cor
+from config import config
+from models.recuperacao_password import TokenRecuperacaoPassword
+from services.recuperacao_password_service import criar_token_recuperacao
 from routers.identidade import _apagar_logo, _guardar_logo
 
 router = APIRouter(prefix="/superadmin")
@@ -32,6 +35,47 @@ def _slug(valor: str) -> str:
 def listar_clubes(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_superadmin)):
     clubes = db.query(Clube).execution_options(ignorar_clube=True).order_by(Clube.nome_oficial).all()
     return templates.TemplateResponse(request, "superadmin/clubes.html", {"utilizador": utilizador, "clubes": clubes})
+
+
+@router.get("/utilizadores", response_class=HTMLResponse)
+def listar_utilizadores_globais(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_superadmin)):
+    utilizadores = db.query(Utilizador).execution_options(ignorar_clube=True).order_by(
+        Utilizador.clube_id, Utilizador.nome,
+    ).all()
+    return templates.TemplateResponse(request, "superadmin/utilizadores.html", {
+        "utilizador": utilizador, "utilizadores": utilizadores,
+    })
+
+
+@router.post("/utilizadores/{utilizador_id}/recuperacao-temporaria", response_class=HTMLResponse)
+def gerar_recuperacao_temporaria_global(
+    utilizador_id: int, request: Request, db: Session = Depends(get_db),
+    utilizador=Depends(exigir_superadmin),
+):
+    alvo = db.query(Utilizador).execution_options(ignorar_clube=True).filter(Utilizador.id == utilizador_id).first()
+    if not alvo or alvo.id == utilizador.id:
+        return RedirectResponse("/superadmin/utilizadores", status_code=303)
+    from datetime import datetime
+    db.query(TokenRecuperacaoPassword).execution_options(ignorar_clube=True).filter(
+        TokenRecuperacaoPassword.utilizador_id == alvo.id,
+        TokenRecuperacaoPassword.tipo == "administrativo",
+        TokenRecuperacaoPassword.utilizado_em.is_(None),
+    ).update({"utilizado_em": datetime.now()}, synchronize_session=False)
+    token, registo = criar_token_recuperacao(
+        db, alvo, tipo="administrativo", criado_por=utilizador,
+        pedido_ip=getattr(request.client, "host", None),
+    )
+    registar_auditoria(
+        db, utilizador, "gerar_acesso_temporario", "utilizador", alvo.id,
+        f"Recuperação global para {alvo.username}; clube {alvo.clube_id}; expira em {registo.expira_em:%d/%m/%Y %H:%M}.", request,
+    )
+    db.commit()
+    return templates.TemplateResponse(request, "superadmin/recuperacao_temporaria.html", {
+        "utilizador": utilizador, "alvo": alvo,
+        "ligacao_temporaria": f"{config.app_base_url}/acesso-temporario/{token}",
+        "criado_em": registo.criado_em,
+        "expira_em": registo.expira_em,
+    })
 
 
 @router.get("/clubes/novo", response_class=HTMLResponse)

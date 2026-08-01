@@ -120,6 +120,26 @@ def actualizar_estrutura_perfis() -> None:
             logger.info("Perfil 'secretaria' adicionado ao enum da base de dados.")
 
 
+def actualizar_estrutura_recuperacao_password() -> None:
+    """Adiciona a versão de sessão a instalações anteriores."""
+    inspector = inspect(engine)
+    if not inspector.has_table("utilizadores"):
+        return
+    colunas = {coluna["name"] for coluna in inspector.get_columns("utilizadores")}
+    if "sessao_versao" in colunas:
+        return
+    with engine.begin() as ligacao:
+        if engine.dialect.name == "postgresql":
+            ligacao.execute(text(
+                "ALTER TABLE utilizadores ADD COLUMN IF NOT EXISTS sessao_versao INTEGER NOT NULL DEFAULT 0"
+            ))
+        else:
+            ligacao.execute(text(
+                "ALTER TABLE utilizadores ADD COLUMN sessao_versao INTEGER NOT NULL DEFAULT 0"
+            ))
+    logger.info("Versão de sessão adicionada aos utilizadores.")
+
+
 def actualizar_estrutura_planeamento_clube() -> None:
     """
     Garante compatibilidade mínima do esquema para evoluções recentes do

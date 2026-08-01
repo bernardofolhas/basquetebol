@@ -52,7 +52,11 @@ def _contraste(cor_a: str, cor_b: str) -> float:
 
 def _enriquecer_identidade(contexto: dict) -> dict:
     principal = contexto["cor_principal"]
+    secundaria = contexto["cor_secundaria"]
+    destaque = contexto["cor_destaque"]
     texto_sobre_principal = "#ffffff" if _contraste(principal, "#ffffff") >= _contraste(principal, "#111827") else "#111827"
+    texto_sobre_secundaria = "#ffffff" if _contraste(secundaria, "#ffffff") >= _contraste(secundaria, "#111827") else "#111827"
+    texto_sobre_destaque = "#ffffff" if _contraste(destaque, "#ffffff") >= _contraste(destaque, "#111827") else "#111827"
     return {
         **contexto,
         "cor_principal_clara": _misturar(principal, "#ffffff", 0.88),
@@ -61,6 +65,8 @@ def _enriquecer_identidade(contexto: dict) -> dict:
         "cor_principal_superficie": _misturar(principal, "#ffffff", 0.94),
         "cor_borda_marca": _misturar(principal, "#ffffff", 0.72),
         "texto_sobre_principal": texto_sobre_principal,
+        "texto_sobre_secundaria": texto_sobre_secundaria,
+        "texto_sobre_destaque": texto_sobre_destaque,
         "contraste_principal": round(_contraste(principal, texto_sobre_principal), 2),
     }
 

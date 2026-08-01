@@ -1,5 +1,6 @@
 """Prepara agendas para partilha externa sem transportar dados internos."""
 
+import calendar
 from collections import defaultdict
 from datetime import date
 
@@ -8,6 +9,7 @@ from models.planeamento_clube import EventoPlaneamentoClube
 from services.planeamento_integrado_service import obter_dashboard_planeamento_intervalo
 
 DIAS_SEMANA = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+MESES = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
 
 def _descricao_publica_por_id(db, itens: list[dict]) -> dict[str, str]:
@@ -74,7 +76,7 @@ def preparar_agenda_partilhavel(
     for item in itens_publicos:
         por_data[item["data"]].append(item)
     dias = [{"data": data_item, "dia_semana": DIAS_SEMANA[data_item.weekday()], "itens": itens_dia} for data_item, itens_dia in sorted(por_data.items())]
-    return {
+    agenda = {
         "data_inicio": data_inicio,
         "data_fim": data_fim,
         "itens": itens_publicos,
@@ -86,3 +88,24 @@ def preparar_agenda_partilhavel(
             "atividades": sum(1 for item in itens_publicos if item["categoria"] not in {"treino", "jogo"}),
         },
     }
+    cursor_mes = date(data_inicio.year, data_inicio.month, 1)
+    limite_mes = date(data_fim.year, data_fim.month, 1)
+    meses = []
+    while cursor_mes <= limite_mes:
+        semanas = []
+        for semana in calendar.Calendar(firstweekday=0).monthdatescalendar(cursor_mes.year, cursor_mes.month):
+            semanas.append([{
+                "data": dia,
+                "dia": dia.day,
+                "do_mes": dia.month == cursor_mes.month,
+                "no_periodo": data_inicio <= dia <= data_fim,
+                "itens": por_data.get(dia, []),
+            } for dia in semana])
+        meses.append({"nome": MESES[cursor_mes.month], "ano": cursor_mes.year, "semanas": semanas})
+        cursor_mes = date(
+            cursor_mes.year + (cursor_mes.month == 12),
+            1 if cursor_mes.month == 12 else cursor_mes.month + 1,
+            1,
+        )
+    agenda["meses"] = meses
+    return agenda

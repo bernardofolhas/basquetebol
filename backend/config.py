@@ -31,6 +31,13 @@ class Configuracao:
     session_cookie_https_only: bool
     session_cookie_max_age_seconds: int
     session_cookie_domain: str | None
+    app_base_url: str
+    smtp_host: str | None
+    smtp_port: int
+    smtp_username: str | None
+    smtp_password: str | None
+    smtp_from_email: str | None
+    smtp_use_tls: bool
 
 
 def _obter_variavel_obrigatoria(nome: str) -> str:
@@ -134,6 +141,12 @@ def _criar_configuracao() -> Configuracao:
     )
     session_cookie_domain = os.getenv("SESSION_COOKIE_DOMAIN")
     session_cookie_domain = session_cookie_domain.strip() if session_cookie_domain else None
+    app_base_url = os.getenv(
+        "APP_BASE_URL",
+        "https://basquetebol-production.up.railway.app" if ambiente == "production" else "http://127.0.0.1:8000",
+    ).strip().rstrip("/")
+    if ambiente == "production" and not app_base_url.startswith("https://"):
+        raise RuntimeError("APP_BASE_URL tem de usar HTTPS em produção.")
 
     if session_secret_key == secret_key:
         if ambiente == "production":
@@ -155,6 +168,13 @@ def _criar_configuracao() -> Configuracao:
         session_cookie_https_only=session_cookie_https_only,
         session_cookie_max_age_seconds=session_cookie_max_age_seconds,
         session_cookie_domain=session_cookie_domain,
+        app_base_url=app_base_url,
+        smtp_host=(os.getenv("SMTP_HOST") or "").strip() or None,
+        smtp_port=_obter_int_ambiente("SMTP_PORT", 587),
+        smtp_username=(os.getenv("SMTP_USERNAME") or "").strip() or None,
+        smtp_password=os.getenv("SMTP_PASSWORD") or None,
+        smtp_from_email=(os.getenv("SMTP_FROM_EMAIL") or "").strip() or None,
+        smtp_use_tls=_obter_bool_ambiente("SMTP_USE_TLS", True),
     )
 
     logger.info("Configuração da aplicação carregada para o ambiente '%s'.", configuracao.ambiente)

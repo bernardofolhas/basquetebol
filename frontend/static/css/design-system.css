@@ -8,6 +8,8 @@
     --clube-primary-surface: #fff7ed;
     --clube-primary-border: #fed7aa;
     --clube-on-primary: #ffffff;
+    --clube-on-secondary: #ffffff;
+    --clube-on-accent: #111827;
     --surface-page: #f3f4f6;
     --surface-card: #ffffff;
     --border-soft: #e5e7eb;
@@ -48,6 +50,35 @@ body {
     letter-spacing: 0.16em;
     text-transform: uppercase;
 }
+
+.ds-button {
+    display: inline-flex;
+    min-height: 2.6rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border: 1px solid transparent;
+    border-radius: 0.75rem;
+    padding: 0.62rem 0.95rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    transition: background-color .16s, border-color .16s, color .16s, box-shadow .16s, transform .16s;
+}
+
+.ds-button:hover { transform: translateY(-1px); }
+.ds-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--clube-accent) 35%, transparent); outline-offset: 2px; }
+.ds-button:active, .ds-button.is-active { transform: translateY(0); box-shadow: inset 0 2px 4px rgb(15 23 42 / .14); }
+.ds-button:disabled, .ds-button[aria-disabled="true"] { cursor: not-allowed; opacity: .5; pointer-events: none; transform: none; }
+.ds-button-primary { background: var(--clube-primary); color: var(--clube-on-primary); }
+.ds-button-primary:hover { background: var(--clube-primary-hover); }
+.ds-button-secondary { border-color: var(--clube-primary-border); background: var(--clube-primary-surface); color: var(--clube-primary-dark); }
+.ds-button-secondary:hover { border-color: var(--clube-primary); background: var(--clube-primary-light); }
+.ds-button-export { border-color: color-mix(in srgb, var(--clube-secondary) 24%, #64748b); background: var(--clube-secondary); color: var(--clube-on-secondary); }
+.ds-button-export:hover { background: color-mix(in srgb, var(--clube-secondary) 86%, #000); }
+.ds-button-share { border-color: color-mix(in srgb, var(--clube-accent) 35%, #cbd5e1); background: color-mix(in srgb, var(--clube-accent) 16%, #fff); color: #111827; }
+.ds-button-share:hover { border-color: var(--clube-accent); background: color-mix(in srgb, var(--clube-accent) 17%, #fff); }
 
 .ds-nav-active {
     background: var(--clube-primary);
@@ -138,4 +169,6 @@ body {
 
 @media (max-width: 640px) {
     .ds-card { border-radius: 0.85rem; }
+    .ds-calendar-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+    .ds-calendar-actions .ds-button { width: 100%; padding-inline: .65rem; white-space: normal; }
 }

@@ -1,7 +1,11 @@
 from datetime import date
+from io import BytesIO
+
+from pypdf import PdfReader
 
 from models.utilizador import PerfilEnum
 from services.navegacao_service import _agrupar_pendencias, _acoes_rapidas
+from services.identidade_clube_service import CORES_PADRAO, _enriquecer_identidade
 from services.pdf_partilhavel_service import _sanitizar_item
 
 
@@ -25,6 +29,16 @@ def test_acoes_rapidas_respeitam_perfil():
     coordenador = _acoes_rapidas(_Utilizador(PerfilEnum.coordenador), [])
     assert not any(acao["label"] == "Adicionar jogador" for acao in treinador)
     assert any(acao["label"] == "Adicionar jogador" for acao in coordenador)
+
+
+def test_identidade_calcula_contraste_para_cores_claras():
+    identidade = _enriquecer_identidade({
+        **CORES_PADRAO,
+        "cor_secundaria": "#ffffff",
+        "cor_destaque": "#fff700",
+    })
+    assert identidade["texto_sobre_secundaria"] == "#111827"
+    assert identidade["texto_sobre_destaque"] == "#111827"
 
 
 def test_pdf_partilhavel_remove_reflexao_e_observacoes_internas():
@@ -68,6 +82,17 @@ def test_barra_global_aparece_sem_rotulo_clube_atual(client_admin):
 
 def test_calendario_partilhavel_gera_pdf_a4(client_admin):
     response = client_admin.get("/partilha/calendario/pdf?inicio=2026-08-01&fim=2026-08-31")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF")
+    texto = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(response.content)).pages)
+    assert "Calendário operacional" in texto
+    assert "Documento para partilha" not in texto
+    assert "Documento operacional preparado pelo clube para partilha" not in texto
+
+
+def test_calendario_pdf_completo_continua_disponivel(client_admin):
+    response = client_admin.get("/calendario/pdf?inicio=2026-08-01&fim=2026-08-31")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert response.content.startswith(b"%PDF")

@@ -22,7 +22,7 @@ def _ids_equipas_utilizador(utilizador) -> list[int] | None:
     return [equipa.id for equipa in getattr(getattr(utilizador, "treinador", None), "equipas", [])]
 
 
-def _responder(request, db, utilizador, *, titulo, data_inicio, data_fim, nome, equipa=None, categorias=None, equipa_ids=None):
+def _responder(request, db, utilizador, *, titulo, data_inicio, data_fim, nome, equipa=None, categorias=None, equipa_ids=None, template="pdf_partilhavel.html"):
     if equipa_ids is None:
         equipa_ids = _ids_equipas_utilizador(utilizador)
     agenda = preparar_agenda_partilhavel(
@@ -32,11 +32,15 @@ def _responder(request, db, utilizador, *, titulo, data_inicio, data_fim, nome, 
         equipa_ids=equipa_ids,
         categorias=categorias,
     )
-    pdf = renderizar_pdf(request, "pdf_partilhavel.html", {
+    nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
+    if not nome_treinador and equipa and equipa.treinadores:
+        nome_treinador = equipa.treinadores[0].nome
+    pdf = renderizar_pdf(request, template, {
         "utilizador": utilizador,
         "titulo_documento": titulo,
         "equipa_documento": equipa,
         "agenda": agenda,
+        "nome_treinador": nome_treinador or utilizador.nome,
         "hoje": date.today(),
     })
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nome}"})
@@ -58,7 +62,7 @@ def calendario_partilhavel(
         verificar_ou_negar_equipa(utilizador, equipa_id, db)
         equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
         equipa_ids = [equipa_id]
-    return _responder(request, db, utilizador, titulo="Calendário operacional", data_inicio=inicio, data_fim=fim, nome="calendario_partilhavel.pdf", equipa=equipa, equipa_ids=equipa_ids)
+    return _responder(request, db, utilizador, titulo="Calendário operacional", data_inicio=inicio, data_fim=fim, nome="calendario_partilhavel.pdf", equipa=equipa, equipa_ids=equipa_ids, template="calendario_partilhavel_pdf.html")
 
 
 @router.get("/equipas/{equipa_id}/jogos/pdf")

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from template_config import Jinja2Templates
@@ -11,6 +13,9 @@ from models.treinador import Treinador
 from models.utilizador import PerfilEnum, Utilizador
 from paths import TEMPLATES_DIR
 from models.auditoria import RegistoAuditoria
+from config import config
+from models.recuperacao_password import TokenRecuperacaoPassword
+from services.recuperacao_password_service import criar_token_recuperacao
 
 router = APIRouter(prefix="/admin")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -39,6 +44,40 @@ def listar_utilizadores(
     return templates.TemplateResponse(request, "admin/utilizadores_lista.html", {
         "utilizador": utilizador,
         "utilizadores": utilizadores,
+    })
+
+
+@router.post("/utilizadores/{utilizador_id}/recuperacao-temporaria", response_class=HTMLResponse)
+def gerar_recuperacao_temporaria(
+    utilizador_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin=Depends(exigir_admin),
+):
+    alvo = db.query(Utilizador).filter(Utilizador.id == utilizador_id).first()
+    if not alvo or alvo.clube_id != admin.clube_id:
+        return RedirectResponse("/admin/utilizadores", status_code=303)
+    db.query(TokenRecuperacaoPassword).filter(
+        TokenRecuperacaoPassword.utilizador_id == alvo.id,
+        TokenRecuperacaoPassword.tipo == "administrativo",
+        TokenRecuperacaoPassword.utilizado_em.is_(None),
+    ).update({"utilizado_em": datetime.now()}, synchronize_session=False)
+    token, registo = criar_token_recuperacao(
+        db, alvo, tipo="administrativo", criado_por=admin,
+        pedido_ip=getattr(request.client, "host", None),
+    )
+    from services.auditoria_service import registar_auditoria
+    registar_auditoria(
+        db, admin, "gerar_acesso_temporario", "utilizador", alvo.id,
+        f"Acesso temporário iniciado para {alvo.username}; expira em {registo.expira_em:%d/%m/%Y %H:%M}.", request,
+    )
+    db.commit()
+    return templates.TemplateResponse(request, "admin/recuperacao_temporaria.html", {
+        "utilizador": admin,
+        "alvo": alvo,
+        "ligacao_temporaria": f"{config.app_base_url}/acesso-temporario/{token}",
+        "criado_em": registo.criado_em,
+        "expira_em": registo.expira_em,
     })
 
 

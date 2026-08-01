@@ -24,6 +24,7 @@ import models.identidade_clube
 import models.planeamento
 import models.planeamento_clube
 import models.playbook
+import models.recuperacao_password
 import models.treinador
 import models.treino
 import models.utilizador
@@ -41,6 +42,7 @@ from database import (
     actualizar_estrutura_perfis,
     actualizar_estrutura_planeamento_clube,
     actualizar_estrutura_planeamento_equipa,
+    actualizar_estrutura_recuperacao_password,
     base_dados_disponivel,
     engine,
     get_db,
@@ -95,6 +97,7 @@ try:
     actualizar_estrutura_perfis()
     actualizar_estrutura_planeamento_clube()
     actualizar_estrutura_planeamento_equipa()
+    actualizar_estrutura_recuperacao_password()
     actualizar_estrutura_assiduidade()
     actualizar_estrutura_jogadores()
     logger.info("Infraestrutura inicial da aplicação preparada com sucesso.")

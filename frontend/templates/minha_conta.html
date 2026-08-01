@@ -38,21 +38,25 @@
         </div>
         {% endif %}
 
+        {% if utilizador.deve_alterar_password %}<div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">O acesso é temporário. Define uma nova palavra-passe antes de continuar.</div>{% endif %}
         <form method="POST" action="/minha-conta/alterar-password" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('_csrf', '') }}">
+            {% if not utilizador.deve_alterar_password %}
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Password atual</label>
                 <input type="password" name="password_atual" required
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
+            {% endif %}
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Nova password</label>
-                <input type="password" name="password_nova" required minlength="8"
+                <input type="password" name="password_nova" required minlength="10"
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                <p class="text-xs text-gray-400 mt-1">Mínimo 8 caracteres.</p>
+                <p class="text-xs text-gray-400 mt-1">Mínimo 10 caracteres, incluindo letras e números.</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar nova password</label>
-                <input type="password" name="password_confirmar" required minlength="8"
+                <input type="password" name="password_confirmar" required minlength="10"
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
             <button type="submit"
