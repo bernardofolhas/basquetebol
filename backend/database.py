@@ -78,6 +78,19 @@ def _atribuir_e_validar_clube(session, flush_context, instances):
             objeto.clube_id = atual
     for objeto in session.dirty:
         if hasattr(objeto, "clube_id") and getattr(objeto, "clube_id", None) != atual:
+            # O superadministrador é global e, por isso, não pertence a um
+            # clube. Também pode gerar auditoria global com clube_id nulo.
+            perfil = getattr(objeto, "perfil", None)
+            perfil_valor = getattr(perfil, "value", perfil)
+            tabela = getattr(objeto, "__tablename__", "")
+            if (
+                getattr(objeto, "clube_id", None) is None
+                and (
+                    (tabela == "utilizadores" and perfil_valor == "superadministrador")
+                    or tabela == "registos_auditoria"
+                )
+            ):
+                continue
             raise PermissionError("O registo não pertence ao clube atual.")
 
 
