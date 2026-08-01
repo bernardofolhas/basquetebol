@@ -38,6 +38,7 @@ class Configuracao:
     smtp_password: str | None
     smtp_from_email: str | None
     smtp_use_tls: bool
+    brevo_api_key: str | None
 
 
 def _obter_variavel_obrigatoria(nome: str) -> str:
@@ -175,6 +176,7 @@ def _criar_configuracao() -> Configuracao:
         smtp_password=os.getenv("SMTP_PASSWORD") or None,
         smtp_from_email=(os.getenv("SMTP_FROM_EMAIL") or "").strip() or None,
         smtp_use_tls=_obter_bool_ambiente("SMTP_USE_TLS", True),
+        brevo_api_key=(os.getenv("BREVO_API_KEY") or "").strip() or None,
     )
 
     logger.info("Configuração da aplicação carregada para o ambiente '%s'.", configuracao.ambiente)
