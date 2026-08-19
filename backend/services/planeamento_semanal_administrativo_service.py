@@ -128,7 +128,7 @@ def validar_reserva(
 
 
 def gerar_grelha_slots(db: Session, semanal) -> dict:
-    """Gera slots visuais a partir das disponibilidades de cada espaço."""
+    """Gera slots visuais, incluindo reservas criadas fora de uma disponibilidade."""
     espacos = db.query(EspacoTreino).filter(EspacoTreino.ativo.is_(True)).order_by(EspacoTreino.nome).all()
     reservas = db.query(AtribuicaoEspacoSemanal).filter(
         AtribuicaoEspacoSemanal.plano_semanal_id == semanal.id,
@@ -155,9 +155,28 @@ def gerar_grelha_slots(db: Session, semanal) -> dict:
                         "atribuicao": next((r for r in reservas if r.espaco_id == espaco.id and r.data == atual and _sobrepoe(inicio, fim, r.hora_inicio, r.hora_fim)), None),
                     })
                     cursor += regra.duracao_slot_minutos
+
+        # Uma reserva pode ter sido criada antes de o horário do espaço existir,
+        # ou ter sido autorizada como exceção. Nunca a ocultamos do mapa.
+        for reserva in (item for item in reservas if item.data == atual):
+            ja_visivel = any(
+                slot["espaco"].id == reserva.espaco_id
+                and _sobrepoe(slot["hora_inicio"], slot["hora_fim"], reserva.hora_inicio, reserva.hora_fim)
+                for slot in dia["slots"]
+            )
+            if not ja_visivel:
+                dia["slots"].append({
+                    "espaco": reserva.espaco,
+                    "hora_inicio": reserva.hora_inicio,
+                    "hora_fim": reserva.hora_fim,
+                    "bloqueio": obter_bloqueio(db, reserva.espaco_id, atual, reserva.hora_inicio, reserva.hora_fim),
+                    "atribuicao": reserva,
+                    "fora_disponibilidade": True,
+                })
+        dia["slots"].sort(key=lambda slot: (slot["hora_inicio"], slot["espaco"].nome.casefold()))
         dias.append(dia)
         atual += timedelta(days=1)
-    return {"dias": dias, "total": sum(len(dia["slots"]) for dia in dias)}
+    return {"dias": dias, "espacos": espacos, "total": sum(len(dia["slots"]) for dia in dias)}
 
 
 def obter_previsao_equipa(db: Session, equipa_id: int, inicio: date, fim: date) -> list:

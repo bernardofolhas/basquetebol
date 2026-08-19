@@ -72,6 +72,30 @@ def test_slots_sao_gerados_sem_criar_sessoes_tecnicas():
         repor_clube_atual(token)
 
 
+def test_mapa_mostra_reserva_mesmo_sem_slot_configurado():
+    db, token, espaco, equipa, treinador, semanal = _contexto()
+    try:
+        db.add(DisponibilidadeEspacoTreino(
+            clube_id=1, espaco_id=espaco.id, dia_semana=0,
+            hora_inicio="18:00", hora_fim="19:30", duracao_slot_minutos=90,
+        ))
+        db.add(AtribuicaoEspacoSemanal(
+            clube_id=1, plano_semanal_id=semanal.id, espaco_id=espaco.id,
+            equipa_id=equipa.id, treinador_id=treinador.id, data=date(2026, 8, 3),
+            hora_inicio="20:00", hora_fim="21:30", tipo_ocupacao=TipoOcupacaoEspacoEnum.treino_equipa,
+            estado=EstadoAtribuicaoEspacoEnum.publicado,
+        ))
+        db.commit()
+
+        grelha = gerar_grelha_slots(db, semanal)
+        slots = grelha["dias"][0]["slots"]
+        assert any(slot["atribuicao"] and slot["hora_inicio"] == "20:00" for slot in slots)
+        assert grelha["espacos"] == [espaco]
+    finally:
+        db.close()
+        repor_clube_atual(token)
+
+
 def test_reserva_deteta_conflitos_de_espaco_equipa_e_treinador():
     db, token, espaco, equipa, treinador, semanal = _contexto()
     try:
