@@ -45,6 +45,7 @@ from services.operacao_clube_service import (
     obter_resumo_operacional_mensal,
 )
 from services.planeamento_semanal_administrativo_service import gerar_grelha_slots, validar_reserva
+from services.atribuicao_espaco_agenda_service import sincronizar_atribuicao_com_agenda
 from services.auditoria_service import registar_auditoria
 from services.agenda_service import metadados_tipo_agenda, tipos_agenda_formulario
 from services.historico_planeamento_service import registar_historico_planeamento
@@ -1437,6 +1438,37 @@ def detalhe_planeamento_anual(anual_id: int, request: Request, db: Session = Dep
     })
 
 
+@router.get("/mensal/novo", response_class=HTMLResponse)
+def form_novo_planeamento_mensal(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+    anuais = db.query(PlaneamentoClubeAnual).order_by(PlaneamentoClubeAnual.data_inicio.desc()).all()
+    return templates.TemplateResponse(request, "planeamento_clube/mensal_form.html", {
+        "utilizador": utilizador, "mensal": None, "planeamentos_anuais": anuais, "modo": "criar",
+        **_obter_contexto_form_mensal(),
+    })
+
+
+@router.post("/mensal/novo")
+async def criar_planeamento_mensal_direto(
+    request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao),
+    planeamento_anual_id: str = Form(...), ano: str = Form(...), mes: str = Form(...), titulo: str = Form(...),
+    objetivos_mes: str = Form(""), observacoes: str = Form(""), estado: str = Form("rascunho"),
+):
+    try:
+        anual_id = _converter_id(planeamento_anual_id, "Planeamento anual", obrigatorio=True)
+        if not db.query(PlaneamentoClubeAnual).filter(PlaneamentoClubeAnual.id == anual_id).first():
+            raise ValueError("Seleciona um planeamento anual válido.")
+        mensal = _criar_planeamento_mensal(anual_id, ano, mes, titulo, objetivos_mes, observacoes, estado)
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url="/planeamento-clube/mensal/novo", status_code=303)
+    db.add(mensal)
+    db.flush()
+    registar_historico_planeamento(db, utilizador, "planeamento_mensal", mensal.id, "criado", mensal.titulo)
+    registar_auditoria(db, utilizador, "criar", "planeamento_mensal", mensal.id, mensal.titulo, request)
+    db.commit()
+    return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal.id}", status_code=303)
+
+
 @router.get("/anual/{anual_id}/pdf")
 def exportar_pdf_planeamento_anual(
     anual_id: int,
@@ -1931,6 +1963,13 @@ def detalhe_plano_semanal(semanal_id: int, request: Request, db: Session = Depen
     calendario_semanal = _construir_calendario_semanal(semanal, eventos, atribuicoes)
     mapa_espacos = construir_mapa_espacos_semanal(atribuicoes)
     grelha_slots = gerar_grelha_slots(db, semanal)
+    slots = [slot for dia in grelha_slots["dias"] for slot in dia["slots"]]
+    resumo_slots = {
+        "livres": sum(1 for slot in slots if not slot["atribuicao"] and not slot["bloqueio"]),
+        "atribuidos": sum(1 for slot in slots if slot["atribuicao"] and slot["atribuicao"].equipa_id),
+        "pendentes": sum(1 for slot in slots if slot["atribuicao"] and not slot["atribuicao"].equipa_id),
+        "bloqueados": sum(1 for slot in slots if slot["bloqueio"]),
+    }
 
     return templates.TemplateResponse(request, "planeamento_clube/semanal_detalhe.html", {
         "utilizador": utilizador,
@@ -1941,6 +1980,7 @@ def detalhe_plano_semanal(semanal_id: int, request: Request, db: Session = Depen
         "mapa_espacos_operacional": mapa_espacos["mapa"],
         "conflitos_espacos": mapa_espacos["conflitos"],
         "grelha_slots": grelha_slots,
+        "resumo_slots": resumo_slots,
         "calendario_semanal": calendario_semanal,
         "pode_gerir": verificar_perfil(utilizador, ["administrador", "coordenador", "superadministrador"]),
         "erro": _obter_mensagem_erro_eliminacao(request.query_params.get("erro")),
@@ -2147,6 +2187,10 @@ async def criar_espaco(
     capacidade: str = Form(""),
     ativo: str = Form("true"),
     observacoes: str = Form(""),
+    dia_semana: str = Form(""),
+    hora_inicio_slot: str = Form(""),
+    hora_fim_slot: str = Form(""),
+    duracao_slot_minutos: int = Form(90),
 ):
 
     try:
@@ -2155,6 +2199,18 @@ async def criar_espaco(
         set_flash(request, str(erro), "error")
         return RedirectResponse(url="/planeamento-clube/espacos/novo", status_code=303)
     db.add(espaco)
+    db.flush()
+    if any((dia_semana, hora_inicio_slot, hora_fim_slot)):
+        inicio = normalizar_hora(hora_inicio_slot, permitir_vazio=False)
+        fim = normalizar_hora(hora_fim_slot, permitir_vazio=False)
+        if not dia_semana.isdigit() or int(dia_semana) not in range(7) or not inicio or not fim or not hora_eh_anterior(inicio, fim):
+            db.rollback()
+            set_flash(request, "A primeira disponibilidade deve indicar dia e um intervalo horário válido.", "error")
+            return RedirectResponse(url="/planeamento-clube/espacos/novo", status_code=303)
+        db.add(DisponibilidadeEspacoTreino(
+            espaco_id=espaco.id, dia_semana=int(dia_semana), hora_inicio=inicio,
+            hora_fim=fim, duracao_slot_minutos=duracao_slot_minutos,
+        ))
     db.commit()
     db.refresh(espaco)
 
@@ -2272,6 +2328,7 @@ def criar_disponibilidade_espaco(
     hora_inicio: str = Form(...),
     hora_fim: str = Form(...),
     duracao_slot_minutos: int = Form(90),
+    dias_repetir: list[str] = Form([]),
 ):
     espaco = db.query(EspacoTreino).filter(EspacoTreino.id == espaco_id).first()
     inicio = normalizar_hora(hora_inicio, permitir_vazio=False)
@@ -2282,14 +2339,44 @@ def criar_disponibilidade_espaco(
     if duracao_slot_minutos < 15 or duracao_slot_minutos > 360:
         set_flash(request, "A duração do slot deve estar entre 15 e 360 minutos.", "error")
         return RedirectResponse(url=f"/planeamento-clube/espacos/{espaco_id}", status_code=303)
-    db.add(DisponibilidadeEspacoTreino(
-        espaco_id=espaco.id, dia_semana=dia_semana, hora_inicio=inicio,
-        hora_fim=fim, duracao_slot_minutos=duracao_slot_minutos,
-    ))
+    dias = {dia_semana}
+    for valor in dias_repetir:
+        if valor.isdigit() and int(valor) in range(7):
+            dias.add(int(valor))
+    for dia in sorted(dias):
+        db.add(DisponibilidadeEspacoTreino(
+            espaco_id=espaco.id, dia_semana=dia, hora_inicio=inicio,
+            hora_fim=fim, duracao_slot_minutos=duracao_slot_minutos,
+        ))
     registar_auditoria(db, utilizador, "criar", "disponibilidade_espaco", espaco.id, f"Dia {dia_semana}: {inicio}-{fim}", request)
     db.commit()
-    set_flash(request, "Disponibilidade adicionada. Os slots já ficam visíveis nas semanas abrangidas.")
+    set_flash(request, f"Disponibilidade adicionada a {len(dias)} dia(s). Os slots já ficam visíveis nas semanas abrangidas.")
     return RedirectResponse(url=f"/planeamento-clube/espacos/{espaco_id}", status_code=303)
+
+
+@router.post("/espacos/disponibilidades/{disponibilidade_id}/editar")
+def editar_disponibilidade_espaco(
+    disponibilidade_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+    dia_semana: int = Form(...),
+    hora_inicio: str = Form(...),
+    hora_fim: str = Form(...),
+    duracao_slot_minutos: int = Form(90),
+):
+    item = db.query(DisponibilidadeEspacoTreino).filter(DisponibilidadeEspacoTreino.id == disponibilidade_id).first()
+    inicio = normalizar_hora(hora_inicio, permitir_vazio=False)
+    fim = normalizar_hora(hora_fim, permitir_vazio=False)
+    if not item or dia_semana not in range(7) or not inicio or not fim or not hora_eh_anterior(inicio, fim) or not 15 <= duracao_slot_minutos <= 360:
+        set_flash(request, "A disponibilidade indicada não é válida.", "error")
+        return RedirectResponse(url=f"/planeamento-clube/espacos/{item.espaco_id if item else ''}", status_code=303)
+    item.dia_semana, item.hora_inicio, item.hora_fim = dia_semana, inicio, fim
+    item.duracao_slot_minutos = duracao_slot_minutos
+    registar_auditoria(db, utilizador, "editar", "disponibilidade_espaco", item.espaco_id, f"Dia {dia_semana}: {inicio}-{fim}", request)
+    db.commit()
+    set_flash(request, "Disponibilidade atualizada.")
+    return RedirectResponse(url=f"/planeamento-clube/espacos/{item.espaco_id}", status_code=303)
 
 
 @router.post("/espacos/disponibilidades/{disponibilidade_id}/eliminar")
@@ -2481,11 +2568,13 @@ async def criar_atribuicao(
         return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
     db.add(atribuicao)
     db.flush()
+    mensagem_sincronizacao = sincronizar_atribuicao_com_agenda(db, atribuicao)
     registar_historico_planeamento(db, utilizador, "plano_semanal", semanal.id, "reserva_criada", f"{data_convertida} {hora_inicio}-{hora_fim}.")
     registar_auditoria(db, utilizador, "criar", "atribuicao_espaco_semanal", atribuicao.id, observacoes, request)
     db.commit()
     db.refresh(atribuicao)
 
+    set_flash(request, mensagem_sincronizacao, "info")
     return RedirectResponse(url=f"/planeamento-clube/atribuicoes/{atribuicao.id}", status_code=303)
 
 
@@ -2634,10 +2723,12 @@ async def editar_atribuicao(
             dados_formulario,
         )
         return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
+    mensagem_sincronizacao = sincronizar_atribuicao_com_agenda(db, atribuicao)
     registar_historico_planeamento(db, utilizador, "plano_semanal", semanal.id, "reserva_alterada", f"{data_convertida} {hora_inicio}-{hora_fim}.")
     registar_auditoria(db, utilizador, "editar", "atribuicao_espaco_semanal", atribuicao.id, observacoes, request)
     db.commit()
 
+    set_flash(request, mensagem_sincronizacao, "info")
     return RedirectResponse(url=f"/planeamento-clube/atribuicoes/{atribuicao.id}", status_code=303)
 
 

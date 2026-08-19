@@ -125,7 +125,9 @@ def _obter_contexto_calendario(request: Request, db: Session, utilizador) -> dic
         },
         "agenda_contexto": {
             "global": True,
-            "retorno": str(request.url),
+            # O formulário da agenda só aceita destinos internos. Guardar apenas
+            # caminho e query mantém o utilizador no mesmo calendário filtrado.
+            "retorno": request.url.path + (f"?{request.url.query}" if request.url.query else ""),
             "data_inicio": inicio,
             "data_fim": fim,
         },

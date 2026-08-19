@@ -6,7 +6,7 @@ from pypdf import PdfReader
 from models.utilizador import PerfilEnum
 from services.navegacao_service import _agrupar_pendencias, _acoes_rapidas
 from services.identidade_clube_service import CORES_PADRAO, _enriquecer_identidade
-from services.pdf_partilhavel_service import _sanitizar_item
+from services.pdf_partilhavel_service import _sanitizar_item, preparar_calendario_intervalo_partilhavel
 
 
 class _Utilizador:
@@ -96,3 +96,15 @@ def test_calendario_pdf_completo_continua_disponivel(client_admin):
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert response.content.startswith(b"%PDF")
+
+
+def test_calendario_partilhavel_de_mesociclo_mantem_apenas_dias_do_intervalo(monkeypatch):
+    import services.pdf_partilhavel_service as servico
+
+    monkeypatch.setattr(servico, "preparar_agenda_partilhavel", lambda *args, **kwargs: {
+        "itens": [{"data": date(2026, 1, 31), "titulo": "Treino"}],
+    })
+    agenda = preparar_calendario_intervalo_partilhavel(None, date(2026, 1, 31), date(2026, 2, 2), equipa_ids=[1])
+    dias = [dia["data"] for semana in agenda["semanas_intervalo"] for dia in semana if dia]
+    assert dias == [date(2026, 1, 31), date(2026, 2, 1), date(2026, 2, 2)]
+    assert agenda["meses_intervalo"] == "Janeiro 2026 · Fevereiro 2026"

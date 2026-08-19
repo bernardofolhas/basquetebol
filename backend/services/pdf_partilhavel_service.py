@@ -2,7 +2,7 @@
 
 import calendar
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 from models.atividade import Atividade
 from models.planeamento_clube import EventoPlaneamentoClube
@@ -108,4 +108,33 @@ def preparar_agenda_partilhavel(
             1,
         )
     agenda["meses"] = meses
+    return agenda
+
+
+def preparar_calendario_intervalo_partilhavel(db, data_inicio: date, data_fim: date, *, equipa_ids: list[int]) -> dict:
+    """Grelha compacta só com os dias reais de um intervalo de planeamento."""
+    agenda = preparar_agenda_partilhavel(db, data_inicio, data_fim, equipa_ids=equipa_ids)
+    itens_por_data = defaultdict(list)
+    for item in agenda["itens"]:
+        itens_por_data[item["data"]].append(item)
+
+    semanas, cursor = [], data_inicio
+    semana = [None] * cursor.weekday()
+    while cursor <= data_fim:
+        semana.append({"data": cursor, "itens": itens_por_data.get(cursor, [])})
+        if len(semana) == 7:
+            semanas.append(semana)
+            semana = []
+        cursor += timedelta(days=1)
+    if semana:
+        semanas.append(semana + [None] * (7 - len(semana)))
+
+    meses = []
+    atual = date(data_inicio.year, data_inicio.month, 1)
+    limite = date(data_fim.year, data_fim.month, 1)
+    while atual <= limite:
+        meses.append(f"{MESES[atual.month]} {atual.year}")
+        atual = date(atual.year + (atual.month == 12), 1 if atual.month == 12 else atual.month + 1, 1)
+    agenda["semanas_intervalo"] = semanas
+    agenda["meses_intervalo"] = " · ".join(meses)
     return agenda

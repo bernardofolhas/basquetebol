@@ -87,6 +87,11 @@ def _url_contexto(
     return "/calendario"
 
 
+def _retorno_seguro(retorno: str | None) -> str:
+    """Evita redirecionamentos externos e mantém o fluxo no calendário atual."""
+    return retorno if retorno and retorno.startswith("/") and not retorno.startswith("//") else "/calendario"
+
+
 def _resolver_contexto(
     db: Session,
     equipa_id: int | None,
@@ -401,7 +406,7 @@ async def editar_atividade_agenda(
 ):
     evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
     if not evento:
-        return RedirectResponse(url=retorno or "/calendario", status_code=303)
+        return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
     try:
         tipo_valido = TipoEventoPlaneamentoClubeEnum(tipo)
         data_convertida = _data(data_evento)
@@ -446,7 +451,7 @@ async def editar_atividade_agenda(
     except ValueError as erro:
         db.rollback()
         set_flash(request, str(erro), "error")
-        return RedirectResponse(url=retorno or f"/planeamento-clube/eventos/{evento_id}", status_code=303)
+        return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
 
     if conflitos:
         set_flash(request, f"Atividade atualizada com {len(conflitos)} conflito(s) de agenda.", "error")
@@ -468,7 +473,7 @@ async def apagar_atividade_agenda(
 ):
     evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
     if not evento:
-        return RedirectResponse(url=retorno or "/calendario", status_code=303)
+        return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
     _verificar_acesso(utilizador, evento.equipa_id, db, evento.aplica_a_todas_equipas)
     alvos = [evento]
     if evento.serie_id and escopo_recorrencia in {"futuro", "serie"}:
@@ -486,7 +491,7 @@ async def apagar_atividade_agenda(
             db.delete(alvo)
     db.commit()
     set_flash(request, f"{len(alvos)} atividade(s) removida(s) do calendário.")
-    return RedirectResponse(url=retorno or "/calendario", status_code=303)
+    return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
 
 
 @router.post("/atividades/{evento_id}/duplicar")
@@ -500,7 +505,7 @@ async def duplicar_atividade_agenda(
 ):
     evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
     if not evento:
-        return RedirectResponse(url=retorno or "/calendario", status_code=303)
+        return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
     _verificar_acesso(utilizador, evento.equipa_id, db, evento.aplica_a_todas_equipas)
     copia = EventoPlaneamentoClube(
         tipo=evento.tipo,

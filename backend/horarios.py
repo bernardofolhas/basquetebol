@@ -7,12 +7,13 @@ def normalizar_hora(hora: str | None, *, permitir_vazio: bool = True) -> str | N
     """
     Normaliza uma hora para HH:MM e devolve None quando estiver vazia.
 
-    Aceita entradas como "9:00" e converte-as para "09:00".
+    Aceita entradas como "9:00" ou "18h30" e converte-as para "09:00".
     """
     valor = (hora or "").strip()
     if not valor:
         return None if permitir_vazio else None
 
+    valor = valor.casefold().replace("h", ":")
     partes = valor.split(":", 1)
     if len(partes) != 2 or not all(parte.isdigit() for parte in partes):
         return None

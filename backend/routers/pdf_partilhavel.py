@@ -9,7 +9,7 @@ from database import get_db
 from models.equipa import Equipa
 from models.planeamento import Macrociclo, Mesociclo, Microciclo
 from models.planeamento_clube import PlaneamentoClubeAnual, PlanoSemanalClube
-from services.pdf_partilhavel_service import preparar_agenda_partilhavel
+from services.pdf_partilhavel_service import preparar_agenda_partilhavel, preparar_calendario_intervalo_partilhavel
 from services.pdf_service import renderizar_pdf
 
 
@@ -103,7 +103,21 @@ def meso_partilhavel(meso_id: int, request: Request, db: Session = Depends(get_d
         return RedirectResponse("/equipas", status_code=303)
     equipa = meso.macrociclo.equipa
     verificar_ou_negar_equipa(utilizador, equipa.id, db)
-    return _responder(request, db, utilizador, titulo=f"Mesociclo {meso.numero} · calendário", data_inicio=meso.data_inicio, data_fim=meso.data_fim, nome=f"mesociclo_{meso.id}_partilhavel.pdf", equipa=equipa, equipa_ids=[equipa.id])
+    agenda = preparar_calendario_intervalo_partilhavel(
+        db, meso.data_inicio, meso.data_fim, equipa_ids=[equipa.id]
+    )
+    nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None) or (
+        equipa.treinadores[0].nome if equipa.treinadores else utilizador.nome
+    )
+    pdf = renderizar_pdf(request, "mesociclo_partilhavel_pdf.html", {
+        "utilizador": utilizador,
+        "titulo_documento": f"Mesociclo {meso.numero} · calendário",
+        "equipa_documento": equipa,
+        "agenda": agenda,
+        "nome_treinador": nome_treinador,
+        "hoje": date.today(),
+    })
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=mesociclo_{meso.id}_partilhavel.pdf"})
 
 
 @router.get("/microciclos/{micro_id}/pdf")
