@@ -450,6 +450,7 @@ def _construir_meses_intervalo(data_inicio: date, data_fim: date, itens: list[di
                 dias_semana.append({
                     "data": dia,
                     "dia": dia.day,
+                    "nome_semana": NOMES_DIAS[dia.weekday()],
                     "do_mes_atual": dia.month == cursor.month,
                     "no_periodo": data_inicio <= dia <= data_fim,
                     "itens": itens_dia,

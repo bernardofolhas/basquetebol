@@ -1,3 +1,4 @@
+from calendar import monthrange
 from datetime import date, timedelta
 from services.alertas_service import obter_alertas_globais, obter_alertas_treinador
 from services.operacao_clube_service import (
@@ -449,6 +450,19 @@ def get_dashboard_coordenador(db, utilizador):
         incluir_pendencias_secretaria=False,
         perfil_visual="coordenador",
     ))
+    # O coordenador acompanha a operação do clube, não a preparação técnica individual.
+    contexto["tarefas"] = [
+        tarefa for tarefa in contexto["tarefas"]
+        if tarefa["titulo"] != "Completar plano de treino"
+    ]
+    contexto["resumo_agenda"]["tarefas"] = len(contexto["tarefas"])
+    inicio_mes = date(hoje.year, hoje.month, 1)
+    fim_mes = date(hoje.year, hoje.month, monthrange(hoje.year, hoje.month)[1])
+    contexto["calendario_mes"] = obter_dashboard_planeamento_intervalo(
+        db,
+        inicio_mes,
+        fim_mes,
+    )["meses"][0]
     return contexto
 
 

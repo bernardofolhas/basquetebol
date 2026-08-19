@@ -6,7 +6,7 @@ from template_config import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from auth import encriptar_password, verificar_perfil
-from auth_deps import exigir_admin, exigir_autenticacao, exigir_coordenacao
+from auth_deps import exigir_autenticacao, exigir_coordenacao
 from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
@@ -204,7 +204,7 @@ def apagar_treinador(
     treinador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_admin),
+    utilizador=Depends(exigir_coordenacao),
 ):
     treinador = db.query(Treinador).filter(Treinador.id == treinador_id).first()
     if treinador:

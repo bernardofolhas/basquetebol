@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session, joinedload
 from auth import verificar_perfil
 from auth_deps import (
     AcessoNegado,
-    exigir_admin,
     exigir_autenticacao,
     exigir_coordenacao,
     exigir_operacao_desportiva,
@@ -284,7 +283,7 @@ def apagar_equipa(
     equipa_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_admin),
+    utilizador=Depends(exigir_coordenacao),
 ):
     equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
     if not equipa:

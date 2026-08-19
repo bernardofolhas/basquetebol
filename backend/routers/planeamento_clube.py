@@ -2941,6 +2941,42 @@ def listar_eventos(request: Request, db: Session = Depends(get_db), utilizador=D
     })
 
 
+def _eliminar_evento_com_dependencias(db: Session, evento: EventoPlaneamentoClube) -> None:
+    """Remove o evento sem deixar sessões ou reservas apontadas para ele."""
+    sessoes_geradas = db.query(SessaoTreino).filter(
+        SessaoTreino.evento_planeamento_clube_id == evento.id,
+        SessaoTreino.origem == "planeamento_global",
+    ).all()
+    for sessao in sessoes_geradas:
+        sessao.ativa = False
+        sessao.sincronizada = False
+        sessao.evento_planeamento_clube_id = None
+    for atribuicao in evento.atribuicoes_espaco:
+        atribuicao.evento_id = None
+        if atribuicao.origem == OrigemAtribuicaoEspacoEnum.evento_global:
+            atribuicao.origem = OrigemAtribuicaoEspacoEnum.manual
+    db.delete(evento)
+
+
+@router.post("/eventos/eliminar-selecionados")
+async def eliminar_eventos_selecionados(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+):
+    form = await request.form()
+    ids = sorted({int(valor) for valor in form.getlist("evento_ids") if str(valor).isdigit()})
+    eventos = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id.in_(ids)).all() if ids else []
+    if not eventos or str(len(eventos)) != str(form.get("confirmar_total", "")):
+        set_flash(request, "A confirmação não corresponde ao número de eventos selecionados.", "error")
+        return RedirectResponse(url="/planeamento-clube/eventos", status_code=303)
+    for evento in eventos:
+        _eliminar_evento_com_dependencias(db, evento)
+    db.commit()
+    set_flash(request, f"{len(eventos)} evento(s) eliminado(s).")
+    return RedirectResponse(url="/planeamento-clube/eventos", status_code=303)
+
+
 @router.get("/eventos/novo", response_class=HTMLResponse)
 def form_novo_evento(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
 
@@ -3217,19 +3253,7 @@ async def eliminar_evento(evento_id: int, request: Request, db: Session = Depend
 
     evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
     if evento:
-        sessoes_geradas = db.query(SessaoTreino).filter(
-            SessaoTreino.evento_planeamento_clube_id == evento.id,
-            SessaoTreino.origem == "planeamento_global",
-        ).all()
-        for sessao in sessoes_geradas:
-            sessao.ativa = False
-            sessao.sincronizada = False
-            sessao.evento_planeamento_clube_id = None
-        for atribuicao in evento.atribuicoes_espaco:
-            atribuicao.evento_id = None
-            if atribuicao.origem == OrigemAtribuicaoEspacoEnum.evento_global:
-                atribuicao.origem = OrigemAtribuicaoEspacoEnum.manual
-        db.delete(evento)
+        _eliminar_evento_com_dependencias(db, evento)
         db.commit()
 
     return RedirectResponse(url="/planeamento-clube/eventos", status_code=303)

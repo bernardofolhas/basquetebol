@@ -16,10 +16,13 @@
 </div>
 
 {% if eventos %}
+<form id="eventos-massa" method="POST" action="/planeamento-clube/eventos/eliminar-selecionados">
+<div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"><label class="flex items-center gap-2 font-medium text-slate-700"><input id="selecionar-todos-eventos" type="checkbox" class="h-4 w-4 rounded border-slate-300"> Selecionar todos</label><div class="flex items-center gap-3"><span class="text-slate-500"><strong id="total-eventos-selecionados">0</strong> selecionado(s)</span><button type="button" onclick="eliminarEventosSelecionados()" class="ds-button ds-button-danger">Eliminar selecionados</button></div></div>
 <div class="space-y-4">
     {% for evento in eventos %}
     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div class="flex items-start justify-between gap-4">
+            <input class="evento-check mt-1 h-4 w-4 rounded border-slate-300" type="checkbox" name="evento_ids" value="{{ evento.id }}" aria-label="Selecionar {{ evento.titulo }}">
             <div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full">{{ metadados_tipo_agenda(evento.tipo).label }}</span>
@@ -65,6 +68,12 @@
     </div>
     {% endfor %}
 </div>
+</form>
+<script>
+const checksEventos=()=>Array.from(document.querySelectorAll('.evento-check'));const atualizarEventos=()=>document.getElementById('total-eventos-selecionados').textContent=checksEventos().filter(item=>item.checked).length;
+document.getElementById('selecionar-todos-eventos')?.addEventListener('change',evento=>{checksEventos().forEach(item=>item.checked=evento.target.checked);atualizarEventos();});checksEventos().forEach(item=>item.addEventListener('change',atualizarEventos));
+function eliminarEventosSelecionados(){const total=checksEventos().filter(item=>item.checked).length;if(!total)return alert('Seleciona pelo menos um evento.');if(confirm(`Eliminar ${total} evento(s)? As sessões sincronizadas serão desativadas.`)){const campo=document.createElement('input');campo.type='hidden';campo.name='confirmar_total';campo.value=total;document.getElementById('eventos-massa').appendChild(campo);document.getElementById('eventos-massa').submit();}}
+</script>
 {% else %}
 <div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
     <span class="text-5xl">🗓️</span>

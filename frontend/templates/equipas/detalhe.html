@@ -15,7 +15,7 @@
     {% if utilizador.perfil.value in ['administrador', 'coordenador', 'superadministrador'] %}
     <a href="/equipas/{{ equipa.id }}/editar" class="rounded-full bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-blue-50 hover:text-blue-700">Editar equipa</a>
     {% endif %}
-    {% if utilizador.perfil.value == 'administrador' %}
+    {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}
     <form method="POST" action="/equipas/{{ equipa.id }}/apagar">
         <button type="button" onclick="if(confirm('Tens a certeza que queres apagar esta equipa? Esta ação é irreversível.')) this.closest('form').submit()" class="rounded-full bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-red-50 hover:text-red-700">Apagar equipa</button>
     </form>

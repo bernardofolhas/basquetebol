@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from auth_deps import (
     AcessoNegado,
-    exigir_admin,
     exigir_autenticacao,
+    exigir_coordenacao,
     exigir_operacao_desportiva,
     exigir_secretaria,
     verificar_ou_negar_equipa,
@@ -205,7 +205,7 @@ async def criar_jogador(
 async def eliminar_jogadores_selecionados(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_admin),
+    utilizador=Depends(exigir_coordenacao),
 ):
     form = await request.form()
     equipa_id_form = str(form.get("equipa_id", "")).strip()
@@ -233,7 +233,7 @@ async def eliminar_jogadores_selecionados(
 async def eliminar_todos_jogadores(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_admin),
+    utilizador=Depends(exigir_coordenacao),
 ):
     form = await request.form()
     equipa_id_form = str(form.get("equipa_id", "")).strip()
@@ -484,7 +484,7 @@ def apagar_jogador(
     jogador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_admin),
+    utilizador=Depends(exigir_coordenacao),
 ):
     jogador = db.query(Jogador).filter(Jogador.id == jogador_id).first()
     if jogador:

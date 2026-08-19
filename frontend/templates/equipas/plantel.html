@@ -2,7 +2,7 @@
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Plantel — {{ equipa.nome }}{% endblock %}
 {% block conteudo %}
-{% set pode_eliminar = utilizador.perfil.value == 'administrador' %}
+{% set pode_eliminar = utilizador.perfil.value in ['administrador', 'coordenador'] %}
 {% call equipa_contexto(equipa, "Plantel", "Lista operacional da equipa com acesso direto às fichas.", "plantel", "/equipas/" ~ equipa.id, "Voltar ao resumo") %}
   <a href="/jogadores/novo?equipa_id={{ equipa.id }}" class="ds-button ds-button-primary">+ Novo jogador</a>
 {% endcall %}

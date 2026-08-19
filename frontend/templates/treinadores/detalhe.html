@@ -97,7 +97,7 @@
         ✏️ Editar
     </a>
     {% endif %}
-    {% if utilizador.perfil.value == 'administrador' %}
+    {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}
     <form method="POST" action="/treinadores/{{ treinador.id }}/apagar">
         <button type="button"
                 onclick="if(confirm('Tens a certeza que queres apagar este treinador?')) this.closest('form').submit()"
