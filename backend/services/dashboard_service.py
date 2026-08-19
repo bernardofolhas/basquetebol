@@ -8,7 +8,7 @@ from services.operacao_clube_service import (
     obter_dashboard_sincronizacao,
     obter_resumo_operacional_mensal,
 )
-from services.planeamento_integrado_service import obter_dashboard_planeamento_intervalo
+from services.planeamento_integrado_service import apresentar_treinos_por_perfil, obter_dashboard_planeamento_intervalo
 from services.sessao_workflow import normalizar_estado_sessao
 
 
@@ -38,10 +38,11 @@ def _obter_nome_mes_portugues(mes: int) -> str:
     return meses.get(mes, str(mes))
 
 
-def _obter_itens_agenda(db, data_inicio, data_fim, equipa_ids=None):
+def _obter_itens_agenda(db, data_inicio, data_fim, equipa_ids=None, perfil_visual=None):
     """Obtém itens integrados, evitando duplicados quando há várias equipas."""
     if equipa_ids is None:
-        return obter_dashboard_planeamento_intervalo(db, data_inicio, data_fim)["itens"]
+        itens = obter_dashboard_planeamento_intervalo(db, data_inicio, data_fim)["itens"]
+        return apresentar_treinos_por_perfil(itens, perfil_visual)
     if not equipa_ids:
         return []
 
@@ -55,13 +56,21 @@ def _obter_itens_agenda(db, data_inicio, data_fim, equipa_ids=None):
         )
         for item in dashboard["itens"]:
             itens_por_id[item["id"]] = item
-    return sorted(
+    itens = sorted(
         itens_por_id.values(),
         key=lambda item: (item["data"], item["hora_inicio"] or "99:99", item["titulo"].lower()),
     )
+    return apresentar_treinos_por_perfil(itens, perfil_visual)
 
 
-def obter_painel_operacional(db, equipa_ids=None, hoje=None, *, incluir_pendencias_secretaria=True):
+def obter_painel_operacional(
+    db,
+    equipa_ids=None,
+    hoje=None,
+    *,
+    incluir_pendencias_secretaria=True,
+    perfil_visual=None,
+):
     """Constrói agenda e tarefas acionáveis para a página inicial."""
     from models.assiduidade import RegistoAssiduidade
     from models.jogador import Jogador
@@ -71,7 +80,7 @@ def obter_painel_operacional(db, equipa_ids=None, hoje=None, *, incluir_pendenci
 
     hoje = hoje or date.today()
     limite = hoje + timedelta(days=7)
-    itens = _obter_itens_agenda(db, hoje, limite, equipa_ids)
+    itens = _obter_itens_agenda(db, hoje, limite, equipa_ids, perfil_visual)
     agenda_hoje = [item for item in itens if item["data"] == hoje]
     agenda_proxima = [item for item in itens if hoje <= item["data"] <= limite]
     tarefas = []
@@ -435,7 +444,11 @@ def get_dashboard_coordenador(db, utilizador):
     contexto["planeamento_mensal"] = contexto_planeamento["mensal"]
     contexto["resumo_equipas"] = contexto_planeamento["resumo_equipas"]
     contexto["mes_atual_label"] = contexto_planeamento["mes_atual_label"]
-    contexto.update(obter_painel_operacional(db, incluir_pendencias_secretaria=False))
+    contexto.update(obter_painel_operacional(
+        db,
+        incluir_pendencias_secretaria=False,
+        perfil_visual="coordenador",
+    ))
     return contexto
 
 
@@ -453,7 +466,7 @@ def get_dashboard_admin(db, utilizador):
     contexto["planeamento_mensal"] = contexto_planeamento["mensal"]
     contexto["resumo_equipas"] = contexto_planeamento["resumo_equipas"]
     contexto["mes_atual_label"] = contexto_planeamento["mes_atual_label"]
-    contexto.update(obter_painel_operacional(db))
+    contexto.update(obter_painel_operacional(db, perfil_visual="administrador"))
     return contexto
 
 

@@ -48,8 +48,8 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
             tipo=(TipoEventoPlaneamentoClubeEnum.treino_individual
                   if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_individual
                   else TipoEventoPlaneamentoClubeEnum.treino_equipa),
-            titulo="Treino previsto pelo clube",
-            descricao="Horário e espaço atribuídos pela coordenação.",
+            titulo="Treino",
+            descricao="Horário e espaço definidos para a equipa.",
             data=atribuicao.data,
             hora_inicio=atribuicao.hora_inicio,
             hora_fim=atribuicao.hora_fim,
@@ -62,6 +62,9 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
         db.add(evento)
         db.flush()
     else:
+        # Normaliza também previsões antigas quando voltam a ser publicadas.
+        if evento.titulo == "Treino previsto pelo clube":
+            evento.titulo = "Treino"
         evento.espaco_id = atribuicao.espaco_id
         evento.treinador_id = atribuicao.treinador_id
         evento.plano_semanal_id = atribuicao.plano_semanal_id

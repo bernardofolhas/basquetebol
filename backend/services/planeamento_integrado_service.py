@@ -137,6 +137,7 @@ def _criar_item_base(
     hora_fim: str | None,
     local: str | None,
     equipa_nome: str | None,
+    equipa_escalao: str | None,
     origem_label: str,
     detalhe: str | None,
     link: str | None = None,
@@ -153,6 +154,7 @@ def _criar_item_base(
         "horario": _formatar_horario(hora_inicio, hora_fim),
         "local": local or "Local por definir",
         "equipa_nome": equipa_nome,
+        "equipa_escalao": equipa_escalao,
         "origem_label": origem_label,
         "detalhe": detalhe,
         "link": link,
@@ -195,6 +197,7 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
         hora_fim=sessao.hora_fim,
         local=sessao.local,
         equipa_nome=equipa.nome,
+        equipa_escalao=equipa.escalao.value if equipa.escalao else None,
         origem_label="Planeamento da equipa" if sessao.origem != "planeamento_global" else "Planeamento global",
         detalhe=detalhe,
         link=f"/treino/sessoes/{sessao.id}",
@@ -235,6 +238,20 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
     return item
 
 
+def apresentar_treinos_por_perfil(itens: list[dict], perfil: str | None) -> list[dict]:
+    """Mantém o treino simples para técnicos e identificável na visão global."""
+    for item in itens:
+        if item.get("categoria") != "treino":
+            continue
+        if perfil in {"administrador", "coordenador", "superadministrador"} and item.get("equipa_nome"):
+            escalao = item.get("equipa_escalao")
+            sufixo = f" ({escalao})" if escalao else ""
+            item["titulo"] = f"Treino de {item['equipa_nome']}{sufixo}"
+        else:
+            item["titulo"] = "Treino"
+    return itens
+
+
 def _item_jogo(jogo: Jogo) -> dict:
     titulo = f"vs {jogo.adversario}" if jogo.adversario else "Jogo oficial"
     detalhe = jogo.competicao or ("Casa" if jogo.em_casa else "Fora")
@@ -248,6 +265,7 @@ def _item_jogo(jogo: Jogo) -> dict:
         hora_fim=None,
         local=jogo.local,
         equipa_nome=jogo.equipa.nome if jogo.equipa else None,
+        equipa_escalao=jogo.equipa.escalao.value if jogo.equipa and jogo.equipa.escalao else None,
         origem_label="Calendario de jogos",
         detalhe=detalhe,
         link=f"/jogos/{jogo.id}",
@@ -266,6 +284,7 @@ def _item_atividade(atividade: Atividade) -> dict:
         hora_fim=None,
         local=atividade.local,
         equipa_nome=None,
+        equipa_escalao=None,
         origem_label="Atividade global",
         detalhe=detalhe,
         link="/atividades",
@@ -279,10 +298,12 @@ def _item_evento(evento: EventoPlaneamentoClube, equipa_id: int | None = None) -
     detalhe = evento.descricao or evento.observacoes or metadados["label"]
 
     equipa_nome = None
+    equipa_escalao = None
     if evento.aplica_a_todas_equipas:
         equipa_nome = "Todas as equipas"
     elif evento.equipa:
         equipa_nome = evento.equipa.nome
+        equipa_escalao = evento.equipa.escalao.value if evento.equipa.escalao else None
     elif evento.equipas:
         equipa_nome = ", ".join(equipa.nome for equipa in evento.equipas[:2])
         if len(evento.equipas) > 2:
@@ -302,6 +323,7 @@ def _item_evento(evento: EventoPlaneamentoClube, equipa_id: int | None = None) -
         hora_fim=evento.hora_fim,
         local=evento.espaco.nome if evento.espaco else None,
         equipa_nome=equipa_nome,
+        equipa_escalao=equipa_escalao,
         origem_label="Planeamento global",
         detalhe=detalhe,
         link=link,

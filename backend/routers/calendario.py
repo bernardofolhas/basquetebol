@@ -14,7 +14,7 @@ from models.espaco_treino import EspacoTreino
 from models.treinador import Treinador
 from paths import TEMPLATES_DIR
 from services.agenda_service import tipos_agenda_formulario
-from services.planeamento_integrado_service import obter_dashboard_planeamento_intervalo
+from services.planeamento_integrado_service import apresentar_treinos_por_perfil, obter_dashboard_planeamento_intervalo
 from services.pdf_service import renderizar_pdf
 
 router = APIRouter()
@@ -47,9 +47,16 @@ def _equipas_visiveis(db: Session, utilizador) -> list[Equipa]:
     return db.query(Equipa).order_by(Equipa.nome).all()
 
 
-def _obter_itens_calendario(db: Session, inicio: date, fim: date, equipa_ids: list[int] | None):
+def _obter_itens_calendario(
+    db: Session,
+    inicio: date,
+    fim: date,
+    equipa_ids: list[int] | None,
+    perfil_visual: str,
+):
     if equipa_ids is None:
-        return obter_dashboard_planeamento_intervalo(db, inicio, fim)["itens"]
+        itens = obter_dashboard_planeamento_intervalo(db, inicio, fim)["itens"]
+        return apresentar_treinos_por_perfil(itens, perfil_visual)
     if not equipa_ids:
         return []
 
@@ -58,10 +65,11 @@ def _obter_itens_calendario(db: Session, inicio: date, fim: date, equipa_ids: li
         dashboard = obter_dashboard_planeamento_intervalo(db, inicio, fim, equipa_id=equipa_id)
         for item in dashboard["itens"]:
             itens_por_id[item["id"]] = item
-    return sorted(
+    itens = sorted(
         itens_por_id.values(),
         key=lambda item: (item["data"], item["hora_inicio"] or "99:99", item["titulo"].lower()),
     )
+    return apresentar_treinos_por_perfil(itens, perfil_visual)
 
 
 def _obter_contexto_calendario(request: Request, db: Session, utilizador) -> dict:
@@ -71,7 +79,7 @@ def _obter_contexto_calendario(request: Request, db: Session, utilizador) -> dic
     filtro_equipa = request.query_params.get("equipa_id", "").strip()
     equipa_id = int(filtro_equipa) if filtro_equipa.isdigit() and int(filtro_equipa) in ids_visiveis else None
     ids_consulta = [equipa_id] if equipa_id else (ids_visiveis if utilizador.perfil.value == "treinador" else None)
-    itens = _obter_itens_calendario(db, inicio, fim, ids_consulta)
+    itens = _obter_itens_calendario(db, inicio, fim, ids_consulta, utilizador.perfil.value)
     itens_por_data: dict[date, list] = {}
     for item in itens:
         itens_por_data.setdefault(item["data"], []).append(item)

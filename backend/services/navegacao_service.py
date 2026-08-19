@@ -99,7 +99,11 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
 
     equipas = _equipas_permitidas(utilizador)
     equipa_ids = [equipa.id for equipa in equipas] if utilizador.perfil == PerfilEnum.treinador else None
-    painel = obter_painel_operacional(db, equipa_ids=equipa_ids)
+    painel = obter_painel_operacional(
+        db,
+        equipa_ids=equipa_ids,
+        perfil_visual=utilizador.perfil.value,
+    )
     tarefas = painel.get("tarefas", [])
     if utilizador.perfil == PerfilEnum.secretaria:
         tarefas = [tarefa for tarefa in tarefas if _grupo_tarefa(tarefa) == "secretaria"]
