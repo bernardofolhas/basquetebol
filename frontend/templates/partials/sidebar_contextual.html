@@ -51,7 +51,15 @@
       {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
       <div class="my-3 border-t border-slate-200"></div><p class="ds-side-section">Operação do clube</p>
       {{ nav_link('/dashboard/clube', 'DC', 'Visão do clube', p.startswith('/dashboard/clube')) }}
-      {{ nav_link('/planeamento-clube/anual', 'PA', 'Planeamento', p.startswith('/planeamento-clube')) }}
+      <details class="ds-side-group" {% if p.startswith('/planeamento-clube') %}open{% endif %}>
+        <summary class="ds-side-link"><span class="ds-side-icon">PN</span><span class="ds-side-label">Planeamento</span><span class="ds-side-chevron ds-side-label">⌄</span></summary>
+        <div class="ds-side-submenu">
+          {{ nav_link('/planeamento-clube/anual', 'AN', 'Plano anual', p.startswith('/planeamento-clube/anual')) }}
+          {{ nav_link('/planeamento-clube/mensal', 'MS', 'Plano mensal', p.startswith('/planeamento-clube/mensal')) }}
+          {{ nav_link('/planeamento-clube/semanal', 'SM', 'Plano semanal', p.startswith('/planeamento-clube/semanal')) }}
+          {{ nav_link('/planeamento-clube/atribuicao-espacos', 'AT', 'Atribuir espaços', p.startswith('/planeamento-clube/atribuicao-espacos')) }}
+        </div>
+      </details>
       {{ nav_link('/planeamento-clube/espacos', 'ES', 'Espaços e slots', p.startswith('/espacos') or p.startswith('/planeamento-clube/espacos')) }}
       {{ nav_link('/secretaria/pendencias', 'SE', 'Secretaria', p.startswith('/secretaria')) }}
       {{ nav_link('/jogadores', 'JD', 'Jogadores', p.startswith('/jogadores')) }}

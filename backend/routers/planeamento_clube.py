@@ -2157,10 +2157,52 @@ async def sincronizar_plano_semanal(semanal_id: int, request: Request, db: Sessi
 def listar_espacos(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_secretaria)):
 
     espacos = db.query(EspacoTreino).order_by(EspacoTreino.ativo.desc(), EspacoTreino.nome.asc()).all()
+    hoje = date.today()
+    semana_atribuicao = db.query(PlanoSemanalClube).filter(
+        PlanoSemanalClube.data_inicio <= hoje,
+        PlanoSemanalClube.data_fim >= hoje,
+    ).order_by(PlanoSemanalClube.data_inicio.desc()).first()
+    if not semana_atribuicao:
+        semana_atribuicao = db.query(PlanoSemanalClube).filter(
+            PlanoSemanalClube.data_inicio >= hoje,
+        ).order_by(PlanoSemanalClube.data_inicio.asc()).first()
     return templates.TemplateResponse(request, "planeamento_clube/espacos_lista.html", {
         "utilizador": utilizador,
         "espacos": espacos,
+        "semana_atribuicao": semana_atribuicao,
         "pode_gerir": verificar_perfil(utilizador, ["administrador", "coordenador", "superadministrador"]),
+    })
+
+
+@router.get("/atribuicao-espacos", response_class=HTMLResponse)
+def painel_atribuicao_espacos(
+    request: Request,
+    semana_id: int | None = None,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+):
+    """Entrada operacional autónoma para distribuir slots, sem navegar pelos planos."""
+    semanais = db.query(PlanoSemanalClube).order_by(PlanoSemanalClube.data_inicio.desc()).all()
+    hoje = date.today()
+    semanal = next((item for item in semanais if item.id == semana_id), None)
+    if not semanal:
+        semanal = next(
+            (item for item in semanais if item.data_inicio <= hoje <= item.data_fim),
+            next((item for item in semanais if item.data_inicio >= hoje), semanais[0] if semanais else None),
+        )
+
+    grelha_slots = gerar_grelha_slots(db, semanal) if semanal else None
+    slots = [slot for dia in grelha_slots["dias"] for slot in dia["slots"]] if grelha_slots else []
+    return templates.TemplateResponse(request, "planeamento_clube/atribuicao_espacos.html", {
+        "utilizador": utilizador,
+        "semanais": semanais,
+        "semanal": semanal,
+        "grelha_slots": grelha_slots,
+        "resumo_slots": {
+            "livres": sum(1 for slot in slots if not slot["atribuicao"] and not slot["bloqueio"]),
+            "ocupados": sum(1 for slot in slots if slot["atribuicao"]),
+            "bloqueados": sum(1 for slot in slots if slot["bloqueio"]),
+        },
     })
 
 
@@ -2191,6 +2233,7 @@ async def criar_espaco(
     hora_inicio_slot: str = Form(""),
     hora_fim_slot: str = Form(""),
     duracao_slot_minutos: int = Form(90),
+    dias_repetir: list[str] = Form([]),
 ):
 
     try:
@@ -2207,10 +2250,18 @@ async def criar_espaco(
             db.rollback()
             set_flash(request, "A primeira disponibilidade deve indicar dia e um intervalo horário válido.", "error")
             return RedirectResponse(url="/planeamento-clube/espacos/novo", status_code=303)
-        db.add(DisponibilidadeEspacoTreino(
-            espaco_id=espaco.id, dia_semana=int(dia_semana), hora_inicio=inicio,
-            hora_fim=fim, duracao_slot_minutos=duracao_slot_minutos,
-        ))
+        if not 15 <= duracao_slot_minutos <= 360:
+            db.rollback()
+            set_flash(request, "A duração de cada slot deve estar entre 15 e 360 minutos.", "error")
+            return RedirectResponse(url="/planeamento-clube/espacos/novo", status_code=303)
+
+        dias = {int(dia_semana)}
+        dias.update(int(dia) for dia in dias_repetir if dia.isdigit() and int(dia) in range(7))
+        for dia in sorted(dias):
+            db.add(DisponibilidadeEspacoTreino(
+                espaco_id=espaco.id, dia_semana=dia, hora_inicio=inicio,
+                hora_fim=fim, duracao_slot_minutos=duracao_slot_minutos,
+            ))
     db.commit()
     db.refresh(espaco)
 

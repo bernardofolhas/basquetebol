@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block titulo %}Atribuir Espaços de Treino{% endblock %}
+
+{% block conteudo %}
+<div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">Atribuir espaços de treino</h1>
+        <p class="mt-1 text-gray-500">Distribua os horários disponíveis sem entrar no planeamento mensal ou semanal.</p>
+    </div>
+    <a href="/planeamento-clube/espacos" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Gerir espaços e horários</a>
+</div>
+
+{% if semanais %}
+<form method="GET" class="mb-6 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+    <label for="semana_id" class="mb-1 block text-sm font-semibold text-gray-700">Semana a distribuir</label>
+    <div class="flex flex-wrap gap-3">
+        <select id="semana_id" name="semana_id" class="min-w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            {% for item in semanais %}
+            <option value="{{ item.id }}" {% if semanal and item.id == semanal.id %}selected{% endif %}>{{ item.titulo }} · {{ item.data_inicio|data_pt }} a {{ item.data_fim|data_pt }}</option>
+            {% endfor %}
+        </select>
+        <button class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Ver slots</button>
+    </div>
+</form>
+
+{% if semanal %}
+<div class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><p class="text-xs font-semibold uppercase text-emerald-700">Livres</p><p class="mt-1 text-2xl font-bold text-emerald-900">{{ resumo_slots.livres }}</p></div>
+    <div class="rounded-xl border border-blue-100 bg-blue-50 p-4"><p class="text-xs font-semibold uppercase text-blue-700">Atribuídos</p><p class="mt-1 text-2xl font-bold text-blue-900">{{ resumo_slots.ocupados }}</p></div>
+    <div class="rounded-xl border border-amber-100 bg-amber-50 p-4"><p class="text-xs font-semibold uppercase text-amber-700">Bloqueados</p><p class="mt-1 text-2xl font-bold text-amber-900">{{ resumo_slots.bloqueados }}</p></div>
+</div>
+
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+    {% for dia in grelha_slots.dias %}
+    <section class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+        <h2 class="font-semibold text-gray-800">{{ dia.nome }} <span class="font-normal text-gray-500">· {{ dia.data|data_pt }}</span></h2>
+        <div class="mt-4 space-y-3">
+            {% for slot in dia.slots %}
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-3 {% if slot.bloqueio %}border-amber-200 bg-amber-50{% elif slot.atribuicao %}border-blue-200 bg-blue-50{% else %}border-emerald-200 bg-emerald-50{% endif %}">
+                <div class="text-sm text-gray-800"><strong>{{ slot.espaco.nome }}</strong><br><span class="text-gray-600">{{ slot.hora_inicio }}–{{ slot.hora_fim }}</span></div>
+                {% if slot.bloqueio %}<span class="text-sm font-medium text-amber-800">Bloqueado</span>
+                {% elif slot.atribuicao %}<span class="text-sm font-medium text-blue-800">{{ slot.atribuicao.equipa.nome if slot.atribuicao.equipa else 'Reservado' }}</span>
+                {% else %}<a href="/planeamento-clube/semanal/{{ semanal.id }}/atribuicoes/nova?espaco_id={{ slot.espaco.id }}&data_atribuicao={{ dia.data|data_iso }}&hora_inicio={{ slot.hora_inicio }}&hora_fim={{ slot.hora_fim }}" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Atribuir slot</a>{% endif %}
+            </div>
+            {% else %}<p class="text-sm text-gray-400">Não há slots configurados para este dia.</p>{% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+</div>
+{% endif %}
+{% else %}
+<div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center"><h2 class="font-semibold text-gray-800">Ainda não existe uma semana operacional</h2><p class="mt-2 text-sm text-gray-500">Crie uma semana para distribuir os horários dos espaços às equipas.</p><a href="/planeamento-clube/semanal/novo" class="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Criar plano semanal</a></div>
+{% endif %}
+{% endblock %}

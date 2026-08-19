@@ -24,11 +24,34 @@
         <h1 class="text-2xl font-bold text-gray-800">Espaços de Treino</h1>
         <p class="text-gray-500 mt-1">Gestão operacional dos espaços disponíveis do clube</p>
     </div>
-    {% if pode_gerir %}<a href="/planeamento-clube/espacos/novo"
-       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
-        + Novo Espaço
-    </a>{% endif %}
+    {% if pode_gerir %}<div class="flex flex-wrap items-center gap-3">
+        {% if semana_atribuicao %}
+        <a href="/planeamento-clube/atribuicao-espacos?semana_id={{ semana_atribuicao.id }}"
+           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
+            Distribuir espaços desta semana
+        </a>
+        {% else %}
+        <a href="/planeamento-clube/semanal/novo"
+           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
+            Criar semana para distribuir espaços
+        </a>
+        {% endif %}
+        <a href="/planeamento-clube/espacos/novo"
+           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
+            + Novo Espaço
+        </a>
+    </div>{% endif %}
 </div>
+{% if pode_gerir %}
+<div class="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-5 py-4 text-sm text-blue-900">
+    <strong>Distribuição de espaços:</strong>
+    {% if semana_atribuicao %}
+    os horários configurados aparecem como slots livres numa página própria. Escolha a semana e depois <em>Atribuir slot</em> no espaço e hora pretendidos.
+    {% else %}
+    crie primeiro uma semana operacional; depois os slots configurados poderão ser atribuídos a equipas e treinadores.
+    {% endif %}
+</div>
+{% endif %}
 {% endif %}
 
 {% if semanal %}
@@ -101,9 +124,10 @@
                 <p class="text-sm text-gray-500 mt-2">Tipo: {{ espaco.tipo.value }}</p>
                 <p class="text-sm text-gray-500">Localização: {{ espaco.localizacao or "—" }}</p>
                 <p class="text-sm text-gray-500">Capacidade: {{ espaco.capacidade if espaco.capacidade is not none else "—" }}</p>
+                <p class="text-sm text-gray-500">Horários configurados: {{ espaco.disponibilidades|length }}</p>
             </div>
             <div class="flex items-center gap-3">
-                <a href="/planeamento-clube/espacos/{{ espaco.id }}" class="text-orange-500 hover:text-orange-600 text-sm font-medium">Ver</a>
+                <a href="/planeamento-clube/espacos/{{ espaco.id }}" class="text-orange-500 hover:text-orange-600 text-sm font-medium">Gerir slots</a>
                 {% if pode_gerir %}<a href="/planeamento-clube/espacos/{{ espaco.id }}/editar" class="text-blue-500 hover:text-blue-600 text-sm font-medium">Editar</a>
                 <form method="POST" action="/planeamento-clube/espacos/{{ espaco.id }}/eliminar">
                     <button type="submit"
