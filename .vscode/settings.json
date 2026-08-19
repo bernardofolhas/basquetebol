@@ -1,4 +1,5 @@
 {
     "html.validate.scripts": false,
-    "css.validate": false
+    "css.validate": false,
+    "claudeCodeChat.permissions.yoloMode": true
 }
