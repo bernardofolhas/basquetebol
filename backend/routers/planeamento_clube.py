@@ -2193,11 +2193,19 @@ def painel_atribuicao_espacos(
 
     grelha_slots = gerar_grelha_slots(db, semanal) if semanal else None
     slots = [slot for dia in grelha_slots["dias"] for slot in dia["slots"]] if grelha_slots else []
+    horarios_slots = sorted({(slot["hora_inicio"], slot["hora_fim"]) for slot in slots})
+    slots_por_chave = {
+        f"{dia['data'].isoformat()}|{slot['hora_inicio']}|{slot['hora_fim']}": slot
+        for dia in (grelha_slots["dias"] if grelha_slots else [])
+        for slot in dia["slots"]
+    }
     return templates.TemplateResponse(request, "planeamento_clube/atribuicao_espacos.html", {
         "utilizador": utilizador,
         "semanais": semanais,
         "semanal": semanal,
         "grelha_slots": grelha_slots,
+        "horarios_slots": horarios_slots,
+        "slots_por_chave": slots_por_chave,
         "resumo_slots": {
             "livres": sum(1 for slot in slots if not slot["atribuicao"] and not slot["bloqueio"]),
             "ocupados": sum(1 for slot in slots if slot["atribuicao"]),
