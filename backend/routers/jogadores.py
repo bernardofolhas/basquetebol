@@ -136,10 +136,12 @@ def form_novo_jogador(
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_autenticacao),
 ):
+    equipa_preselecionada = request.query_params.get("equipa_id", "").strip()
     return templates.TemplateResponse(request, "jogadores/form.html", {
         "utilizador": utilizador,
         "equipas": _equipas_para_utilizador(utilizador, db),
         "jogador": None,
+        "equipa_preselecionada": int(equipa_preselecionada) if equipa_preselecionada.isdigit() else None,
     })
 
 
@@ -206,17 +208,25 @@ async def eliminar_jogadores_selecionados(
     utilizador=Depends(exigir_admin),
 ):
     form = await request.form()
+    equipa_id_form = str(form.get("equipa_id", "")).strip()
+    equipa_id = int(equipa_id_form) if equipa_id_form.isdigit() else None
+    if equipa_id:
+        verificar_ou_negar_equipa(utilizador, equipa_id, db)
     ids = sorted({int(valor) for valor in form.getlist("jogador_ids") if str(valor).isdigit()})
-    jogadores = db.query(Jogador).filter(Jogador.id.in_(ids)).all() if ids else []
+    query = db.query(Jogador).filter(Jogador.id.in_(ids))
+    if equipa_id:
+        query = query.filter(Jogador.equipa_id == equipa_id)
+    jogadores = query.all() if ids else []
+    retorno = f"/equipas/{equipa_id}/plantel" if equipa_id else "/jogadores"
     if not jogadores or str(len(jogadores)) != str(form.get("confirmar_total", "")):
         set_flash(request, "A confirmação não corresponde ao número de jogadores selecionados.", "error")
-        return RedirectResponse(url="/jogadores", status_code=303)
+        return RedirectResponse(url=retorno, status_code=303)
     fotografias = [_apagar_jogador_com_dependencias(db, jogador) for jogador in jogadores]
     db.commit()
     for fotografia_url in fotografias:
         apagar_fotografia(fotografia_url)
     set_flash(request, f"{len(jogadores)} jogador(es) eliminados.")
-    return RedirectResponse(url="/jogadores", status_code=303)
+    return RedirectResponse(url=retorno, status_code=303)
 
 
 @router.post("/eliminar-todos")
@@ -226,16 +236,24 @@ async def eliminar_todos_jogadores(
     utilizador=Depends(exigir_admin),
 ):
     form = await request.form()
-    jogadores = db.query(Jogador).filter(Jogador.ativo.is_(True)).all()
+    equipa_id_form = str(form.get("equipa_id", "")).strip()
+    equipa_id = int(equipa_id_form) if equipa_id_form.isdigit() else None
+    if equipa_id:
+        verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    query = db.query(Jogador).filter(Jogador.ativo.is_(True))
+    if equipa_id:
+        query = query.filter(Jogador.equipa_id == equipa_id)
+    jogadores = query.all()
+    retorno = f"/equipas/{equipa_id}/plantel" if equipa_id else "/jogadores"
     if not jogadores or str(len(jogadores)) != str(form.get("confirmar_total", "")):
         set_flash(request, "Confirma o número total de jogadores antes de eliminar.", "error")
-        return RedirectResponse(url="/jogadores", status_code=303)
+        return RedirectResponse(url=retorno, status_code=303)
     fotografias = [_apagar_jogador_com_dependencias(db, jogador) for jogador in jogadores]
     db.commit()
     for fotografia_url in fotografias:
         apagar_fotografia(fotografia_url)
     set_flash(request, f"Todos os {len(jogadores)} jogadores foram eliminados.")
-    return RedirectResponse(url="/jogadores", status_code=303)
+    return RedirectResponse(url=retorno, status_code=303)
 
 
 @router.get("/{jogador_id}", response_class=HTMLResponse)

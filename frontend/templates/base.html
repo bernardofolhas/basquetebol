@@ -36,7 +36,7 @@
   {% include "partials/sidebar_contextual.html" %}
 
   <main id="conteudo-principal" class="relative z-0 min-w-0 px-4 pb-8 pt-20 transition-[margin] sm:px-6 lg:ml-64">
-    {% if equipa_contexto_id %}
+    {% if equipa_contexto_id and not (equipa is defined and equipa and p.startswith('/equipas/')) %}
     <section class="ds-context-bar mb-4">
       <div class="flex min-w-0 items-center gap-3"><span class="ds-context-mark">EQ</span><div class="min-w-0"><p class="text-[0.66rem] font-bold uppercase tracking-[.16em] text-slate-400">Equipa selecionada</p><p class="truncate font-bold text-slate-900">{{ equipa_contexto_nome or 'Equipa' }}</p></div></div>
       <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">

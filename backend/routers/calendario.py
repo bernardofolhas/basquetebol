@@ -19,6 +19,7 @@ from services.pdf_service import renderizar_pdf
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+MESES_PT = ("", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro")
 
 
 def _converter_data_query(valor: str | None, fallback: date) -> date:
@@ -91,8 +92,13 @@ def _obter_contexto_calendario(request: Request, db: Session, utilizador) -> dic
                 "do_mes": dia.month == cursor_mes.month,
                 "itens": itens_por_data.get(dia, []),
             } for dia in semana])
-        meses.append({"nome": calendar.month_name[cursor_mes.month], "ano": cursor_mes.year, "semanas": semanas})
+        meses.append({"nome": MESES_PT[cursor_mes.month], "ano": cursor_mes.year, "semanas": semanas})
         cursor_mes = date(cursor_mes.year + (cursor_mes.month == 12), 1 if cursor_mes.month == 12 else cursor_mes.month + 1, 1)
+
+    mes_anterior = date(inicio.year - (inicio.month == 1), 12 if inicio.month == 1 else inicio.month - 1, 1)
+    mes_seguinte = date(fim.year + (fim.month == 12), 1 if fim.month == 12 else fim.month + 1, 1)
+    fim_mes_anterior = date(mes_anterior.year, mes_anterior.month, monthrange(mes_anterior.year, mes_anterior.month)[1])
+    fim_mes_seguinte = date(mes_seguinte.year, mes_seguinte.month, monthrange(mes_seguinte.year, mes_seguinte.month)[1])
 
     return {
         "utilizador": utilizador,
@@ -105,6 +111,12 @@ def _obter_contexto_calendario(request: Request, db: Session, utilizador) -> dic
         "itens_administrativos": [item for item in itens if item["categoria"] not in {"treino", "jogo"}],
         "equipas": equipas,
         "equipa_id_selecionada": equipa_id,
+        "navegacao_meses": {
+            "anterior_inicio": mes_anterior,
+            "anterior_fim": fim_mes_anterior,
+            "seguinte_inicio": mes_seguinte,
+            "seguinte_fim": fim_mes_seguinte,
+        },
         "estatisticas": {
             "total": len(itens),
             "treinos": sum(item["categoria"] == "treino" for item in itens),

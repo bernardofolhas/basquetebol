@@ -22,15 +22,15 @@
 
         .meta { padding: 9px 14px 7px; }
         .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-        .meta-box { border: 1px solid #d1d5db; min-height: 34px; padding: 4px 6px; }
+        .meta-box { border: 1px solid #d1d5db; min-height: 29px; padding: 3px 6px; }
         .meta-box label { display: block; font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; }
         .meta-box strong { display: block; margin-top: 3px; font-size: 10px; color: #111827; }
 
         .block-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
-        .block-card { border: 1px solid #d1d5db; min-height: 38px; padding: 5px 7px; }
+        .block-card { border: 1px solid #d1d5db; min-height: 31px; padding: 4px 7px; }
         .block-card h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; }
-        .block-card strong { display: block; margin-top: 8px; font-size: 15px; }
-        .block-card span { display: block; margin-top: 4px; font-size: 10px; color: #6b7280; }
+        .block-card strong { display: block; margin-top: 4px; font-size: 12px; }
+        .block-card span { display: block; margin-top: 2px; font-size: 9px; color: #6b7280; }
 
         .objectives { margin-top: 10px; border: 1px solid #d1d5db; padding: 10px 12px; }
         .objectives h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 6px; }
@@ -39,7 +39,7 @@
         .content { padding: 0 10px 12px; }
         .block-section { margin-top: 10px; }
         .block-title { break-after: avoid; page-break-after: avoid; background: var(--pdf-secondary); color: #fff; padding: 6px 9px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.12em; }
-        .exercise { border: 1px solid #d1d5db; border-top: 0; }
+        .exercise { border: 1px solid #d1d5db; border-top: 0; break-inside: avoid; page-break-inside: avoid; }
         .exercise.force-page { break-before: page; page-break-before: always; border-top: 1px solid #d1d5db; }
         .exercise-head { display: grid; grid-template-columns: 15mm 15mm minmax(0, 1fr) 23mm 14mm; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
         .exercise-head div { border-right: 1px solid #e5e7eb; padding: 6px 8px; }
@@ -172,7 +172,7 @@
         <div class="block-section">
             <div class="block-title">{{ bloco_ui.nome }}{% if bloco_ui.tipo %} · {{ bloco_ui.tipo }}{% endif %}</div>
             {% for ex in exercicios_por_bloco[bloco_letra] %}
-            <div class="exercise {% if loop.index0 > 0 and loop.index0 % 2 == 0 %}force-page{% endif %}">
+            <div class="exercise">
                 <div class="exercise-head">
                     <div>
                         <label>Hora</label>
@@ -224,10 +224,10 @@
         {% endif %}
         {% endfor %}
 
-        <div class="reflection">
+        {% if plano and plano.reflexao %}<div class="reflection">
             <h2>Reflexão</h2>
-            <p>{{ plano.reflexao if plano and plano.reflexao else "" }}</p>
-        </div>
+            <p>{{ plano.reflexao }}</p>
+        </div>{% endif %}
     </div>
 
 </div>

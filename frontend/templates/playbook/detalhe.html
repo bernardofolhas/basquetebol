@@ -198,14 +198,20 @@ const CANVAS_ESTADO = {};
 function inicializarDesenho(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemBase: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 2, corLinha: '#333333' };
     const configurarCanvas = () => {
         const imgEl = canvas.parentElement.querySelector('img');
         if (imgEl && imgEl.offsetWidth > 0) { canvas.width = imgEl.offsetWidth; canvas.height = imgEl.offsetHeight; }
         else { canvas.width = 400; canvas.height = 300; }
+        const passoId = canvasId.replace('canvas_', '');
+        const overlay = document.getElementById('overlay_' + passoId);
+        if (overlay) {
+            const carregar = () => { CANVAS_ESTADO[canvasId].imagemBase = overlay; redesenhar(canvasId); };
+            if (overlay.complete) carregar(); else overlay.addEventListener('load', carregar, { once: true });
+        } else redesenhar(canvasId);
     };
     setTimeout(configurarCanvas, 100);
-    const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 2, corLinha: '#333333' };
     canvas.addEventListener('mousedown', (e) => aoPremir(canvasId, e));
     canvas.addEventListener('mousemove', (e) => aoMover(canvasId, e));
     canvas.addEventListener('mouseup', (e) => aoSoltar(canvasId, e));
@@ -231,7 +237,7 @@ function aoPremir(canvasId, e) {
         redesenhar(canvasId); if (est.objectoSeleccionado) desenharSeleccao(est.ctx, est.objectoSeleccionado); return;
     }
     if (simbolos.includes(est.ferramenta)) { est.objectos.push({ tipo: est.ferramenta, x: pos.x, y: pos.y, tamanho: 1, numero: est.ferramenta === 'jogador_ataque' ? est.contadores.ataque++ : est.ferramenta === 'jogador_defesa' ? est.contadores.defesa++ : null }); redesenhar(canvasId); return; }
-    if (!est.linhaMultipla) est.linhaMultipla = { tipo: est.ferramenta, pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 };
+    if (!est.linhaMultipla) { est.linhaMultipla = { tipo: est.ferramenta, pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 }; est.posicaoCursor = pos; }
     else est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
     redesenhar(canvasId); if (est.posicaoCursor) desenharLinhaMultipla(est.ctx, est.linhaMultipla, est.posicaoCursor);
 }
@@ -258,6 +264,7 @@ function redesenhar(canvasId) {
     const est = CANVAS_ESTADO[canvasId]; if (!est) return;
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
     est.ctx.clearRect(0, 0, est.canvas.width, est.canvas.height);
+    if (est.imagemBase) est.ctx.drawImage(est.imagemBase, 0, 0, est.canvas.width, est.canvas.height);
     est.objectos.forEach(obj => { if (simbolos.includes(obj.tipo)) desenharSimbolo(est.ctx, obj); else desenharLinhaMultipla(est.ctx, obj, null); });
 }
 
@@ -338,7 +345,7 @@ function definirFerramenta(canvasId, ferramenta) {
 
 function limparTudo(canvasId) {
     const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    est.objectos = []; est.contadores = { ataque: 1, defesa: 1 }; redesenhar(canvasId);
+    est.objectos = []; est.imagemBase = null; est.linhaMultipla = null; est.contadores = { ataque: 1, defesa: 1 }; redesenhar(canvasId);
 }
 
 function desfazer(canvasId) {

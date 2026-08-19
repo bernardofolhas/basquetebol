@@ -9,7 +9,8 @@ from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
 from models.playbook import Playbook, PassoSetPlay, SetPlay
-from paths import TEMPLATES_DIR
+from services.desenho_service import compor_desenho_sobre_campo, normalizar_data_uri
+from paths import STATIC_DIR, TEMPLATES_DIR
 from services.pdf_service import renderizar_pdf
 
 router = APIRouter(prefix="/playbook")
@@ -203,10 +204,12 @@ async def guardar_desenho_passo(passo_id: int, request: Request, db: Session = D
         equipa_id = _equipa_id_por_passo(db, passo_id)
         _verificar_acesso_playbook(utilizador, equipa_id, db)
         body = await request.json()
-        dados = body.get("dados", "")
+        dados = normalizar_data_uri(body.get("dados", ""))
         passo = db.query(PassoSetPlay).filter(PassoSetPlay.id == passo_id).first()
         if not passo:
             return JSONResponse({"sucesso": False, "erro": "Passo não encontrado"})
+        if not dados:
+            return JSONResponse({"sucesso": False, "erro": "O desenho enviado não é uma imagem válida."}, status_code=400)
         passo.desenho = dados
         db.commit()
         return JSONResponse({"sucesso": True})
@@ -249,6 +252,10 @@ def exportar_pdf_setplay(setplay_id: int, request: Request, db: Session = Depend
     setplay = db.query(SetPlay).filter(SetPlay.id == setplay_id).first()
     if not setplay:
         return RedirectResponse(url="/equipas")
+
+    caminho_campo = STATIC_DIR / "campos" / "campo_meio.png"
+    for passo in setplay.passos:
+        passo.imagem_composta_pdf = compor_desenho_sobre_campo(caminho_campo, passo.desenho)
 
     pdf_bytes = renderizar_pdf(request, "playbook/pdf.html", {
         "setplay": setplay,

@@ -78,6 +78,8 @@ def test_templates_expoem_navegacao_e_acoes_responsivas_sem_textos_internos():
     biblioteca = (ROOT / "frontend/templates/biblioteca/detalhe.html").read_text(encoding="utf-8")
     calendario = (ROOT / "frontend/templates/calendario_partilhavel_pdf.html").read_text(encoding="utf-8")
     plano_pdf = (ROOT / "frontend/templates/treino/plano_print.html").read_text(encoding="utf-8")
+    playbook = (ROOT / "frontend/templates/playbook/detalhe.html").read_text(encoding="utf-8")
+    playbook_pdf = (ROOT / "frontend/templates/playbook/pdf.html").read_text(encoding="utf-8")
 
     for nivel in ("Plano anual", "Macrociclos", "Mesociclos", "Microciclos", "Planos de treino"):
         assert nivel in sidebar
@@ -87,6 +89,12 @@ def test_templates_expoem_navegacao_e_acoes_responsivas_sem_textos_internos():
     assert "Documento operacional preparado pelo clube para partilha" not in calendario
     assert "ex.campos_pdf" in plano_pdf
     assert "identidade.nome_oficial" in plano_pdf
+    assert "{% if plano and plano.reflexao %}" in plano_pdf
+    assert "imagemBase" in playbook
+    assert "est.posicaoCursor = pos" in playbook
+    assert "est.imagemBase = null" in playbook
+    assert "passo.imagem_composta_pdf" in playbook_pdf
+    assert 'src="/static/campos/campo_meio.png"' not in playbook_pdf
 
 
 def test_sidebar_liga_todos_os_niveis_a_listas_independentes():
@@ -97,6 +105,12 @@ def test_sidebar_liga_todos_os_niveis_a_listas_independentes():
     assert "'/treino/equipas/' ~ equipa_contexto_id ~ '/planos'" in sidebar
     assert "('/calendario?equipa_id=' ~ equipa_contexto_id)" not in sidebar
     assert "is-disabled" not in sidebar
+
+
+def test_area_da_equipa_nao_duplica_barra_de_contexto():
+    base = (ROOT / "frontend/templates/base.html").read_text(encoding="utf-8")
+
+    assert "not (equipa is defined and equipa and p.startswith('/equipas/'))" in base
 
 
 def test_treino_da_agenda_aponta_para_resolucao_do_plano():
