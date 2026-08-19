@@ -38,14 +38,14 @@
             </div>
 
             {% if caller is defined %}
-            <div class="flex flex-wrap gap-2 lg:max-w-xl lg:justify-end">
+            <div class="ds-team-actions flex flex-wrap gap-2 lg:max-w-xl lg:justify-end">
                 {{ caller() }}
             </div>
             {% endif %}
         </div>
 
         <div class="border-t border-orange-100 bg-white/75 px-4 py-3">
-            <div class="flex flex-wrap gap-2">
+            <div class="ds-scroll-tabs flex flex-wrap gap-2">
                 {% for aba in abas %}
                 <a href="{{ aba.href }}"
                    class="{% if ativo == aba.id %}bg-orange-500 text-white shadow-sm{% else %}bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-orange-50 hover:text-orange-600 hover:ring-orange-200{% endif %} inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition">

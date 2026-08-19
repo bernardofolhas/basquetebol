@@ -173,3 +173,53 @@ body {
     .ds-calendar-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
     .ds-calendar-actions .ds-button { width: 100%; padding-inline: .65rem; white-space: normal; }
 }
+
+/* Compact layouts favour the next action over a dense desktop overview. */
+.ds-mobile-agenda { display: none; }
+.ds-scroll-tabs { scrollbar-width: thin; }
+
+@media (max-width: 1023px) {
+    .ds-sidebar { width: min(19rem, calc(100vw - 2.5rem)); }
+    .ds-sidebar .ds-side-link { min-height: 2.75rem; padding-block: .65rem; }
+    .ds-sidebar .ds-side-submenu .ds-side-link { min-height: 2.5rem; }
+    #conteudo-principal { padding-bottom: 2rem; }
+    .ds-team-actions > * { min-height: 2.65rem; }
+    .ds-week-agenda { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 767px) {
+    :root { --topbar-height: 3.75rem; }
+    body { overflow-x: hidden; }
+    .ds-topbar { height: var(--topbar-height); padding-inline: .55rem; }
+    .ds-topbar .ds-menu { flex: none; }
+    .ds-logo { width: 2.2rem; height: 2.2rem; }
+    #sidebar-overlay { top: var(--topbar-height); }
+    #sidebar-principal { top: var(--topbar-height); width: min(20rem, calc(100vw - 1.5rem)); border-radius: 0 1rem 0 0; }
+    #conteudo-principal { padding: calc(var(--topbar-height) + .75rem) .75rem 2rem; }
+    #conteudo-principal h1 { font-size: 1.45rem; line-height: 1.2; }
+    #conteudo-principal h2 { overflow-wrap: anywhere; }
+    .ds-context-bar { margin-inline: -.1rem; padding: .7rem; }
+    .ds-context-pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ds-team-actions { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+    .ds-team-actions > * { display: inline-flex; min-width: 0; justify-content: center; padding-inline: .7rem; text-align: center; }
+    .ds-scroll-tabs { flex-wrap: nowrap !important; overflow-x: auto; padding-bottom: .2rem; scroll-snap-type: x proximity; }
+    .ds-scroll-tabs > * { flex: 0 0 auto; scroll-snap-align: start; }
+    .ds-calendar-actions .ds-button:first-child { grid-column: span 2; }
+    .ds-calendar-actions .ds-button:nth-last-child(-n+2) { grid-column: span 2; }
+    .ds-calendar-filter { padding: .85rem; }
+    .ds-calendar-desktop { display: none; }
+    .ds-mobile-agenda { display: block; }
+    .ds-mobile-agenda-day { min-height: 3.5rem; }
+    .ds-mobile-agenda-day:focus-within { outline: 2px solid color-mix(in srgb, var(--clube-primary) 50%, transparent); outline-offset: 2px; }
+    .ds-table-scroll { margin-inline: -.75rem; padding-inline: .75rem; -webkit-overflow-scrolling: touch; }
+    .ds-table-scroll::after { content: "Deslize para ver mais"; display: block; padding: .45rem 0 .1rem; color: var(--text-muted); font-size: .7rem; }
+    form input:not([type="checkbox"]):not([type="radio"]), form select, form textarea { min-height: 2.7rem; font-size: 1rem; }
+    form button[type="submit"], .ds-button { min-height: 2.7rem; }
+    [id^="toolbar_"] { gap: .35rem; padding: .45rem; }
+    [id^="toolbar_"] button { min-width: 2.35rem; min-height: 2.35rem; padding: .35rem; }
+    .ds-week-agenda { grid-template-columns: 1fr; }
+}
+
+@media (min-width: 768px) {
+    .ds-calendar-desktop { display: block; }
+}
