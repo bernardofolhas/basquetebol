@@ -8,7 +8,10 @@
         <h1 class="text-2xl font-bold text-gray-800">Atribuir espaços de treino</h1>
         <p class="mt-1 text-gray-500">Distribua os horários disponíveis sem entrar no planeamento mensal ou semanal.</p>
     </div>
-    <a href="/planeamento-clube/espacos" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Gerir espaços e horários</a>
+    <div class="flex flex-wrap gap-2">
+        {% if semanal %}<a href="/planeamento-clube/atribuicao-espacos/pdf?semana_id={{ semanal.id }}" target="_blank" class="rounded-lg bg-[var(--cor-principal,#2563eb)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[var(--cor-destaque,#38bdf8)] focus:ring-offset-2">Exportar mapa PDF</a>{% endif %}
+        <a href="/planeamento-clube/espacos" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Gerir espaços e horários</a>
+    </div>
 </div>
 
 {% if semanais %}
@@ -33,6 +36,18 @@
 
 <div class="mb-4 flex flex-wrap gap-2 text-xs font-semibold"><span class="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-800 ring-1 ring-emerald-200">Livre</span><span class="rounded-full bg-blue-50 px-3 py-1.5 text-blue-800 ring-1 ring-blue-200">Atribuído</span><span class="rounded-full bg-amber-50 px-3 py-1.5 text-amber-800 ring-1 ring-amber-200">Bloqueado</span><span class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 ring-1 ring-slate-200">Sem horário configurado</span></div>
 
+{% if equipas_com_atribuicoes %}
+<section class="mb-6 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+    <h2 class="text-sm font-semibold text-gray-800">Equipas atribuídas</h2>
+    <p class="mt-1 text-sm text-gray-500">Cada equipa mantém esta cor no mapa e no PDF para facilitar a leitura da semana.</p>
+    <div class="mt-3 flex flex-wrap gap-2">
+        {% for equipa in equipas_com_atribuicoes %}{% set cor = cores_equipas.get(equipa.id, cor_equipa_neutra) %}
+        <span class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" style="background-color: {{ cor.fundo }}; border-color: {{ cor.borda }}; color: {{ cor.texto }}"><span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ cor.marca }}"></span>{{ equipa.nome }}</span>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
 {% if espacos_sem_horario %}
 <section class="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4"><div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="font-semibold text-slate-800">Espaços sem horário nesta semana</h2><p class="mt-1 text-sm text-slate-500">Estes espaços existem no clube, mas ainda não têm slots disponíveis para os dias escolhidos.</p></div><div class="flex flex-wrap gap-2">{% for espaco in espacos_sem_horario %}<a href="/planeamento-clube/espacos/{{ espaco.id }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-blue-400 hover:text-blue-700">{{ espaco.nome }} · Configurar</a>{% endfor %}</div></div></section>
 {% endif %}
@@ -49,7 +64,7 @@
             {% if slots_celula %}
                 <div class="space-y-2">{% for slot in slots_celula %}
                     {% if slot.bloqueio %}<div class="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"><strong>{{ slot.espaco.nome }}</strong><br><span class="mt-1 block">Bloqueado</span></div>
-                    {% elif slot.atribuicao %}<a href="/planeamento-clube/atribuicoes/{{ slot.atribuicao.id }}" class="block rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900 hover:border-blue-400"><strong>{{ slot.espaco.nome }}</strong><span class="mt-1 block font-semibold">{{ slot.atribuicao.equipa.nome if slot.atribuicao.equipa else 'Reservado' }}</span>{% if slot.fora_disponibilidade|default(false) %}<span class="mt-1 block text-[10px] text-blue-700">Horário excecional</span>{% endif %}</a>
+                    {% elif slot.atribuicao %}{% set cor = cores_equipas.get(slot.atribuicao.equipa_id, cor_equipa_neutra) %}<a href="/planeamento-clube/atribuicoes/{{ slot.atribuicao.id }}" class="block rounded-lg border p-2 text-xs hover:brightness-95" style="background-color: {{ cor.fundo }}; border-color: {{ cor.borda }}; color: {{ cor.texto }}"><strong>{{ slot.espaco.nome }}</strong><span class="mt-1 flex items-center gap-1 font-semibold"><span class="h-2 w-2 rounded-full" style="background-color: {{ cor.marca }}"></span>{{ slot.atribuicao.equipa.nome if slot.atribuicao.equipa else 'Reservado' }}</span>{% if slot.fora_disponibilidade|default(false) %}<span class="mt-1 block text-[10px]">Horário excecional</span>{% endif %}</a>
                     {% else %}<a href="/planeamento-clube/semanal/{{ semanal.id }}/atribuicoes/nova?espaco_id={{ slot.espaco.id }}&data_atribuicao={{ dia.data|data_iso }}&hora_inicio={{ slot.hora_inicio }}&hora_fim={{ slot.hora_fim }}" class="block rounded-lg border border-dashed border-emerald-300 bg-emerald-50 p-2 text-xs text-emerald-900 hover:border-emerald-500 hover:bg-emerald-100"><strong>{{ slot.espaco.nome }}</strong><span class="mt-1 block font-semibold text-emerald-700">+ Atribuir</span></a>{% endif %}
                 {% endfor %}</div>
             {% else %}<span class="block px-2 py-3 text-center text-xs text-slate-300">—</span>{% endif %}
@@ -65,10 +80,10 @@
         <h2 class="font-semibold text-gray-800">{{ dia.nome }} <span class="font-normal text-gray-500">· {{ dia.data|data_pt }}</span></h2>
         <div class="mt-4 space-y-3">
             {% for slot in dia.slots %}
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-3 {% if slot.bloqueio %}border-amber-200 bg-amber-50{% elif slot.atribuicao %}border-blue-200 bg-blue-50{% else %}border-emerald-200 bg-emerald-50{% endif %}">
+            {% set cor = cores_equipas.get(slot.atribuicao.equipa_id, cor_equipa_neutra) if slot.atribuicao else cor_equipa_neutra %}<div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-3 {% if slot.bloqueio %}border-amber-200 bg-amber-50{% elif slot.atribuicao %}{% else %}border-emerald-200 bg-emerald-50{% endif %}" {% if slot.atribuicao %}style="background-color: {{ cor.fundo }}; border-color: {{ cor.borda }}"{% endif %}>
                 <div class="text-sm text-gray-800"><strong>{{ slot.espaco.nome }}</strong><br><span class="text-gray-600">{{ slot.hora_inicio }}–{{ slot.hora_fim }}</span></div>
                 {% if slot.bloqueio %}<span class="text-sm font-medium text-amber-800">Bloqueado</span>
-                {% elif slot.atribuicao %}<span class="text-sm font-medium text-blue-800">{{ slot.atribuicao.equipa.nome if slot.atribuicao.equipa else 'Reservado' }}</span>
+                {% elif slot.atribuicao %}<a href="/planeamento-clube/atribuicoes/{{ slot.atribuicao.id }}" class="inline-flex items-center gap-1 text-sm font-semibold hover:underline" style="color: {{ cor.texto }}"><span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ cor.marca }}"></span>{{ slot.atribuicao.equipa.nome if slot.atribuicao.equipa else 'Reservado' }}</a>
                 {% else %}<a href="/planeamento-clube/semanal/{{ semanal.id }}/atribuicoes/nova?espaco_id={{ slot.espaco.id }}&data_atribuicao={{ dia.data|data_iso }}&hora_inicio={{ slot.hora_inicio }}&hora_fim={{ slot.hora_fim }}" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Atribuir slot</a>{% endif %}
             </div>
             {% else %}<p class="text-sm text-gray-400">Não há slots configurados para este dia.</p>{% endfor %}

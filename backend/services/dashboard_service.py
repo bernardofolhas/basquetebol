@@ -61,7 +61,7 @@ def _obter_itens_agenda(db, data_inicio, data_fim, equipa_ids=None):
     )
 
 
-def obter_painel_operacional(db, equipa_ids=None, hoje=None):
+def obter_painel_operacional(db, equipa_ids=None, hoje=None, *, incluir_pendencias_secretaria=True):
     """Constrói agenda e tarefas acionáveis para a página inicial."""
     from models.assiduidade import RegistoAssiduidade
     from models.jogador import Jogador
@@ -163,18 +163,19 @@ def obter_painel_operacional(db, equipa_ids=None, hoje=None):
             }
             _adicionar(item, "Resolver conflito de espaço", "/dashboard/clube/espacos", True, conflito["mensagem"])
 
-        pendencias_secretaria = 0
-        jogadores = db.query(Jogador).all()
-        for jogador in jogadores:
-            if jogador.inscricao_estado != "completa" or not jogador.exame_medico_validade:
-                pendencias_secretaria += 1
-            pendencias_secretaria += db.query(DocumentoJogador).filter(
-                DocumentoJogador.jogador_id == jogador.id,
-                DocumentoJogador.estado.in_(["pendente", "expirado"]),
-            ).count()
-        if pendencias_secretaria:
-            item = {"data": hoje, "equipa_nome": "Clube", "titulo": "Pendências administrativas"}
-            _adicionar(item, f"Rever {pendencias_secretaria} pendência(s) administrativas", "/secretaria/pendencias")
+        if incluir_pendencias_secretaria:
+            pendencias_secretaria = 0
+            jogadores = db.query(Jogador).all()
+            for jogador in jogadores:
+                if jogador.inscricao_estado != "completa" or not jogador.exame_medico_validade:
+                    pendencias_secretaria += 1
+                pendencias_secretaria += db.query(DocumentoJogador).filter(
+                    DocumentoJogador.jogador_id == jogador.id,
+                    DocumentoJogador.estado.in_(["pendente", "expirado"]),
+                ).count()
+            if pendencias_secretaria:
+                item = {"data": hoje, "equipa_nome": "Clube", "titulo": "Pendências administrativas"}
+                _adicionar(item, f"Rever {pendencias_secretaria} pendência(s) administrativas", "/secretaria/pendencias")
 
         plano_semanal = db.query(PlanoSemanalClube).filter(
             PlanoSemanalClube.data_inicio <= limite,
@@ -434,7 +435,7 @@ def get_dashboard_coordenador(db, utilizador):
     contexto["planeamento_mensal"] = contexto_planeamento["mensal"]
     contexto["resumo_equipas"] = contexto_planeamento["resumo_equipas"]
     contexto["mes_atual_label"] = contexto_planeamento["mes_atual_label"]
-    contexto.update(obter_painel_operacional(db))
+    contexto.update(obter_painel_operacional(db, incluir_pendencias_secretaria=False))
     return contexto
 
 

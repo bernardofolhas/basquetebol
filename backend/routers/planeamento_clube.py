@@ -46,6 +46,11 @@ from services.operacao_clube_service import (
 )
 from services.planeamento_semanal_administrativo_service import gerar_grelha_slots, validar_reserva
 from services.atribuicao_espaco_agenda_service import sincronizar_atribuicao_com_agenda
+from services.atribuicao_espaco_visual_service import (
+    COR_NEUTRA,
+    construir_cores_equipas,
+    construir_quadro_atribuicoes,
+)
 from services.auditoria_service import registar_auditoria
 from services.agenda_service import metadados_tipo_agenda, tipos_agenda_formulario
 from services.historico_planeamento_service import registar_historico_planeamento
@@ -2204,6 +2209,12 @@ def painel_atribuicao_espacos(
         espaco for espaco in (grelha_slots["espacos"] if grelha_slots else [])
         if espaco.id not in espacos_com_horario
     ]
+    equipas = db.query(Equipa).order_by(Equipa.nome.asc()).all()
+    cores_equipas = construir_cores_equipas(equipas)
+    equipas_com_atribuicoes = [
+        equipa for equipa in equipas
+        if any(slot["atribuicao"] and slot["atribuicao"].equipa_id == equipa.id for slot in slots)
+    ]
     return templates.TemplateResponse(request, "planeamento_clube/atribuicao_espacos.html", {
         "utilizador": utilizador,
         "semanais": semanais,
@@ -2212,12 +2223,46 @@ def painel_atribuicao_espacos(
         "horarios_slots": horarios_slots,
         "slots_por_chave": slots_por_chave,
         "espacos_sem_horario": espacos_sem_horario,
+        "cores_equipas": cores_equipas,
+        "cor_equipa_neutra": COR_NEUTRA,
+        "equipas_com_atribuicoes": equipas_com_atribuicoes,
         "resumo_slots": {
             "livres": sum(1 for slot in slots if not slot["atribuicao"] and not slot["bloqueio"]),
             "ocupados": sum(1 for slot in slots if slot["atribuicao"]),
             "bloqueados": sum(1 for slot in slots if slot["bloqueio"]),
         },
     })
+
+
+@router.get("/atribuicao-espacos/pdf")
+def exportar_pdf_atribuicao_espacos(
+    request: Request,
+    semana_id: int,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+):
+    """Exporta a distribuição semanal numa grelha simples por equipa."""
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semana_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/atribuicao-espacos", status_code=303)
+
+    equipas = db.query(Equipa).order_by(Equipa.nome.asc()).all()
+    atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.plano_semanal_id == semanal.id,
+        AtribuicaoEspacoSemanal.estado != EstadoAtribuicaoEspacoEnum.cancelado,
+    ).all()
+    quadro = construir_quadro_atribuicoes(semanal, equipas, atribuicoes)
+    return _responder_pdf(
+        request,
+        "planeamento_clube/atribuicao_espacos_pdf.html",
+        {
+            "utilizador": utilizador,
+            "semanal": semanal,
+            "quadro": quadro,
+            "data_exportacao": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        },
+        f"atribuicao_espacos_{semanal.data_inicio.isoformat()}.pdf",
+    )
 
 
 @router.get("/espacos/novo", response_class=HTMLResponse)

@@ -103,6 +103,9 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
     tarefas = painel.get("tarefas", [])
     if utilizador.perfil == PerfilEnum.secretaria:
         tarefas = [tarefa for tarefa in tarefas if _grupo_tarefa(tarefa) == "secretaria"]
+    elif utilizador.perfil == PerfilEnum.coordenador:
+        # A coordenação mantém acesso aos registos, sem os receber como pendências diárias.
+        tarefas = [tarefa for tarefa in tarefas if _grupo_tarefa(tarefa) != "secretaria"]
     return {
         "dashboard_url": "/dashboard",
         "equipas": [{"id": equipa.id, "nome": equipa.nome} for equipa in equipas],

@@ -1,0 +1,58 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Atribuição de espaços · {{ semanal.titulo }}</title>
+    <style>
+        * { box-sizing: border-box; }
+        @page { size: A4 landscape; margin: 9mm; }
+        body { margin: 0; color: #172033; font-family: Arial, sans-serif; font-size: 8px; }
+        h2 { margin: 0 0 4px; color: #172033; font-size: 11px; }
+        .intro { margin: 0 0 8px; color: #64748b; font-size: 8.5px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+        th { border: 1px solid #334155; background: #334155; color: white; padding: 5px 4px; font-size: 7.5px; text-align: center; }
+        th:first-child { width: 16%; text-align: left; }
+        td { border: 1px solid #cbd5e1; min-height: 20mm; padding: 4px; vertical-align: top; }
+        .team { font-size: 9px; font-weight: 700; }
+        .team-mark { display: inline-block; width: 5px; min-height: 15mm; margin: -4px 5px -4px -4px; vertical-align: middle; }
+        .reservation { margin-bottom: 3px; border: 1px solid #cbd5e1; border-left-width: 4px; border-radius: 3px; padding: 3px 4px; line-height: 1.25; }
+        .reservation:last-child { margin-bottom: 0; }
+        .reservation strong { display: block; font-size: 7.5px; }
+        .empty { color: #94a3b8; text-align: center; padding-top: 6mm; }
+        .note { margin-top: 7px; color: #64748b; font-size: 7.5px; }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body>
+    {{ cabecalho_pdf('Atribuição de espaços', semanal.titulo ~ ' · ' ~ (semanal.data_inicio|data_pt) ~ ' a ' ~ (semanal.data_fim|data_pt), 'Exportado em ' ~ data_exportacao) }}
+    <h2>Mapa semanal por equipa</h2>
+    <p class="intro">Cada célula mostra o espaço e o horário previsto para a equipa nesse dia.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Equipa</th>
+                {% for dia in quadro.dias %}<th>{{ ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'][dia.weekday()] }}<br><span>{{ dia|data_pt }}</span></th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for linha in quadro.linhas %}
+            <tr>
+                <td class="team" style="background: {{ linha.cor.fundo }}; color: {{ linha.cor.texto }}"><span class="team-mark" style="background: {{ linha.cor.marca }}"></span>{{ linha.equipa.nome }}</td>
+                {% for celula in linha.celulas %}
+                <td>
+                    {% for reserva in celula.reservas %}
+                    <div class="reservation" style="border-left-color: {{ linha.cor.marca }}; background: {{ linha.cor.fundo }}; color: {{ linha.cor.texto }}"><strong>{{ reserva.espaco.nome }}</strong>{{ reserva.hora_inicio }}–{{ reserva.hora_fim }}</div>
+                    {% else %}<div class="empty">—</div>{% endfor %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% else %}<tr><td colspan="8" class="empty">Não existem equipas disponíveis neste clube.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+    <p class="note">As equipas sem horário atribuído permanecem no quadro para identificar rapidamente as pendências.</p>
+    {{ rodape_pdf('Atribuição semanal · ' ~ (semanal.data_inicio|data_pt) ~ ' a ' ~ (semanal.data_fim|data_pt)) }}
+</body>
+</html>
