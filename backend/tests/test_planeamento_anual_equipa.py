@@ -85,6 +85,8 @@ def test_treinador_gere_anual_da_equipa_e_hierarquia_integrada():
         assert pagina.status_code == 200
         assert "Clube → equipa → macro → meso → micro → plano de treino" not in pagina.text
         assert "Macro → Meso → Micro → Plano de treino" in pagina.text
+        assert "Objetivos do planeamento anual" in pagina.text
+        assert "Calendário anual" in pagina.text
 
         resposta = cliente.post(f"/planeamento/equipas/{equipa.id}/macrociclos/novo", data={
             "planeamento_anual_equipa_id": str(anual_equipa.id),
