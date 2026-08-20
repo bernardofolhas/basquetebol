@@ -1,4 +1,5 @@
 {% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+{% set total_equipas = quadro.linhas|length %}
 <!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -7,21 +8,21 @@
     <style>
         * { box-sizing: border-box; }
         @page { size: A4 landscape; margin: 9mm; }
-        body { margin: 0; color: #172033; font-family: Arial, sans-serif; font-size: 8px; }
+        body { margin: 0; color: #172033; font-family: Arial, sans-serif; font-size: {% if total_equipas > 22 %}5.5px{% elif total_equipas > 15 %}6.5px{% else %}8px{% endif %}; }
         h2 { margin: 0 0 4px; color: #172033; font-size: 11px; }
         .intro { margin: 0 0 8px; color: #64748b; font-size: 8.5px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         thead { display: table-header-group; }
         tr { page-break-inside: avoid; }
-        th { border: 1px solid #334155; background: #334155; color: white; padding: 5px 4px; font-size: 7.5px; text-align: center; }
+        th { border: 1px solid #334155; background: #334155; color: white; padding: {% if total_equipas > 15 %}2px{% else %}5px 4px{% endif %}; font-size: {% if total_equipas > 22 %}5.5px{% elif total_equipas > 15 %}6.5px{% else %}7.5px{% endif %}; text-align: center; }
         th:first-child { width: 16%; text-align: left; }
-        td { border: 1px solid #cbd5e1; min-height: 20mm; padding: 4px; vertical-align: top; }
-        .team { font-size: 9px; font-weight: 700; }
-        .team-mark { display: inline-block; width: 5px; min-height: 15mm; margin: -4px 5px -4px -4px; vertical-align: middle; }
-        .reservation { margin-bottom: 3px; border: 1px solid #cbd5e1; border-left-width: 4px; border-radius: 3px; padding: 3px 4px; line-height: 1.25; }
+        td { border: 1px solid #cbd5e1; min-height: {% if total_equipas > 22 %}4.2mm{% elif total_equipas > 15 %}6mm{% else %}20mm{% endif %}; padding: {% if total_equipas > 15 %}1px{% else %}4px{% endif %}; vertical-align: top; }
+        .team { font-size: {% if total_equipas > 22 %}6px{% elif total_equipas > 15 %}7px{% else %}9px{% endif %}; font-weight: 700; }
+        .team-mark { display: inline-block; width: {% if total_equipas > 15 %}3px{% else %}5px{% endif %}; min-height: {% if total_equipas > 22 %}3mm{% elif total_equipas > 15 %}5mm{% else %}15mm{% endif %}; margin: {% if total_equipas > 15 %}-1px 2px -1px -1px{% else %}-4px 5px -4px -4px{% endif %}; vertical-align: middle; }
+        .reservation { margin-bottom: {% if total_equipas > 15 %}1px{% else %}3px{% endif %}; border: 1px solid #cbd5e1; border-left-width: {% if total_equipas > 15 %}2px{% else %}4px{% endif %}; border-radius: 3px; padding: {% if total_equipas > 15 %}1px 2px{% else %}3px 4px{% endif %}; line-height: 1.15; }
         .reservation:last-child { margin-bottom: 0; }
-        .reservation strong { display: block; font-size: 7.5px; }
-        .empty { color: #94a3b8; text-align: center; padding-top: 6mm; }
+        .reservation strong { display: block; font-size: {% if total_equipas > 22 %}5.5px{% elif total_equipas > 15 %}6.5px{% else %}7.5px{% endif %}; }
+        .empty { color: #94a3b8; text-align: center; padding-top: {% if total_equipas > 15 %}1mm{% else %}6mm{% endif %}; }
         .note { margin-top: 7px; color: #64748b; font-size: 7.5px; }
     </style>
     {{ estilo_pdf() }}
