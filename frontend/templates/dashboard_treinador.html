@@ -7,21 +7,6 @@
     <p>O essencial das tuas equipas para hoje.</p></div>
 </div>
 
-<!-- Alertas -->
-{% if alertas %}
-<div class="mb-6 space-y-2">
-    {% for alerta in alertas %}
-    <div class="ds-alert border
-        {% if alerta.urgente %}bg-red-50 border-red-200{% else %}bg-yellow-50 border-yellow-200{% endif %}">
-        <span class="text-xl">{% if alerta.urgente %}🚨{% else %}⚠️{% endif %}</span>
-        <p class="text-sm {% if alerta.urgente %}text-red-700{% else %}text-yellow-700{% endif %}">
-            {{ alerta.mensagem }}
-        </p>
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
-
 {% include "partials/painel_operacional.html" %}
 
 <!-- Equipas -->
