@@ -1129,7 +1129,10 @@ def test_eliminacao_de_mensal_bloqueia_com_dependencias():
         _limpar_planeamento_teste()
 
 
-def test_eliminacao_de_semanal_bloqueia_com_eventos_ou_atribuicoes():
+def test_eliminacao_de_semanal_remove_eventos_e_marcacoes_associadas():
+    from database import SessionLocal
+    from models.planeamento_clube import EventoPlaneamentoClube, PlanoSemanalClube
+
     client = _criar_client()
     _fazer_login(client, "coordenador")
     _limpar_planeamento_teste()
@@ -1158,7 +1161,16 @@ def test_eliminacao_de_semanal_bloqueia_com_eventos_ou_atribuicoes():
         response = client.post(f"/planeamento-clube/semanal/{semanal_id}/eliminar", follow_redirects=False)
 
         assert response.status_code == 303
-        assert "erro=semanal_com_dependencias" in response.headers["location"]
+        assert response.headers["location"] == f"/planeamento-clube/mensal/{mensal_id}"
+
+        db = SessionLocal()
+        try:
+            assert db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first() is None
+            assert db.query(EventoPlaneamentoClube).filter(
+                EventoPlaneamentoClube.plano_semanal_id == semanal_id
+            ).first() is None
+        finally:
+            db.close()
     finally:
         _limpar_planeamento_teste()
 

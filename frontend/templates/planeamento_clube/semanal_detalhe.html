@@ -33,7 +33,7 @@
     <form method="POST" action="/planeamento-clube/semanal/{{ semanal.id }}/eliminar">
         <button type="submit"
                 class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition"
-                onclick="return confirm('Tens a certeza que queres eliminar este plano semanal?')">
+                onclick="return confirm('Eliminar este plano semanal? As marcações de espaços desta semana serão anuladas e os treinadores afetados serão avisados.')">
             Eliminar Plano Semanal
         </button>
     </form>
@@ -238,8 +238,8 @@
                             <form method="POST" action="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/eliminar">
                                 <button type="submit"
                                         class="text-red-500 hover:text-red-600"
-                                        onclick="return confirm('Tens a certeza que queres eliminar esta atribuição?')">
-                                    Eliminar
+                                        onclick="return confirm('Anular esta marcação? O treinador da equipa será avisado se já tiver sido enviada.')">
+                                    Anular
                                 </button>
                             </form>{% endif %}
                         </div>

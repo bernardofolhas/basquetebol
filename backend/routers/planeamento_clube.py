@@ -2132,20 +2132,47 @@ async def editar_plano_semanal(
 
 @router.post("/semanal/{semanal_id}/eliminar")
 async def eliminar_plano_semanal(semanal_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
-
     semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
     if not semanal:
         return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
 
-    tem_eventos = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.plano_semanal_id == semanal_id).first()
-    tem_atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(AtribuicaoEspacoSemanal.plano_semanal_id == semanal_id).first()
-    if tem_eventos or tem_atribuicoes:
-        return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal_id}?erro=semanal_com_dependencias", status_code=303)
+    atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.plano_semanal_id == semanal_id,
+    ).all()
+    eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.plano_semanal_id == semanal_id,
+    ).all()
+    notificacoes_criadas = _notificar_cancelamento_plano_semanal(db, semanal, atribuicoes)
+
+    # Remove eventos e marcações logísticas, mas preserva fichas técnicas manuais.
+    for evento in eventos:
+        _eliminar_evento_com_dependencias(db, evento)
 
     mensal_id = semanal.planeamento_mensal_id
+    registar_historico_planeamento(
+        db,
+        utilizador,
+        "plano_semanal",
+        semanal.id,
+        "eliminado",
+        f"Plano eliminado com {len(atribuicoes)} marcação(ões) anulada(s).",
+    )
+    registar_auditoria(
+        db,
+        utilizador,
+        "eliminar",
+        "plano_semanal",
+        semanal.id,
+        f"{len(atribuicoes)} marcação(ões) anulada(s); {notificacoes_criadas} notificação(ões) enviada(s).",
+        request,
+    )
     db.delete(semanal)
     db.commit()
 
+    set_flash(
+        request,
+        f"Plano semanal eliminado. Foram anuladas {len(atribuicoes)} marcação(ões) e avisados {notificacoes_criadas} treinador(es).",
+    )
     return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal_id}", status_code=303)
 
 
@@ -3050,17 +3077,29 @@ async def editar_atribuicao(
 
 @router.post("/atribuicoes/{atribuicao_id}/eliminar")
 async def eliminar_atribuicao(atribuicao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
-
     atribuicao = db.query(AtribuicaoEspacoSemanal).filter(AtribuicaoEspacoSemanal.id == atribuicao_id).first()
     if not atribuicao:
         return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
 
     semanal_id = atribuicao.plano_semanal_id
-    registar_historico_planeamento(db, utilizador, "plano_semanal", semanal_id, "reserva_eliminada", f"Reserva #{atribuicao.id} eliminada.")
-    registar_auditoria(db, utilizador, "eliminar", "atribuicao_espaco_semanal", atribuicao.id, None, request)
+    notificacoes_criadas = _notificar_cancelamento_atribuicao(db, atribuicao)
+    evento = atribuicao.evento
+    if evento:
+        outras_atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(
+            AtribuicaoEspacoSemanal.evento_id == evento.id,
+            AtribuicaoEspacoSemanal.id != atribuicao.id,
+            AtribuicaoEspacoSemanal.estado != EstadoAtribuicaoEspacoEnum.cancelado,
+        ).first()
+        if outras_atribuicoes:
+            atribuicao.evento_id = None
+        else:
+            _eliminar_evento_com_dependencias(db, evento)
+    registar_historico_planeamento(db, utilizador, "plano_semanal", semanal_id, "reserva_anulada", f"Reserva #{atribuicao.id} anulada.")
+    registar_auditoria(db, utilizador, "anular", "atribuicao_espaco_semanal", atribuicao.id, f"{notificacoes_criadas} notificação(ões) enviada(s).", request)
     db.delete(atribuicao)
     db.commit()
 
+    set_flash(request, f"Marcação anulada. Foram avisados {notificacoes_criadas} treinador(es).")
     return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal_id}", status_code=303)
 
 
@@ -3162,6 +3201,64 @@ def _eliminar_evento_com_dependencias(db: Session, evento: EventoPlaneamentoClub
         if atribuicao.origem == OrigemAtribuicaoEspacoEnum.evento_global:
             atribuicao.origem = OrigemAtribuicaoEspacoEnum.manual
     db.delete(evento)
+
+
+def _notificar_cancelamento_atribuicao(db: Session, atribuicao: AtribuicaoEspacoSemanal) -> int:
+    """Avisa a equipa apenas quando a marcação já lhe tinha sido publicada."""
+    if (
+        atribuicao.estado != EstadoAtribuicaoEspacoEnum.publicado
+        or not atribuicao.equipa
+        or atribuicao.tipo_ocupacao not in {
+            TipoOcupacaoEspacoEnum.treino_equipa,
+            TipoOcupacaoEspacoEnum.treino_individual,
+        }
+    ):
+        return 0
+    return criar_notificacoes_para_equipa(
+        db,
+        atribuicao.equipa,
+        "Treino cancelado",
+        (
+            f"Foi anulada a marcação de treino de {atribuicao.data.strftime('%d/%m/%Y')} "
+            f"das {atribuicao.hora_inicio} às {atribuicao.hora_fim} em {atribuicao.espaco.nome}."
+        ),
+        f"/calendario?equipa_id={atribuicao.equipa_id}",
+    )
+
+
+def _notificar_cancelamento_plano_semanal(
+    db: Session,
+    semanal: PlanoSemanalClube,
+    atribuicoes: list[AtribuicaoEspacoSemanal],
+) -> int:
+    """Agrupa o aviso de eliminação para não inundar cada treinador."""
+    por_equipa: dict[int, list[AtribuicaoEspacoSemanal]] = {}
+    for atribuicao in atribuicoes:
+        if (
+            atribuicao.estado == EstadoAtribuicaoEspacoEnum.publicado
+            and atribuicao.equipa
+            and atribuicao.tipo_ocupacao in {
+                TipoOcupacaoEspacoEnum.treino_equipa,
+                TipoOcupacaoEspacoEnum.treino_individual,
+            }
+        ):
+            por_equipa.setdefault(atribuicao.equipa_id, []).append(atribuicao)
+
+    total = 0
+    for marcacoes in por_equipa.values():
+        equipa = marcacoes[0].equipa
+        quantidade = len(marcacoes)
+        total += criar_notificacoes_para_equipa(
+            db,
+            equipa,
+            "Plano semanal eliminado",
+            (
+                f"O plano semanal \"{semanal.titulo}\" foi eliminado. "
+                f"Foram anulada(s) {quantidade} marcação(ões) de treino da equipa."
+            ),
+            f"/calendario?equipa_id={equipa.id}",
+        )
+    return total
 
 
 @router.post("/eventos/eliminar-selecionados")
