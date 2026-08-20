@@ -5,10 +5,12 @@
 {% block conteudo %}
 <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800">Atribuir espaços de treino</h1>
-        <p class="mt-1 text-gray-500">Distribua os horários disponíveis sem entrar no planeamento mensal ou semanal.</p>
+        <p class="text-xs font-bold uppercase tracking-[0.16em] text-[var(--cor-principal,#2563eb)]">Operação do clube</p>
+        <h1 class="mt-1 text-2xl font-bold text-gray-800">Atribuir espaços de treino</h1>
+        <p class="mt-1 text-gray-500">Clique num slot livre, escolha a equipa e grave todas as alterações no fim.</p>
     </div>
     <div class="flex flex-wrap gap-2">
+        {% if semanal and resumo_slots.rascunhos %}<form method="POST" action="/planeamento-clube/atribuicao-espacos/enviar" onsubmit="return confirm('Enviar {{ resumo_slots.rascunhos }} atribuições aos treinadores? A partir desse momento ficarão visíveis nos calendários das equipas.')"><input type="hidden" name="semana_id" value="{{ semanal.id }}"><button class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2">Enviar aos treinadores ({{ resumo_slots.rascunhos }})</button></form>{% endif %}
         {% if semanal %}<a href="/planeamento-clube/atribuicao-espacos/pdf?semana_id={{ semanal.id }}" target="_blank" class="rounded-lg bg-[var(--cor-principal,#2563eb)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[var(--cor-destaque,#38bdf8)] focus:ring-offset-2">Exportar mapa PDF</a>{% endif %}
         <a href="/planeamento-clube/espacos" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Gerir espaços e horários</a>
     </div>
@@ -17,80 +19,60 @@
 {% if semanais %}
 <form method="GET" class="mb-6 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
     <label for="semana_id" class="mb-1 block text-sm font-semibold text-gray-700">Semana a distribuir</label>
-    <div class="flex flex-wrap gap-3">
-        <select id="semana_id" name="semana_id" class="min-w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm">
-            {% for item in semanais %}
-            <option value="{{ item.id }}" {% if semanal and item.id == semanal.id %}selected{% endif %}>{{ item.titulo }} · {{ item.data_inicio|data_pt }} a {{ item.data_fim|data_pt }}</option>
-            {% endfor %}
-        </select>
-        <button class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Ver slots</button>
-    </div>
+    <div class="flex flex-wrap gap-3"><select id="semana_id" name="semana_id" class="min-w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm">{% for item in semanais %}<option value="{{ item.id }}" {% if semanal and item.id == semanal.id %}selected{% endif %}>{{ item.titulo }} · {{ item.data_inicio|data_pt }} a {{ item.data_fim|data_pt }}</option>{% endfor %}</select><button class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Ver slots</button></div>
 </form>
 
 {% if semanal %}
 <div class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
     <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><p class="text-xs font-semibold uppercase text-emerald-700">Livres</p><p class="mt-1 text-2xl font-bold text-emerald-900">{{ resumo_slots.livres }}</p></div>
-    <div class="rounded-xl border border-blue-100 bg-blue-50 p-4"><p class="text-xs font-semibold uppercase text-blue-700">Atribuídos</p><p class="mt-1 text-2xl font-bold text-blue-900">{{ resumo_slots.ocupados }}</p></div>
+    <div class="rounded-xl border border-blue-100 bg-blue-50 p-4"><p class="text-xs font-semibold uppercase text-blue-700">Atribuídos ou em rascunho</p><p class="mt-1 text-2xl font-bold text-blue-900">{{ resumo_slots.ocupados }}</p></div>
     <div class="rounded-xl border border-amber-100 bg-amber-50 p-4"><p class="text-xs font-semibold uppercase text-amber-700">Bloqueados</p><p class="mt-1 text-2xl font-bold text-amber-900">{{ resumo_slots.bloqueados }}</p></div>
 </div>
 
-<div class="mb-4 flex flex-wrap gap-2 text-xs font-semibold"><span class="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-800 ring-1 ring-emerald-200">Livre</span><span class="rounded-full bg-blue-50 px-3 py-1.5 text-blue-800 ring-1 ring-blue-200">Atribuído</span><span class="rounded-full bg-amber-50 px-3 py-1.5 text-amber-800 ring-1 ring-amber-200">Bloqueado</span><span class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 ring-1 ring-slate-200">Sem horário configurado</span></div>
+<div class="mb-4 flex flex-wrap gap-2 text-xs font-semibold"><span class="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-800 ring-1 ring-emerald-200">Livre: clicar para atribuir</span><span class="rounded-full bg-blue-50 px-3 py-1.5 text-blue-800 ring-1 ring-blue-200">Enviado ao treinador</span><span class="rounded-full bg-violet-50 px-3 py-1.5 text-violet-800 ring-1 ring-violet-200">Rascunho: ainda não enviado</span><span class="rounded-full bg-amber-50 px-3 py-1.5 text-amber-800 ring-1 ring-amber-200">Bloqueado</span></div>
 
 {% if equipas_com_atribuicoes %}
-<section class="mb-6 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-    <h2 class="text-sm font-semibold text-gray-800">Equipas atribuídas</h2>
-    <p class="mt-1 text-sm text-gray-500">Cada equipa mantém esta cor no mapa e no PDF para facilitar a leitura da semana.</p>
-    <div class="mt-3 flex flex-wrap gap-2">
-        {% for equipa in equipas_com_atribuicoes %}{% set cor = cores_equipas.get(equipa.id, cor_equipa_neutra) %}
-        <span class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" style="background-color: {{ cor.fundo }}; border-color: {{ cor.borda }}; color: {{ cor.texto }}"><span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ cor.marca }}"></span>{{ equipa.nome }}</span>
-        {% endfor %}
-    </div>
-</section>
+<section class="mb-6 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"><h2 class="text-sm font-semibold text-gray-800">Cores das equipas</h2><div class="mt-3 flex flex-wrap gap-2">{% for equipa in equipas_com_atribuicoes %}{% set cor = cores_equipas.get(equipa.id, cor_equipa_neutra) %}<span class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" style="background-color: {{ cor.fundo }}; border-color: {{ cor.borda }}; color: {{ cor.texto }}"><span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ cor.marca }}"></span>{{ equipa.nome }}</span>{% endfor %}</div></section>
 {% endif %}
 
 {% if espacos_sem_horario %}
-<section class="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4"><div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="font-semibold text-slate-800">Espaços sem horário nesta semana</h2><p class="mt-1 text-sm text-slate-500">Estes espaços existem no clube, mas ainda não têm slots disponíveis para os dias escolhidos.</p></div><div class="flex flex-wrap gap-2">{% for espaco in espacos_sem_horario %}<a href="/planeamento-clube/espacos/{{ espaco.id }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-blue-400 hover:text-blue-700">{{ espaco.nome }} · Configurar</a>{% endfor %}</div></div></section>
+<section class="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4"><div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="font-semibold text-slate-800">Espaços sem horário nesta semana</h2><p class="mt-1 text-sm text-slate-500">Existem no clube, mas ainda não têm slots disponíveis nos dias escolhidos.</p></div><div class="flex flex-wrap gap-2">{% for espaco in espacos_sem_horario %}<a href="/planeamento-clube/espacos/{{ espaco.id }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-blue-400 hover:text-blue-700">{{ espaco.nome }} · Configurar</a>{% endfor %}</div></div></section>
 {% endif %}
 
-<div class="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm lg:block">
-    <div class="grid min-w-[980px] grid-cols-[7rem_repeat(7,minmax(8rem,1fr))]">
-        <div class="border-b border-r border-gray-200 bg-slate-800 px-3 py-3 text-xs font-bold uppercase tracking-wide text-white">Hora</div>
-        {% for dia in grelha_slots.dias %}<div class="border-b border-r border-slate-700 bg-slate-800 px-3 py-3 text-center text-xs font-bold text-white"><span class="block">{{ dia.nome }}</span><span class="mt-1 block font-normal text-slate-300">{{ dia.data|data_pt }}</span></div>{% endfor %}
-        {% for horario in horarios_slots %}
-        <div class="border-b border-r border-gray-200 bg-slate-50 px-3 py-4 text-sm font-semibold text-slate-700">{{ horario[0] }}–{{ horario[1] }}</div>
-        {% for dia in grelha_slots.dias %}
-        {% set chave = (dia.data|data_iso) ~ '|' ~ horario[0] ~ '|' ~ horario[1] %}{% set slots_celula = slots_por_chave.get(chave, []) %}
-        <div class="min-h-28 border-b border-r border-gray-200 p-2">
-            {% if slots_celula %}
-                <div class="space-y-2">{% for slot in slots_celula %}
-                    {% if slot.bloqueio %}<div class="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"><strong>{{ slot.espaco.nome }}</strong><br><span class="mt-1 block">Bloqueado</span></div>
-                    {% elif slot.atribuicao %}{% set cor = cores_equipas.get(slot.atribuicao.equipa_id, cor_equipa_neutra) %}<a href="/planeamento-clube/atribuicoes/{{ slot.atribuicao.id }}" class="block rounded-lg border p-2 text-xs hover:brightness-95" style="background-color: {{ cor.fundo }}; border-color: {{ cor.borda }}; color: {{ cor.texto }}"><strong>{{ slot.espaco.nome }}</strong><span class="mt-1 flex items-center gap-1 font-semibold"><span class="h-2 w-2 rounded-full" style="background-color: {{ cor.marca }}"></span>{{ slot.atribuicao.equipa.nome if slot.atribuicao.equipa else 'Reservado' }}</span>{% if slot.fora_disponibilidade|default(false) %}<span class="mt-1 block text-[10px]">Horário excecional</span>{% endif %}</a>
-                    {% else %}<a href="/planeamento-clube/semanal/{{ semanal.id }}/atribuicoes/nova?espaco_id={{ slot.espaco.id }}&data_atribuicao={{ dia.data|data_iso }}&hora_inicio={{ slot.hora_inicio }}&hora_fim={{ slot.hora_fim }}" class="block rounded-lg border border-dashed border-emerald-300 bg-emerald-50 p-2 text-xs text-emerald-900 hover:border-emerald-500 hover:bg-emerald-100"><strong>{{ slot.espaco.nome }}</strong><span class="mt-1 block font-semibold text-emerald-700">+ Atribuir</span></a>{% endif %}
-                {% endfor %}</div>
-            {% else %}<span class="block px-2 py-3 text-center text-xs text-slate-300">—</span>{% endif %}
-        </div>
-        {% endfor %}
-        {% endfor %}
-    </div>
+{% macro cartao_slot(slot, data_slot) -%}
+{% set cor_equipa = cores_equipas.get(slot.atribuicao.equipa_id, cor_equipa_neutra) if slot.atribuicao else cor_equipa_neutra %}
+{% set cor_espaco = cores_espacos.get(slot.espaco.id, cor_equipa_neutra) %}
+{% set chave = (data_slot|data_iso) ~ '|' ~ slot.espaco.id ~ '|' ~ slot.hora_inicio ~ '|' ~ slot.hora_fim %}
+<div class="slot-card rounded-lg border p-2 text-xs" data-slot-key="{{ chave }}" data-espaco-id="{{ slot.espaco.id }}" data-espaco-nome="{{ slot.espaco.nome }}" data-data="{{ data_slot|data_iso }}" data-inicio="{{ slot.hora_inicio }}" data-fim="{{ slot.hora_fim }}" {% if slot.atribuicao %}data-atribuicao-id="{{ slot.atribuicao.id }}" data-estado="{{ slot.atribuicao.estado.value if slot.atribuicao.estado.value is defined else slot.atribuicao.estado }}"{% endif %} style="{% if slot.atribuicao %}background-color: {{ cor_equipa.fundo }}; border-color: {{ cor_equipa.borda }}; color: {{ cor_equipa.texto }}{% elif slot.bloqueio %}background-color: #fffbeb; border-color: #fde68a; color: #92400e{% else %}background-color: {{ cor_espaco.fundo }}; border-color: {{ cor_espaco.borda }}; color: {{ cor_espaco.texto }}{% endif %}; border-left: 4px solid {{ cor_espaco.marca }}">
+    <strong class="block">{{ slot.espaco.nome }}</strong>
+    {% if slot.bloqueio %}<span class="mt-1 block font-semibold">Bloqueado</span>
+    {% elif slot.atribuicao %}
+        <span class="mt-1 flex items-center gap-1 font-semibold"><span class="h-2 w-2 rounded-full" style="background-color: {{ cor_equipa.marca }}"></span>{{ slot.atribuicao.equipa.nome if slot.atribuicao.equipa else 'Reservado' }}</span>
+        {% if (slot.atribuicao.estado.value if slot.atribuicao.estado.value is defined else slot.atribuicao.estado) == 'rascunho' %}<span class="mt-1 inline-flex rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800">Rascunho</span><button type="button" data-action="remove" class="ml-1 mt-1 font-semibold text-violet-800 underline hover:text-violet-950">Remover</button>{% else %}<span class="mt-1 inline-flex rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">Enviado</span>{% endif %}
+    {% else %}<button type="button" data-action="assign" class="mt-1 font-semibold underline underline-offset-2 hover:brightness-75">+ Atribuir equipa</button>{% endif %}
 </div>
+{%- endmacro %}
 
-<div class="grid grid-cols-1 gap-5 lg:hidden">
-    {% for dia in grelha_slots.dias %}
-    <section class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h2 class="font-semibold text-gray-800">{{ dia.nome }} <span class="font-normal text-gray-500">· {{ dia.data|data_pt }}</span></h2>
-        <div class="mt-4 space-y-3">
-            {% for slot in dia.slots %}
-            {% set cor = cores_equipas.get(slot.atribuicao.equipa_id, cor_equipa_neutra) if slot.atribuicao else cor_equipa_neutra %}<div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-3 {% if slot.bloqueio %}border-amber-200 bg-amber-50{% elif slot.atribuicao %}{% else %}border-emerald-200 bg-emerald-50{% endif %}" {% if slot.atribuicao %}style="background-color: {{ cor.fundo }}; border-color: {{ cor.borda }}"{% endif %}>
-                <div class="text-sm text-gray-800"><strong>{{ slot.espaco.nome }}</strong><br><span class="text-gray-600">{{ slot.hora_inicio }}–{{ slot.hora_fim }}</span></div>
-                {% if slot.bloqueio %}<span class="text-sm font-medium text-amber-800">Bloqueado</span>
-                {% elif slot.atribuicao %}<a href="/planeamento-clube/atribuicoes/{{ slot.atribuicao.id }}" class="inline-flex items-center gap-1 text-sm font-semibold hover:underline" style="color: {{ cor.texto }}"><span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ cor.marca }}"></span>{{ slot.atribuicao.equipa.nome if slot.atribuicao.equipa else 'Reservado' }}</a>
-                {% else %}<a href="/planeamento-clube/semanal/{{ semanal.id }}/atribuicoes/nova?espaco_id={{ slot.espaco.id }}&data_atribuicao={{ dia.data|data_iso }}&hora_inicio={{ slot.hora_inicio }}&hora_fim={{ slot.hora_fim }}" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Atribuir slot</a>{% endif %}
-            </div>
-            {% else %}<p class="text-sm text-gray-400">Não há slots configurados para este dia.</p>{% endfor %}
-        </div>
-    </section>
-    {% endfor %}
-</div>
+<div class="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm lg:block"><div class="grid min-w-[980px] grid-cols-[7rem_repeat(7,minmax(8rem,1fr))]"><div class="border-b border-r border-gray-200 bg-slate-800 px-3 py-3 text-xs font-bold uppercase tracking-wide text-white">Hora</div>{% for dia in grelha_slots.dias %}<div class="border-b border-r border-slate-700 bg-slate-800 px-3 py-3 text-center text-xs font-bold text-white"><span class="block">{{ dia.nome }}</span><span class="mt-1 block font-normal text-slate-300">{{ dia.data|data_pt }}</span></div>{% endfor %}{% for horario in horarios_slots %}<div class="border-b border-r border-gray-200 bg-slate-50 px-3 py-4 text-sm font-semibold text-slate-700">{{ horario[0] }}–{{ horario[1] }}</div>{% for dia in grelha_slots.dias %}{% set chave = (dia.data|data_iso) ~ '|' ~ horario[0] ~ '|' ~ horario[1] %}{% set slots_celula = slots_por_chave.get(chave, []) %}<div class="min-h-28 border-b border-r border-gray-200 p-2">{% if slots_celula %}<div class="space-y-2">{% for slot in slots_celula %}{{ cartao_slot(slot, dia.data) }}{% endfor %}</div>{% else %}<span class="block px-2 py-3 text-center text-xs text-slate-300">—</span>{% endif %}</div>{% endfor %}{% endfor %}</div></div>
+
+<div class="grid grid-cols-1 gap-5 lg:hidden">{% for dia in grelha_slots.dias %}<section class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm"><h2 class="font-semibold text-gray-800">{{ dia.nome }} <span class="font-normal text-gray-500">· {{ dia.data|data_pt }}</span></h2><div class="mt-4 space-y-3">{% for slot in dia.slots %}<div class="flex flex-wrap items-center justify-between gap-3"><div class="text-sm text-gray-600">{{ slot.hora_inicio }}–{{ slot.hora_fim }}</div>{{ cartao_slot(slot, dia.data) }}</div>{% else %}<p class="text-sm text-gray-400">Não há slots configurados para este dia.</p>{% endfor %}</div></section>{% endfor %}</div>
+
+<dialog id="atribuir-slot-dialog" class="w-[min(28rem,calc(100%-2rem))] rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-900/40"><form method="dialog" class="p-5"><div class="flex items-start justify-between gap-4"><div><h2 class="text-lg font-bold text-slate-900">Atribuir equipa</h2><p id="slot-resumo" class="mt-1 text-sm text-slate-500"></p></div><button aria-label="Fechar" class="rounded-lg px-2 py-1 text-xl text-slate-500 hover:bg-slate-100">×</button></div><label for="equipa-slot" class="mt-5 block text-sm font-semibold text-slate-700">Equipa</label><select id="equipa-slot" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" required><option value="">Selecionar equipa</option>{% for equipa in equipas %}<option value="{{ equipa.id }}" data-nome="{{ equipa.nome }}">{{ equipa.nome }}</option>{% endfor %}</select><p class="mt-3 text-xs text-slate-500">A atribuição fica em rascunho até usar “Gravar alterações”. Só será enviada aos treinadores numa publicação posterior.</p><div class="mt-5 flex justify-end gap-2"><button value="cancel" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button><button id="adicionar-slot" value="default" class="rounded-lg bg-[var(--cor-principal,#2563eb)] px-4 py-2 text-sm font-semibold text-white hover:brightness-95">Adicionar à lista</button></div></form></dialog>
+
+<div id="alteracoes-pendentes" class="fixed inset-x-3 bottom-3 z-30 hidden rounded-xl border border-slate-200 bg-white p-3 shadow-xl sm:inset-x-auto sm:right-6 sm:w-[32rem]"><div class="flex flex-wrap items-center justify-between gap-3"><p id="texto-pendentes" class="text-sm font-medium text-slate-700"></p><div class="flex gap-2"><button type="button" id="descartar-alteracoes" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Descartar</button><button type="button" id="gravar-alteracoes" class="rounded-lg bg-[var(--cor-principal,#2563eb)] px-4 py-2 text-sm font-semibold text-white hover:brightness-95">Gravar alterações</button></div></div><p id="erro-alteracoes" class="mt-2 hidden text-sm font-medium text-rose-700"></p></div>
+
+<script>
+(() => {
+ const dialog=document.getElementById('atribuir-slot-dialog'), selectEquipa=document.getElementById('equipa-slot'), resumo=document.getElementById('slot-resumo'), pendentes=document.getElementById('alteracoes-pendentes'), textoPendentes=document.getElementById('texto-pendentes'), erro=document.getElementById('erro-alteracoes'), criacoes=new Map(), remocoes=new Set(); let slotAtual=null;
+ const dadosSlot=(elemento)=>({chave:elemento.dataset.slotKey,espaco_id:elemento.dataset.espacoId,espaco_nome:elemento.dataset.espacoNome,data:elemento.dataset.data,hora_inicio:elemento.dataset.inicio,hora_fim:elemento.dataset.fim});
+ function atualizarBarra(){const total=criacoes.size+remocoes.size;pendentes.classList.toggle('hidden',total===0);textoPendentes.textContent=`${total} alteração${total===1?'':'ões'} por gravar`;erro.classList.add('hidden');}
+ function renderizarPendente(dados,nome){document.querySelectorAll('.slot-card').forEach((cartao)=>{if(cartao.dataset.slotKey!==dados.chave)return;cartao.dataset.pending='true';cartao.innerHTML='';const espaco=document.createElement('strong');espaco.textContent=dados.espaco_nome;const equipa=document.createElement('span');equipa.className='mt-1 block font-semibold';equipa.textContent=nome;const estado=document.createElement('span');estado.className='mt-1 inline-flex rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800';estado.textContent='Por gravar';const remover=document.createElement('button');remover.type='button';remover.dataset.action='discard-pending';remover.className='ml-1 mt-1 font-semibold text-violet-800 underline';remover.textContent='Remover';cartao.append(espaco,equipa,estado,remover);});}
+ document.addEventListener('click',(event)=>{const botao=event.target.closest('[data-action]');if(!botao)return;if(botao.dataset.action==='assign'){slotAtual=dadosSlot(botao.closest('.slot-card'));selectEquipa.value='';resumo.textContent=`${slotAtual.espaco_nome} · ${slotAtual.data.split('-').reverse().join('/')} · ${slotAtual.hora_inicio}–${slotAtual.hora_fim}`;dialog.showModal();}if(botao.dataset.action==='remove'){const cartao=botao.closest('.slot-card');remocoes.add(cartao.dataset.atribuicaoId);cartao.classList.add('opacity-40');atualizarBarra();}if(botao.dataset.action==='discard-pending'){criacoes.delete(botao.closest('.slot-card').dataset.slotKey);window.location.reload();}});
+ document.getElementById('adicionar-slot').addEventListener('click',(event)=>{event.preventDefault();if(!slotAtual||!selectEquipa.value){selectEquipa.focus();return;}const nome=selectEquipa.options[selectEquipa.selectedIndex].dataset.nome;criacoes.set(slotAtual.chave,{...slotAtual,equipa_id:selectEquipa.value,equipa_nome:nome});renderizarPendente(slotAtual,nome);atualizarBarra();dialog.close();});
+ document.getElementById('descartar-alteracoes').addEventListener('click',()=>window.location.reload());
+ document.getElementById('gravar-alteracoes').addEventListener('click',async(event)=>{const botao=event.currentTarget;botao.disabled=true;botao.textContent='A gravar…';try{const csrf=document.querySelector('meta[name="csrf-token"]')?.content||'';const resposta=await fetch('/planeamento-clube/atribuicao-espacos/gravar',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({semana_id:{{ semanal.id }},criacoes:[...criacoes.values()],remover_ids:[...remocoes]})});const dados=await resposta.json();if(!resposta.ok||!dados.sucesso)throw new Error(dados.erro||'Não foi possível gravar as alterações.');window.location.reload();}catch(excecao){erro.textContent=excecao.message;erro.classList.remove('hidden');botao.disabled=false;botao.textContent='Gravar alterações';}});
+})();
+</script>
 {% endif %}
 {% else %}
 <div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center"><h2 class="font-semibold text-gray-800">Ainda não existe uma semana operacional</h2><p class="mt-2 text-sm text-gray-500">Crie uma semana para distribuir os horários dos espaços às equipas.</p><a href="/planeamento-clube/semanal/novo" class="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Criar plano semanal</a></div>

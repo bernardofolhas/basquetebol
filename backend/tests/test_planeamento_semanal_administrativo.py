@@ -29,6 +29,7 @@ from services.planeamento_semanal_administrativo_service import (
     validar_reserva,
 )
 from services.atribuicao_espaco_agenda_service import sincronizar_atribuicao_com_agenda
+from services.atribuicao_espaco_visual_service import cor_espaco
 from models.planeamento_clube import EventoPlaneamentoClube
 from horarios import normalizar_hora
 
@@ -219,6 +220,33 @@ def test_reserva_publicada_cria_previsao_na_agenda_sem_criar_sessao_tecnica():
         repor_clube_atual(token)
 
 
+def test_rascunho_nao_aparece_na_agenda_antes_do_envio():
+    db, token, espaco, equipa, treinador, semanal = _contexto()
+    try:
+        atribuicao = AtribuicaoEspacoSemanal(
+            clube_id=1, plano_semanal_id=semanal.id, espaco_id=espaco.id,
+            equipa_id=equipa.id, treinador_id=treinador.id, data=date(2026, 8, 3),
+            hora_inicio="18:00", hora_fim="19:30", tipo_ocupacao=TipoOcupacaoEspacoEnum.treino_equipa,
+            estado=EstadoAtribuicaoEspacoEnum.rascunho,
+        )
+        db.add(atribuicao)
+        db.flush()
+
+        mensagem = sincronizar_atribuicao_com_agenda(db, atribuicao)
+
+        assert "sem criar previsão" in mensagem
+        assert db.query(EventoPlaneamentoClube).count() == 0
+        assert db.query(SessaoTreino).count() == 0
+    finally:
+        db.close()
+        repor_clube_atual(token)
+
+
 def test_horas_escritas_com_h_sao_normalizadas_para_slots():
     assert normalizar_hora("18h30") == "18:30"
     assert normalizar_hora("20H00") == "20:00"
+
+
+def test_cada_espaco_recebe_uma_cor_estavel_no_mapa():
+    assert cor_espaco(1) == cor_espaco(1)
+    assert cor_espaco(1) != cor_espaco(2)

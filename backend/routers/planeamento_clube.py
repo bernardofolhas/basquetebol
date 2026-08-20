@@ -3,7 +3,7 @@ import re
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -48,6 +48,7 @@ from services.planeamento_semanal_administrativo_service import gerar_grelha_slo
 from services.atribuicao_espaco_agenda_service import sincronizar_atribuicao_com_agenda
 from services.atribuicao_espaco_visual_service import (
     COR_NEUTRA,
+    construir_cores_espacos,
     construir_cores_equipas,
     construir_quadro_atribuicoes,
 )
@@ -2211,6 +2212,7 @@ def painel_atribuicao_espacos(
     ]
     equipas = db.query(Equipa).order_by(Equipa.nome.asc()).all()
     cores_equipas = construir_cores_equipas(equipas)
+    cores_espacos = construir_cores_espacos(grelha_slots["espacos"] if grelha_slots else [])
     equipas_com_atribuicoes = [
         equipa for equipa in equipas
         if any(slot["atribuicao"] and slot["atribuicao"].equipa_id == equipa.id for slot in slots)
@@ -2223,15 +2225,209 @@ def painel_atribuicao_espacos(
         "horarios_slots": horarios_slots,
         "slots_por_chave": slots_por_chave,
         "espacos_sem_horario": espacos_sem_horario,
+        "equipas": equipas,
         "cores_equipas": cores_equipas,
+        "cores_espacos": cores_espacos,
         "cor_equipa_neutra": COR_NEUTRA,
         "equipas_com_atribuicoes": equipas_com_atribuicoes,
         "resumo_slots": {
             "livres": sum(1 for slot in slots if not slot["atribuicao"] and not slot["bloqueio"]),
             "ocupados": sum(1 for slot in slots if slot["atribuicao"]),
             "bloqueados": sum(1 for slot in slots if slot["bloqueio"]),
+            "rascunhos": sum(
+                1 for slot in slots
+                if slot["atribuicao"] and slot["atribuicao"].estado == EstadoAtribuicaoEspacoEnum.rascunho
+            ),
         },
     })
+
+
+@router.post("/atribuicao-espacos/gravar")
+async def gravar_atribuicoes_rapidas(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+):
+    """Guarda as escolhas feitas directamente no mapa, sempre como rascunho."""
+    try:
+        dados = await request.json()
+    except ValueError:
+        return JSONResponse({"sucesso": False, "erro": "Os dados enviados não são válidos."}, status_code=400)
+
+    try:
+        semanal_id = int(dados.get("semana_id"))
+    except (TypeError, ValueError):
+        return JSONResponse({"sucesso": False, "erro": "A semana seleccionada não é válida."}, status_code=422)
+
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semanal_id).first()
+    if not semanal:
+        return JSONResponse({"sucesso": False, "erro": "O plano semanal já não existe."}, status_code=404)
+
+    criacoes = dados.get("criacoes", [])
+    remover_ids = dados.get("remover_ids", [])
+    if not isinstance(criacoes, list) or not isinstance(remover_ids, list):
+        return JSONResponse({"sucesso": False, "erro": "As alterações enviadas não são válidas."}, status_code=422)
+    if len(criacoes) + len(remover_ids) > 80:
+        return JSONResponse({"sucesso": False, "erro": "Guarda até 80 alterações de cada vez."}, status_code=422)
+
+    try:
+        ids_remover = {int(item) for item in remover_ids}
+    except (TypeError, ValueError):
+        return JSONResponse({"sucesso": False, "erro": "Uma atribuição a remover não é válida."}, status_code=422)
+
+    rascunhos_a_remover = []
+    if ids_remover:
+        rascunhos_a_remover = db.query(AtribuicaoEspacoSemanal).filter(
+            AtribuicaoEspacoSemanal.id.in_(ids_remover),
+            AtribuicaoEspacoSemanal.plano_semanal_id == semanal.id,
+            AtribuicaoEspacoSemanal.estado == EstadoAtribuicaoEspacoEnum.rascunho,
+        ).all()
+        if len(rascunhos_a_remover) != len(ids_remover):
+            return JSONResponse({
+                "sucesso": False,
+                "erro": "Só é possível remover do mapa as atribuições ainda não enviadas.",
+            }, status_code=422)
+
+    try:
+        for atribuicao in rascunhos_a_remover:
+            db.delete(atribuicao)
+        db.flush()
+
+        criadas = []
+        for indice, item in enumerate(criacoes, start=1):
+            if not isinstance(item, dict):
+                raise ValueError(f"A atribuição {indice} não é válida.")
+            espaco_id = _converter_id(str(item.get("espaco_id", "")), "Espaço", obrigatorio=True)
+            equipa_id = _converter_id(str(item.get("equipa_id", "")), "Equipa", obrigatorio=True)
+            data_atribuicao = str(item.get("data", ""))
+            hora_inicio = normalizar_hora(str(item.get("hora_inicio", "")), permitir_vazio=False)
+            hora_fim = normalizar_hora(str(item.get("hora_fim", "")), permitir_vazio=False)
+            erro = _validar_dados_atribuicao(semanal, data_atribuicao, hora_inicio, hora_fim)
+            if erro:
+                raise ValueError(f"A atribuição {indice}: {erro}")
+
+            espaco = db.query(EspacoTreino).filter(EspacoTreino.id == espaco_id).first()
+            equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+            if not espaco or not equipa:
+                raise ValueError(f"A atribuição {indice} refere um espaço ou equipa que já não existe.")
+            if getattr(espaco, "clube_id", semanal.clube_id) != semanal.clube_id or getattr(equipa, "clube_id", semanal.clube_id) != semanal.clube_id:
+                raise ValueError(f"A atribuição {indice} tem de usar dados do mesmo clube.")
+
+            data_convertida = _converter_data(data_atribuicao, "Data da atribuição")
+            conflitos = validar_reserva(
+                db,
+                espaco_id=espaco_id,
+                equipa_id=equipa_id,
+                treinador_id=None,
+                data_slot=data_convertida,
+                hora_inicio=hora_inicio,
+                hora_fim=hora_fim,
+            )
+            if conflitos:
+                raise ValueError(f"A atribuição {indice}: {' '.join(conflitos)}")
+
+            atribuicao = _criar_atribuicao(
+                semanal.id,
+                str(espaco_id),
+                str(equipa_id),
+                "",
+                "",
+                data_atribuicao,
+                hora_inicio,
+                hora_fim,
+                TipoOcupacaoEspacoEnum.treino_equipa.value,
+                EstadoAtribuicaoEspacoEnum.rascunho.value,
+                OrigemAtribuicaoEspacoEnum.manual.value,
+                "",
+            )
+            atribuicao.clube_id = semanal.clube_id
+            db.add(atribuicao)
+            db.flush()
+            criadas.append(atribuicao)
+    except ValueError as erro:
+        db.rollback()
+        return JSONResponse({"sucesso": False, "erro": str(erro)}, status_code=422)
+
+    if criadas or rascunhos_a_remover:
+        registar_historico_planeamento(
+            db,
+            utilizador,
+            "plano_semanal",
+            semanal.id,
+            "atribuicoes_atualizadas",
+            f"Mapa actualizado: {len(criadas)} atribuições criadas e {len(rascunhos_a_remover)} removidas.",
+        )
+        registar_auditoria(
+            db,
+            utilizador,
+            "atualizar",
+            "atribuicoes_espaco_semanais",
+            semanal.id,
+            f"{len(criadas)} rascunhos criados; {len(rascunhos_a_remover)} removidos.",
+            request,
+        )
+    db.commit()
+    return JSONResponse({
+        "sucesso": True,
+        "mensagem": f"Foram guardadas {len(criadas)} atribuições em rascunho.",
+        "criadas": len(criadas),
+        "removidas": len(rascunhos_a_remover),
+    })
+
+
+@router.post("/atribuicao-espacos/enviar")
+async def enviar_atribuicoes_aos_treinadores(
+    request: Request,
+    semana_id: int = Form(...),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+):
+    """Publica rascunhos de espaços e só então cria as previsões nas agendas."""
+    semanal = db.query(PlanoSemanalClube).filter(PlanoSemanalClube.id == semana_id).first()
+    if not semanal:
+        return RedirectResponse(url="/planeamento-clube/atribuicao-espacos", status_code=303)
+
+    conflitos = _obter_conflitos_publicacao(db, semanal)
+    if conflitos:
+        set_flash(request, f"Não é possível enviar: existem {len(conflitos)} conflito(s) de espaço.", "error")
+        return RedirectResponse(url=f"/planeamento-clube/atribuicao-espacos?semana_id={semana_id}", status_code=303)
+
+    rascunhos = db.query(AtribuicaoEspacoSemanal).filter(
+        AtribuicaoEspacoSemanal.plano_semanal_id == semanal.id,
+        AtribuicaoEspacoSemanal.estado == EstadoAtribuicaoEspacoEnum.rascunho,
+    ).order_by(AtribuicaoEspacoSemanal.data, AtribuicaoEspacoSemanal.hora_inicio).all()
+    if not rascunhos:
+        set_flash(request, "Não existem atribuições por enviar nesta semana.", "info")
+        return RedirectResponse(url=f"/planeamento-clube/atribuicao-espacos?semana_id={semana_id}", status_code=303)
+
+    mensagens = []
+    for atribuicao in rascunhos:
+        atribuicao.estado = EstadoAtribuicaoEspacoEnum.publicado
+        mensagens.append(sincronizar_atribuicao_com_agenda(db, atribuicao))
+    registar_historico_planeamento(
+        db,
+        utilizador,
+        "plano_semanal",
+        semanal.id,
+        "atribuicoes_enviadas",
+        f"Foram enviadas {len(rascunhos)} atribuições aos treinadores.",
+    )
+    registar_auditoria(
+        db,
+        utilizador,
+        "publicar",
+        "atribuicoes_espaco_semanais",
+        semanal.id,
+        f"{len(rascunhos)} atribuições enviadas aos treinadores.",
+        request,
+    )
+    db.commit()
+    atualizadas = sum("treino técnico coincidente" in mensagem for mensagem in mensagens)
+    set_flash(
+        request,
+        f"Foram enviadas {len(rascunhos)} atribuições. {atualizadas} treino(s) técnico(s) receberam o local automaticamente.",
+    )
+    return RedirectResponse(url=f"/planeamento-clube/atribuicao-espacos?semana_id={semana_id}", status_code=303)
 
 
 @router.get("/atribuicao-espacos/pdf")

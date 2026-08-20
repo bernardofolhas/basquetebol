@@ -31,6 +31,18 @@ def construir_cores_equipas(equipas) -> dict[int, dict[str, str]]:
     return {equipa.id: cor_equipa(equipa.id) for equipa in equipas}
 
 
+def cor_espaco(espaco_id: int | None) -> dict[str, str]:
+    """Devolve uma cor estável para identificar rapidamente cada espaço no mapa."""
+    if not espaco_id:
+        return COR_NEUTRA
+    indice = (int(espaco_id) * 5 + 1) % len(PALETA_EQUIPAS)
+    return PALETA_EQUIPAS[indice]
+
+
+def construir_cores_espacos(espacos) -> dict[int, dict[str, str]]:
+    return {espaco.id: cor_espaco(espaco.id) for espaco in espacos}
+
+
 def construir_quadro_atribuicoes(semanal, equipas, atribuicoes) -> dict:
     """Organiza reservas numa matriz fixa: uma linha por equipa e um dia por coluna."""
     total_dias = (semanal.data_fim - semanal.data_inicio).days + 1
