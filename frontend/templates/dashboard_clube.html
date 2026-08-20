@@ -2,48 +2,48 @@
 {% block titulo %}Dashboard do Clube{% endblock %}
 {% block conteudo %}
 
-<div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+<div class="ds-page-header">
     <div>
         <h1 class="text-2xl font-bold text-gray-800">Dashboard do Clube</h1>
         <p class="text-gray-500 mt-1">Leitura operacional da semana {{ periodo.label }}</p>
     </div>
-    <div class="ds-team-actions flex flex-wrap gap-2">
-        <a href="/dashboard/clube/espacos" class="bg-white border border-gray-300 hover:border-orange-400 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+    <div class="ds-action-bar ds-team-actions">
+        <a href="/dashboard/clube/espacos" class="ds-button ds-button-secondary">
             Espaços
         </a>
-        <a href="/dashboard/clube/carga" class="bg-white border border-gray-300 hover:border-orange-400 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+        <a href="/dashboard/clube/carga" class="ds-button ds-button-secondary">
             Carga de Treino
         </a>
-        <a href="/dashboard/clube/executado" class="bg-white border border-gray-300 hover:border-orange-400 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+        <a href="/dashboard/clube/executado" class="ds-button ds-button-secondary">
             Planeado vs Estado
         </a>
-        <a href="/dashboard/clube/sincronizacao" class="bg-white border border-gray-300 hover:border-orange-400 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+        <a href="/dashboard/clube/sincronizacao" class="ds-button ds-button-secondary">
             Sincronização
         </a>
     </div>
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <p class="text-sm text-gray-500">Equipas</p>
-        <p class="text-3xl font-bold text-gray-800 mt-2">{{ kpis.total_equipas }}</p>
+    <div class="ds-panel ds-kpi">
+        <p class="ds-kpi-label">Equipas</p>
+        <p class="ds-kpi-value">{{ kpis.total_equipas }}</p>
     </div>
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <p class="text-sm text-gray-500">Jogadores</p>
-        <p class="text-3xl font-bold text-gray-800 mt-2">{{ kpis.total_jogadores }}</p>
+    <div class="ds-panel ds-kpi">
+        <p class="ds-kpi-label">Jogadores</p>
+        <p class="ds-kpi-value">{{ kpis.total_jogadores }}</p>
     </div>
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <p class="text-sm text-gray-500">Sessões na Semana</p>
-        <p class="text-3xl font-bold text-gray-800 mt-2">{{ kpis.total_sessoes_semana }}</p>
+    <div class="ds-panel ds-kpi">
+        <p class="ds-kpi-label">Sessões na semana</p>
+        <p class="ds-kpi-value">{{ kpis.total_sessoes_semana }}</p>
     </div>
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <p class="text-sm text-gray-500">Jogos na Semana</p>
-        <p class="text-3xl font-bold text-gray-800 mt-2">{{ kpis.total_jogos_semana }}</p>
+    <div class="ds-panel ds-kpi">
+        <p class="ds-kpi-label">Jogos na semana</p>
+        <p class="ds-kpi-value">{{ kpis.total_jogos_semana }}</p>
     </div>
 </div>
 
 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="ds-panel p-5 sm:p-6">
         <div class="flex items-center justify-between mb-3">
             <h2 class="font-semibold text-gray-700">Estado Operacional</h2>
             {% if estado_plano.plano %}
@@ -65,7 +65,7 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="ds-panel p-5 sm:p-6">
         <h2 class="font-semibold text-gray-700 mb-4">Alertas Operacionais</h2>
         <div class="space-y-3">
             {% for alerta in alertas_operacionais %}
@@ -78,22 +78,22 @@
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-    <a href="/dashboard/clube/espacos" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition block">
+    <a href="/dashboard/clube/espacos" class="ds-panel ds-list-row block p-5">
         <p class="text-sm text-gray-500">Ocupação de Espaços</p>
         <p class="text-2xl font-bold text-gray-800 mt-2">{{ resumo_espacos.total_atribuicoes }}</p>
         <p class="text-sm text-gray-500 mt-2">{{ resumo_espacos.total_conflitos }} conflito(s) detetado(s)</p>
     </a>
-    <a href="/dashboard/clube/carga" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition block">
+    <a href="/dashboard/clube/carga" class="ds-panel ds-list-row block p-5">
         <p class="text-sm text-gray-500">Carga de Treino</p>
         <p class="text-2xl font-bold text-gray-800 mt-2">{{ resumo_carga.total_sessoes }}</p>
         <p class="text-sm text-gray-500 mt-2">Volume semanal: {{ resumo_carga.volume_total }} min</p>
     </a>
-    <a href="/dashboard/clube/executado" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition block">
+    <a href="/dashboard/clube/executado" class="ds-panel ds-list-row block p-5">
         <p class="text-sm text-gray-500">Planeado vs Estado</p>
         <p class="text-2xl font-bold text-gray-800 mt-2">{{ resumo_execucao.planeadas }}</p>
         <p class="text-sm text-gray-500 mt-2">{{ resumo_execucao.desativadas }} sessão(ões) desativada(s)</p>
     </a>
-    <a href="/dashboard/clube/sincronizacao" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition block">
+    <a href="/dashboard/clube/sincronizacao" class="ds-panel ds-list-row block p-5">
         <p class="text-sm text-gray-500">Sincronização</p>
         <p class="text-2xl font-bold text-gray-800 mt-2">{{ resumo_sincronizacao.sincronizadas }}</p>
         <p class="text-sm text-gray-500 mt-2">{{ resumo_sincronizacao.desatualizadas }} desatualizada(s)</p>

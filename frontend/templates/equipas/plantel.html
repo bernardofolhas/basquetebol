@@ -11,7 +11,7 @@
 <form id="plantel-massa" method="POST" action="/jogadores/eliminar-selecionados">
   <input type="hidden" name="equipa_id" value="{{ equipa.id }}">
   {% if pode_eliminar %}
-  <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+  <div class="ds-panel ds-action-bar mb-3 justify-between px-4 py-3 text-sm">
     <label class="flex items-center gap-2 font-medium text-slate-700">
       <input id="selecionar-plantel" type="checkbox" class="h-4 w-4 rounded border-slate-300" aria-label="Selecionar todo o plantel">
       Selecionar todos
@@ -30,7 +30,7 @@
     </div>
     <div class="divide-y divide-slate-100">
       {% for jogador in equipa.jogadores|sort(attribute='nome') %}
-      <article class="grid {% if pode_eliminar %}grid-cols-[auto_minmax(0,1fr)_auto] md:grid-cols-[2.2rem_minmax(15rem,2fr)_minmax(10rem,1fr)_8rem_7rem_9rem]{% else %}grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(15rem,2fr)_minmax(10rem,1fr)_8rem_7rem_9rem]{% endif %} items-center gap-3 px-4 py-3 hover:bg-slate-50">
+      <article class="ds-list-row grid {% if pode_eliminar %}grid-cols-[auto_minmax(0,1fr)_auto] md:grid-cols-[2.2rem_minmax(15rem,2fr)_minmax(10rem,1fr)_8rem_7rem_9rem]{% else %}grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(15rem,2fr)_minmax(10rem,1fr)_8rem_7rem_9rem]{% endif %} items-center gap-3 px-4 py-3">
         {% if pode_eliminar %}<input class="plantel-check h-4 w-4 rounded border-slate-300" type="checkbox" name="jogador_ids" value="{{ jogador.id }}" aria-label="Selecionar {{ jogador.nome }}">{% endif %}
         <a href="/jogadores/{{ jogador.id }}" class="flex min-w-0 items-center gap-3 font-semibold text-slate-900">
           <span class="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-slate-100">

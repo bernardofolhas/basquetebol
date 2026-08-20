@@ -2,16 +2,16 @@
 {% block titulo %}Dashboard — Administrador{% endblock %}
 {% block conteudo %}
 
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
-    <p class="text-gray-500 mt-1">Bem-vindo, {{ utilizador.nome }}!</p>
+<div class="ds-page-header">
+    <div><h1>Visão geral do clube</h1>
+    <p>Equipas, planeamento e operação num único resumo.</p></div>
 </div>
 
 <!-- Alertas -->
 {% if alertas %}
 <div class="mb-6 space-y-2">
     {% for alerta in alertas %}
-    <div class="flex items-center gap-3 p-4 rounded-xl border {% if alerta.urgente %}bg-red-50 border-red-200{% else %}bg-yellow-50 border-yellow-200{% endif %}">
+    <div class="ds-alert border {% if alerta.urgente %}bg-red-50 border-red-200{% else %}bg-yellow-50 border-yellow-200{% endif %}">
         <span class="text-xl">{% if alerta.urgente %}🚨{% else %}⚠️{% endif %}</span>
         <p class="text-sm {% if alerta.urgente %}text-red-700{% else %}text-yellow-700{% endif %}">{{ alerta.mensagem }}</p>
     </div>
@@ -23,21 +23,21 @@
 
 <!-- Resumo -->
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="ds-panel ds-kpi">
         <div class="flex items-center justify-between">
             <div><p class="text-sm text-gray-500">Equipas</p><p class="text-3xl font-bold text-gray-800 mt-1">{{ total_equipas }}</p></div>
             <span class="text-4xl">🏀</span>
         </div>
         <a href="/equipas" class="text-orange-500 text-sm mt-3 block hover:underline">Ver equipas →</a>
     </div>
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="ds-panel ds-kpi">
         <div class="flex items-center justify-between">
             <div><p class="text-sm text-gray-500">Treinadores</p><p class="text-3xl font-bold text-gray-800 mt-1">{{ total_treinadores }}</p></div>
             <span class="text-4xl">👤</span>
         </div>
         <a href="/treinadores" class="text-orange-500 text-sm mt-3 block hover:underline">Ver treinadores →</a>
     </div>
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="ds-panel ds-kpi">
         <div class="flex items-center justify-between">
             <div><p class="text-sm text-gray-500">Jogadores</p><p class="text-3xl font-bold text-gray-800 mt-1">{{ total_jogadores }}</p></div>
             <span class="text-4xl">🏃</span>
@@ -46,7 +46,7 @@
     </div>
 </div>
 
-<section id="planeamento-mensal-atual" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+<section id="planeamento-mensal-atual" class="ds-panel mb-6 p-5 sm:p-6">
     <div class="flex items-center justify-between gap-4 mb-4">
         <div>
             <h2 class="font-semibold text-gray-700">Planeamento do Mês ({{ mes_atual_label }})</h2>
@@ -121,7 +121,7 @@
 </section>
 
 <!-- Equipas do Clube -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+<div class="ds-panel mb-6 p-5 sm:p-6">
     <h2 class="font-semibold text-gray-700 mb-4">Equipas do Clube</h2>
     {% if dados_equipas %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -165,7 +165,7 @@
 
 <!-- Próximos jogos e últimos resultados -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="ds-panel p-5 sm:p-6">
         <h2 class="font-semibold text-gray-700 mb-4">Próximos Jogos</h2>
         {% if proximos_jogos %}
         <div class="space-y-3">
@@ -185,7 +185,7 @@
         <p class="text-gray-400 text-sm">Sem jogos agendados.</p>
         {% endif %}
     </div>
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="ds-panel p-5 sm:p-6">
         <h2 class="font-semibold text-gray-700 mb-4">Últimos Resultados</h2>
         {% if ultimos_resultados %}
         <div class="space-y-3">

@@ -2,16 +2,16 @@
 {% block titulo %}Dashboard — Treinador{% endblock %}
 {% block conteudo %}
 
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-800">Olá, {{ utilizador.nome }}! 👋</h1>
-    <p class="text-gray-500 mt-1">Bem-vindo ao teu painel de treinador</p>
+<div class="ds-page-header">
+    <div><h1>Olá, {{ utilizador.nome }}</h1>
+    <p>O essencial das tuas equipas para hoje.</p></div>
 </div>
 
 <!-- Alertas -->
 {% if alertas %}
 <div class="mb-6 space-y-2">
     {% for alerta in alertas %}
-    <div class="flex items-center gap-3 p-4 rounded-xl border
+    <div class="ds-alert border
         {% if alerta.urgente %}bg-red-50 border-red-200{% else %}bg-yellow-50 border-yellow-200{% endif %}">
         <span class="text-xl">{% if alerta.urgente %}🚨{% else %}⚠️{% endif %}</span>
         <p class="text-sm {% if alerta.urgente %}text-red-700{% else %}text-yellow-700{% endif %}">
@@ -30,13 +30,13 @@
 <div class="mb-8">
 
     <!-- Cabeçalho da equipa -->
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between gap-3 mb-4">
         <div>
             <h2 class="text-xl font-bold text-gray-800">{{ item.equipa.nome }}</h2>
             <p class="text-gray-400 text-sm">{{ item.equipa.escalao.value }} — {{ item.equipa.genero.value }}</p>
         </div>
         <a href="/equipas/{{ item.equipa.id }}"
-           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+           class="ds-button ds-button-primary">
             Ver equipa →
         </a>
     </div>
@@ -45,7 +45,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
 
         <!-- Próximo jogo -->
-        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+        <div class="ds-panel p-5">
             <p class="text-xs font-semibold text-gray-400 uppercase mb-3">Próximo Jogo</p>
             {% if item.proximo_jogo %}
             <p class="font-bold text-gray-800">vs {{ item.proximo_jogo.adversario }}</p>
@@ -68,7 +68,7 @@
         </div>
 
         <!-- Último resultado -->
-        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+        <div class="ds-panel p-5">
             <p class="text-xs font-semibold text-gray-400 uppercase mb-3">Último Resultado</p>
             {% if item.ultimo_resultado %}
             <p class="font-bold text-gray-800">vs {{ item.ultimo_resultado.adversario }}</p>
@@ -84,7 +84,7 @@
         </div>
 
         <!-- Jogadores -->
-        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+        <div class="ds-panel p-5">
             <p class="text-xs font-semibold text-gray-400 uppercase mb-3">Equipa</p>
             <p class="text-3xl font-bold text-gray-800">{{ item.total_jogadores }}</p>
             <p class="text-sm text-gray-500 mt-1">jogadores</p>
@@ -97,22 +97,22 @@
     <!-- Acessos rápidos -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <a href="/planeamento/equipas/{{ item.equipa.id }}/anuais"
-           class="bg-white rounded-xl p-4 border border-gray-100 hover:shadow-md transition text-center">
+           class="ds-panel ds-list-row p-4 text-center">
             <span class="text-2xl block mb-2">📋</span>
             <p class="text-sm font-medium text-gray-700">Planeamento</p>
         </a>
         <a href="/jogos/equipas/{{ item.equipa.id }}"
-           class="bg-white rounded-xl p-4 border border-gray-100 hover:shadow-md transition text-center">
+           class="ds-panel ds-list-row p-4 text-center">
             <span class="text-2xl block mb-2">🏀</span>
             <p class="text-sm font-medium text-gray-700">Calendário</p>
         </a>
         <a href="/fisico/equipas/{{ item.equipa.id }}"
-           class="bg-white rounded-xl p-4 border border-gray-100 hover:shadow-md transition text-center">
+           class="ds-panel ds-list-row p-4 text-center">
             <span class="text-2xl block mb-2">💪</span>
             <p class="text-sm font-medium text-gray-700">Físico</p>
         </a>
         <a href="/equipas/{{ item.equipa.id }}"
-           class="bg-white rounded-xl p-4 border border-gray-100 hover:shadow-md transition text-center">
+           class="ds-panel ds-list-row p-4 text-center">
             <span class="text-2xl block mb-2">👥</span>
             <p class="text-sm font-medium text-gray-700">Equipa</p>
         </a>
@@ -122,7 +122,7 @@
 {% endfor %}
 
 {% else %}
-<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+<div class="ds-panel p-12 text-center">
     <span class="text-5xl">🏀</span>
     <p class="text-gray-500 mt-4">Ainda não tens equipas associadas.</p>
     <p class="text-gray-400 text-sm mt-2">Contacta o administrador para associar uma equipa à tua conta.</p>
