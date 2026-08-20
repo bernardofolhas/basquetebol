@@ -1376,9 +1376,14 @@ def test_eliminacao_de_atribuicao_funciona():
         atribuicao_id = _obter_atribuicao_por_espaco(espaco_id)
         assert atribuicao_id is not None
 
-        response = client.post(f"/planeamento-clube/atribuicoes/{atribuicao_id}/eliminar", follow_redirects=False)
+        response = client.post(
+            f"/planeamento-clube/atribuicoes/{atribuicao_id}/eliminar",
+            data={"retorno": "/planeamento-clube/atribuicao-espacos?semana_id=" + str(semanal_id)},
+            follow_redirects=False,
+        )
 
         assert response.status_code == 303
+        assert response.headers["location"] == f"/planeamento-clube/atribuicao-espacos?semana_id={semanal_id}"
         assert _obter_atribuicao_por_espaco(espaco_id) is None
     finally:
         _limpar_planeamento_teste()

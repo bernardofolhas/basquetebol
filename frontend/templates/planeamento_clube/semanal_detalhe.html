@@ -236,6 +236,7 @@
                             <a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}" class="text-orange-500 hover:text-orange-600">Ver</a>
                             {% if pode_gerir %}<a href="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/editar" class="text-blue-500 hover:text-blue-600">Editar</a>
                             <form method="POST" action="/planeamento-clube/atribuicoes/{{ atribuicao.id }}/eliminar">
+                                <input type="hidden" name="retorno" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
                                 <button type="submit"
                                         class="text-red-500 hover:text-red-600"
                                         onclick="return confirm('Anular esta marcação? O treinador da equipa será avisado se já tiver sido enviada.')">

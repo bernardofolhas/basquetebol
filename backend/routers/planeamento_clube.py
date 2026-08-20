@@ -1,6 +1,7 @@
 import calendar
 import re
 from datetime import date, datetime, timedelta
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -77,6 +78,21 @@ MENSAGENS_ERRO_ELIMINACAO = {
 }
 
 ESTADOS_PLANEAMENTO = {"rascunho", "ativo"}
+
+
+def _destino_retorno_seguro(request: Request, retorno: str | None, fallback: str) -> str:
+    """Mantem a acao no ecrã de origem, sem aceitar redirecionamentos externos."""
+    candidatos = (retorno, request.headers.get("referer"))
+    for candidato in candidatos:
+        if not candidato:
+            continue
+        partes = urlsplit(candidato)
+        if partes.scheme or partes.netloc:
+            if partes.netloc != request.url.netloc:
+                continue
+        if partes.path.startswith("/") and not partes.path.startswith("//"):
+            return partes.path + (f"?{partes.query}" if partes.query else "")
+    return fallback
 
 
 def _obter_conflitos_publicacao(db: Session, semanal: PlanoSemanalClube) -> list[dict]:
@@ -3076,7 +3092,13 @@ async def editar_atribuicao(
 
 
 @router.post("/atribuicoes/{atribuicao_id}/eliminar")
-async def eliminar_atribuicao(atribuicao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_coordenacao)):
+async def eliminar_atribuicao(
+    atribuicao_id: int,
+    request: Request,
+    retorno: str = Form(""),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_coordenacao),
+):
     atribuicao = db.query(AtribuicaoEspacoSemanal).filter(AtribuicaoEspacoSemanal.id == atribuicao_id).first()
     if not atribuicao:
         return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
@@ -3100,7 +3122,10 @@ async def eliminar_atribuicao(atribuicao_id: int, request: Request, db: Session 
     db.commit()
 
     set_flash(request, f"Marcação anulada. Foram avisados {notificacoes_criadas} treinador(es).")
-    return RedirectResponse(url=f"/planeamento-clube/semanal/{semanal_id}", status_code=303)
+    return RedirectResponse(
+        url=_destino_retorno_seguro(request, retorno, f"/planeamento-clube/semanal/{semanal_id}"),
+        status_code=303,
+    )
 
 
 @router.get("/indisponibilidades-treinador", response_class=HTMLResponse)
