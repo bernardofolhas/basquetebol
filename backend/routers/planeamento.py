@@ -33,7 +33,7 @@ from services.sincronizacao_ui import preparar_sessoes_para_ui, sessao_correspon
 
 # Importamos os modelos que vamos precisar
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnualEquipa, SessaoTreino
-from models.planeamento_clube import PlaneamentoClubeAnual
+from models.planeamento_clube import EventoPlaneamentoClube, PlaneamentoClubeAnual, TipoEventoPlaneamentoClubeEnum
 from models.atribuicao_espaco_semanal import (
     AtribuicaoEspacoSemanal,
     EstadoAtribuicaoEspacoEnum,
@@ -149,6 +149,72 @@ def _contexto_agenda(
             else f"/planeamento/macrociclos/{macrociclo_id}"
         ),
     }
+
+
+def _duracao_evento_minutos(hora_inicio: str | None, hora_fim: str | None) -> int | None:
+    if not hora_inicio or not hora_fim:
+        return None
+    try:
+        inicio = int(hora_inicio[:2]) * 60 + int(hora_inicio[3:])
+        fim = int(hora_fim[:2]) * 60 + int(hora_fim[3:])
+    except (TypeError, ValueError):
+        return None
+    return max(0, fim - inicio)
+
+
+def _integrar_eventos_planeados_no_microciclo(db: Session, microciclo: Microciclo) -> int:
+    """Materializa na semana técnica eventos da equipa já marcados acima na época."""
+    equipa_id = microciclo.mesociclo.macrociclo.equipa_id
+    eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.equipa_id == equipa_id,
+        EventoPlaneamentoClube.data >= microciclo.data_inicio,
+        EventoPlaneamentoClube.data <= microciclo.data_fim,
+        EventoPlaneamentoClube.ativo.is_(True),
+        EventoPlaneamentoClube.tipo.in_([
+            TipoEventoPlaneamentoClubeEnum.treino_equipa,
+            TipoEventoPlaneamentoClubeEnum.treino_individual,
+            TipoEventoPlaneamentoClubeEnum.jogo,
+        ]),
+    ).order_by(EventoPlaneamentoClube.data, EventoPlaneamentoClube.hora_inicio, EventoPlaneamentoClube.id).all()
+    criadas = 0
+    for evento in eventos:
+        existe = db.query(SessaoTreino).filter(
+            SessaoTreino.microciclo_id == microciclo.id,
+            SessaoTreino.evento_planeamento_clube_id == evento.id,
+        ).first()
+        evento.macrociclo_id = microciclo.mesociclo.macrociclo_id
+        evento.mesociclo_id = microciclo.mesociclo_id
+        evento.microciclo_id = microciclo.id
+        if existe:
+            continue
+        e_jogo = evento.tipo == TipoEventoPlaneamentoClubeEnum.jogo
+        numero = None if e_jogo else (
+            db.query(SessaoTreino).filter(
+                SessaoTreino.microciclo_id == microciclo.id,
+                SessaoTreino.e_jogo.is_(False),
+            ).count() + 1
+        )
+        db.add(SessaoTreino(
+            clube_id=evento.clube_id,
+            data=evento.data,
+            local=evento.espaco.nome if evento.espaco else None,
+            hora_inicio=evento.hora_inicio,
+            hora_fim=evento.hora_fim,
+            volume_minutos=_duracao_evento_minutos(evento.hora_inicio, evento.hora_fim) if not e_jogo else None,
+            intensidade_rpe=0 if not e_jogo and evento.espaco_id else None,
+            numero_treino=numero,
+            e_jogo=e_jogo,
+            origem="planeamento_integrado",
+            sincronizada=True,
+            alterada_manual=False,
+            ativa=True,
+            estado="planeada",
+            microciclo_id=microciclo.id,
+            plano_semanal_clube_id=evento.plano_semanal_id,
+            evento_planeamento_clube_id=evento.id,
+        ))
+        criadas += 1
+    return criadas
 
 
 def _validar_intervalo_horario_sessao(hora_inicio: str | None, hora_fim: str | None) -> str | None:
@@ -1357,8 +1423,13 @@ async def criar_microciclo(
     )
 
     db.add(microciclo)
+    db.flush()
+    eventos_integrados = _integrar_eventos_planeados_no_microciclo(db, microciclo)
     db.commit()
-    set_flash(request, "Microciclo criado com sucesso.")
+    mensagem = "Microciclo criado com sucesso."
+    if eventos_integrados:
+        mensagem += f" Foram integrados {eventos_integrados} treino(s) ou jogo(s) já marcados no planeamento."
+    set_flash(request, mensagem)
     return RedirectResponse(
         url=f"/planeamento/mesociclos/{meso_id}",
         status_code=303
