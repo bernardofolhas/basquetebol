@@ -3,7 +3,9 @@
 from collections import OrderedDict
 
 from models.utilizador import PerfilEnum
+from models.notificacao import Notificacao
 from services.dashboard_service import obter_painel_operacional
+from services.notificacoes_service import obter_notificacoes_utilizador
 
 
 GRUPOS_PENDENCIAS = OrderedDict([
@@ -95,6 +97,8 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
             "total_pendencias": 0,
             "total_urgentes": 0,
             "acoes_rapidas": [],
+            "notificacoes": [],
+            "total_notificacoes": 0,
         }
 
     equipas = _equipas_permitidas(utilizador)
@@ -117,4 +121,9 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
         "total_pendencias": len(tarefas),
         "total_urgentes": sum(1 for tarefa in tarefas if tarefa.get("urgente")),
         "acoes_rapidas": _acoes_rapidas(utilizador, equipas),
+        "notificacoes": obter_notificacoes_utilizador(db, utilizador),
+        "total_notificacoes": db.query(Notificacao).filter(
+            Notificacao.utilizador_id == utilizador.id,
+            Notificacao.lida.is_(False),
+        ).count(),
     }

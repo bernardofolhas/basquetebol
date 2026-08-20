@@ -46,6 +46,7 @@ from services.operacao_clube_service import (
 )
 from services.planeamento_semanal_administrativo_service import gerar_grelha_slots, validar_reserva
 from services.atribuicao_espaco_agenda_service import sincronizar_atribuicao_com_agenda
+from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.atribuicao_espaco_visual_service import (
     COR_NEUTRA,
     construir_cores_espacos,
@@ -2401,16 +2402,25 @@ async def enviar_atribuicoes_aos_treinadores(
         return RedirectResponse(url=f"/planeamento-clube/atribuicao-espacos?semana_id={semana_id}", status_code=303)
 
     mensagens = []
+    notificacoes_criadas = 0
     for atribuicao in rascunhos:
         atribuicao.estado = EstadoAtribuicaoEspacoEnum.publicado
         mensagens.append(sincronizar_atribuicao_com_agenda(db, atribuicao))
+        if atribuicao.equipa:
+            notificacoes_criadas += criar_notificacoes_para_equipa(
+                db,
+                atribuicao.equipa,
+                "Treino atualizado",
+                f"{atribuicao.data.strftime('%d/%m/%Y')} · {atribuicao.hora_inicio}–{atribuicao.hora_fim} · {atribuicao.espaco.nome}",
+                f"/calendario?equipa_id={atribuicao.equipa_id}",
+            )
     registar_historico_planeamento(
         db,
         utilizador,
         "plano_semanal",
         semanal.id,
         "atribuicoes_enviadas",
-        f"Foram enviadas {len(rascunhos)} atribuições aos treinadores.",
+        f"Foram enviadas {len(rascunhos)} atribuições aos treinadores; {notificacoes_criadas} notificações criadas.",
     )
     registar_auditoria(
         db,

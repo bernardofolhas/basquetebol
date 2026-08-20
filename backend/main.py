@@ -19,6 +19,7 @@ import models.espaco_treino
 import models.fisico
 import models.jogador
 import models.jogo
+import models.notificacao
 import models.historico_planeamento
 import models.identidade_clube
 import models.indisponibilidade_treinador
@@ -69,6 +70,7 @@ from routers import equipas
 from routers import fisico
 from routers import jogadores
 from routers import jogos
+from routers import notificacoes
 from routers import identidade
 from routers import secretaria
 from routers import superadmin
@@ -161,6 +163,7 @@ app.include_router(pdf_partilhavel.router)
 app.include_router(assiduidade.router)
 app.include_router(treino.router)
 app.include_router(jogos.router)
+app.include_router(notificacoes.router)
 app.include_router(identidade.router)
 app.include_router(secretaria.router)
 app.include_router(superadmin.router)
