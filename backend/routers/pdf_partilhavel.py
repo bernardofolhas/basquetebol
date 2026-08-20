@@ -9,7 +9,7 @@ from database import get_db
 from models.equipa import Equipa
 from models.planeamento import Macrociclo, Mesociclo, Microciclo
 from models.planeamento_clube import PlaneamentoClubeAnual, PlanoSemanalClube
-from services.pdf_partilhavel_service import preparar_agenda_partilhavel, preparar_calendario_intervalo_partilhavel
+from services.pdf_partilhavel_service import preparar_calendario_intervalo_partilhavel
 from services.pdf_service import renderizar_pdf
 
 
@@ -25,13 +25,18 @@ def _ids_equipas_utilizador(utilizador) -> list[int] | None:
 def _responder(request, db, utilizador, *, titulo, data_inicio, data_fim, nome, equipa=None, categorias=None, equipa_ids=None, template="calendario_partilhavel_pdf.html"):
     if equipa_ids is None:
         equipa_ids = _ids_equipas_utilizador(utilizador)
-    agenda = preparar_agenda_partilhavel(
-        db,
-        data_inicio,
-        data_fim,
-        equipa_ids=equipa_ids,
-        categorias=categorias,
+    agenda = preparar_calendario_intervalo_partilhavel(
+        db, data_inicio, data_fim, equipa_ids=equipa_ids or []
     )
+    if categorias:
+        agenda["itens"] = [item for item in agenda["itens"] if item.get("categoria") in categorias]
+        itens_por_data = {}
+        for item in agenda["itens"]:
+            itens_por_data.setdefault(item["data"], []).append(item)
+        for semana in agenda["semanas_intervalo"]:
+            for dia in semana:
+                if dia:
+                    dia["itens"] = itens_por_data.get(dia["data"], [])
     nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
     if not nome_treinador and equipa and equipa.treinadores:
         nome_treinador = equipa.treinadores[0].nome
@@ -103,21 +108,15 @@ def meso_partilhavel(meso_id: int, request: Request, db: Session = Depends(get_d
         return RedirectResponse("/equipas", status_code=303)
     equipa = meso.macrociclo.equipa
     verificar_ou_negar_equipa(utilizador, equipa.id, db)
-    agenda = preparar_calendario_intervalo_partilhavel(
-        db, meso.data_inicio, meso.data_fim, equipa_ids=[equipa.id]
+    return _responder(
+        request, db, utilizador,
+        titulo=f"Mesociclo {meso.numero} · calendário",
+        data_inicio=meso.data_inicio,
+        data_fim=meso.data_fim,
+        nome=f"mesociclo_{meso.id}_partilhavel.pdf",
+        equipa=equipa,
+        equipa_ids=[equipa.id],
     )
-    nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None) or (
-        equipa.treinadores[0].nome if equipa.treinadores else utilizador.nome
-    )
-    pdf = renderizar_pdf(request, "mesociclo_partilhavel_pdf.html", {
-        "utilizador": utilizador,
-        "titulo_documento": f"Mesociclo {meso.numero} · calendário",
-        "equipa_documento": equipa,
-        "agenda": agenda,
-        "nome_treinador": nome_treinador,
-        "hoje": date.today(),
-    })
-    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=mesociclo_{meso.id}_partilhavel.pdf"})
 
 
 @router.get("/microciclos/{micro_id}/pdf")

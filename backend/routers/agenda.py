@@ -19,6 +19,7 @@ from models.planeamento_clube import (
     TipoEventoPlaneamentoClubeEnum,
 )
 from services.agenda_service import conflitos_do_evento, metadados_tipo_agenda
+from services.notificacoes_service import criar_notificacoes_para_equipa
 
 
 router = APIRouter(prefix="/agenda")
@@ -67,6 +68,19 @@ def _horas(hora_inicio: str | None, hora_fim: str | None) -> tuple[str | None, s
     if inicio and fim and not hora_eh_anterior(inicio, fim):
         raise ValueError("A hora de início deve ser anterior à hora de término.")
     return inicio, fim
+
+
+def _carga_prevista(volume_minutos: str | None, intensidade_rpe: str | None) -> tuple[int | None, float | None]:
+    try:
+        volume = int(volume_minutos) if volume_minutos not in (None, "") else None
+        rpe = float(intensidade_rpe) if intensidade_rpe not in (None, "") else None
+    except (TypeError, ValueError):
+        raise ValueError("O volume deve ser um número inteiro e o RPE deve ser um valor entre 0 e 10.") from None
+    if volume is not None and not 1 <= volume <= 600:
+        raise ValueError("O volume previsto deve estar entre 1 e 600 minutos.")
+    if rpe is not None and not 0 <= rpe <= 10:
+        raise ValueError("O RPE previsto deve estar entre 0 e 10.")
+    return volume, rpe
 
 
 def _url_contexto(
@@ -148,6 +162,8 @@ def _criar_sessao_se_necessario(
     microciclo: Microciclo | None,
     tipo: str,
     equipa_id: int | None,
+    volume_minutos: int | None = None,
+    intensidade_rpe: float | None = None,
 ) -> None:
     if not microciclo or tipo not in {
         TipoEventoPlaneamentoClubeEnum.treino_equipa.value,
@@ -168,6 +184,8 @@ def _criar_sessao_se_necessario(
         local=_obter_espaco_nome(db, evento.espaco_id),
         hora_inicio=evento.hora_inicio,
         hora_fim=evento.hora_fim,
+        volume_minutos=volume_minutos,
+        intensidade_rpe=intensidade_rpe,
         numero_treino=numero,
         e_jogo=e_jogo,
         origem="manual",
@@ -272,13 +290,15 @@ def _preparar_evento(
     microciclo_id: str,
     aplica_a_todas_equipas: str,
     retorno: str,
+    volume_minutos: int | None = None,
+    intensidade_rpe: float | None = None,
     db_commit: bool = False,
 ) -> tuple[EventoPlaneamentoClube, str]:
     valores = {item.value for item in TipoEventoPlaneamentoClubeEnum}
     if tipo not in valores:
         raise ValueError("O tipo de atividade não é válido.")
-    if not titulo.strip():
-        raise ValueError("Indica um título para a atividade.")
+    # Um título é opcional: o tipo mantém a agenda legível sem criar trabalho extra.
+    titulo_final = titulo.strip() or metadados_tipo_agenda(TipoEventoPlaneamentoClubeEnum(tipo))["label"]
 
     data_convertida = _data(data_evento)
     inicio, fim = _horas(hora_inicio, hora_fim)
@@ -299,7 +319,7 @@ def _preparar_evento(
 
     evento = EventoPlaneamentoClube(
         tipo=TipoEventoPlaneamentoClubeEnum(tipo),
-        titulo=titulo.strip(),
+        titulo=titulo_final,
         descricao=descricao.strip() or None,
         data=data_convertida,
         hora_inicio=inicio,
@@ -317,7 +337,10 @@ def _preparar_evento(
     )
     db.add(evento)
     db.flush()
-    _criar_sessao_se_necessario(db, evento, microciclo, tipo, equipa_convertida)
+    _criar_sessao_se_necessario(
+        db, evento, microciclo, tipo, equipa_convertida,
+        volume_minutos=volume_minutos, intensidade_rpe=intensidade_rpe,
+    )
     return evento, _url_contexto(
         macrociclo_id=evento.macrociclo_id,
         mesociclo_id=evento.mesociclo_id,
@@ -332,7 +355,7 @@ async def criar_atividade_agenda(
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_autenticacao),
     tipo: str = Form(...),
-    titulo: str = Form(...),
+    titulo: str = Form(""),
     data_evento: str = Form(...),
     data_fim: str = Form(""),
     recorrencia: str = Form("unica"),
@@ -347,6 +370,8 @@ async def criar_atividade_agenda(
     microciclo_id: str = Form(""),
     aplica_a_todas_equipas: str = Form("false"),
     retorno: str = Form(""),
+    volume_minutos: str = Form(""),
+    intensidade_rpe: str = Form(""),
 ):
     try:
         inicio = _data(data_evento)
@@ -355,12 +380,14 @@ async def criar_atividade_agenda(
         serie_id = str(uuid4()) if len(datas) > 1 else None
         conflitos = []
         destino = retorno or "/calendario"
+        volume, rpe = _carga_prevista(volume_minutos, intensidade_rpe)
         for data_ocorrencia in datas:
             evento, destino = _preparar_evento(
                 db, utilizador, tipo=tipo, titulo=titulo, data_evento=data_ocorrencia.isoformat(),
                 hora_inicio=hora_inicio, hora_fim=hora_fim, descricao=descricao, espaco_id=espaco_id,
                 equipa_id=equipa_id, macrociclo_id=macrociclo_id, mesociclo_id=mesociclo_id,
                 microciclo_id=microciclo_id, aplica_a_todas_equipas=aplica_a_todas_equipas, retorno=retorno,
+                volume_minutos=volume, intensidade_rpe=rpe,
             )
             evento.data_fim = fim
             evento.serie_id = serie_id
@@ -379,6 +406,21 @@ async def criar_atividade_agenda(
     else:
         sufixo = f" ({len(datas)} ocorrências)" if len(datas) > 1 else ""
         set_flash(request, f"{metadados_tipo_agenda(evento.tipo)['label']} criado com sucesso{sufixo}.")
+    if (
+        evento.tipo == TipoEventoPlaneamentoClubeEnum.jogo
+        and evento.equipa_id
+        and verificar_perfil(utilizador, ["administrador", "coordenador"])
+    ):
+        equipa = db.query(Equipa).filter(Equipa.id == evento.equipa_id).first()
+        if equipa:
+            criar_notificacoes_para_equipa(
+                db,
+                equipa,
+                "Jogo marcado",
+                f"{evento.data.strftime('%d/%m/%Y')} · {evento.titulo}",
+                destino,
+            )
+            db.commit()
     return RedirectResponse(url=destino, status_code=303)
 
 
@@ -389,7 +431,7 @@ async def editar_atividade_agenda(
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_autenticacao),
     tipo: str = Form(...),
-    titulo: str = Form(...),
+    titulo: str = Form(""),
     data_evento: str = Form(...),
     data_fim: str = Form(""),
     escopo_recorrencia: str = Form("ocorrencia"),
@@ -420,8 +462,7 @@ async def editar_atividade_agenda(
         )
         aplica = aplica_a_todas_equipas == "true"
         _verificar_acesso(utilizador, equipa_convertida or evento.equipa_id, db, aplica)
-        if not titulo.strip():
-            raise ValueError("Indica um título para a atividade.")
+        titulo_final = titulo.strip() or metadados_tipo_agenda(tipo_valido)["label"]
         alvos = [evento]
         if evento.serie_id and escopo_recorrencia in {"futuro", "serie"}:
             query = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.serie_id == evento.serie_id, EventoPlaneamentoClube.ativo.is_(True))
@@ -432,7 +473,7 @@ async def editar_atividade_agenda(
         conflitos = []
         for alvo in alvos:
             alvo.tipo = tipo_valido
-            alvo.titulo = titulo.strip()
+            alvo.titulo = titulo_final
             alvo.data = alvo.data + deslocamento
             alvo.data_fim = _data(data_fim) if data_fim else alvo.data_fim
             alvo.hora_inicio = inicio

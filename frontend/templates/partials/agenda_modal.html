@@ -45,8 +45,8 @@
                     {% endfor %}
                 </select>
             </label>
-            <label class="text-sm font-medium text-slate-700">Título
-                <input id="agenda-titulo" name="titulo" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" required>
+            <label class="text-sm font-medium text-slate-700">Título <span class="font-normal text-slate-400">(opcional)</span>
+                <input id="agenda-titulo" name="titulo" placeholder="Usa o tipo de atividade se ficar vazio" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
             </label>
             <label class="text-sm font-medium text-slate-700">Data
                 <input id="agenda-data" type="date" name="data_evento" min="{{ agenda_contexto.data_inicio|default('')|data_iso }}" max="{{ agenda_contexto.data_fim|default('')|data_iso }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" required>
@@ -74,6 +74,14 @@
             <label class="text-sm font-medium text-slate-700">Hora de término
                 <input id="agenda-hora-fim" type="time" name="hora_fim" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
             </label>
+            {% if agenda_contexto.microciclo_id|default('') %}
+            <label class="text-sm font-medium text-slate-700">Volume previsto (minutos)
+                <input id="agenda-volume" type="number" name="volume_minutos" min="1" max="600" placeholder="Ex.: 90" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+            </label>
+            <label class="text-sm font-medium text-slate-700">RPE previsto (0–10)
+                <input id="agenda-rpe" type="number" name="intensidade_rpe" min="0" max="10" step="0.5" placeholder="Ex.: 6" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+            </label>
+            {% endif %}
         </div>
 
         <label class="mt-4 block text-sm font-medium text-slate-700">Descrição ou observações

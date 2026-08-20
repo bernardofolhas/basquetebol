@@ -69,6 +69,9 @@
        class="rounded-full bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600">
         📄 Exportar PDF
     </a>
+    <form method="POST" action="/treino/planos/{{ plano.id }}/eliminar" onsubmit="return confirm('Eliminar esta ficha de treino? A sessão e o respetivo local/horário serão mantidos.')">
+        <button class="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50">Eliminar ficha</button>
+    </form>
 {% endcall %}
 
 <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">

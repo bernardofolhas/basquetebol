@@ -129,6 +129,13 @@
                     </div>
                     <p class="text-xs font-medium text-gray-700 mt-1">{{ item.titulo }}</p>
                     <p class="text-[10px] text-gray-500 mt-1">{{ item.local }}</p>
+                    {% if item.sessao_id|default(false) and not item.e_jogo %}
+                    <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ item.sessao_id }}/carga" class="mt-2 grid grid-cols-2 gap-1" aria-label="Carga prevista do treino">
+                        <input type="number" name="volume_minutos" min="1" max="600" value="{{ item.volume_minutos if item.volume_minutos is not none else '' }}" placeholder="Minutos" class="min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px]">
+                        <input type="number" name="intensidade_rpe" min="0" max="10" step="0.5" value="{{ item.intensidade_rpe if item.intensidade_rpe is not none else '' }}" placeholder="RPE 0–10" class="min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px]">
+                        <button class="col-span-2 rounded border border-orange-200 bg-white px-2 py-1 text-[10px] font-semibold text-orange-700 hover:bg-orange-50">Guardar carga</button>
+                    </form>
+                    {% endif %}
                     {% if item.link %}
                     <a href="{{ item.link }}" {% if item.agenda_editavel %}data-agenda-event-id="{{ item.agenda_id }}" data-agenda-tipo="{{ item.agenda_tipo }}" data-agenda-titulo="{{ item.agenda_titulo|e }}" data-agenda-data="{{ item.data|data_iso }}" data-agenda-hora-inicio="{{ item.hora_inicio or '' }}" data-agenda-hora-fim="{{ item.hora_fim or '' }}" data-agenda-descricao="{{ item.agenda_descricao|e }}" data-agenda-espaco-id="{{ item.agenda_espaco_id }}" data-agenda-equipa-id="{{ item.agenda_equipa_id }}" data-agenda-aplica-todas="{{ 'true' if item.agenda_equipa_id == '' else 'false' }}"{% endif %} class="inline-block mt-1 text-[10px] text-orange-500 hover:text-orange-600">Abrir →</a>
                     {% endif %}

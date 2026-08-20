@@ -134,6 +134,7 @@ def _contexto_agenda(
     macrociclo_id: int | None = None,
     mesociclo_id: int | None = None,
     microciclo_id: int | None = None,
+    retorno: str | None = None,
 ) -> dict:
     return {
         "equipa_id": equipa_id,
@@ -142,7 +143,7 @@ def _contexto_agenda(
         "microciclo_id": microciclo_id or "",
         "data_inicio": data_inicio,
         "data_fim": data_fim,
-        "retorno": (
+        "retorno": retorno or (
             f"/planeamento/microciclos/{microciclo_id}" if microciclo_id
             else f"/planeamento/mesociclos/{mesociclo_id}" if mesociclo_id
             else f"/planeamento/macrociclos/{macrociclo_id}"
@@ -494,11 +495,27 @@ def detalhe_anual_equipa(
     macrociclos = db.query(Macrociclo).filter(
         Macrociclo.planeamento_anual_equipa_id == anual_id,
     ).order_by(Macrociclo.numero).all()
+    dashboard_planeamento = obter_dashboard_planeamento_equipa(
+        db,
+        planeamento.equipa_id,
+        planeamento.data_inicio,
+        planeamento.data_fim,
+    )
     return templates.TemplateResponse(request, "planeamento/anuais/detalhe.html", {
         "utilizador": utilizador,
         "planeamento": planeamento,
         "equipa": planeamento.equipa,
         "macrociclos": macrociclos,
+        "dashboard_planeamento": dashboard_planeamento,
+        "objetivos_por_categoria": objetivos_por_categoria(planeamento),
+        "agenda_contexto": _contexto_agenda(
+            equipa_id=planeamento.equipa_id,
+            data_inicio=planeamento.data_inicio,
+            data_fim=planeamento.data_fim,
+            retorno=f"/planeamento/anuais/{planeamento.id}",
+        ),
+        "agenda_tipos": tipos_agenda_formulario(),
+        "espacos_agenda": db.query(EspacoTreino).filter(EspacoTreino.ativo.is_(True)).order_by(EspacoTreino.nome).all(),
     })
 
 
@@ -1594,6 +1611,43 @@ async def criar_sessao(
         url=f"/planeamento/microciclos/{micro_id}",
         status_code=303
     )
+
+
+@router.post("/microciclos/{micro_id}/sessoes/{sessao_id}/carga")
+async def atualizar_carga_rapida_sessao(
+    micro_id: int,
+    sessao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    volume_minutos: str = Form(""),
+    intensidade_rpe: str = Form(""),
+):
+    """Atualiza a previsão de carga diretamente na agenda do microciclo."""
+    equipa_id = _obter_equipa_id_por_microciclo(db, micro_id)
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    sessao = db.query(SessaoTreino).filter(
+        SessaoTreino.id == sessao_id,
+        SessaoTreino.microciclo_id == micro_id,
+        SessaoTreino.ativa.is_(True),
+    ).first()
+    if not sessao:
+        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+    try:
+        volume = int(volume_minutos)
+        rpe = float(intensidade_rpe)
+        if not 1 <= volume <= 600 or not 0 <= rpe <= 10:
+            raise ValueError
+    except (TypeError, ValueError):
+        set_flash(request, "Indica um volume entre 1 e 600 minutos e um RPE entre 0 e 10.", "error")
+        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+    sessao.volume_minutos = volume
+    sessao.intensidade_rpe = rpe
+    sessao.alterada_manual = True
+    sessao.sincronizada = False
+    db.commit()
+    set_flash(request, "Volume e RPE atualizados.")
+    return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
 
 
 @router.get("/microciclos/{micro_id}/calendario/pdf")

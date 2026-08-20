@@ -205,6 +205,10 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
     estado = normalizar_estado_sessao(getattr(sessao, "estado", None))
     estado_visual = estado_sessao_visual(estado)
     item.update({
+        "sessao_id": sessao.id,
+        "volume_minutos": sessao.volume_minutos,
+        "intensidade_rpe": sessao.intensidade_rpe,
+        "e_jogo": sessao.e_jogo,
         "estado": estado,
         "estado_label": estado_visual["label"],
         "estado_classes": estado_visual["classes"],
@@ -248,7 +252,8 @@ def apresentar_treinos_por_perfil(itens: list[dict], perfil: str | None) -> list
             sufixo = f" ({escalao})" if escalao else ""
             item["titulo"] = f"Treino de {item['equipa_nome']}{sufixo}"
         else:
-            item["titulo"] = "Treino"
+            local = item.get("local")
+            item["titulo"] = f"Treino ({local})" if local and local != "Local por definir" else "Treino"
     return itens
 
 

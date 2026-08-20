@@ -11,6 +11,12 @@ def _sobrepoe(inicio_a: str, fim_a: str, inicio_b: str | None, fim_b: str | None
     return not inicio_b or not fim_b or (inicio_a < fim_b and fim_a > inicio_b)
 
 
+def _duracao_minutos(inicio: str, fim: str) -> int:
+    inicio_minutos = int(inicio[:2]) * 60 + int(inicio[3:])
+    fim_minutos = int(fim[:2]) * 60 + int(fim[3:])
+    return max(0, fim_minutos - inicio_minutos)
+
+
 def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
     """Publica a previsão na agenda e aplica o espaço a uma sessão coincidente.
 
@@ -85,6 +91,10 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
         sessao.local = atribuicao.espaco.nome
         sessao.hora_inicio = atribuicao.hora_inicio
         sessao.hora_fim = atribuicao.hora_fim
+        if sessao.volume_minutos is None:
+            sessao.volume_minutos = _duracao_minutos(atribuicao.hora_inicio, atribuicao.hora_fim)
+        if sessao.intensidade_rpe is None:
+            sessao.intensidade_rpe = 0
         sessao.plano_semanal_clube_id = atribuicao.plano_semanal_id
         sessao.evento_planeamento_clube_id = evento.id
         return "Previsão publicada e local aplicado ao treino técnico coincidente."

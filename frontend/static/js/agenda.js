@@ -32,6 +32,8 @@
         campo('agenda-intervalo').value = '1';
         campo('agenda-hora-inicio').value = '';
         campo('agenda-hora-fim').value = '';
+        if (campo('agenda-volume')) campo('agenda-volume').value = '';
+        if (campo('agenda-rpe')) campo('agenda-rpe').value = '';
         campo('agenda-descricao').value = '';
         campo('agenda-espaco').value = '';
         if (campo('agenda-equipa')) campo('agenda-equipa').value = '';
@@ -87,8 +89,6 @@
     document.addEventListener('click', function (evento) {
         const existente = evento.target.closest('[data-agenda-event-id]');
         if (existente) {
-            const destino = existente.getAttribute('href') || '';
-            if (destino && !destino.startsWith('/planeamento-clube/eventos/')) return;
             evento.preventDefault();
             evento.stopPropagation();
             abrirEdicaoAgenda(existente);

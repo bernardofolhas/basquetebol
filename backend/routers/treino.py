@@ -332,6 +332,26 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
     })
 
 
+@router.post("/planos/{plano_id}/eliminar")
+async def eliminar_plano_treino(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Apaga apenas a ficha; a sessão prevista mantém-se disponível para recomeçar."""
+    equipa_id = _obter_equipa_id_por_plano(db, plano_id)
+    _verificar_acesso_treino(utilizador, equipa_id, db)
+    plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+    if not plano:
+        return RedirectResponse(url="/equipas", status_code=303)
+    sessao_id = plano.sessao_id
+    db.delete(plano)
+    db.commit()
+    set_flash(request, "Plano de treino eliminado. A sessão mantém a data, local e horário para criares uma nova ficha.")
+    return RedirectResponse(url=f"/treino/sessoes/{sessao_id}", status_code=303)
+
+
 @router.post("/sessoes/{sessao_id}/estado")
 async def atualizar_estado_sessao(
     sessao_id: int,
