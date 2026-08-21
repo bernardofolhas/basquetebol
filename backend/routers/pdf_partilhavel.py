@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from auth_deps import exigir_autenticacao, exigir_coordenacao, exigir_operacao_desportiva, verificar_ou_negar_equipa
 from database import get_db
 from models.equipa import Equipa
+from models.jogo import Jogo
 from models.planeamento import Macrociclo, Mesociclo, Microciclo
 from models.planeamento_clube import PlaneamentoClubeAnual, PlanoSemanalClube
 from services.pdf_partilhavel_service import preparar_calendario_intervalo_partilhavel
@@ -78,7 +79,28 @@ def jogos_partilhaveis(equipa_id: int, request: Request, inicio: date | None = N
         return RedirectResponse("/equipas", status_code=303)
     inicio = inicio or date.today()
     fim = fim or (inicio + timedelta(days=180))
-    return _responder(request, db, utilizador, titulo="Calendário de jogos", data_inicio=inicio, data_fim=fim, nome=f"jogos_{equipa_id}_partilhavel.pdf", equipa=equipa, equipa_ids=[equipa_id], categorias={"jogo"})
+    jogos = db.query(Jogo).filter(
+        Jogo.equipa_id == equipa_id,
+        Jogo.data >= inicio,
+        Jogo.data <= fim,
+    ).order_by(Jogo.data, Jogo.hora, Jogo.id).all()
+    nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
+    if not nome_treinador and equipa.treinadores:
+        nome_treinador = equipa.treinadores[0].nome
+    pdf = renderizar_pdf(request, "jogos/jogos_partilhavel_pdf.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "jogos": jogos,
+        "data_inicio": inicio,
+        "data_fim": fim,
+        "nome_treinador": nome_treinador or utilizador.nome,
+        "hoje": date.today(),
+    })
+    return Response(
+        pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=jogos_{equipa_id}_partilhavel.pdf"},
+    )
 
 
 @router.get("/equipas/{equipa_id}/treinos/pdf")
