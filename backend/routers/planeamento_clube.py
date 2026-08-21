@@ -58,6 +58,11 @@ from services.auditoria_service import registar_auditoria
 from services.agenda_service import metadados_tipo_agenda, tipos_agenda_formulario
 from services.historico_planeamento_service import registar_historico_planeamento
 from services.planeamento_integrado_service import obter_dashboard_planeamento_anual
+from services.numeracao_planeamento_service import (
+    renumerar_macrociclos,
+    renumerar_mesociclos,
+    renumerar_microciclos,
+)
 from services.pdf_service import renderizar_pdf
 from services.sincronizacao_ui import (
     construir_resumo_sincronizacao_texto,
@@ -848,6 +853,7 @@ def _obter_ou_criar_macrociclo_para_equipa_intervalo(
     )
     db.add(macrociclo)
     db.flush()
+    renumerar_macrociclos(db, equipa_id, planeamento_anual.id)
     return macrociclo
 
 
@@ -876,6 +882,7 @@ def _obter_ou_criar_mesociclo_para_intervalo(
     )
     db.add(mesociclo)
     db.flush()
+    renumerar_mesociclos(db, macrociclo.id)
     return mesociclo
 
 
@@ -897,6 +904,7 @@ def _criar_microciclo_automatico(
     )
     db.add(microciclo)
     db.flush()
+    renumerar_microciclos(db, mesociclo.id)
     return microciclo
 
 

@@ -51,12 +51,14 @@ from database import (
     base_dados_disponivel,
     engine,
     get_db,
+    SessionLocal,
     validar_ligacao_base_dados,
 )
 from flash import FlashMiddleware
 from formatacao import data_hora_pt, data_iso, data_pt, finalizar_valor_template
 from logging_config import obter_logger
 from paths import STATIC_DIR, TEMPLATES_DIR
+from services.numeracao_planeamento_service import renumerar_todos_os_ciclos
 from routers import admin
 from routers import agenda
 from routers import assiduidade
@@ -108,6 +110,9 @@ try:
     actualizar_estrutura_planeamento_equipa()
     actualizar_estrutura_assiduidade()
     actualizar_estrutura_jogadores()
+    with SessionLocal() as db:
+        renumerar_todos_os_ciclos(db)
+        db.commit()
     logger.info("Infraestrutura inicial da aplicação preparada com sucesso.")
 except Exception:
     logger.exception("Erro ao arrancar a aplicação: não foi possível preparar a infraestrutura inicial.")

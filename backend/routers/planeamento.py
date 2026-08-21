@@ -43,6 +43,11 @@ from models.espaco_treino import EspacoTreino
 from models.jogo import Jogo
 from services.agenda_service import tipos_agenda_formulario
 from services.planeamento_objetivos_service import contexto_objetivos_superiores, objetivos_por_categoria
+from services.numeracao_planeamento_service import (
+    renumerar_macrociclos,
+    renumerar_mesociclos,
+    renumerar_microciclos,
+)
 
 # prefix="/planeamento" significa que todas as rotas deste router
 # começam com /planeamento — ex: /planeamento/macrociclos
@@ -837,6 +842,8 @@ async def criar_macrociclo(
 
     # db.add() prepara o objecto para ser inserido na BD
     db.add(macrociclo)
+    db.flush()
+    renumerar_macrociclos(db, equipa_id, planeamento_anual.id)
     # db.commit() confirma a transacção — só aqui os dados são realmente guardados
     db.commit()
 
@@ -987,6 +994,7 @@ async def editar_macrociclo(
     macrociclo.obj_tatica_coletiva_defensiva = None
     macrociclo.obj_fisicos = obj_fisicos or None
     macrociclo.obj_psicologicos = obj_psicologicos or None
+    renumerar_macrociclos(db, macrociclo.equipa_id, macrociclo.planeamento_anual_equipa_id)
     db.commit()
     set_flash(request, "Macrociclo atualizado.")
     return RedirectResponse(url=f"/planeamento/macrociclos/{macro_id}", status_code=303)
@@ -1001,6 +1009,8 @@ async def eliminar_macrociclo(macro_id: int, request: Request, db: Session = Dep
     anual_id = macrociclo.planeamento_anual_equipa_id if macrociclo else None
     if macrociclo:
         db.delete(macrociclo)
+        db.flush()
+        renumerar_macrociclos(db, equipa_id, anual_id)
         db.commit()
         set_flash(request, "Macrociclo eliminado.")
     retorno = f"/planeamento/anuais/{anual_id}" if anual_id else f"/planeamento/equipas/{equipa_id}/anuais"
@@ -1045,6 +1055,8 @@ async def criar_mesociclo(
     )
 
     db.add(mesociclo)
+    db.flush()
+    renumerar_mesociclos(db, macro_id)
     db.commit()
     set_flash(request, "Mesociclo criado com sucesso.")
     return RedirectResponse(url=f"/planeamento/macrociclos/{macro_id}", status_code=303)
@@ -1299,6 +1311,7 @@ async def editar_mesociclo(
     mesociclo.obj_tatica_coletiva_defensiva = None
     mesociclo.obj_fisicos = obj_fisicos or None
     mesociclo.obj_psicologicos = obj_psicologicos or None
+    renumerar_mesociclos(db, mesociclo.macrociclo_id)
     db.commit()
     set_flash(request, "Mesociclo atualizado.")
     return RedirectResponse(url=f"/planeamento/mesociclos/{meso_id}", status_code=303)
@@ -1312,6 +1325,8 @@ async def eliminar_mesociclo(meso_id: int, request: Request, db: Session = Depen
     if mesociclo:
         macro_id = mesociclo.macrociclo_id
         db.delete(mesociclo)
+        db.flush()
+        renumerar_mesociclos(db, macro_id)
         db.commit()
         set_flash(request, "Mesociclo eliminado.")
     return RedirectResponse(url=f"/planeamento/macrociclos/{macro_id}" if macro_id else "/equipas", status_code=303)
@@ -1424,6 +1439,7 @@ async def criar_microciclo(
 
     db.add(microciclo)
     db.flush()
+    renumerar_microciclos(db, meso_id)
     eventos_integrados = _integrar_eventos_planeados_no_microciclo(db, microciclo)
     db.commit()
     mensagem = "Microciclo criado com sucesso."
@@ -1485,6 +1501,7 @@ async def editar_microciclo(
     microciclo.obj_tatica_coletiva_defensiva = None
     microciclo.obj_fisicos = obj_fisicos or None
     microciclo.obj_psicologicos = obj_psicologicos or None
+    renumerar_microciclos(db, microciclo.mesociclo_id)
     db.commit()
     set_flash(request, "Microciclo atualizado.")
     return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
@@ -1498,6 +1515,8 @@ async def eliminar_microciclo(micro_id: int, request: Request, db: Session = Dep
     if microciclo:
         meso_id = microciclo.mesociclo_id
         db.delete(microciclo)
+        db.flush()
+        renumerar_microciclos(db, meso_id)
         db.commit()
         set_flash(request, "Microciclo eliminado.")
     return RedirectResponse(url=f"/planeamento/mesociclos/{meso_id}" if meso_id else "/equipas", status_code=303)
