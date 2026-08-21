@@ -49,7 +49,7 @@ def _mensagem_novo_jogo(jogo: Jogo) -> str:
 
 def _nome_clube_pedido(request: Request, equipa: Equipa) -> str:
     identidade = getattr(request.state, "identidade_clube", {}) or {}
-    return identidade.get("nome_oficial") or equipa.nome
+    return identidade.get("nome_curto") or identidade.get("nome_oficial") or equipa.nome
 
 
 def _confrontos(jogos: list[Jogo], nome_clube: str) -> dict[int, str]:

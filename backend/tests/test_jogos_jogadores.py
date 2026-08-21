@@ -39,11 +39,11 @@ def test_mensagem_de_notificacao_de_jogo_inclui_contexto_operacional():
 
 
 def test_confronto_de_jogo_respeita_a_ordem_de_casa_e_fora():
-    assert formatar_confronto("Sport Lisboa e Benfica", "Clube Visitante", True) == (
-        "Sport Lisboa e Benfica vs Clube Visitante"
+    assert formatar_confronto("SL Benfica", "Clube Visitante", True) == (
+        "SL Benfica vs Clube Visitante"
     )
-    assert formatar_confronto("Sport Lisboa e Benfica", "Clube Visitante", False) == (
-        "Clube Visitante vs Sport Lisboa e Benfica"
+    assert formatar_confronto("SL Benfica", "Clube Visitante", False) == (
+        "Clube Visitante vs SL Benfica"
     )
 
 

@@ -89,7 +89,7 @@ def jogos_partilhaveis(equipa_id: int, request: Request, inicio: date | None = N
     if not nome_treinador and equipa.treinadores:
         nome_treinador = equipa.treinadores[0].nome
     identidade = getattr(request.state, "identidade_clube", {}) or {}
-    nome_clube = identidade.get("nome_oficial") or equipa.nome
+    nome_clube = identidade.get("nome_curto") or identidade.get("nome_oficial") or equipa.nome
     pdf = renderizar_pdf(request, "jogos/jogos_partilhavel_pdf.html", {
         "utilizador": utilizador,
         "equipa": equipa,
