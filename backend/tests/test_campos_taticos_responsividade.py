@@ -99,12 +99,16 @@ def test_templates_expoem_navegacao_e_acoes_responsivas_sem_textos_internos():
 
 def test_sidebar_liga_todos_os_niveis_a_listas_independentes():
     sidebar = (ROOT / "frontend/templates/partials/sidebar_contextual.html").read_text(encoding="utf-8")
+    contexto_equipa = (ROOT / "frontend/templates/partials/equipa_contexto.html").read_text(encoding="utf-8")
 
     assert "'/planeamento/equipas/' ~ equipa_contexto_id ~ '/mesociclos'" in sidebar
     assert "'/planeamento/equipas/' ~ equipa_contexto_id ~ '/microciclos'" in sidebar
     assert "'/treino/equipas/' ~ equipa_contexto_id ~ '/planos'" in sidebar
     assert "('/calendario?equipa_id=' ~ equipa_contexto_id)" not in sidebar
     assert "is-disabled" not in sidebar
+    assert 'class="ds-tab-menu"' in contexto_equipa
+    for nivel in ("Plano anual", "Macrociclos", "Mesociclos", "Microciclos", "Planos de treino"):
+        assert nivel in contexto_equipa
 
 
 def test_area_da_equipa_nao_duplica_barra_de_contexto():

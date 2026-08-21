@@ -40,10 +40,25 @@
 
         <div class="ds-tabs">
                 {% for aba in abas %}
+                {% if aba.id == "planeamento" %}
+                <details class="ds-tab-menu" {% if ativo == aba.id %}open{% endif %}>
+                    <summary class="ds-tab {% if ativo == aba.id %}is-active{% endif %}">
+                        {{ aba.label }} <span class="ds-tab-chevron" aria-hidden="true">⌄</span>
+                    </summary>
+                    <div class="ds-tab-submenu" aria-label="Opções de planeamento">
+                        <a href="/planeamento/equipas/{{ equipa.id }}/anuais">Plano anual</a>
+                        <a href="/planeamento/equipas/{{ equipa.id }}/macrociclos">Macrociclos</a>
+                        <a href="/planeamento/equipas/{{ equipa.id }}/mesociclos">Mesociclos</a>
+                        <a href="/planeamento/equipas/{{ equipa.id }}/microciclos">Microciclos</a>
+                        <a href="/treino/equipas/{{ equipa.id }}/planos">Planos de treino</a>
+                    </div>
+                </details>
+                {% else %}
                 <a href="{{ aba.href }}"
                    class="ds-tab {% if ativo == aba.id %}is-active{% endif %}">
                     {{ aba.label }}
                 </a>
+                {% endif %}
                 {% endfor %}
         </div>
     </div>
