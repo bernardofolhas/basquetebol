@@ -107,8 +107,16 @@ def test_sidebar_liga_todos_os_niveis_a_listas_independentes():
     assert "('/calendario?equipa_id=' ~ equipa_contexto_id)" not in sidebar
     assert "is-disabled" not in sidebar
     assert 'class="ds-tab-menu"' in contexto_equipa
+    assert 'data-planning-menu' in contexto_equipa
+    assert 'ativo == aba.id %}open' not in contexto_equipa
     for nivel in ("Plano anual", "Macrociclos", "Mesociclos", "Microciclos", "Planos de treino"):
         assert nivel in contexto_equipa
+
+    estilos = (ROOT / "frontend/static/css/design-system.css").read_text(encoding="utf-8")
+    base = (ROOT / "frontend/templates/base.html").read_text(encoding="utf-8")
+    assert "overflow-y:hidden" in estilos
+    assert ".ds-tab-submenu { position:fixed;" in estilos
+    assert 'menuDetails.addEventListener("mouseleave"' in base
 
 
 def test_area_da_equipa_nao_duplica_barra_de_contexto():

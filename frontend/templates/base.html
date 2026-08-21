@@ -58,6 +58,14 @@
       if(menu)menu.addEventListener("click",function(){sidebar.classList.contains("-translate-x-full")?openMenu():closeMenu()});if(overlay)overlay.addEventListener("click",closeMenu);sidebar.querySelectorAll("[data-sidebar-link]").forEach(function(link){link.addEventListener("click",closeMenu)});
       var collapsed=localStorage.getItem("sidebar-collapsed")==="1";function applyCollapse(){document.body.classList.toggle("sidebar-is-collapsed",collapsed);if(collapse){collapse.setAttribute("aria-label",collapsed?"Expandir menu":"Recolher menu");collapse.title=collapsed?"Expandir menu":"Recolher menu"}}applyCollapse();if(collapse)collapse.addEventListener("click",function(){collapsed=!collapsed;localStorage.setItem("sidebar-collapsed",collapsed?"1":"0");applyCollapse()});
       document.querySelectorAll(".ds-menu").forEach(function(menuDetails){menuDetails.addEventListener("toggle",function(){if(menuDetails.open)document.querySelectorAll(".ds-menu[open]").forEach(function(other){if(other!==menuDetails)other.removeAttribute("open")})})});
+      document.querySelectorAll("[data-planning-menu]").forEach(function(menuDetails){
+        var summary=menuDetails.querySelector("summary"),submenu=menuDetails.querySelector(".ds-tab-submenu"),closeTimer;
+        function positionMenu(){var rect=summary.getBoundingClientRect(),left=Math.max(8,Math.min(rect.left,window.innerWidth-submenu.offsetWidth-8));submenu.style.left=left+"px";submenu.style.top=rect.bottom+"px"}
+        menuDetails.addEventListener("toggle",function(){if(menuDetails.open){document.querySelectorAll("[data-planning-menu][open]").forEach(function(other){if(other!==menuDetails)other.removeAttribute("open")});positionMenu()}});
+        menuDetails.addEventListener("mouseleave",function(){closeTimer=setTimeout(function(){if(!menuDetails.matches(":hover"))menuDetails.removeAttribute("open")},120)});
+        menuDetails.addEventListener("mouseenter",function(){clearTimeout(closeTimer)});
+        window.addEventListener("resize",function(){if(menuDetails.open)positionMenu()});
+      });
       window.addEventListener("resize",function(){if(window.innerWidth>=1024){overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}});
     });
   </script>

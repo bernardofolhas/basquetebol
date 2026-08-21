@@ -41,7 +41,7 @@
         <div class="ds-tabs">
                 {% for aba in abas %}
                 {% if aba.id == "planeamento" %}
-                <details class="ds-tab-menu" {% if ativo == aba.id %}open{% endif %}>
+                <details class="ds-tab-menu" data-planning-menu>
                     <summary class="ds-tab {% if ativo == aba.id %}is-active{% endif %}">
                         {{ aba.label }} <span class="ds-tab-chevron" aria-hidden="true">⌄</span>
                     </summary>

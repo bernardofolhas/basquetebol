@@ -202,7 +202,7 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
 .ds-team-hero h1 { margin-top:.35rem; color:var(--text-main); font-size:1.6rem; font-weight:800; letter-spacing:-.04em; line-height:1.15; }
 .ds-team-meta { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.85rem; }
 .ds-team-meta span { border:1px solid var(--border-soft); border-radius:999px; background:rgb(255 255 255 / .78); padding:.32rem .6rem; color:#526176; font-size:.74rem; font-weight:700; }
-.ds-tabs { display:flex; gap:.35rem; overflow-x:auto; border-top:1px solid var(--border-soft); background:rgb(255 255 255 / .72); padding:.65rem .8rem; scrollbar-width:thin; }
+.ds-tabs { display:flex; gap:.35rem; overflow-x:auto; overflow-y:hidden; border-top:1px solid var(--border-soft); background:rgb(255 255 255 / .72); padding:.65rem .8rem; scrollbar-width:thin; }
 .ds-tab { display:inline-flex; flex:none; align-items:center; border:1px solid transparent; border-radius:.58rem; padding:.52rem .72rem; color:#5b687b; font-size:.8rem; font-weight:750; transition:background .15s,border-color .15s,color .15s; }
 .ds-tab:hover { border-color:var(--clube-primary-border); background:var(--clube-primary-surface); color:var(--clube-primary-dark); }
 .ds-tab.is-active { border-color:var(--clube-primary); background:var(--clube-primary); color:var(--clube-on-primary); box-shadow:0 4px 10px color-mix(in srgb,var(--clube-primary) 18%,transparent); }
@@ -211,7 +211,7 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
 .ds-tab-menu>summary::-webkit-details-marker { display:none; }
 .ds-tab-chevron { margin-left:.4rem; font-size:.9rem; line-height:1; transition:transform .15s; }
 .ds-tab-menu[open] .ds-tab-chevron { transform:rotate(180deg); }
-.ds-tab-submenu { position:absolute; z-index:20; top:calc(100% + .45rem); left:0; min-width:11.5rem; padding:.35rem; border:1px solid var(--border-soft); border-radius:.7rem; background:#fff; box-shadow:0 12px 28px rgb(15 23 42 / .16); }
+.ds-tab-submenu { position:fixed; z-index:60; min-width:11.5rem; padding:.35rem; border:1px solid var(--border-soft); border-radius:.7rem; background:#fff; box-shadow:0 12px 28px rgb(15 23 42 / .16); }
 .ds-tab-submenu a { display:block; border-radius:.45rem; padding:.52rem .62rem; color:#46566d; font-size:.8rem; font-weight:700; white-space:nowrap; }
 .ds-tab-submenu a:hover { background:var(--clube-primary-surface); color:var(--clube-primary-dark); }
 .ds-record-card { border:1px solid var(--border-soft); border-radius:.9rem; background:#fff; padding:1.1rem; box-shadow:var(--shadow-card); transition:transform .16s,box-shadow .16s,border-color .16s; }
