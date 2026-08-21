@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from auth import verificar_perfil
 from auth_deps import exigir_autenticacao, verificar_ou_negar_equipa
 from database import get_db
 from flash import set_flash
@@ -12,6 +13,7 @@ from models.equipa import Equipa
 from models.jogador import Jogador
 from models.jogo import Convocado, Jogo, PlanoJogo
 from paths import TEMPLATES_DIR
+from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.pdf_service import renderizar_pdf
 
 router = APIRouter(prefix="/jogos")
@@ -31,6 +33,17 @@ def _atualizar_campos_jogo(jogo: Jogo, data: str, hora: str, local: str,
     jogo.competicao = competicao or None
     jogo.em_casa = em_casa == "true"
     jogo.observacoes = observacoes or None
+
+
+def _mensagem_novo_jogo(jogo: Jogo) -> str:
+    """Resumo curto e útil para a caixa de notificações do treinador."""
+    detalhes = [jogo.data.strftime("%d/%m/%Y")]
+    if jogo.hora:
+        detalhes.append(jogo.hora)
+    if jogo.local:
+        detalhes.append(jogo.local)
+    localidade = "em casa" if jogo.em_casa else "fora"
+    return f"{jogo.adversario} · {localidade} · " + " · ".join(detalhes)
 
 
 @router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
@@ -104,6 +117,18 @@ async def criar_jogo(
         equipa_id=equipa_id,
     )
     db.add(jogo)
+    db.flush()
+
+    if verificar_perfil(utilizador, ["administrador", "coordenador"]):
+        equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+        if equipa:
+            criar_notificacoes_para_equipa(
+                db,
+                equipa,
+                "Jogo marcado",
+                _mensagem_novo_jogo(jogo),
+                f"/jogos/{jogo.id}",
+            )
     db.commit()
     set_flash(request, f"Jogo contra '{adversario}' criado.")
     return RedirectResponse(url=f"/jogos/equipas/{equipa_id}", status_code=303)

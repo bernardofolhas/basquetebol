@@ -5,6 +5,8 @@ import sys
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from main import app
+from models.jogo import Jogo
+from routers.jogos import _mensagem_novo_jogo
 from testsupport import TestClient
 
 
@@ -20,6 +22,19 @@ NOME_JOGADOR_TESTE = "Jogador Integridade Sprint 12"
 
 def _criar_client():
     return TestClient(app)
+
+
+def test_mensagem_de_notificacao_de_jogo_inclui_contexto_operacional():
+    jogo = Jogo(
+        data=date(2026, 9, 5),
+        hora="18:30",
+        local="Pavilhão Principal",
+        adversario="Clube Visitante",
+        em_casa=False,
+        equipa_id=1,
+    )
+
+    assert _mensagem_novo_jogo(jogo) == "Clube Visitante · fora · 05/09/2026 · 18:30 · Pavilhão Principal"
 
 
 def _fazer_login(client: TestClient, perfil: str):
