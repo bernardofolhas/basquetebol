@@ -92,7 +92,7 @@
                         <span class="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{{ jogo.competicao }}</span>
                         {% endif %}
                     </div>
-                    <p class="font-bold text-gray-800 mt-1">vs {{ jogo.adversario }}</p>
+                    <p class="font-bold text-gray-800 mt-1">{{ confrontos[jogo.id] }}</p>
                     <div class="flex items-center gap-3 text-xs text-gray-400 mt-1">
                         {% if jogo.hora %}<span>🕐 {{ jogo.hora }}</span>{% endif %}
                         {% if jogo.local %}<span>📍 {{ jogo.local }}</span>{% endif %}

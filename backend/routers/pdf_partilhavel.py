@@ -12,6 +12,7 @@ from models.planeamento import Macrociclo, Mesociclo, Microciclo
 from models.planeamento_clube import PlaneamentoClubeAnual, PlanoSemanalClube
 from services.pdf_partilhavel_service import preparar_calendario_intervalo_partilhavel
 from services.pdf_service import renderizar_pdf
+from services.jogos_service import formatar_confronto
 
 
 router = APIRouter(prefix="/partilha", tags=["PDF partilhável"])
@@ -87,10 +88,16 @@ def jogos_partilhaveis(equipa_id: int, request: Request, inicio: date | None = N
     nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
     if not nome_treinador and equipa.treinadores:
         nome_treinador = equipa.treinadores[0].nome
+    identidade = getattr(request.state, "identidade_clube", {}) or {}
+    nome_clube = identidade.get("nome_oficial") or equipa.nome
     pdf = renderizar_pdf(request, "jogos/jogos_partilhavel_pdf.html", {
         "utilizador": utilizador,
         "equipa": equipa,
         "jogos": jogos,
+        "confrontos": {
+            jogo.id: formatar_confronto(nome_clube, jogo.adversario, jogo.em_casa)
+            for jogo in jogos
+        },
         "data_inicio": inicio,
         "data_fim": fim,
         "nome_treinador": nome_treinador or utilizador.nome,

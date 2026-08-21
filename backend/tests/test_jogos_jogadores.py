@@ -7,6 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from main import app
 from models.jogo import Jogo
 from routers.jogos import _mensagem_novo_jogo
+from services.jogos_service import formatar_confronto
 from testsupport import TestClient
 
 
@@ -35,6 +36,15 @@ def test_mensagem_de_notificacao_de_jogo_inclui_contexto_operacional():
     )
 
     assert _mensagem_novo_jogo(jogo) == "Clube Visitante · fora · 05/09/2026 · 18:30 · Pavilhão Principal"
+
+
+def test_confronto_de_jogo_respeita_a_ordem_de_casa_e_fora():
+    assert formatar_confronto("Sport Lisboa e Benfica", "Clube Visitante", True) == (
+        "Sport Lisboa e Benfica vs Clube Visitante"
+    )
+    assert formatar_confronto("Sport Lisboa e Benfica", "Clube Visitante", False) == (
+        "Clube Visitante vs Sport Lisboa e Benfica"
+    )
 
 
 def _fazer_login(client: TestClient, perfil: str):

@@ -15,6 +15,7 @@ from models.jogo import Convocado, Jogo, PlanoJogo
 from paths import TEMPLATES_DIR
 from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.pdf_service import renderizar_pdf
+from services.jogos_service import formatar_confronto
 
 router = APIRouter(prefix="/jogos")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -46,6 +47,18 @@ def _mensagem_novo_jogo(jogo: Jogo) -> str:
     return f"{jogo.adversario} · {localidade} · " + " · ".join(detalhes)
 
 
+def _nome_clube_pedido(request: Request, equipa: Equipa) -> str:
+    identidade = getattr(request.state, "identidade_clube", {}) or {}
+    return identidade.get("nome_oficial") or equipa.nome
+
+
+def _confrontos(jogos: list[Jogo], nome_clube: str) -> dict[int, str]:
+    return {
+        jogo.id: formatar_confronto(nome_clube, jogo.adversario, jogo.em_casa)
+        for jogo in jogos
+    }
+
+
 @router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
 def calendario_jogos(
     equipa_id: int,
@@ -60,11 +73,13 @@ def calendario_jogos(
         return RedirectResponse(url="/equipas")
 
     jogos = db.query(Jogo).filter(Jogo.equipa_id == equipa_id).order_by(Jogo.data).all()
+    nome_clube = _nome_clube_pedido(request, equipa)
 
     return templates.TemplateResponse(request, "jogos/calendario.html", {
         "utilizador": utilizador,
         "equipa": equipa,
         "jogos": jogos,
+        "confrontos": _confrontos(jogos, nome_clube),
     })
 
 
@@ -80,10 +95,12 @@ def exportar_pdf_calendario_equipa(
     if not equipa:
         return RedirectResponse(url="/equipas")
     jogos = db.query(Jogo).filter(Jogo.equipa_id == equipa_id).order_by(Jogo.data, Jogo.hora).all()
+    nome_clube = _nome_clube_pedido(request, equipa)
     pdf_bytes = renderizar_pdf(request, "jogos/calendario_pdf.html", {
         "utilizador": utilizador,
         "equipa": equipa,
         "jogos": jogos,
+        "confrontos": _confrontos(jogos, nome_clube),
         "hoje": date.today(),
     })
     nome = f"calendario_{equipa.nome}_{equipa.id}.pdf".replace(" ", "_")
