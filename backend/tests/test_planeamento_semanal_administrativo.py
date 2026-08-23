@@ -220,6 +220,29 @@ def test_reserva_publicada_cria_previsao_na_agenda_sem_criar_sessao_tecnica():
         repor_clube_atual(token)
 
 
+def test_treino_fisico_publicado_cria_previsao_identificada_na_agenda():
+    db, token, espaco, equipa, treinador, semanal = _contexto()
+    try:
+        atribuicao = AtribuicaoEspacoSemanal(
+            clube_id=1, plano_semanal_id=semanal.id, espaco_id=espaco.id,
+            equipa_id=equipa.id, treinador_id=treinador.id, data=date(2026, 8, 3),
+            hora_inicio="18:00", hora_fim="19:30", tipo_ocupacao=TipoOcupacaoEspacoEnum.treino_fisico,
+            estado=EstadoAtribuicaoEspacoEnum.publicado,
+        )
+        db.add(atribuicao)
+        db.flush()
+
+        mensagem = sincronizar_atribuicao_com_agenda(db, atribuicao)
+        db.commit()
+
+        evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == atribuicao.evento_id).one()
+        assert evento.titulo == "Treino físico"
+        assert "agenda da equipa" in mensagem
+    finally:
+        db.close()
+        repor_clube_atual(token)
+
+
 def test_rascunho_nao_aparece_na_agenda_antes_do_envio():
     db, token, espaco, equipa, treinador, semanal = _contexto()
     try:

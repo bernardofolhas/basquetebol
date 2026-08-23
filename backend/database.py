@@ -249,6 +249,16 @@ def actualizar_estrutura_planeamento_clube() -> None:
                         f"ALTER TYPE tipoeventoplaneamentoclubeenum ADD VALUE '{tipo}'"
                     ))
 
+            existe_treino_fisico = ligacao.execute(text(
+                "SELECT 1 FROM pg_enum "
+                "WHERE enumtypid = 'tipoocupacaoespacoenum'::regtype "
+                "AND enumlabel = 'treino_fisico'"
+            )).first()
+            if not existe_treino_fisico:
+                ligacao.execute(text(
+                    "ALTER TYPE tipoocupacaoespacoenum ADD VALUE 'treino_fisico'"
+                ))
+
         if "espaco_id" not in colunas_eventos:
             if dialecto == "postgresql":
                 ligacao.execute(text(

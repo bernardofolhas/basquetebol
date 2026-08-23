@@ -4,11 +4,12 @@ from uuid import uuid4
 from database import SessionLocal
 from models.clube import Clube
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
-from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnualEquipa
+from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnualEquipa, SessaoTreino
 from services.numeracao_planeamento_service import (
     renumerar_macrociclos,
     renumerar_mesociclos,
     renumerar_microciclos,
+    renumerar_treinos_equipa,
     renumerar_todos_os_ciclos,
 )
 
@@ -43,14 +44,27 @@ def test_ciclos_sao_renumerados_pela_data_de_inicio():
         db.add_all([micro_tardio, micro_cedo])
         db.flush()
         renumerar_microciclos(db, meso_cedo.id)
+        sessao_tardia = SessaoTreino(
+            clube_id=clube.id, microciclo_id=micro_cedo.id, data=date(2026, 1, 5),
+            hora_inicio="20:00", numero_treino=9, e_jogo=False, ativa=True,
+        )
+        sessao_cedo = SessaoTreino(
+            clube_id=clube.id, microciclo_id=micro_cedo.id, data=date(2026, 1, 2),
+            hora_inicio="18:00", numero_treino=8, e_jogo=False, ativa=True,
+        )
+        db.add_all([sessao_tardia, sessao_cedo])
+        db.flush()
+        renumerar_treinos_equipa(db, equipa.id)
         renumerar_todos_os_ciclos(db)
         db.commit()
 
         assert (macro_cedo.numero, macro_tardio.numero) == (1, 2)
         assert (meso_cedo.numero, meso_tardio.numero) == (1, 2)
         assert (micro_cedo.numero, micro_tardio.numero) == (1, 2)
+        assert (sessao_cedo.numero_treino, sessao_tardia.numero_treino) == (1, 2)
     finally:
         db.rollback()
+        db.query(SessaoTreino).execution_options(ignorar_clube=True).filter(SessaoTreino.clube_id == clube.id).delete(synchronize_session=False)
         db.query(Microciclo).execution_options(ignorar_clube=True).filter(Microciclo.clube_id == clube.id).delete(synchronize_session=False)
         db.query(Mesociclo).execution_options(ignorar_clube=True).filter(Mesociclo.clube_id == clube.id).delete(synchronize_session=False)
         db.query(Macrociclo).execution_options(ignorar_clube=True).filter(Macrociclo.clube_id == clube.id).delete(synchronize_session=False)

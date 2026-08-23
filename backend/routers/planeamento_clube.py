@@ -62,6 +62,7 @@ from services.numeracao_planeamento_service import (
     renumerar_macrociclos,
     renumerar_mesociclos,
     renumerar_microciclos,
+    renumerar_treinos_equipa,
 )
 from services.pdf_service import renderizar_pdf
 from services.sincronizacao_ui import (
@@ -2354,6 +2355,7 @@ async def gravar_atribuicoes_rapidas(
             data_atribuicao = str(item.get("data", ""))
             hora_inicio = normalizar_hora(str(item.get("hora_inicio", "")), permitir_vazio=False)
             hora_fim = normalizar_hora(str(item.get("hora_fim", "")), permitir_vazio=False)
+            tipo_ocupacao = str(item.get("tipo_ocupacao", TipoOcupacaoEspacoEnum.treino_equipa.value))
             erro = _validar_dados_atribuicao(semanal, data_atribuicao, hora_inicio, hora_fim)
             if erro:
                 raise ValueError(f"A atribuição {indice}: {erro}")
@@ -2387,7 +2389,7 @@ async def gravar_atribuicoes_rapidas(
                 data_atribuicao,
                 hora_inicio,
                 hora_fim,
-                TipoOcupacaoEspacoEnum.treino_equipa.value,
+                tipo_ocupacao,
                 EstadoAtribuicaoEspacoEnum.rascunho.value,
                 OrigemAtribuicaoEspacoEnum.manual.value,
                 "",
@@ -2458,10 +2460,12 @@ async def enviar_atribuicoes_aos_treinadores(
         atribuicao.estado = EstadoAtribuicaoEspacoEnum.publicado
         mensagens.append(sincronizar_atribuicao_com_agenda(db, atribuicao))
         if atribuicao.equipa:
+            renumerar_treinos_equipa(db, atribuicao.equipa_id)
+            tipo_treino = "Treino físico" if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_fisico else "Treino"
             notificacoes_criadas += criar_notificacoes_para_equipa(
                 db,
                 atribuicao.equipa,
-                "Treino atualizado",
+                f"{tipo_treino} atualizado",
                 f"{atribuicao.data.strftime('%d/%m/%Y')} · {atribuicao.hora_inicio}–{atribuicao.hora_fim} · {atribuicao.espaco.nome}",
                 f"/calendario?equipa_id={atribuicao.equipa_id}",
             )
@@ -2936,6 +2940,8 @@ async def criar_atribuicao(
     db.add(atribuicao)
     db.flush()
     mensagem_sincronizacao = sincronizar_atribuicao_com_agenda(db, atribuicao)
+    if atribuicao.equipa_id:
+        renumerar_treinos_equipa(db, atribuicao.equipa_id)
     registar_historico_planeamento(db, utilizador, "plano_semanal", semanal.id, "reserva_criada", f"{data_convertida} {hora_inicio}-{hora_fim}.")
     registar_auditoria(db, utilizador, "criar", "atribuicao_espaco_semanal", atribuicao.id, observacoes, request)
     db.commit()
@@ -3063,6 +3069,7 @@ async def editar_atribuicao(
         )
         return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
 
+    equipa_id_anterior = atribuicao.equipa_id
     try:
         _atualizar_atribuicao(
             atribuicao,
@@ -3091,6 +3098,8 @@ async def editar_atribuicao(
         )
         return templates.TemplateResponse(request, "planeamento_clube/atribuicao_form.html", contexto, status_code=400)
     mensagem_sincronizacao = sincronizar_atribuicao_com_agenda(db, atribuicao)
+    for equipa_id in {equipa_id_anterior, atribuicao.equipa_id} - {None}:
+        renumerar_treinos_equipa(db, equipa_id)
     registar_historico_planeamento(db, utilizador, "plano_semanal", semanal.id, "reserva_alterada", f"{data_convertida} {hora_inicio}-{hora_fim}.")
     registar_auditoria(db, utilizador, "editar", "atribuicao_espaco_semanal", atribuicao.id, observacoes, request)
     db.commit()
@@ -3112,6 +3121,7 @@ async def eliminar_atribuicao(
         return RedirectResponse(url="/planeamento-clube/anual", status_code=303)
 
     semanal_id = atribuicao.plano_semanal_id
+    equipa_id = atribuicao.equipa_id
     notificacoes_criadas = _notificar_cancelamento_atribuicao(db, atribuicao)
     evento = atribuicao.evento
     if evento:
@@ -3127,6 +3137,8 @@ async def eliminar_atribuicao(
     registar_historico_planeamento(db, utilizador, "plano_semanal", semanal_id, "reserva_anulada", f"Reserva #{atribuicao.id} anulada.")
     registar_auditoria(db, utilizador, "anular", "atribuicao_espaco_semanal", atribuicao.id, f"{notificacoes_criadas} notificação(ões) enviada(s).", request)
     db.delete(atribuicao)
+    if equipa_id:
+        renumerar_treinos_equipa(db, equipa_id)
     db.commit()
 
     set_flash(request, f"Marcação anulada. Foram avisados {notificacoes_criadas} treinador(es).")
@@ -3243,6 +3255,7 @@ def _notificar_cancelamento_atribuicao(db: Session, atribuicao: AtribuicaoEspaco
         or not atribuicao.equipa
         or atribuicao.tipo_ocupacao not in {
             TipoOcupacaoEspacoEnum.treino_equipa,
+            TipoOcupacaoEspacoEnum.treino_fisico,
             TipoOcupacaoEspacoEnum.treino_individual,
         }
     ):
@@ -3250,7 +3263,7 @@ def _notificar_cancelamento_atribuicao(db: Session, atribuicao: AtribuicaoEspaco
     return criar_notificacoes_para_equipa(
         db,
         atribuicao.equipa,
-        "Treino cancelado",
+        "Treino físico cancelado" if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_fisico else "Treino cancelado",
         (
             f"Foi anulada a marcação de treino de {atribuicao.data.strftime('%d/%m/%Y')} "
             f"das {atribuicao.hora_inicio} às {atribuicao.hora_fim} em {atribuicao.espaco.nome}."
@@ -3272,6 +3285,7 @@ def _notificar_cancelamento_plano_semanal(
             and atribuicao.equipa
             and atribuicao.tipo_ocupacao in {
                 TipoOcupacaoEspacoEnum.treino_equipa,
+                TipoOcupacaoEspacoEnum.treino_fisico,
                 TipoOcupacaoEspacoEnum.treino_individual,
             }
         ):

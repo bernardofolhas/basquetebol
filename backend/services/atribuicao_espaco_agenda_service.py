@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from models.atribuicao_espaco_semanal import EstadoAtribuicaoEspacoEnum, TipoOcupacaoEspacoEnum
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.planeamento_clube import EventoPlaneamentoClube, OrigemEventoPlaneamentoClubeEnum, TipoEventoPlaneamentoClubeEnum
+from services.numeracao_planeamento_service import renumerar_treinos_equipa
 
 
 def _sobrepoe(inicio_a: str, fim_a: str, inicio_b: str | None, fim_b: str | None) -> bool:
@@ -28,6 +29,7 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
         or not atribuicao.equipa_id
         or atribuicao.tipo_ocupacao not in {
             TipoOcupacaoEspacoEnum.treino_equipa,
+            TipoOcupacaoEspacoEnum.treino_fisico,
             TipoOcupacaoEspacoEnum.treino_individual,
         }
     ):
@@ -54,7 +56,11 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
             tipo=(TipoEventoPlaneamentoClubeEnum.treino_individual
                   if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_individual
                   else TipoEventoPlaneamentoClubeEnum.treino_equipa),
-            titulo="Treino",
+            titulo=(
+                "Treino físico"
+                if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_fisico
+                else "Treino"
+            ),
             descricao="Horário e espaço definidos para a equipa.",
             data=atribuicao.data,
             hora_inicio=atribuicao.hora_inicio,
@@ -69,8 +75,12 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
         db.flush()
     else:
         # Normaliza também previsões antigas quando voltam a ser publicadas.
-        if evento.titulo == "Treino previsto pelo clube":
-            evento.titulo = "Treino"
+        if evento.titulo in {"Treino previsto pelo clube", "Treino", "Treino físico"}:
+            evento.titulo = (
+                "Treino físico"
+                if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_fisico
+                else "Treino"
+            )
         evento.espaco_id = atribuicao.espaco_id
         evento.treinador_id = atribuicao.treinador_id
         evento.plano_semanal_id = atribuicao.plano_semanal_id
@@ -97,5 +107,6 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
             sessao.intensidade_rpe = 0
         sessao.plano_semanal_clube_id = atribuicao.plano_semanal_id
         sessao.evento_planeamento_clube_id = evento.id
+        renumerar_treinos_equipa(db, atribuicao.equipa_id)
         return "Previsão publicada e local aplicado ao treino técnico coincidente."
     return "Previsão publicada na agenda da equipa; ainda não existe um treino técnico coincidente."

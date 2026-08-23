@@ -9,6 +9,7 @@ from database import Base
 
 class TipoOcupacaoEspacoEnum(str, enum.Enum):
     treino_equipa = "treino_equipa"
+    treino_fisico = "treino_fisico"
     treino_individual = "treino_individual"
     jogo = "jogo"
     atividade = "atividade"

@@ -2,7 +2,7 @@
 
 from sqlalchemy.orm import Session
 
-from models.planeamento import Macrociclo, Mesociclo, Microciclo
+from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 
 
 def _renumerar(ciclos: list) -> None:
@@ -34,6 +34,26 @@ def renumerar_microciclos(db: Session, mesociclo_id: int) -> None:
     _renumerar(ciclos)
 
 
+def renumerar_treinos_equipa(db: Session, equipa_id: int) -> None:
+    """Numera os treinos ativos pela data e hora dentro de cada microciclo."""
+    sessoes = db.query(SessaoTreino).execution_options(ignorar_clube=True).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+        SessaoTreino.e_jogo.is_(False),
+        SessaoTreino.ativa.is_(True),
+    ).order_by(
+        SessaoTreino.microciclo_id,
+        SessaoTreino.data,
+        SessaoTreino.hora_inicio,
+        SessaoTreino.id,
+    ).all()
+    grupos: dict[int, list[SessaoTreino]] = {}
+    for sessao in sessoes:
+        grupos.setdefault(sessao.microciclo_id, []).append(sessao)
+    for grupo in grupos.values():
+        for numero, sessao in enumerate(grupo, start=1):
+            sessao.numero_treino = numero
+
+
 def renumerar_todos_os_ciclos(db: Session) -> None:
     """Alinha também os ciclos existentes quando a aplicação arranca."""
     macrociclos = db.query(Macrociclo).execution_options(ignorar_clube=True).order_by(
@@ -63,3 +83,11 @@ def renumerar_todos_os_ciclos(db: Session) -> None:
         grupos_micro.setdefault(micro.mesociclo_id, []).append(micro)
     for grupo in grupos_micro.values():
         _renumerar(grupo)
+
+    equipas_ids = {
+        equipa_id for (equipa_id,) in db.query(Macrociclo.equipa_id).execution_options(
+            ignorar_clube=True
+        ).distinct().all()
+    }
+    for equipa_id in equipas_ids:
+        renumerar_treinos_equipa(db, equipa_id)
