@@ -1605,8 +1605,6 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
         "categorias_conteudo": categorias_conteudo_para_ui(),
         "categorias_conteudo_por_codigo": CATEGORIAS_POR_CODIGO,
         "visao_semanal_conteudos": construir_visao_semanal_conteudos(
-            microciclo.data_inicio,
-            microciclo.data_fim,
             [sessao for sessao in sessoes_ativas if not sessao.e_jogo],
         ),
         "calendario_semanal": calendario_semanal,

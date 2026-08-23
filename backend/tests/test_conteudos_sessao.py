@@ -45,16 +45,13 @@ def test_visao_semanal_organiza_conteudos_por_dia_e_categoria():
         )],
     )
 
-    dias = construir_visao_semanal_conteudos(
-        date(2026, 7, 20), date(2026, 7, 26), [sessao]
-    )
+    treinos = construir_visao_semanal_conteudos([sessao])
 
-    assert len(dias) == 7
-    assert dias[0]["dia_semana"] == "Segunda-feira"
-    entrada = dias[2]["conteudos_por_categoria"]["tatica_coletiva_ofensiva"][0]
+    assert len(treinos) == 1
+    assert treinos[0]["dia_semana"] == "Quarta-feira"
+    entrada = treinos[0]["conteudos_por_categoria"]["tatica_coletiva_ofensiva"][0]
     assert entrada == {
-        "sessao_id": 12,
-        "treino_numero": 3,
+        "id": None,
         "descricao": "Saída de pressão",
         "minutos": 18,
     }

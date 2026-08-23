@@ -1,6 +1,6 @@
 """Regras para os conteúdos distribuídos pelos treinos do microciclo."""
 
-from datetime import date, timedelta
+from datetime import date
 
 CATEGORIAS_CONTEUDO_SESSAO = (
     ("tecnica_individual_ofensiva", "Técnica individual ofensiva", "TIO", "min_tecnica_individual_ofensiva"),
@@ -48,34 +48,30 @@ def atualizar_minutos_por_componente(sessao) -> None:
 
 
 def construir_visao_semanal_conteudos(
-    data_inicio: date,
-    data_fim: date,
     sessoes: list,
 ) -> list[dict]:
-    """Prepara a grelha semanal: dias nas colunas e componentes nas linhas."""
-    sessoes_por_data: dict[date, list] = {}
-    for sessao in sessoes:
-        sessoes_por_data.setdefault(sessao.data, []).append(sessao)
-
-    dias = []
-    data_atual = data_inicio
-    while data_atual <= data_fim:
+    """Prepara a grelha: apenas treinos previstos nas colunas."""
+    treinos = []
+    for sessao in sorted(
+        sessoes,
+        key=lambda item: (item.data, getattr(item, "hora_inicio", None) or "", item.id or 0),
+    ):
         conteudos_por_categoria = {codigo: [] for codigo in CATEGORIAS_POR_CODIGO}
-        treinos = sessoes_por_data.get(data_atual, [])
-        for sessao in treinos:
-            for conteudo in sessao.conteudos:
-                if conteudo.categoria in conteudos_por_categoria:
-                    conteudos_por_categoria[conteudo.categoria].append({
-                        "sessao_id": sessao.id,
-                        "treino_numero": sessao.numero_treino,
-                        "descricao": conteudo.descricao,
-                        "minutos": conteudo.minutos,
-                    })
-        dias.append({
-            "data": data_atual,
-            "dia_semana": NOMES_DIAS_SEMANA[data_atual.weekday()],
-            "treinos": treinos,
+        for conteudo in sessao.conteudos:
+            if conteudo.categoria in conteudos_por_categoria:
+                conteudos_por_categoria[conteudo.categoria].append({
+                    "id": getattr(conteudo, "id", None),
+                    "descricao": conteudo.descricao,
+                    "minutos": conteudo.minutos,
+                })
+        treinos.append({
+            "sessao_id": sessao.id,
+            "numero_treino": sessao.numero_treino,
+            "data": sessao.data,
+            "dia_semana": NOMES_DIAS_SEMANA[sessao.data.weekday()],
+            "hora_inicio": getattr(sessao, "hora_inicio", None),
+            "hora_fim": getattr(sessao, "hora_fim", None),
+            "local": getattr(sessao, "local", None),
             "conteudos_por_categoria": conteudos_por_categoria,
         })
-        data_atual += timedelta(days=1)
-    return dias
+    return treinos
