@@ -59,6 +59,7 @@ from services.conteudos_sessao_service import (
     CATEGORIAS_POR_CODIGO,
     atualizar_minutos_por_componente,
     categorias_conteudo_para_ui,
+    construir_visao_semanal_conteudos,
 )
 
 # prefix="/planeamento" significa que todas as rotas deste router
@@ -1603,6 +1604,11 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
         ],
         "categorias_conteudo": categorias_conteudo_para_ui(),
         "categorias_conteudo_por_codigo": CATEGORIAS_POR_CODIGO,
+        "visao_semanal_conteudos": construir_visao_semanal_conteudos(
+            microciclo.data_inicio,
+            microciclo.data_fim,
+            [sessao for sessao in sessoes_ativas if not sessao.e_jogo],
+        ),
         "calendario_semanal": calendario_semanal,
         "filtro_sessoes_atual": filtro_sessoes,
         "filtros_sessoes": filtros_sessoes,

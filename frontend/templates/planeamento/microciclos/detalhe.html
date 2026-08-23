@@ -152,10 +152,66 @@
 
 {{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, equipas_agenda|default([]), request.session.get('_csrf', '')) }}
 
+<section class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
+    <div class="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 md:flex-row md:items-end md:justify-between">
+        <div>
+            <h2 class="font-semibold text-gray-800">Visão semanal dos conteúdos</h2>
+            <p class="mt-1 text-sm text-gray-500">Uma leitura global da distribuição do trabalho por dia e componente.</p>
+        </div>
+        <span class="text-xs text-slate-400">No telemóvel, desliza o quadro para ver todos os dias.</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-[1100px] w-full border-collapse text-left">
+            <thead class="bg-slate-800 text-white">
+                <tr>
+                    <th class="w-48 border-r border-slate-700 px-4 py-3 text-xs font-semibold uppercase tracking-wide">Componente</th>
+                    {% for dia in visao_semanal_conteudos %}
+                    <th class="min-w-36 border-r border-slate-700 px-3 py-3 text-center last:border-r-0">
+                        <span class="block text-xs font-semibold">{{ dia.dia_semana }}</span>
+                        <span class="mt-0.5 block text-[11px] font-normal text-slate-300">{{ dia.data|data_pt }}</span>
+                        {% if dia.treinos %}
+                        <span class="mt-1 inline-block rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-medium">{% for treino in dia.treinos %}T{{ treino.numero_treino or loop.index }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+                        {% endif %}
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for categoria in categorias_conteudo %}
+                <tr class="border-b border-slate-200 last:border-b-0">
+                    <th class="border-r border-slate-200 bg-slate-50 px-4 py-3 align-top">
+                        <span class="block text-xs font-bold text-orange-700">{{ categoria.sigla }}</span>
+                        <span class="mt-0.5 block text-[11px] font-medium text-slate-600">{{ categoria.label }}</span>
+                    </th>
+                    {% for dia in visao_semanal_conteudos %}
+                    {% set conteudos = dia.conteudos_por_categoria[categoria.codigo] %}
+                    <td class="min-w-36 border-r border-slate-200 p-2 align-top last:border-r-0">
+                        {% if conteudos %}
+                        <div class="space-y-1.5">
+                            {% for conteudo in conteudos %}
+                            <a href="#treino-conteudos-{{ conteudo.sessao_id }}" class="block rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700 transition hover:border-orange-300 hover:bg-orange-100">
+                                <span class="font-bold text-orange-700">T{{ conteudo.treino_numero or '?' }}</span>
+                                <span class="ml-1">{{ conteudo.descricao }}</span>
+                                <span class="mt-0.5 block font-semibold text-slate-500">{{ conteudo.minutos }} min</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <span class="block py-2 text-center text-xs text-slate-300">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
 <section class="bg-white rounded-xl shadow-sm p-5 md:p-6 border border-gray-100 mb-6">
     <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between mb-5">
         <div>
-            <h2 class="font-semibold text-gray-800">Conteúdos por treino</h2>
+            <h2 class="font-semibold text-gray-800">Editar conteúdos por treino</h2>
             <p class="text-sm text-gray-500 mt-1">Distribui o trabalho previsto por sessão. Os minutos atualizam automaticamente o quadro de balanço.</p>
         </div>
         <span class="text-xs text-gray-400">{{ treinos_conteudos|length }} treino(s) no microciclo</span>
@@ -165,7 +221,7 @@
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {% for sessao in treinos_conteudos %}
         {% set total_conteudos = sessao.conteudos|sum(attribute='minutos') %}
-        <article class="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
+        <article id="treino-conteudos-{{ sessao.id }}" class="scroll-mt-4 rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
             <header class="flex flex-wrap items-center justify-between gap-3 bg-white border-b border-slate-100 px-4 py-3">
                 <div>
                     <p class="text-sm font-semibold text-slate-800">Treino {{ sessao.numero_treino or loop.index }}</p>
