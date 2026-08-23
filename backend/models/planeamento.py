@@ -243,6 +243,7 @@ class SessaoTreino(Base):
     min_tatica_coletiva_ofensiva = Column(Integer, default=0)
     min_tatica_coletiva_defensiva = Column(Integer, default=0)
     min_fisicos = Column(Integer, default=0)
+    min_psicologicos = Column(Integer, default=0)
 
     reflexao = Column(Text, nullable=True)
     origem = Column(String, nullable=False, default="manual")
@@ -272,3 +273,29 @@ class SessaoTreino(Base):
         cascade="all, delete-orphan",
         single_parent=True,
     )
+    conteudos = relationship(
+        "ConteudoSessaoTreino",
+        back_populates="sessao",
+        cascade="all, delete-orphan",
+        order_by="ConteudoSessaoTreino.ordem, ConteudoSessaoTreino.id",
+    )
+
+
+class ConteudoSessaoTreino(Base):
+    """Conteúdo planeado dentro de uma sessão do microciclo."""
+
+    __tablename__ = "conteudos_sessao_treino"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sessao_id = Column(
+        Integer,
+        ForeignKey("sessoes_treino.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    categoria = Column(String(64), nullable=False)
+    descricao = Column(Text, nullable=False)
+    minutos = Column(Integer, nullable=False)
+    ordem = Column(Integer, nullable=False, default=0)
+
+    sessao = relationship("SessaoTreino", back_populates="conteudos")

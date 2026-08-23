@@ -571,6 +571,22 @@ def actualizar_estrutura_planeamento_equipa() -> None:
                 ))
         logger.info("Ligação anual adicionada aos macrociclos.")
 
+    if inspector.has_table("sessoes_treino"):
+        colunas_sessoes = {coluna["name"] for coluna in inspector.get_columns("sessoes_treino")}
+        if "min_psicologicos" not in colunas_sessoes:
+            with engine.begin() as ligacao:
+                if engine.dialect.name == "postgresql":
+                    ligacao.execute(text(
+                        "ALTER TABLE sessoes_treino "
+                        "ADD COLUMN IF NOT EXISTS min_psicologicos INTEGER NOT NULL DEFAULT 0"
+                    ))
+                else:
+                    ligacao.execute(text(
+                        "ALTER TABLE sessoes_treino "
+                        "ADD COLUMN min_psicologicos INTEGER NOT NULL DEFAULT 0"
+                    ))
+            logger.info("Coluna 'min_psicologicos' adicionada a sessoes_treino.")
+
     from models.planeamento import Macrociclo, PlaneamentoAnualEquipa
     from models.planeamento_clube import PlaneamentoClubeAnual
 

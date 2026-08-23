@@ -32,7 +32,14 @@ from services.pdf_service import renderizar_pdf
 from services.sincronizacao_ui import preparar_sessoes_para_ui, sessao_corresponde_filtro
 
 # Importamos os modelos que vamos precisar
-from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnualEquipa, SessaoTreino
+from models.planeamento import (
+    ConteudoSessaoTreino,
+    Macrociclo,
+    Mesociclo,
+    Microciclo,
+    PlaneamentoAnualEquipa,
+    SessaoTreino,
+)
 from models.planeamento_clube import EventoPlaneamentoClube, PlaneamentoClubeAnual, TipoEventoPlaneamentoClubeEnum
 from models.atribuicao_espaco_semanal import (
     AtribuicaoEspacoSemanal,
@@ -47,6 +54,11 @@ from services.numeracao_planeamento_service import (
     renumerar_macrociclos,
     renumerar_mesociclos,
     renumerar_microciclos,
+)
+from services.conteudos_sessao_service import (
+    CATEGORIAS_POR_CODIGO,
+    atualizar_minutos_por_componente,
+    categorias_conteudo_para_ui,
 )
 
 # prefix="/planeamento" significa que todas as rotas deste router
@@ -327,6 +339,7 @@ def _calcular_balanco_microciclo(sessoes_ativas: list[SessaoTreino]) -> tuple[di
         "TCO": sum(s.min_tatica_coletiva_ofensiva or 0 for s in treinos),
         "TCD": sum(s.min_tatica_coletiva_defensiva or 0 for s in treinos),
         "FÍS": sum(s.min_fisicos or 0 for s in treinos),
+        "PSI": sum(s.min_psicologicos or 0 for s in treinos),
     }
 
     balanco = {
@@ -1585,6 +1598,11 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
         "microciclo": microciclo,
         "equipa": microciclo.mesociclo.macrociclo.equipa,
         "sessoes": sessoes_filtradas,
+        "treinos_conteudos": [
+            sessao for sessao in sessoes_ativas if not sessao.e_jogo
+        ],
+        "categorias_conteudo": categorias_conteudo_para_ui(),
+        "categorias_conteudo_por_codigo": CATEGORIAS_POR_CODIGO,
         "calendario_semanal": calendario_semanal,
         "filtro_sessoes_atual": filtro_sessoes,
         "filtros_sessoes": filtros_sessoes,
@@ -1737,6 +1755,88 @@ async def atualizar_carga_rapida_sessao(
     sessao.sincronizada = False
     db.commit()
     set_flash(request, "Volume e RPE atualizados.")
+    return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+
+
+@router.post("/microciclos/{micro_id}/sessoes/{sessao_id}/conteudos")
+async def adicionar_conteudo_sessao(
+    micro_id: int,
+    sessao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    categoria: str = Form(...),
+    descricao: str = Form(...),
+    minutos: str = Form(...),
+):
+    """Adiciona um conteúdo planeado ao treino sem alterar a sua agenda."""
+    equipa_id = _obter_equipa_id_por_microciclo(db, micro_id)
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    sessao = db.query(SessaoTreino).filter(
+        SessaoTreino.id == sessao_id,
+        SessaoTreino.microciclo_id == micro_id,
+        SessaoTreino.e_jogo.is_(False),
+        SessaoTreino.ativa.is_(True),
+    ).first()
+    if not sessao:
+        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+
+    descricao = descricao.strip()
+    try:
+        minutos_int = int(minutos)
+        if categoria not in CATEGORIAS_POR_CODIGO or not descricao or not 1 <= minutos_int <= 600:
+            raise ValueError
+    except (TypeError, ValueError):
+        set_flash(request, "Indica uma categoria, conteúdo e duração entre 1 e 600 minutos.", "error")
+        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+
+    ordem = len(sessao.conteudos) + 1
+    sessao.conteudos.append(ConteudoSessaoTreino(
+        categoria=categoria,
+        descricao=descricao,
+        minutos=minutos_int,
+        ordem=ordem,
+    ))
+    atualizar_minutos_por_componente(sessao)
+    sessao.alterada_manual = True
+    sessao.sincronizada = False
+    db.commit()
+    set_flash(request, "Conteúdo adicionado ao treino.")
+    return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+
+
+@router.post("/microciclos/{micro_id}/sessoes/{sessao_id}/conteudos/{conteudo_id}/eliminar")
+async def eliminar_conteudo_sessao(
+    micro_id: int,
+    sessao_id: int,
+    conteudo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _obter_equipa_id_por_microciclo(db, micro_id)
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    sessao = db.query(SessaoTreino).filter(
+        SessaoTreino.id == sessao_id,
+        SessaoTreino.microciclo_id == micro_id,
+        SessaoTreino.e_jogo.is_(False),
+        SessaoTreino.ativa.is_(True),
+    ).first()
+    conteudo = db.query(ConteudoSessaoTreino).filter(
+        ConteudoSessaoTreino.id == conteudo_id,
+        ConteudoSessaoTreino.sessao_id == sessao_id,
+    ).first()
+    if not sessao or not conteudo:
+        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+
+    # Remover pela relação mantém a coleção em memória sincronizada antes do recálculo.
+    sessao.conteudos.remove(conteudo)
+    db.flush()
+    atualizar_minutos_por_componente(sessao)
+    sessao.alterada_manual = True
+    sessao.sincronizada = False
+    db.commit()
+    set_flash(request, "Conteúdo removido do treino.")
     return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
 
 
