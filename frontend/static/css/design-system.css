@@ -211,7 +211,7 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
 .ds-tab-menu>summary::-webkit-details-marker { display:none; }
 .ds-tab-chevron { margin-left:.4rem; font-size:.9rem; line-height:1; transition:transform .15s; }
 .ds-tab-menu[open] .ds-tab-chevron { transform:rotate(180deg); }
-.ds-tab-submenu { position:fixed; z-index:60; min-width:11.5rem; padding:.35rem; border:1px solid var(--border-soft); border-radius:.7rem; background:#fff; box-shadow:0 12px 28px rgb(15 23 42 / .16); }
+.ds-tab-submenu { position:fixed; z-index:1000; min-width:11.5rem; padding:.35rem; border:1px solid var(--border-soft); border-radius:.7rem; background:#fff; box-shadow:0 12px 28px rgb(15 23 42 / .16); }
 .ds-tab-submenu a { display:block; border-radius:.45rem; padding:.52rem .62rem; color:#46566d; font-size:.8rem; font-weight:700; white-space:nowrap; }
 .ds-tab-submenu a:hover { background:var(--clube-primary-surface); color:var(--clube-primary-dark); }
 .ds-record-card { border:1px solid var(--border-soft); border-radius:.9rem; background:#fff; padding:1.1rem; box-shadow:var(--shadow-card); transition:transform .16s,box-shadow .16s,border-color .16s; }

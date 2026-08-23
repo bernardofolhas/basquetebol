@@ -117,6 +117,7 @@ def test_sidebar_liga_todos_os_niveis_a_listas_independentes():
     assert "overflow-y:hidden" in estilos
     assert ".ds-tab-submenu { position:fixed;" in estilos
     assert 'menuDetails.addEventListener("mouseleave"' in base
+    assert "document.body.appendChild(submenu)" in base
 
 
 def test_area_da_equipa_nao_duplica_barra_de_contexto():

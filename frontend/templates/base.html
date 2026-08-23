@@ -61,9 +61,13 @@
       document.querySelectorAll("[data-planning-menu]").forEach(function(menuDetails){
         var summary=menuDetails.querySelector("summary"),submenu=menuDetails.querySelector(".ds-tab-submenu"),closeTimer;
         function positionMenu(){var rect=summary.getBoundingClientRect(),left=Math.max(8,Math.min(rect.left,window.innerWidth-submenu.offsetWidth-8));submenu.style.left=left+"px";submenu.style.top=rect.bottom+"px"}
-        menuDetails.addEventListener("toggle",function(){if(menuDetails.open){document.querySelectorAll("[data-planning-menu][open]").forEach(function(other){if(other!==menuDetails)other.removeAttribute("open")});positionMenu()}});
-        menuDetails.addEventListener("mouseleave",function(){closeTimer=setTimeout(function(){if(!menuDetails.matches(":hover"))menuDetails.removeAttribute("open")},120)});
+        function fechar(){menuDetails.removeAttribute("open")}
+        function agendarFecho(){clearTimeout(closeTimer);closeTimer=setTimeout(fechar,120)}
+        menuDetails.addEventListener("toggle",function(){if(menuDetails.open){document.querySelectorAll("[data-planning-menu][open]").forEach(function(other){if(other!==menuDetails)other.removeAttribute("open")});document.body.appendChild(submenu);positionMenu()}else if(submenu.parentElement!==menuDetails){menuDetails.appendChild(submenu)}});
+        menuDetails.addEventListener("mouseleave",agendarFecho);
         menuDetails.addEventListener("mouseenter",function(){clearTimeout(closeTimer)});
+        submenu.addEventListener("mouseenter",function(){clearTimeout(closeTimer)});
+        submenu.addEventListener("mouseleave",agendarFecho);
         window.addEventListener("resize",function(){if(menuDetails.open)positionMenu()});
       });
       window.addEventListener("resize",function(){if(window.innerWidth>=1024){overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}});
