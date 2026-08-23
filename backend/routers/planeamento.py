@@ -354,9 +354,9 @@ def _calcular_balanco_microciclo(sessoes_ativas: list[SessaoTreino]) -> tuple[di
     }
 
     dados_graficos = {
-        "labels": [s.data.isoformat() if s.data else "" for s in sessoes_ordenadas],
-        "volumes": [s.volume_minutos if s.volume_minutos else 0 for s in sessoes_ordenadas],
-        "rpes": [float(s.intensidade_rpe) if s.intensidade_rpe else 0 for s in sessoes_ordenadas],
+        "labels": [_obter_tipo_legivel_sessao(sessao) for sessao in treinos],
+        "volumes": [sessao.volume_minutos if sessao.volume_minutos else 0 for sessao in treinos],
+        "rpes": [float(sessao.intensidade_rpe) if sessao.intensidade_rpe else 0 for sessao in treinos],
     }
 
     return balanco, dados_graficos

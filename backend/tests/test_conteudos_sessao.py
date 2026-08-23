@@ -7,6 +7,7 @@ from services.conteudos_sessao_service import (
     categorias_conteudo_para_ui,
     construir_visao_semanal_conteudos,
 )
+from routers.planeamento import _calcular_balanco_microciclo
 
 
 def test_conteudos_atualizam_totais_por_componente():
@@ -54,4 +55,35 @@ def test_visao_semanal_organiza_conteudos_por_dia_e_categoria():
         "id": None,
         "descricao": "Saída de pressão",
         "minutos": 18,
+    }
+
+
+def test_graficos_do_microciclo_usam_o_nome_do_treino():
+    campos_componentes = {
+        "min_tecnica_individual_ofensiva": 0,
+        "min_tecnica_individual_defensiva": 0,
+        "min_tatica_individual_ofensiva": 0,
+        "min_tatica_individual_defensiva": 0,
+        "min_tatica_coletiva_ofensiva": 0,
+        "min_tatica_coletiva_defensiva": 0,
+        "min_fisicos": 0,
+        "min_psicologicos": 0,
+    }
+    treino = SimpleNamespace(
+        id=1, data=date(2026, 7, 22), hora_inicio="18:00", e_jogo=False,
+        numero_treino=3, volume_minutos=90, intensidade_rpe=6,
+        **campos_componentes,
+    )
+    jogo = SimpleNamespace(
+        id=2, data=date(2026, 7, 23), hora_inicio="18:00", e_jogo=True,
+        numero_treino=None, volume_minutos=None, intensidade_rpe=None,
+        **campos_componentes,
+    )
+
+    _, dados_graficos = _calcular_balanco_microciclo([jogo, treino])
+
+    assert dados_graficos == {
+        "labels": ["Treino 3"],
+        "volumes": [90],
+        "rpes": [6.0],
     }
