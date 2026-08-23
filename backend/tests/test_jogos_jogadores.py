@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from main import app
 from models.jogo import Jogo
 from routers.jogos import _mensagem_novo_jogo
-from services.jogos_service import formatar_confronto
+from services.jogos_service import formatar_confronto, preparar_linhas_calendario_jogos, separar_visitada_visitante
 from testsupport import TestClient
 
 
@@ -45,6 +45,20 @@ def test_confronto_de_jogo_respeita_a_ordem_de_casa_e_fora():
     assert formatar_confronto("SL Benfica", "Clube Visitante", False) == (
         "Clube Visitante vs SL Benfica"
     )
+
+
+def test_linhas_de_calendario_separam_visitada_e_visitante():
+    assert separar_visitada_visitante("SL Benfica", "Clube Visitante", True) == (
+        "SL Benfica", "Clube Visitante"
+    )
+    assert separar_visitada_visitante("SL Benfica", "Clube Visitante", False) == (
+        "Clube Visitante", "SL Benfica"
+    )
+
+    jogo = Jogo(data=date(2026, 9, 5), adversario="Clube Visitante", em_casa=False)
+    linha = preparar_linhas_calendario_jogos([jogo], "SL Benfica")[0]
+    assert linha["visitada"] == "Clube Visitante"
+    assert linha["visitante"] == "SL Benfica"
 
 
 def _fazer_login(client: TestClient, perfil: str):

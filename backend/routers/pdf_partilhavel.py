@@ -12,7 +12,7 @@ from models.planeamento import Macrociclo, Mesociclo, Microciclo
 from models.planeamento_clube import PlaneamentoClubeAnual, PlanoSemanalClube
 from services.pdf_partilhavel_service import preparar_calendario_intervalo_partilhavel
 from services.pdf_service import renderizar_pdf
-from services.jogos_service import formatar_confronto
+from services.jogos_service import formatar_confronto, preparar_linhas_calendario_jogos
 
 
 router = APIRouter(prefix="/partilha", tags=["PDF partilhável"])
@@ -78,13 +78,14 @@ def jogos_partilhaveis(equipa_id: int, request: Request, inicio: date | None = N
     equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
     if not equipa:
         return RedirectResponse("/equipas", status_code=303)
-    inicio = inicio or date.today()
-    fim = fim or (inicio + timedelta(days=180))
-    jogos = db.query(Jogo).filter(
-        Jogo.equipa_id == equipa_id,
-        Jogo.data >= inicio,
-        Jogo.data <= fim,
-    ).order_by(Jogo.data, Jogo.hora, Jogo.id).all()
+    consulta = db.query(Jogo).filter(Jogo.equipa_id == equipa_id)
+    if inicio:
+        consulta = consulta.filter(Jogo.data >= inicio)
+    if fim:
+        consulta = consulta.filter(Jogo.data <= fim)
+    jogos = consulta.order_by(Jogo.data, Jogo.hora, Jogo.id).all()
+    data_inicio = inicio or (jogos[0].data if jogos else None)
+    data_fim = fim or (jogos[-1].data if jogos else None)
     nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
     if not nome_treinador and equipa.treinadores:
         nome_treinador = equipa.treinadores[0].nome
@@ -94,12 +95,13 @@ def jogos_partilhaveis(equipa_id: int, request: Request, inicio: date | None = N
         "utilizador": utilizador,
         "equipa": equipa,
         "jogos": jogos,
+        "linhas_jogos": preparar_linhas_calendario_jogos(jogos, nome_clube),
         "confrontos": {
             jogo.id: formatar_confronto(nome_clube, jogo.adversario, jogo.em_casa)
             for jogo in jogos
         },
-        "data_inicio": inicio,
-        "data_fim": fim,
+        "data_inicio": data_inicio,
+        "data_fim": data_fim,
         "nome_treinador": nome_treinador or utilizador.nome,
         "hoje": date.today(),
     })

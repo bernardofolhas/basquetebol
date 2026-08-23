@@ -15,7 +15,7 @@ from models.jogo import Convocado, Jogo, PlanoJogo
 from paths import TEMPLATES_DIR
 from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.pdf_service import renderizar_pdf
-from services.jogos_service import formatar_confronto
+from services.jogos_service import formatar_confronto, preparar_linhas_calendario_jogos
 
 router = APIRouter(prefix="/jogos")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -80,6 +80,7 @@ def calendario_jogos(
         "equipa": equipa,
         "jogos": jogos,
         "confrontos": _confrontos(jogos, nome_clube),
+        "linhas_jogos": preparar_linhas_calendario_jogos(jogos, nome_clube),
     })
 
 
@@ -101,6 +102,7 @@ def exportar_pdf_calendario_equipa(
         "equipa": equipa,
         "jogos": jogos,
         "confrontos": _confrontos(jogos, nome_clube),
+        "linhas_jogos": preparar_linhas_calendario_jogos(jogos, nome_clube),
         "hoje": date.today(),
     })
     nome = f"calendario_{equipa.nome}_{equipa.id}.pdf".replace(" ", "_")
