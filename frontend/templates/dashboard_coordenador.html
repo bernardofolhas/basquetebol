@@ -14,7 +14,7 @@
             <h2 class="mt-2 text-xl font-bold text-slate-900">O que precisa de atenção</h2>
             <p class="mt-1 text-sm text-slate-500">Conflitos, jogos e decisões operacionais do clube.</p>
         </div>
-        <a href="/calendario" class="ds-button ds-button-secondary">Abrir calendário</a>
+        <div class="flex flex-wrap gap-2"><a href="/calendario" class="ds-button ds-button-secondary">Abrir calendário</a><a href="/exportacoes/clube/dados" class="ds-button ds-button-secondary">Descarregar dados do clube</a></div>
     </div>
     <div class="mt-5 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
         {% for tarefa in tarefas[:6] %}

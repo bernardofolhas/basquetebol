@@ -67,6 +67,7 @@ from routers import auth_web
 from routers import biblioteca
 from routers import calendario
 from routers import espacos_agenda
+from routers import exportacoes
 from routers import dashboard
 from routers import equipas
 from routers import fisico
@@ -157,6 +158,7 @@ except Exception:
 app.include_router(biblioteca.router)
 app.include_router(agenda.router)
 app.include_router(espacos_agenda.router)
+app.include_router(exportacoes.router)
 app.include_router(equipas.router)
 app.include_router(treinadores.router)
 app.include_router(jogadores.router)
