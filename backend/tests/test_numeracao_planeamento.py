@@ -5,6 +5,8 @@ from database import SessionLocal
 from models.clube import Clube
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnualEquipa, SessaoTreino
+from models.planeamento_clube import EventoPlaneamentoClube, TipoEventoPlaneamentoClubeEnum
+from routers.planeamento import _integrar_eventos_planeados_no_microciclo
 from services.numeracao_planeamento_service import (
     renumerar_macrociclos,
     renumerar_mesociclos,
@@ -64,6 +66,73 @@ def test_ciclos_sao_renumerados_pela_data_de_inicio():
         assert (sessao_cedo.numero_treino, sessao_tardia.numero_treino) == (1, 2)
     finally:
         db.rollback()
+        db.query(SessaoTreino).execution_options(ignorar_clube=True).filter(SessaoTreino.clube_id == clube.id).delete(synchronize_session=False)
+        db.query(Microciclo).execution_options(ignorar_clube=True).filter(Microciclo.clube_id == clube.id).delete(synchronize_session=False)
+        db.query(Mesociclo).execution_options(ignorar_clube=True).filter(Mesociclo.clube_id == clube.id).delete(synchronize_session=False)
+        db.query(Macrociclo).execution_options(ignorar_clube=True).filter(Macrociclo.clube_id == clube.id).delete(synchronize_session=False)
+        db.query(PlaneamentoAnualEquipa).execution_options(ignorar_clube=True).filter(PlaneamentoAnualEquipa.clube_id == clube.id).delete(synchronize_session=False)
+        db.query(Equipa).execution_options(ignorar_clube=True).filter(Equipa.id == equipa.id).delete(synchronize_session=False)
+        db.query(Clube).filter(Clube.id == clube.id).delete(synchronize_session=False)
+        db.commit()
+        db.close()
+
+
+def test_treino_planeado_pelo_treinador_entra_no_microciclo_existente():
+    """Um treino criado acima do micro passa a sessão com carga editável."""
+    sufixo = uuid4().hex[:10]
+    db = SessionLocal()
+    clube = Clube(nome_oficial=f"Clube integração {sufixo}", nome_curto="Integração", identificador=f"int-{sufixo}")
+    db.add(clube)
+    db.flush()
+    equipa = Equipa(clube_id=clube.id, nome=f"Equipa integração {sufixo}", escalao=EscalaoEnum.sub18, genero=GeneroEnum.feminino)
+    db.add(equipa)
+    db.flush()
+    anual = PlaneamentoAnualEquipa(
+        clube_id=clube.id, equipa_id=equipa.id, epoca="2026/2027", titulo="Anual",
+        data_inicio=date(2026, 9, 1), data_fim=date(2027, 6, 30),
+    )
+    db.add(anual)
+    db.flush()
+    macro = Macrociclo(
+        clube_id=clube.id, equipa_id=equipa.id, planeamento_anual_equipa_id=anual.id,
+        numero=1, data_inicio=date(2026, 9, 1), data_fim=date(2026, 10, 31),
+    )
+    db.add(macro)
+    db.flush()
+    meso = Mesociclo(
+        clube_id=clube.id, macrociclo_id=macro.id, numero=1,
+        data_inicio=date(2026, 9, 1), data_fim=date(2026, 9, 30),
+    )
+    db.add(meso)
+    db.flush()
+    micro = Microciclo(
+        clube_id=clube.id, mesociclo_id=meso.id, numero=1,
+        data_inicio=date(2026, 9, 7), data_fim=date(2026, 9, 13),
+    )
+    db.add(micro)
+    db.flush()
+    evento = EventoPlaneamentoClube(
+        clube_id=clube.id, equipa_id=equipa.id,
+        tipo=TipoEventoPlaneamentoClubeEnum.treino_equipa,
+        titulo="Treino", data=date(2026, 9, 9), hora_inicio="18:30", hora_fim="20:00",
+    )
+    db.add(evento)
+    db.flush()
+    try:
+        assert _integrar_eventos_planeados_no_microciclo(db, micro) > 0
+        db.flush()
+        sessao = db.query(SessaoTreino).filter(
+            SessaoTreino.microciclo_id == micro.id,
+            SessaoTreino.evento_planeamento_clube_id == evento.id,
+        ).one()
+
+        assert sessao.numero_treino == 1
+        assert sessao.volume_minutos == 90
+        assert sessao.intensidade_rpe is None
+        assert evento.microciclo_id == micro.id
+    finally:
+        db.rollback()
+        db.query(EventoPlaneamentoClube).execution_options(ignorar_clube=True).filter(EventoPlaneamentoClube.clube_id == clube.id).delete(synchronize_session=False)
         db.query(SessaoTreino).execution_options(ignorar_clube=True).filter(SessaoTreino.clube_id == clube.id).delete(synchronize_session=False)
         db.query(Microciclo).execution_options(ignorar_clube=True).filter(Microciclo.clube_id == clube.id).delete(synchronize_session=False)
         db.query(Mesociclo).execution_options(ignorar_clube=True).filter(Mesociclo.clube_id == clube.id).delete(synchronize_session=False)

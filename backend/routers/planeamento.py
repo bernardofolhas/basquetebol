@@ -181,7 +181,12 @@ def _duracao_evento_minutos(hora_inicio: str | None, hora_fim: str | None) -> in
 
 
 def _integrar_eventos_planeados_no_microciclo(db: Session, microciclo: Microciclo) -> int:
-    """Materializa na semana técnica eventos da equipa já marcados acima na época."""
+    """Materializa na semana técnica eventos da equipa já marcados acima na época.
+
+    Os treinos podem ser criados primeiro no anual, macro ou meso. Quando a
+    semana já existe, esta sincronização garante que passam também a sessões
+    do microciclo, onde o treinador define volume, RPE e conteúdos.
+    """
     equipa_id = microciclo.mesociclo.macrociclo.equipa_id
     eventos = db.query(EventoPlaneamentoClube).filter(
         EventoPlaneamentoClube.equipa_id == equipa_id,
@@ -194,15 +199,21 @@ def _integrar_eventos_planeados_no_microciclo(db: Session, microciclo: Microcicl
             TipoEventoPlaneamentoClubeEnum.jogo,
         ]),
     ).order_by(EventoPlaneamentoClube.data, EventoPlaneamentoClube.hora_inicio, EventoPlaneamentoClube.id).all()
-    criadas = 0
+    alteracoes = 0
     for evento in eventos:
         existe = db.query(SessaoTreino).filter(
             SessaoTreino.microciclo_id == microciclo.id,
             SessaoTreino.evento_planeamento_clube_id == evento.id,
         ).first()
-        evento.macrociclo_id = microciclo.mesociclo.macrociclo_id
-        evento.mesociclo_id = microciclo.mesociclo_id
-        evento.microciclo_id = microciclo.id
+        if evento.macrociclo_id != microciclo.mesociclo.macrociclo_id:
+            evento.macrociclo_id = microciclo.mesociclo.macrociclo_id
+            alteracoes += 1
+        if evento.mesociclo_id != microciclo.mesociclo_id:
+            evento.mesociclo_id = microciclo.mesociclo_id
+            alteracoes += 1
+        if evento.microciclo_id != microciclo.id:
+            evento.microciclo_id = microciclo.id
+            alteracoes += 1
         if existe:
             continue
         e_jogo = evento.tipo == TipoEventoPlaneamentoClubeEnum.jogo
@@ -231,8 +242,8 @@ def _integrar_eventos_planeados_no_microciclo(db: Session, microciclo: Microcicl
             plano_semanal_clube_id=evento.plano_semanal_id,
             evento_planeamento_clube_id=evento.id,
         ))
-        criadas += 1
-    return criadas
+        alteracoes += 1
+    return alteracoes
 
 
 def _validar_intervalo_horario_sessao(hora_inicio: str | None, hora_fim: str | None) -> str | None:
@@ -1549,6 +1560,12 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
     microciclo = db.query(Microciclo).filter(Microciclo.id == micro_id).first()
     if not microciclo:
         return RedirectResponse(url="/equipas")
+
+    # Inclui treinos previstos pelo treinador no anual/macro/meso, mesmo que
+    # tenham sido criados depois do microciclo. Assim aparecem na agenda,
+    # visão semanal e gráficos de carga desta semana.
+    if _integrar_eventos_planeados_no_microciclo(db, microciclo):
+        db.commit()
 
     from models.planeamento import SessaoTreino
     filtro_sessoes = request.query_params.get("filtro_sessoes", "todas")
