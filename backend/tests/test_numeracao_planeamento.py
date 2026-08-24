@@ -54,7 +54,11 @@ def test_ciclos_sao_renumerados_pela_data_de_inicio():
             clube_id=clube.id, microciclo_id=micro_cedo.id, data=date(2026, 1, 2),
             hora_inicio="18:00", numero_treino=8, e_jogo=False, ativa=True,
         )
-        db.add_all([sessao_tardia, sessao_cedo])
+        treino_fisico = SessaoTreino(
+            clube_id=clube.id, microciclo_id=micro_cedo.id, data=date(2026, 1, 3),
+            hora_inicio="18:00", numero_treino=7, tipo_treino="fisico", e_jogo=False, ativa=True,
+        )
+        db.add_all([sessao_tardia, sessao_cedo, treino_fisico])
         db.flush()
         renumerar_treinos_equipa(db, equipa.id)
         renumerar_todos_os_ciclos(db)
@@ -64,6 +68,7 @@ def test_ciclos_sao_renumerados_pela_data_de_inicio():
         assert (meso_cedo.numero, meso_tardio.numero) == (1, 2)
         assert (micro_cedo.numero, micro_tardio.numero) == (1, 2)
         assert (sessao_cedo.numero_treino, sessao_tardia.numero_treino) == (1, 2)
+        assert treino_fisico.numero_treino == 1
     finally:
         db.rollback()
         db.query(SessaoTreino).execution_options(ignorar_clube=True).filter(SessaoTreino.clube_id == clube.id).delete(synchronize_session=False)

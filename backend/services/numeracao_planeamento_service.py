@@ -35,7 +35,7 @@ def renumerar_microciclos(db: Session, mesociclo_id: int) -> None:
 
 
 def renumerar_treinos_equipa(db: Session, equipa_id: int) -> None:
-    """Numera os treinos ativos pela data e hora dentro de cada microciclo."""
+    """Numera separadamente treinos normais e físicos em cada microciclo."""
     sessoes = db.query(SessaoTreino).execution_options(ignorar_clube=True).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
         Macrociclo.equipa_id == equipa_id,
         SessaoTreino.e_jogo.is_(False),
@@ -46,9 +46,10 @@ def renumerar_treinos_equipa(db: Session, equipa_id: int) -> None:
         SessaoTreino.hora_inicio,
         SessaoTreino.id,
     ).all()
-    grupos: dict[int, list[SessaoTreino]] = {}
+    grupos: dict[tuple[int, str], list[SessaoTreino]] = {}
     for sessao in sessoes:
-        grupos.setdefault(sessao.microciclo_id, []).append(sessao)
+        tipo_treino = getattr(sessao, "tipo_treino", None) or "normal"
+        grupos.setdefault((sessao.microciclo_id, tipo_treino), []).append(sessao)
     for grupo in grupos.values():
         for numero, sessao in enumerate(grupo, start=1):
             sessao.numero_treino = numero

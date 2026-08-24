@@ -99,8 +99,7 @@
     {% endif %}
 
     <div class="section">
-        <div class="section-title">Calendário Semanal</div>
-        {{ agenda_grelha_pdf(dashboard_planeamento.semanas, 'Agenda diária') }}
+        {{ agenda_grelha_pdf(dashboard_planeamento.semanas, 'Calendário semanal') }}
         {% if calendario_semanal %}
         <table class="legacy-calendar">
             <thead>
@@ -128,6 +127,29 @@
         </table>
         {% else %}
         <div class="empty">Sem sessões ativas neste microciclo.</div>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <div class="section-title">Distribuição de conteúdos</div>
+        {% set treinos_pdf = sessoes_pdf | rejectattr('sessao.e_jogo') | list %}
+        {% if treinos_pdf %}
+        <table>
+            <thead><tr><th style="width:18%">Treino</th><th style="width:18%">Data</th><th>Conteúdos previstos</th><th style="width:12%">Minutos</th></tr></thead>
+            <tbody>
+            {% for item in treinos_pdf %}
+                {% set conteudos = item.sessao.conteudos %}
+                <tr>
+                    <td>{{ item.tipo_label }}</td>
+                    <td>{{ item.sessao.data|data_pt }}</td>
+                    <td>{% for conteudo in conteudos %}{{ conteudo.descricao }}{% if not loop.last %}<br>{% endif %}{% else %}<span class="empty">Por definir</span>{% endfor %}</td>
+                    <td>{% for conteudo in conteudos %}{{ conteudo.minutos }}{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">Sem treinos previstos neste microciclo.</div>
         {% endif %}
     </div>
 

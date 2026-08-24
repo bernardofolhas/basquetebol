@@ -42,6 +42,7 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
             EventoPlaneamentoClube.data == atribuicao.data,
             EventoPlaneamentoClube.tipo.in_([
                 TipoEventoPlaneamentoClubeEnum.treino_equipa,
+                TipoEventoPlaneamentoClubeEnum.treino_fisico,
                 TipoEventoPlaneamentoClubeEnum.treino_individual,
             ]),
             EventoPlaneamentoClube.ativo.is_(True),
@@ -53,9 +54,13 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
     if not evento:
         evento = EventoPlaneamentoClube(
             clube_id=atribuicao.clube_id,
-            tipo=(TipoEventoPlaneamentoClubeEnum.treino_individual
-                  if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_individual
-                  else TipoEventoPlaneamentoClubeEnum.treino_equipa),
+            tipo=(
+                TipoEventoPlaneamentoClubeEnum.treino_fisico
+                if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_fisico
+                else TipoEventoPlaneamentoClubeEnum.treino_individual
+                if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_individual
+                else TipoEventoPlaneamentoClubeEnum.treino_equipa
+            ),
             titulo=(
                 "Treino físico"
                 if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_fisico
@@ -98,6 +103,7 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
         atribuicao.hora_inicio, atribuicao.hora_fim, item.hora_inicio, item.hora_fim
     )), None)
     if sessao:
+        sessao.tipo_treino = "fisico" if atribuicao.tipo_ocupacao == TipoOcupacaoEspacoEnum.treino_fisico else "normal"
         sessao.local = atribuicao.espaco.nome
         sessao.hora_inicio = atribuicao.hora_inicio
         sessao.hora_fim = atribuicao.hora_fim

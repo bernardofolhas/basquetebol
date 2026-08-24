@@ -226,6 +226,8 @@ class SessaoTreino(Base):
 
     # Número sequencial do treino na época
     numero_treino = Column(Integer, nullable=True)
+    # "normal" ou "fisico". Cada tipo mantém a sua numeração no microciclo.
+    tipo_treino = Column(String, nullable=False, default="normal")
 
     # Volume em minutos e intensidade RPE (escala 1-10)
     volume_minutos = Column(Integer, nullable=True)

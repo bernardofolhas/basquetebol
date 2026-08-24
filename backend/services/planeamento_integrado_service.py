@@ -31,6 +31,7 @@ NOMES_MESES = [
 
 TIPOS_EVENTO_TREINO = {
     TipoEventoPlaneamentoClubeEnum.treino_equipa,
+    TipoEventoPlaneamentoClubeEnum.treino_fisico,
     TipoEventoPlaneamentoClubeEnum.treino_individual,
 }
 TIPOS_EVENTO_SESSAO = TIPOS_EVENTO_TREINO | {TipoEventoPlaneamentoClubeEnum.jogo}
@@ -179,9 +180,12 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
     if not equipa:
         return None
 
-    categoria = "jogo" if sessao.e_jogo else "treino"
-    subtipo = "jogo_sessao" if sessao.e_jogo else "treino_sessao"
+    treino_fisico = (getattr(sessao, "tipo_treino", None) or "normal") == "fisico"
+    categoria = "jogo" if sessao.e_jogo else ("fisico" if treino_fisico else "treino")
+    subtipo = "jogo_sessao" if sessao.e_jogo else ("treino_fisico_sessao" if treino_fisico else "treino_sessao")
     titulo = "Jogo da equipa" if sessao.e_jogo else (
+        f"Treino físico {sessao.numero_treino}" if (getattr(sessao, "tipo_treino", None) or "normal") == "fisico" and sessao.numero_treino else
+        "Treino físico" if (getattr(sessao, "tipo_treino", None) or "normal") == "fisico" else
         f"Treino {sessao.numero_treino}" if sessao.numero_treino else "Treino"
     )
     detalhe = None
@@ -245,15 +249,16 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
 def apresentar_treinos_por_perfil(itens: list[dict], perfil: str | None) -> list[dict]:
     """Mantém o treino simples para técnicos e identificável na visão global."""
     for item in itens:
-        if item.get("categoria") != "treino":
+        if item.get("categoria") not in {"treino", "fisico"}:
             continue
+        nome_treino = "Treino físico" if item.get("categoria") == "fisico" else "Treino"
         if perfil in {"administrador", "coordenador", "superadministrador"} and item.get("equipa_nome"):
             escalao = item.get("equipa_escalao")
             sufixo = f" ({escalao})" if escalao else ""
-            item["titulo"] = f"Treino de {item['equipa_nome']}{sufixo}"
+            item["titulo"] = f"{nome_treino} de {item['equipa_nome']}{sufixo}"
         else:
             local = item.get("local")
-            item["titulo"] = f"Treino ({local})" if local and local != "Local por definir" else "Treino"
+            item["titulo"] = f"{nome_treino} ({local})" if local and local != "Local por definir" else nome_treino
     return itens
 
 

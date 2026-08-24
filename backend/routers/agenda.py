@@ -20,6 +20,7 @@ from models.planeamento_clube import (
 )
 from services.agenda_service import conflitos_do_evento, metadados_tipo_agenda
 from services.notificacoes_service import criar_notificacoes_para_equipa
+from services.numeracao_planeamento_service import renumerar_treinos_equipa
 
 
 router = APIRouter(prefix="/agenda")
@@ -167,16 +168,19 @@ def _criar_sessao_se_necessario(
 ) -> None:
     if not microciclo or tipo not in {
         TipoEventoPlaneamentoClubeEnum.treino_equipa.value,
+        TipoEventoPlaneamentoClubeEnum.treino_fisico.value,
         TipoEventoPlaneamentoClubeEnum.treino_individual.value,
         TipoEventoPlaneamentoClubeEnum.jogo.value,
     }:
         return
     e_jogo = tipo == TipoEventoPlaneamentoClubeEnum.jogo.value
+    tipo_treino = "fisico" if tipo == TipoEventoPlaneamentoClubeEnum.treino_fisico.value else "normal"
     numero = None
     if not e_jogo:
         numero = db.query(SessaoTreino).filter(
             SessaoTreino.microciclo_id == microciclo.id,
             SessaoTreino.e_jogo.is_(False),
+            SessaoTreino.tipo_treino == tipo_treino,
         ).count() + 1
     sessao = SessaoTreino(
         clube_id=evento.clube_id,
@@ -187,6 +191,7 @@ def _criar_sessao_se_necessario(
         volume_minutos=volume_minutos,
         intensidade_rpe=intensidade_rpe,
         numero_treino=numero,
+        tipo_treino=tipo_treino,
         e_jogo=e_jogo,
         origem="manual",
         sincronizada=False,
@@ -198,6 +203,9 @@ def _criar_sessao_se_necessario(
         evento_planeamento_clube=evento,
     )
     db.add(sessao)
+    db.flush()
+    if equipa_id:
+        renumerar_treinos_equipa(db, equipa_id)
 
 
 @router.get("/atividades/{evento_id}/plano")
@@ -216,6 +224,7 @@ def abrir_plano_de_evento_treino(
     ).with_for_update().first()
     if not evento or evento.tipo not in {
         TipoEventoPlaneamentoClubeEnum.treino_equipa,
+        TipoEventoPlaneamentoClubeEnum.treino_fisico,
         TipoEventoPlaneamentoClubeEnum.treino_individual,
     } or not _evento_visivel_para_equipa(evento, equipa_id):
         raise AcessoNegado(f"/planeamento/equipas/{equipa_id}/microciclos")
@@ -269,8 +278,11 @@ def _atualizar_sessao_ligada(db: Session, evento: EventoPlaneamentoClube, tipo: 
         sessao.hora_fim = evento.hora_fim
         sessao.local = _obter_espaco_nome(db, evento.espaco_id)
         sessao.e_jogo = tipo == TipoEventoPlaneamentoClubeEnum.jogo.value
+        sessao.tipo_treino = "fisico" if tipo == TipoEventoPlaneamentoClubeEnum.treino_fisico.value else "normal"
         sessao.alterada_manual = True
         sessao.sincronizada = False
+    if evento.equipa_id:
+        renumerar_treinos_equipa(db, evento.equipa_id)
 
 
 def _preparar_evento(

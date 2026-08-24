@@ -159,6 +159,8 @@ def _obter_tipo_treino_evento_ou_atribuicao(
     """Traduz o tipo técnico para uma label operacional legível."""
     if evento and evento.tipo == TipoEventoPlaneamentoClubeEnum.treino_individual:
         return "Treino individual"
+    if evento and evento.tipo == TipoEventoPlaneamentoClubeEnum.treino_fisico:
+        return "Treino físico"
     if evento and evento.tipo == TipoEventoPlaneamentoClubeEnum.treino_equipa:
         return "Treino equipa"
     if atribuicao and getattr(atribuicao.tipo_ocupacao, "value", None):
@@ -258,6 +260,7 @@ def obter_resumo_operacional_mensal(
             continue
         if evento.tipo not in {
             TipoEventoPlaneamentoClubeEnum.treino_equipa,
+            TipoEventoPlaneamentoClubeEnum.treino_fisico,
             TipoEventoPlaneamentoClubeEnum.treino_individual,
         }:
             continue

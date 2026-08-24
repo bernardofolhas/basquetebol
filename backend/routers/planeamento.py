@@ -54,6 +54,7 @@ from services.numeracao_planeamento_service import (
     renumerar_macrociclos,
     renumerar_mesociclos,
     renumerar_microciclos,
+    renumerar_treinos_equipa,
 )
 from services.conteudos_sessao_service import (
     CATEGORIAS_POR_CODIGO,
@@ -195,6 +196,7 @@ def _integrar_eventos_planeados_no_microciclo(db: Session, microciclo: Microcicl
         EventoPlaneamentoClube.ativo.is_(True),
         EventoPlaneamentoClube.tipo.in_([
             TipoEventoPlaneamentoClubeEnum.treino_equipa,
+            TipoEventoPlaneamentoClubeEnum.treino_fisico,
             TipoEventoPlaneamentoClubeEnum.treino_individual,
             TipoEventoPlaneamentoClubeEnum.jogo,
         ]),
@@ -217,10 +219,12 @@ def _integrar_eventos_planeados_no_microciclo(db: Session, microciclo: Microcicl
         if existe:
             continue
         e_jogo = evento.tipo == TipoEventoPlaneamentoClubeEnum.jogo
+        tipo_treino = "fisico" if evento.tipo == TipoEventoPlaneamentoClubeEnum.treino_fisico else "normal"
         numero = None if e_jogo else (
             db.query(SessaoTreino).filter(
                 SessaoTreino.microciclo_id == microciclo.id,
                 SessaoTreino.e_jogo.is_(False),
+                SessaoTreino.tipo_treino == tipo_treino,
             ).count() + 1
         )
         db.add(SessaoTreino(
@@ -232,6 +236,7 @@ def _integrar_eventos_planeados_no_microciclo(db: Session, microciclo: Microcicl
             volume_minutos=_duracao_evento_minutos(evento.hora_inicio, evento.hora_fim) if not e_jogo else None,
             intensidade_rpe=0 if not e_jogo and evento.espaco_id else None,
             numero_treino=numero,
+            tipo_treino=tipo_treino,
             e_jogo=e_jogo,
             origem="planeamento_integrado",
             sincronizada=True,
@@ -303,6 +308,8 @@ def _obter_tipo_legivel_sessao(sessao: SessaoTreino) -> str:
     """Traduz a sessão para uma label curta legível."""
     if sessao.e_jogo:
         return "Jogo"
+    if (getattr(sessao, "tipo_treino", None) or "normal") == "fisico":
+        return f"Treino físico {sessao.numero_treino}" if sessao.numero_treino is not None else "Treino físico"
     if sessao.numero_treino is not None:
         return f"Treino {sessao.numero_treino}"
     return "Treino"
@@ -1565,6 +1572,7 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
     # tenham sido criados depois do microciclo. Assim aparecem na agenda,
     # visão semanal e gráficos de carga desta semana.
     if _integrar_eventos_planeados_no_microciclo(db, microciclo):
+        renumerar_treinos_equipa(db, equipa_id)
         db.commit()
 
     from models.planeamento import SessaoTreino
@@ -1669,7 +1677,8 @@ async def criar_sessao(
     hora_fim: str = Form(""),
     volume_minutos: str = Form(""),
     intensidade_rpe: str = Form(""),
-    e_jogo: str = Form("")
+    e_jogo: str = Form(""),
+    tipo_treino: str = Form("normal"),
 ):
     equipa_id = _obter_equipa_id_por_microciclo(db, micro_id)
     _verificar_acesso_planeamento(utilizador, equipa_id, db)
@@ -1686,10 +1695,13 @@ async def criar_sessao(
     hora_inicio = normalizar_hora(hora_inicio)
     hora_fim = normalizar_hora(hora_fim)
 
+    if tipo_treino not in {"normal", "fisico"}:
+        tipo_treino = "normal"
     total_treinos = db.query(SessaoTreino).filter(
         SessaoTreino.microciclo_id == micro_id,
         SessaoTreino.e_jogo == False,
         SessaoTreino.ativa == True,
+        SessaoTreino.tipo_treino == tipo_treino,
     ).count()
 
     data_sessao = date.fromisoformat(data)
@@ -1714,10 +1726,13 @@ async def criar_sessao(
         intensidade_rpe=float(intensidade_rpe) if intensidade_rpe else None,
         e_jogo=e_jogo == "true",
         numero_treino=None if e_jogo == "true" else total_treinos + 1,
+        tipo_treino=tipo_treino,
         microciclo_id=micro_id
     )
 
     db.add(sessao)
+    db.flush()
+    renumerar_treinos_equipa(db, equipa_id)
     db.commit()
 
     if divergencia_atribuicao["divergente"]:

@@ -67,6 +67,12 @@ def construir_visao_semanal_conteudos(
         treinos.append({
             "sessao_id": sessao.id,
             "numero_treino": sessao.numero_treino,
+            "tipo_treino": getattr(sessao, "tipo_treino", None) or "normal",
+            "titulo_treino": (
+                f"Treino físico {sessao.numero_treino}"
+                if (getattr(sessao, "tipo_treino", None) or "normal") == "fisico"
+                else f"Treino {sessao.numero_treino}"
+            ),
             "data": sessao.data,
             "dia_semana": NOMES_DIAS_SEMANA[sessao.data.weekday()],
             "hora_inicio": getattr(sessao, "hora_inicio", None),

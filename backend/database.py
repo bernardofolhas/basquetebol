@@ -238,7 +238,7 @@ def actualizar_estrutura_planeamento_clube() -> None:
         if dialecto == "postgresql":
             # Instalações antigas podem arrancar sem executar Alembic. Mantemos
             # o enum compatível com o modelo antes de aceitar novos eventos.
-            for tipo in ("folga", "torneio", "viagem", "teste_fisico", "outro"):
+            for tipo in ("treino_fisico", "folga", "torneio", "viagem", "teste_fisico", "outro"):
                 existe = ligacao.execute(text(
                     "SELECT 1 FROM pg_enum "
                     "WHERE enumtypid = 'tipoeventoplaneamentoclubeenum'::regtype "
@@ -494,6 +494,19 @@ def actualizar_estrutura_planeamento_clube() -> None:
                     "ADD COLUMN estado VARCHAR NOT NULL DEFAULT 'planeada'"
                 ))
             logger.info("Coluna 'estado' adicionada a sessoes_treino.")
+
+        if "tipo_treino" not in colunas_sessoes:
+            if dialecto == "postgresql":
+                ligacao.execute(text(
+                    "ALTER TABLE sessoes_treino "
+                    "ADD COLUMN IF NOT EXISTS tipo_treino VARCHAR NOT NULL DEFAULT 'normal'"
+                ))
+            else:
+                ligacao.execute(text(
+                    "ALTER TABLE sessoes_treino "
+                    "ADD COLUMN tipo_treino VARCHAR NOT NULL DEFAULT 'normal'"
+                ))
+            logger.info("Coluna 'tipo_treino' adicionada a sessoes_treino.")
 
     inspector = inspect(engine)
     if inspector.has_table("biblioteca_exercicios"):

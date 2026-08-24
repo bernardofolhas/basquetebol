@@ -13,6 +13,11 @@ TIPOS_AGENDA = {
         "categoria": "treino",
         "cor": "emerald",
     },
+    TipoEventoPlaneamentoClubeEnum.treino_fisico.value: {
+        "label": "Treino físico",
+        "categoria": "fisico",
+        "cor": "indigo",
+    },
     TipoEventoPlaneamentoClubeEnum.treino_individual.value: {
         "label": "Treino individual",
         "categoria": "treino",

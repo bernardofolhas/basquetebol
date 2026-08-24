@@ -102,6 +102,7 @@ class PlanoSemanalClube(Base):
 
 class TipoEventoPlaneamentoClubeEnum(str, enum.Enum):
     treino_equipa = "treino_equipa"
+    treino_fisico = "treino_fisico"
     treino_individual = "treino_individual"
     jogo = "jogo"
     atividade_extra = "atividade_extra"

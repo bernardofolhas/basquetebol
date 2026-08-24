@@ -164,7 +164,7 @@
                     <th class="w-48 border-r border-slate-700 px-4 py-3 text-xs font-semibold uppercase tracking-wide">Componente</th>
                     {% for treino in visao_semanal_conteudos %}
                     <th class="min-w-52 border-r border-slate-700 px-3 py-3 text-center last:border-r-0">
-                        <span class="block text-xs font-semibold">Treino {{ treino.numero_treino or loop.index }}</span>
+                        <span class="block text-xs font-semibold">{{ treino.titulo_treino }}</span>
                         <span class="mt-0.5 block text-[11px] font-normal text-slate-300">{{ treino.dia_semana }} · {{ treino.data|data_pt }}</span>
                         {% if treino.hora_inicio or treino.local %}
                         <span class="mt-1 block text-[10px] font-normal text-slate-300">{{ treino.hora_inicio or 'Hora por definir' }}{% if treino.local %} · {{ treino.local }}{% endif %}</span>
@@ -195,7 +195,7 @@
                             {% endfor %}
                         </div>
                         {% endif %}
-                        <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ treino.sessao_id }}/conteudos" class="grid grid-cols-[minmax(0,1fr)_54px_28px] gap-1" aria-label="Adicionar conteúdo de {{ categoria.label }} ao treino {{ treino.numero_treino or loop.index }}">
+                        <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ treino.sessao_id }}/conteudos" class="grid grid-cols-[minmax(0,1fr)_54px_28px] gap-1" aria-label="Adicionar conteúdo de {{ categoria.label }} ao {{ treino.titulo_treino|lower }}">
                             <input type="hidden" name="categoria" value="{{ categoria.codigo }}">
                             <input type="text" name="descricao" required maxlength="500" placeholder="Conteúdo" class="min-w-0 rounded border border-slate-200 bg-white px-2 py-1.5 text-[11px] text-slate-700 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-100">
                             <input type="number" name="minutos" required min="1" max="600" inputmode="numeric" placeholder="min" class="min-w-0 rounded border border-slate-200 bg-white px-1 py-1.5 text-center text-[11px] text-slate-700 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-100">

@@ -107,7 +107,7 @@ def test_visao_e_graficos_incluem_treinos_manuais_e_atribuidos():
     )
     treino_atribuido = SimpleNamespace(
         id=2, data=date(2026, 7, 23), hora_inicio="19:00", e_jogo=False,
-        numero_treino=2, volume_minutos=90, intensidade_rpe=7, origem="planeamento_global",
+        numero_treino=1, volume_minutos=90, intensidade_rpe=7, origem="planeamento_global", tipo_treino="fisico",
         conteudos=[], **campos_componentes,
     )
 
@@ -115,6 +115,6 @@ def test_visao_e_graficos_incluem_treinos_manuais_e_atribuidos():
     _, dados_graficos = _calcular_balanco_microciclo([treino_atribuido, treino_manual])
 
     assert [treino["sessao_id"] for treino in visao] == [1, 2]
-    assert dados_graficos["labels"] == ["Treino 1", "Treino 2"]
+    assert dados_graficos["labels"] == ["Treino 1", "Treino físico 1"]
     assert dados_graficos["volumes"] == [75, 90]
     assert dados_graficos["rpes"] == [5.0, 7.0]

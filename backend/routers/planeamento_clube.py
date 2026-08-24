@@ -742,6 +742,7 @@ def _tipo_evento_gera_sessao(evento: EventoPlaneamentoClube) -> bool:
     """Indica se o evento deve originar uma sessão operacional de equipa."""
     return evento.tipo in {
         TipoEventoPlaneamentoClubeEnum.treino_equipa,
+        TipoEventoPlaneamentoClubeEnum.treino_fisico,
         TipoEventoPlaneamentoClubeEnum.treino_individual,
     }
 
@@ -991,12 +992,18 @@ def _obter_equipa_id_por_sessao(sessao: SessaoTreino) -> int | None:
     return sessao.microciclo.mesociclo.macrociclo.equipa_id
 
 
-def _calcular_numero_treino_microciclo(db: Session, microciclo_id: int, sessao_id_excluir: int | None = None) -> int:
-    """Calcula o próximo número de treino para um microciclo."""
+def _calcular_numero_treino_microciclo(
+    db: Session,
+    microciclo_id: int,
+    sessao_id_excluir: int | None = None,
+    tipo_treino: str = "normal",
+) -> int:
+    """Calcula o próximo número, separado entre treino normal e físico."""
     query = db.query(SessaoTreino).filter(
         SessaoTreino.microciclo_id == microciclo_id,
         SessaoTreino.e_jogo == False,
         SessaoTreino.ativa == True,
+        SessaoTreino.tipo_treino == tipo_treino,
     )
     if sessao_id_excluir:
         query = query.filter(SessaoTreino.id != sessao_id_excluir)
@@ -1017,6 +1024,7 @@ def _criar_ou_atualizar_sessao_evento(
     local = _combinar_local_evento(evento)
     hora_inicio, hora_fim = _combinar_horario_evento(evento)
     reflexao = _combinar_reflexao_evento(evento)
+    tipo_treino = "fisico" if evento.tipo == TipoEventoPlaneamentoClubeEnum.treino_fisico else "normal"
 
     if sessao_existente:
         if sessao_existente.alterada_manual:
@@ -1030,6 +1038,7 @@ def _criar_ou_atualizar_sessao_evento(
         sessao_existente.hora_inicio = hora_inicio
         sessao_existente.hora_fim = hora_fim
         sessao_existente.e_jogo = False
+        sessao_existente.tipo_treino = tipo_treino
         sessao_existente.microciclo_id = microciclo.id
         sessao_existente.origem = "planeamento_global"
         sessao_existente.plano_semanal_clube_id = semanal.id
@@ -1042,7 +1051,9 @@ def _criar_ou_atualizar_sessao_evento(
                 db,
                 microciclo.id,
                 sessao_id_excluir=sessao_existente.id,
+                tipo_treino=tipo_treino,
             )
+        renumerar_treinos_equipa(db, equipa.id)
         return "atualizada"
 
     sessao = SessaoTreino(
@@ -1050,7 +1061,8 @@ def _criar_ou_atualizar_sessao_evento(
         local=local,
         hora_inicio=hora_inicio,
         hora_fim=hora_fim,
-        numero_treino=_calcular_numero_treino_microciclo(db, microciclo.id),
+        numero_treino=_calcular_numero_treino_microciclo(db, microciclo.id, tipo_treino=tipo_treino),
+        tipo_treino=tipo_treino,
         volume_minutos=None,
         intensidade_rpe=None,
         e_jogo=False,
@@ -1064,6 +1076,8 @@ def _criar_ou_atualizar_sessao_evento(
         evento_planeamento_clube_id=evento.id,
     )
     db.add(sessao)
+    db.flush()
+    renumerar_treinos_equipa(db, equipa.id)
     return "criada"
 
 
