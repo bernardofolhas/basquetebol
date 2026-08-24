@@ -533,6 +533,7 @@ def _listar_eventos_intervalo(
     equipa_id: int | None = None,
 ) -> list[EventoPlaneamentoClube]:
     eventos = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.ativo.is_(True),
         EventoPlaneamentoClube.data >= data_inicio,
         EventoPlaneamentoClube.data <= data_fim,
     ).order_by(

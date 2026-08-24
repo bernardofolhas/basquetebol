@@ -62,7 +62,9 @@ def _carregar_equipa_detalhe(equipa_id: int, db: Session):
 
 
 def _eventos_visiveis_equipa(equipa_id: int, db: Session):
-    eventos_globais = db.query(EventoPlaneamentoClube).order_by(
+    eventos_globais = db.query(EventoPlaneamentoClube).filter(
+        EventoPlaneamentoClube.ativo.is_(True),
+    ).order_by(
         EventoPlaneamentoClube.data.asc(),
         EventoPlaneamentoClube.hora_inicio.asc(),
     ).all()

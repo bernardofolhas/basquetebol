@@ -2181,6 +2181,17 @@ async def eliminar_plano_semanal(semanal_id: int, request: Request, db: Session 
     eventos = db.query(EventoPlaneamentoClube).filter(
         EventoPlaneamentoClube.plano_semanal_id == semanal_id,
     ).all()
+    # Algumas marcações antigas foram ligadas à atribuição mas não guardaram o
+    # plano semanal no evento. A atribuição continua a ser a fonte de verdade.
+    eventos_por_id = {evento.id: evento for evento in eventos}
+    for atribuicao in atribuicoes:
+        if atribuicao.evento_id and atribuicao.evento_id not in eventos_por_id:
+            evento = db.query(EventoPlaneamentoClube).filter(
+                EventoPlaneamentoClube.id == atribuicao.evento_id,
+            ).first()
+            if evento:
+                eventos_por_id[evento.id] = evento
+    eventos = list(eventos_por_id.values())
     notificacoes_criadas = _notificar_cancelamento_plano_semanal(db, semanal, atribuicoes)
 
     # Remove eventos e todas as sessões que vieram deste plano. Uma ficha que
