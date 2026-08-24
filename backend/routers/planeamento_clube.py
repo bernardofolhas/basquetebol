@@ -3246,20 +3246,25 @@ def listar_eventos(request: Request, db: Session = Depends(get_db), utilizador=D
 
 
 def _eliminar_evento_com_dependencias(db: Session, evento: EventoPlaneamentoClube) -> None:
-    """Remove o evento sem deixar sessões ou reservas apontadas para ele."""
+    """Remove o evento e oculta todas as sessões que nasceram dessa marcação."""
     sessoes_geradas = db.query(SessaoTreino).filter(
         SessaoTreino.evento_planeamento_clube_id == evento.id,
-        SessaoTreino.origem == "planeamento_global",
     ).all()
+    equipas_afetadas: set[int] = set()
     for sessao in sessoes_geradas:
         sessao.ativa = False
         sessao.sincronizada = False
         sessao.evento_planeamento_clube_id = None
+        equipa_id = _obter_equipa_id_por_sessao(sessao)
+        if equipa_id:
+            equipas_afetadas.add(equipa_id)
     for atribuicao in evento.atribuicoes_espaco:
         atribuicao.evento_id = None
         if atribuicao.origem == OrigemAtribuicaoEspacoEnum.evento_global:
             atribuicao.origem = OrigemAtribuicaoEspacoEnum.manual
     db.delete(evento)
+    for equipa_id in equipas_afetadas:
+        renumerar_treinos_equipa(db, equipa_id)
 
 
 def _notificar_cancelamento_atribuicao(db: Session, atribuicao: AtribuicaoEspacoSemanal) -> int:

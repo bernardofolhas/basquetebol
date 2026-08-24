@@ -7,6 +7,7 @@ from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnualEquipa, SessaoTreino
 from models.planeamento_clube import EventoPlaneamentoClube, TipoEventoPlaneamentoClubeEnum
 from routers.planeamento import _integrar_eventos_planeados_no_microciclo
+from routers.planeamento_clube import _eliminar_evento_com_dependencias
 from services.numeracao_planeamento_service import (
     renumerar_macrociclos,
     renumerar_mesociclos,
@@ -135,6 +136,10 @@ def test_treino_planeado_pelo_treinador_entra_no_microciclo_existente():
         assert sessao.volume_minutos == 90
         assert sessao.intensidade_rpe is None
         assert evento.microciclo_id == micro.id
+
+        _eliminar_evento_com_dependencias(db, evento)
+        db.flush()
+        assert sessao.ativa is False
     finally:
         db.rollback()
         db.query(EventoPlaneamentoClube).execution_options(ignorar_clube=True).filter(EventoPlaneamentoClube.clube_id == clube.id).delete(synchronize_session=False)
