@@ -165,9 +165,9 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
     object-fit: contain;
 }
 
-.ds-topbar { background: linear-gradient(110deg, var(--clube-secondary), var(--clube-primary)); color: var(--clube-on-primary); box-shadow:0 1px 0 rgb(255 255 255 / .12) inset,0 7px 22px rgb(15 23 42 / .16); }
-.ds-icon-button,.ds-top-action { display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border:1px solid rgb(255 255 255 / .10);border-radius:.65rem;background:rgb(15 23 42 / .15);padding:.48rem .65rem;font-size:.82rem;font-weight:700;transition:background .15s,border-color .15s;cursor:pointer;list-style:none; }
-.ds-icon-button:hover,.ds-top-action:hover { border-color:rgb(255 255 255 / .24);background:rgb(15 23 42 / .27); }
+.ds-topbar { background:var(--clube-primary);color:var(--clube-header-text);box-shadow:0 1px 0 color-mix(in srgb,var(--clube-header-text) 16%,transparent) inset,0 7px 22px rgb(15 23 42 / .16); }
+.ds-icon-button,.ds-top-action { display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border:1px solid color-mix(in srgb,var(--clube-header-text) 20%,transparent);border-radius:.65rem;background:color-mix(in srgb,var(--clube-header-text) 10%,transparent);padding:.48rem .65rem;color:inherit;font-size:.82rem;font-weight:700;transition:background .15s,border-color .15s;cursor:pointer;list-style:none; }
+.ds-icon-button:hover,.ds-top-action:hover { border-color:color-mix(in srgb,var(--clube-header-text) 38%,transparent);background:color-mix(in srgb,var(--clube-header-text) 20%,transparent); }
 .ds-icon-button svg,.ds-top-action svg,.ds-topbar label svg { width:1.1rem;height:1.1rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
 .ds-menu summary::-webkit-details-marker { display:none; }
 .ds-counter { display:grid;min-width:1.2rem;height:1.2rem;place-items:center;border-radius:999px;background:#fff;color:var(--clube-primary-dark);padding:0 .25rem;font-size:.65rem;font-weight:900; }
@@ -298,20 +298,20 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
 :root { --topbar-height: 4.5rem; }
 body { background:linear-gradient(180deg,#f4f7fa 0,#f7f8fa 24rem,#f4f6f8 100%); }
 .ds-topbar {
-    background:
-        radial-gradient(circle at 12% -100%, color-mix(in srgb,var(--clube-accent) 38%,transparent), transparent 38%),
-        linear-gradient(115deg,var(--clube-secondary),color-mix(in srgb,var(--clube-secondary) 68%,var(--clube-primary)) 62%,var(--clube-primary));
-    box-shadow:0 1px 0 rgb(255 255 255 / .12) inset,0 8px 24px rgb(15 23 42 / .14);
+    background:var(--clube-primary);
+    color:var(--clube-header-text);
+    box-shadow:0 1px 0 color-mix(in srgb,var(--clube-header-text) 16%,transparent) inset,0 8px 24px rgb(15 23 42 / .14);
 }
 .ds-brand-link { display:flex;min-width:0;flex:none;align-items:center;gap:.65rem;border-radius:.7rem;padding:.25rem; }
-.ds-brand-link:focus-visible { outline:2px solid rgb(255 255 255 / .9);outline-offset:2px; }
+.ds-brand-link:focus-visible { outline:2px solid var(--clube-header-text);outline-offset:2px; }
 .ds-brand-name { display:none;max-width:10rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem;font-weight:800;letter-spacing:-.01em; }
 .ds-header-navigation { display:none;min-width:0;align-items:center; }
-.ds-primary-nav { display:flex;align-items:center;gap:.15rem; }
+.ds-primary-nav,.ds-team-direct-nav { display:flex;align-items:center;gap:.12rem; }
 .ds-primary-menu { position:relative; }
-.ds-header-trigger { display:flex;min-height:2.45rem;align-items:center;justify-content:center;gap:.35rem;border-radius:.62rem;padding:.55rem .72rem;color:rgb(255 255 255 / .82);font-size:.8rem;font-weight:750;line-height:1;list-style:none;white-space:nowrap;transition:background .15s,color .15s;cursor:pointer; }
+.ds-header-trigger { display:flex;min-height:2.45rem;align-items:center;justify-content:center;gap:.35rem;border-radius:.62rem;padding:.55rem .62rem;color:inherit;font-size:.76rem;font-weight:750;line-height:1;list-style:none;white-space:nowrap;transition:background .15s,color .15s;cursor:pointer; }
 .ds-header-trigger::-webkit-details-marker { display:none; }
-.ds-header-trigger:hover,.ds-header-trigger.is-active,.ds-primary-menu[open]>.ds-header-trigger { background:rgb(0 0 0 / .2);color:#fff; }
+.ds-header-trigger:hover,.ds-header-trigger.is-active,.ds-primary-menu[open]>.ds-header-trigger { background:color-mix(in srgb,var(--clube-header-text) 18%,transparent);color:inherit; }
+.ds-header-trigger:focus-visible { outline:2px solid var(--clube-header-text);outline-offset:1px; }
 .ds-menu-chevron { font-size:.78rem;opacity:.7;transition:transform .15s; }
 .ds-primary-menu[open] .ds-menu-chevron { transform:rotate(180deg); }
 .ds-navigation-dropdown { left:0;top:calc(100% + .65rem);max-height:min(76vh,42rem);overflow-y:auto;padding:.4rem; }
@@ -347,10 +347,17 @@ body { background:linear-gradient(180deg,#f4f7fa 0,#f7f8fa 24rem,#f4f6f8 100%); 
     .ds-primary-nav { margin-left:.6rem; }
 }
 
+@media (min-width:1280px) and (max-width:1535px) {
+    .ds-brand-name { display:none; }
+    .ds-primary-nav { margin-left:.2rem; }
+    .ds-header-trigger { padding-inline:.48rem;font-size:.7rem; }
+}
+
 @media (max-width:1279px) {
     .ds-header-navigation { position:fixed;left:.75rem;right:.75rem;top:calc(var(--topbar-height) + .55rem);z-index:60;max-height:calc(100vh - var(--topbar-height) - 1.1rem);overflow-y:auto;border:1px solid rgb(255 255 255 / .7);border-radius:1rem;background:#fff;padding:.65rem;color:#334155;box-shadow:0 22px 60px rgb(15 23 42 / .24); }
     .ds-header-navigation.is-open { display:block; }
-    .ds-primary-nav { align-items:stretch;flex-direction:column;gap:.15rem; }
+    .ds-primary-nav,.ds-team-direct-nav { align-items:stretch;flex-direction:column;gap:.15rem; }
+    .ds-team-direct-nav { border-block:1px solid var(--border-soft);margin:.35rem 0;padding:.35rem 0; }
     .ds-header-trigger { justify-content:space-between;color:#3f4e62;padding:.75rem .8rem;font-size:.86rem; }
     .ds-header-trigger:hover,.ds-header-trigger.is-active,.ds-primary-menu[open]>.ds-header-trigger { background:var(--clube-primary-surface);color:var(--clube-primary-dark); }
     .ds-primary-menu { width:100%; }

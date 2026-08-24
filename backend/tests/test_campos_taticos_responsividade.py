@@ -107,6 +107,9 @@ def test_header_liga_todos_os_niveis_a_listas_independentes():
     assert "'/calendario?equipa_id=' ~ equipa_contexto_id" in navegacao
     assert 'class="ds-menu ds-primary-menu"' in navegacao
     assert 'class="ds-team-switcher"' in navegacao
+    assert 'class="ds-team-direct-nav"' in navegacao
+    for area in ("Resumo", "Plantel", "Jogos", "Assiduidade", "Equipa técnica", "Eventos", "Físico", "Playbook"):
+        assert f'>{area}</a>' in navegacao
     assert 'class="ds-tabs"' not in contexto_equipa
     assert 'data-planning-menu' not in contexto_equipa
     for nivel in ("Plano anual", "Macrociclos", "Mesociclos", "Microciclos", "Planos de treino"):
@@ -118,6 +121,18 @@ def test_header_liga_todos_os_niveis_a_listas_independentes():
     assert ".ds-primary-menu>.ds-dropdown" in estilos
     assert 'menuDetails.addEventListener("mouseleave"' in base
     assert "document.body.appendChild(submenu)" not in base
+
+
+def test_header_usa_cor_solida_do_clube_e_texto_alternativo():
+    estilos = (ROOT / "frontend/static/css/design-system.css").read_text(encoding="utf-8")
+    base = (ROOT / "frontend/templates/base.html").read_text(encoding="utf-8")
+
+    regras_topbar = [bloco for bloco in estilos.split("}") if ".ds-topbar" in bloco]
+    assert regras_topbar
+    assert all("linear-gradient" not in bloco and "radial-gradient" not in bloco for bloco in regras_topbar)
+    assert "background:var(--clube-primary)" in estilos
+    assert "color:var(--clube-header-text)" in estilos
+    assert "--clube-header-text:" in base
 
 
 def test_area_da_equipa_usa_apenas_navegacao_superior():

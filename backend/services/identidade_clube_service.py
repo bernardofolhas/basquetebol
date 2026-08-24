@@ -65,6 +65,7 @@ def _enriquecer_identidade(contexto: dict) -> dict:
         "cor_principal_superficie": _misturar(principal, "#ffffff", 0.94),
         "cor_borda_marca": _misturar(principal, "#ffffff", 0.72),
         "texto_sobre_principal": texto_sobre_principal,
+        "texto_cabecalho": secundaria if _contraste(principal, secundaria) >= 4.5 else texto_sobre_principal,
         "texto_sobre_secundaria": texto_sobre_secundaria,
         "texto_sobre_destaque": texto_sobre_destaque,
         "contraste_principal": round(_contraste(principal, texto_sobre_principal), 2),
