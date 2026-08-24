@@ -1,15 +1,4 @@
 {% macro equipa_contexto(equipa, titulo, subtitulo="", ativo="resumo", voltar_href="/equipas", voltar_label="Voltar às equipas") %}
-{% set abas = [
-    {"id": "resumo", "href": "/equipas/" ~ equipa.id, "icon": "🏠", "label": "Resumo"},
-    {"id": "equipa_tecnica", "href": "/equipas/" ~ equipa.id ~ "/equipa-tecnica", "icon": "🧑‍🏫", "label": "Equipa Técnica"},
-    {"id": "eventos", "href": "/equipas/" ~ equipa.id ~ "/eventos", "icon": "📍", "label": "Eventos"},
-    {"id": "plantel", "href": "/equipas/" ~ equipa.id ~ "/plantel", "icon": "👥", "label": "Plantel"},
-    {"id": "planeamento", "href": "/planeamento/equipas/" ~ equipa.id ~ "/anuais", "icon": "🗂️", "label": "Planeamento"},
-    {"id": "jogos", "href": "/jogos/equipas/" ~ equipa.id, "icon": "📅", "label": "Jogos"},
-    {"id": "playbook", "href": "/playbook/equipas/" ~ equipa.id, "icon": "📚", "label": "Playbook"},
-    {"id": "fisico", "href": "/fisico/equipas/" ~ equipa.id, "icon": "💪", "label": "Físico"},
-] %}
-
 <div class="mb-6">
     <a href="{{ voltar_href }}" class="inline-flex items-center gap-2 text-sm font-medium text-orange-500 hover:text-orange-600">
         <span>←</span> {{ voltar_label }}
@@ -38,29 +27,6 @@
             {% endif %}
         </div>
 
-        <div class="ds-tabs">
-                {% for aba in abas %}
-                {% if aba.id == "planeamento" %}
-                <details class="ds-tab-menu" data-planning-menu>
-                    <summary class="ds-tab {% if ativo == aba.id %}is-active{% endif %}">
-                        {{ aba.label }} <span class="ds-tab-chevron" aria-hidden="true">⌄</span>
-                    </summary>
-                    <div class="ds-tab-submenu" aria-label="Opções de planeamento">
-                        <a href="/planeamento/equipas/{{ equipa.id }}/anuais">Plano anual</a>
-                        <a href="/planeamento/equipas/{{ equipa.id }}/macrociclos">Macrociclos</a>
-                        <a href="/planeamento/equipas/{{ equipa.id }}/mesociclos">Mesociclos</a>
-                        <a href="/planeamento/equipas/{{ equipa.id }}/microciclos">Microciclos</a>
-                        <a href="/treino/equipas/{{ equipa.id }}/planos">Planos de treino</a>
-                    </div>
-                </details>
-                {% else %}
-                <a href="{{ aba.href }}"
-                   class="ds-tab {% if ativo == aba.id %}is-active{% endif %}">
-                    {{ aba.label }}
-                </a>
-                {% endif %}
-                {% endfor %}
-        </div>
     </div>
 </div>
 {% endmacro %}

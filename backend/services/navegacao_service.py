@@ -2,6 +2,7 @@
 
 from collections import OrderedDict
 
+from models.equipa import Equipa
 from models.utilizador import PerfilEnum
 from models.notificacao import Notificacao
 from services.dashboard_service import obter_painel_operacional
@@ -17,11 +18,18 @@ GRUPOS_PENDENCIAS = OrderedDict([
 ])
 
 
-def _equipas_permitidas(utilizador) -> list:
-    if utilizador.perfil != PerfilEnum.treinador:
-        return []
-    treinador = getattr(utilizador, "treinador", None)
-    return list(getattr(treinador, "equipas", []) or [])
+def _equipas_permitidas(db, utilizador, clube_atual=None) -> list:
+    if utilizador.perfil == PerfilEnum.treinador:
+        treinador = getattr(utilizador, "treinador", None)
+        return sorted(
+            list(getattr(treinador, "equipas", []) or []),
+            key=lambda equipa: equipa.nome.lower(),
+        )
+    if utilizador.perfil in {PerfilEnum.administrador, PerfilEnum.coordenador, PerfilEnum.superadministrador}:
+        clube_id = getattr(clube_atual, "id", None) or getattr(utilizador, "clube_id", None)
+        if clube_id:
+            return db.query(Equipa).filter(Equipa.clube_id == clube_id).order_by(Equipa.nome).all()
+    return []
 
 
 def _grupo_tarefa(tarefa: dict) -> str:
@@ -101,7 +109,7 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
             "total_notificacoes": 0,
         }
 
-    equipas = _equipas_permitidas(utilizador)
+    equipas = _equipas_permitidas(db, utilizador, clube_atual)
     equipa_ids = [equipa.id for equipa in equipas] if utilizador.perfil == PerfilEnum.treinador else None
     painel = obter_painel_operacional(
         db,

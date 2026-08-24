@@ -74,7 +74,7 @@ def test_contexto_pdf_prepara_todos_os_campos_ativos():
 
 
 def test_templates_expoem_navegacao_e_acoes_responsivas_sem_textos_internos():
-    sidebar = (ROOT / "frontend/templates/partials/sidebar_contextual.html").read_text(encoding="utf-8")
+    navegacao = (ROOT / "frontend/templates/partials/navbar_global.html").read_text(encoding="utf-8")
     biblioteca = (ROOT / "frontend/templates/biblioteca/detalhe.html").read_text(encoding="utf-8")
     calendario = (ROOT / "frontend/templates/calendario_partilhavel_pdf.html").read_text(encoding="utf-8")
     plano_pdf = (ROOT / "frontend/templates/treino/plano_print.html").read_text(encoding="utf-8")
@@ -82,7 +82,7 @@ def test_templates_expoem_navegacao_e_acoes_responsivas_sem_textos_internos():
     playbook_pdf = (ROOT / "frontend/templates/playbook/pdf.html").read_text(encoding="utf-8")
 
     for nivel in ("Plano anual", "Macrociclos", "Mesociclos", "Microciclos", "Planos de treino"):
-        assert nivel in sidebar
+        assert nivel in navegacao
     assert "canvas_bib_completo" in biblioteca
     assert "'cone'" in biblioteca
     assert "Documento para partilha" not in calendario
@@ -97,33 +97,35 @@ def test_templates_expoem_navegacao_e_acoes_responsivas_sem_textos_internos():
     assert 'src="/static/campos/campo_meio.png"' not in playbook_pdf
 
 
-def test_sidebar_liga_todos_os_niveis_a_listas_independentes():
-    sidebar = (ROOT / "frontend/templates/partials/sidebar_contextual.html").read_text(encoding="utf-8")
+def test_header_liga_todos_os_niveis_a_listas_independentes():
+    navegacao = (ROOT / "frontend/templates/partials/navbar_global.html").read_text(encoding="utf-8")
     contexto_equipa = (ROOT / "frontend/templates/partials/equipa_contexto.html").read_text(encoding="utf-8")
 
-    assert "'/planeamento/equipas/' ~ equipa_contexto_id ~ '/mesociclos'" in sidebar
-    assert "'/planeamento/equipas/' ~ equipa_contexto_id ~ '/microciclos'" in sidebar
-    assert "'/treino/equipas/' ~ equipa_contexto_id ~ '/planos'" in sidebar
-    assert "('/calendario?equipa_id=' ~ equipa_contexto_id)" not in sidebar
-    assert "is-disabled" not in sidebar
-    assert 'class="ds-tab-menu"' in contexto_equipa
-    assert 'data-planning-menu' in contexto_equipa
-    assert 'ativo == aba.id %}open' not in contexto_equipa
+    assert "'/planeamento/equipas/' ~ equipa_contexto_id ~ '/mesociclos'" in navegacao
+    assert "'/planeamento/equipas/' ~ equipa_contexto_id ~ '/microciclos'" in navegacao
+    assert "'/treino/equipas/' ~ equipa_contexto_id ~ '/planos'" in navegacao
+    assert "'/calendario?equipa_id=' ~ equipa_contexto_id" in navegacao
+    assert 'class="ds-menu ds-primary-menu"' in navegacao
+    assert 'class="ds-team-switcher"' in navegacao
+    assert 'class="ds-tabs"' not in contexto_equipa
+    assert 'data-planning-menu' not in contexto_equipa
     for nivel in ("Plano anual", "Macrociclos", "Mesociclos", "Microciclos", "Planos de treino"):
-        assert nivel in contexto_equipa
+        assert nivel in navegacao
 
     estilos = (ROOT / "frontend/static/css/design-system.css").read_text(encoding="utf-8")
     base = (ROOT / "frontend/templates/base.html").read_text(encoding="utf-8")
-    assert "overflow-y:hidden" in estilos
-    assert ".ds-tab-submenu { position:fixed;" in estilos
+    assert ".ds-header-navigation.is-open" in estilos
+    assert ".ds-primary-menu>.ds-dropdown" in estilos
     assert 'menuDetails.addEventListener("mouseleave"' in base
-    assert "document.body.appendChild(submenu)" in base
+    assert "document.body.appendChild(submenu)" not in base
 
 
-def test_area_da_equipa_nao_duplica_barra_de_contexto():
+def test_area_da_equipa_usa_apenas_navegacao_superior():
     base = (ROOT / "frontend/templates/base.html").read_text(encoding="utf-8")
 
-    assert "not (equipa is defined and equipa and p.startswith('/equipas/'))" in base
+    assert 'partials/sidebar_contextual.html' not in base
+    assert 'id="sidebar-principal"' not in base
+    assert 'class="ds-context-bar mb-4"' not in base
 
 
 def test_treino_da_agenda_aponta_para_resolucao_do_plano():

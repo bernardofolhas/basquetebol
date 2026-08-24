@@ -32,45 +32,25 @@
   {% endif %}
 
   {% include "partials/navbar_global.html" %}
-  <div id="sidebar-overlay" class="fixed inset-0 top-16 z-30 hidden bg-slate-950/45 lg:hidden" aria-hidden="true"></div>
-  {% include "partials/sidebar_contextual.html" %}
 
-  <main id="conteudo-principal" class="relative z-0 min-w-0 px-4 pb-8 pt-20 transition-[margin] sm:px-6 lg:ml-64">
-    {% if equipa_contexto_id and not (equipa is defined and equipa and p.startswith('/equipas/')) %}
-    <section class="ds-context-bar mb-4">
-      <div class="flex min-w-0 items-center gap-3"><span class="ds-context-mark">EQ</span><div class="min-w-0"><p class="text-[0.66rem] font-bold uppercase tracking-[.16em] text-slate-400">Equipa selecionada</p><p class="truncate font-bold text-slate-900">{{ equipa_contexto_nome or 'Equipa' }}</p></div></div>
-      <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
-        {% if identidade.epoca_predefinida %}<span class="ds-context-pill">Época {{ identidade.epoca_predefinida }}</span>{% endif %}
-        {% if sessao is defined and sessao %}<span class="ds-context-pill">Sessão · {{ sessao.estado|default('planeada')|replace('_',' ')|title }}</span>{% elif microciclo is defined and microciclo %}<span class="ds-context-pill">Microciclo {{ microciclo.numero }}</span>{% elif mesociclo is defined and mesociclo %}<span class="ds-context-pill">Mesociclo {{ mesociclo.numero }}</span>{% elif macrociclo is defined and macrociclo %}<span class="ds-context-pill">Macrociclo {{ macrociclo.numero }}</span>{% endif %}
-        <a href="/calendario?equipa_id={{ equipa_contexto_id }}" class="ds-context-action">Calendário</a>
-      </div>
-    </section>
-    {% endif %}
+  <main id="conteudo-principal" class="relative z-0 mx-auto min-w-0 max-w-[1600px] px-4 pb-8 pt-24 sm:px-6">
     {% if request.state.flash %}<div id="flash-msg" class="mb-4 flex items-center justify-between rounded-xl border px-4 py-3 {% if request.state.flash.tipo == 'error' %}border-red-200 bg-red-50 text-red-800{% else %}border-emerald-200 bg-emerald-50 text-emerald-800{% endif %}"><span>{{ request.state.flash.mensagem }}</span><button onclick="this.parentElement.remove()" class="ml-4 text-xl opacity-60" aria-label="Fechar">&times;</button></div>{% endif %}
     {% block conteudo %}{% endblock %}
   </main>
 
   <script>
     document.addEventListener("DOMContentLoaded",function(){
-      var menu=document.getElementById("menu-mobile"),sidebar=document.getElementById("sidebar-principal"),overlay=document.getElementById("sidebar-overlay"),collapse=document.getElementById("sidebar-collapse");
-      function closeMenu(){sidebar.classList.add("-translate-x-full");overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}
-      function openMenu(){sidebar.classList.remove("-translate-x-full");overlay.classList.remove("hidden");if(menu)menu.setAttribute("aria-expanded","true")}
-      if(menu)menu.addEventListener("click",function(){sidebar.classList.contains("-translate-x-full")?openMenu():closeMenu()});if(overlay)overlay.addEventListener("click",closeMenu);sidebar.querySelectorAll("[data-sidebar-link]").forEach(function(link){link.addEventListener("click",closeMenu)});
-      var collapsed=localStorage.getItem("sidebar-collapsed")==="1";function applyCollapse(){document.body.classList.toggle("sidebar-is-collapsed",collapsed);if(collapse){collapse.setAttribute("aria-label",collapsed?"Expandir menu":"Recolher menu");collapse.title=collapsed?"Expandir menu":"Recolher menu"}}applyCollapse();if(collapse)collapse.addEventListener("click",function(){collapsed=!collapsed;localStorage.setItem("sidebar-collapsed",collapsed?"1":"0");applyCollapse()});
+      var menu=document.getElementById("menu-mobile"),navigation=document.getElementById("header-navigation"),overlay=document.getElementById("header-overlay");
+      function closeMenu(){navigation.classList.remove("is-open");overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}
+      function openMenu(){navigation.classList.add("is-open");overlay.classList.remove("hidden");if(menu)menu.setAttribute("aria-expanded","true")}
+      if(menu)menu.addEventListener("click",function(){navigation.classList.contains("is-open")?closeMenu():openMenu()});if(overlay)overlay.addEventListener("click",closeMenu);navigation.querySelectorAll("a").forEach(function(link){link.addEventListener("click",closeMenu)});
       document.querySelectorAll(".ds-menu").forEach(function(menuDetails){menuDetails.addEventListener("toggle",function(){if(menuDetails.open)document.querySelectorAll(".ds-menu[open]").forEach(function(other){if(other!==menuDetails)other.removeAttribute("open")})})});
-      document.querySelectorAll("[data-planning-menu]").forEach(function(menuDetails){
-        var summary=menuDetails.querySelector("summary"),submenu=menuDetails.querySelector(".ds-tab-submenu"),closeTimer;
-        function positionMenu(){var rect=summary.getBoundingClientRect(),left=Math.max(8,Math.min(rect.left,window.innerWidth-submenu.offsetWidth-8));submenu.style.left=left+"px";submenu.style.top=rect.bottom+"px"}
-        function fechar(){menuDetails.removeAttribute("open")}
-        function agendarFecho(){clearTimeout(closeTimer);closeTimer=setTimeout(fechar,120)}
-        menuDetails.addEventListener("toggle",function(){if(menuDetails.open){document.querySelectorAll("[data-planning-menu][open]").forEach(function(other){if(other!==menuDetails)other.removeAttribute("open")});document.body.appendChild(submenu);positionMenu()}else if(submenu.parentElement!==menuDetails){menuDetails.appendChild(submenu)}});
-        menuDetails.addEventListener("mouseleave",agendarFecho);
-        menuDetails.addEventListener("mouseenter",function(){clearTimeout(closeTimer)});
-        submenu.addEventListener("mouseenter",function(){clearTimeout(closeTimer)});
-        submenu.addEventListener("mouseleave",agendarFecho);
-        window.addEventListener("resize",function(){if(menuDetails.open)positionMenu()});
+      document.querySelectorAll(".ds-primary-menu").forEach(function(menuDetails){
+        var timer;menuDetails.addEventListener("mouseenter",function(){clearTimeout(timer)});menuDetails.addEventListener("mouseleave",function(){if(window.matchMedia("(min-width: 1280px)").matches)timer=setTimeout(function(){menuDetails.open=false},140)});
       });
-      window.addEventListener("resize",function(){if(window.innerWidth>=1024){overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}});
+      document.addEventListener("click",function(event){document.querySelectorAll(".ds-menu[open]").forEach(function(item){if(!item.contains(event.target))item.removeAttribute("open")})});
+      document.addEventListener("keydown",function(event){if(event.key==="Escape"){closeMenu();document.querySelectorAll(".ds-menu[open]").forEach(function(item){item.removeAttribute("open")})}});
+      window.addEventListener("resize",function(){if(window.innerWidth>=1280)closeMenu()});
     });
   </script>
 </body>

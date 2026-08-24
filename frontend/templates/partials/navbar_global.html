@@ -1,87 +1,194 @@
 {% set nav = request.state.navegacao|default({}, true) %}
-<nav class="ds-topbar fixed inset-x-0 top-0 z-50 flex h-16 items-center gap-3 px-3 text-white shadow-md sm:px-5">
-  <button id="menu-mobile" type="button" class="ds-icon-button lg:hidden" aria-label="Abrir menu" aria-expanded="false">
+{% set total_caixa_entrada = (nav.total_pendencias|default(0)) + (nav.total_notificacoes|default(0)) %}
+
+{% macro menu_link(href, label, descricao="", ativo=False) %}
+<a href="{{ href }}" class="ds-header-link {% if ativo %}is-active{% endif %}">
+  <span>{{ label }}</span>{% if descricao %}<small>{{ descricao }}</small>{% endif %}
+</a>
+{% endmacro %}
+
+<nav class="ds-topbar fixed inset-x-0 top-0 z-50 flex h-[4.5rem] items-center gap-2 px-3 text-white sm:px-5">
+  <button id="menu-mobile" type="button" class="ds-icon-button xl:hidden" aria-label="Abrir navegação" aria-expanded="false" aria-controls="header-navigation">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
   </button>
 
-  <a href="{{ nav.dashboard_url|default('/dashboard') }}" class="flex min-w-0 items-center gap-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/80" aria-label="Ir para o dashboard">
+  <a href="{{ nav.dashboard_url|default('/dashboard') }}" class="ds-brand-link" aria-label="Ir para o início">
     {% if not modo_plataforma and identidade.logo_principal %}
-    <img src="{{ identidade.logo_principal }}" alt="Logótipo de {{ identidade.nome_oficial|default('clube') }}" class="ds-logo h-10 w-10 rounded-lg bg-white/95 p-1">
+    <img src="{{ identidade.logo_principal }}" alt="Logótipo de {{ identidade.nome_oficial|default('clube') }}" class="ds-logo rounded-lg bg-white/95 p-1">
     {% elif not modo_plataforma %}
     <span class="grid h-9 w-9 place-items-center rounded-lg bg-white/15 font-black">B</span>
     {% endif %}
-    <span class="hidden max-w-48 truncate font-bold sm:block">{{ 'Gestão da Plataforma' if modo_plataforma else identidade.nome_curto or identidade.nome_oficial or 'Basquetebol' }}</span>
+    <span class="ds-brand-name">{{ 'Gestão da Plataforma' if modo_plataforma else identidade.nome_curto or identidade.nome_oficial or 'Basquetebol' }}</span>
   </a>
 
-  {% if not modo_plataforma %}
-  <a href="/dashboard" class="hidden rounded-lg px-3 py-2 text-sm font-semibold hover:bg-black/15 xl:block">Dashboard</a>
-  {% if equipa_contexto_id %}
-  <a href="/equipas/{{ equipa_contexto_id }}" class="hidden max-w-44 items-center gap-2 rounded-full bg-black/15 px-3 py-1.5 text-sm font-semibold lg:flex">
-    <span class="h-2 w-2 rounded-full bg-white"></span><span class="truncate">{{ equipa_contexto_nome or 'Equipa' }}</span>
-  </a>
-  {% endif %}
+  <div id="header-navigation" class="ds-header-navigation" aria-label="Navegação principal">
+    {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
+    <form action="/pesquisa" method="get" class="ds-mobile-search xl:hidden">
+      <label><span class="sr-only">Pesquisar</span><input name="q" minlength="2" placeholder="Pesquisar no clube"></label>
+    </form>
+    {% endif %}
 
-  {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
-  <form action="/pesquisa" method="get" class="ml-auto hidden w-full max-w-xs md:block">
-    <label class="relative block">
-      <span class="sr-only">Pesquisar</span>
-      <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-      <input name="q" minlength="2" placeholder="Pesquisar no clube" class="w-full rounded-xl border border-white/20 bg-black/15 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/65 focus:border-white/50 focus:outline-none focus:ring-2 focus:ring-white/30">
-    </label>
-  </form>
-  {% endif %}
+    <div class="ds-primary-nav">
+      <a href="{{ nav.dashboard_url|default('/dashboard') }}" class="ds-header-trigger {% if p == '/dashboard' %}is-active{% endif %}">Início</a>
 
-  <details class="ds-menu relative ml-auto md:ml-0">
-    <summary class="ds-top-action" aria-label="Ações rápidas">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="hidden xl:inline">Criar</span>
-    </summary>
-    <div class="ds-dropdown right-0 w-72">
-      <p class="ds-dropdown-title">Ações rápidas</p>
-      {% for acao in nav.acoes_rapidas|default([]) %}
-      <a href="{{ acao.link }}" class="ds-dropdown-link"><strong>{{ acao.label }}</strong><span>{{ acao.descricao }}</span></a>
-      {% else %}<p class="px-3 py-4 text-sm text-slate-500">Sem ações disponíveis neste contexto.</p>{% endfor %}
+      {% if modo_plataforma %}
+      <details class="ds-menu ds-primary-menu">
+        <summary class="ds-header-trigger {% if p.startswith('/superadmin') %}is-active{% endif %}">Plataforma <span class="ds-menu-chevron">⌄</span></summary>
+        <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
+          <p class="ds-dropdown-title">Gestão global</p>
+          {{ menu_link('/superadmin/clubes', 'Clubes', 'Configuração e identidade', p.startswith('/superadmin/clubes')) }}
+          {{ menu_link('/superadmin/utilizadores', 'Utilizadores', 'Contas e recuperação', p.startswith('/superadmin/utilizadores')) }}
+          {{ menu_link('/superadmin/clubes/novo', 'Criar clube', 'Adicionar organização') }}
+        </div>
+      </details>
+      {% else %}
+      {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
+      <details class="ds-menu ds-primary-menu">
+        <summary class="ds-header-trigger {% if equipa_contexto_id or p.startswith('/equipas') %}is-active{% endif %}">
+          <span class="truncate">{{ equipa_contexto_nome or 'Equipas' }}</span><span class="ds-menu-chevron">⌄</span>
+        </summary>
+        <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
+          {% if equipa_contexto_id %}
+          <p class="ds-dropdown-title">{{ equipa_contexto_nome or 'Equipa selecionada' }}</p>
+          <div class="ds-menu-grid">
+            {{ menu_link('/equipas/' ~ equipa_contexto_id, 'Resumo', 'Visão da equipa', p == '/equipas/' ~ equipa_contexto_id) }}
+            {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/plantel', 'Plantel', 'Atletas e fichas', p.endswith('/plantel')) }}
+            {{ menu_link('/jogos/equipas/' ~ equipa_contexto_id, 'Jogos', 'Calendário e planos', p.startswith('/jogos')) }}
+            {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id, 'Assiduidade', 'Presenças e relatório', p.startswith('/assiduidade')) }}
+            {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/equipa-tecnica', 'Equipa técnica', 'Treinadores associados', p.endswith('/equipa-tecnica')) }}
+            {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/eventos', 'Eventos', 'Atividades da equipa', p.endswith('/eventos')) }}
+            {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id, 'Preparação física', 'Testes e evolução', p.startswith('/fisico')) }}
+            {{ menu_link('/playbook/equipas/' ~ equipa_contexto_id, 'Playbook', 'Sistemas e movimentos', p.startswith('/playbook')) }}
+          </div>
+          {% endif %}
+          <div class="ds-dropdown-section">
+            <div class="flex items-center justify-between gap-2 px-2 pb-1"><span class="ds-dropdown-label">{{ 'Mudar de equipa' if equipa_contexto_id else 'Abrir equipa' }}</span><a href="/equipas" class="ds-dropdown-all">Ver todas</a></div>
+            <div class="ds-team-switcher">
+              {% for item in nav.equipas|default([]) %}<a href="/equipas/{{ item.id }}" class="{% if item.id == equipa_contexto_id %}is-current{% endif %}"><span class="ds-team-dot"></span><span class="truncate">{{ item.nome }}</span></a>{% else %}<p>Sem equipas disponíveis.</p>{% endfor %}
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="ds-menu ds-primary-menu">
+        <summary class="ds-header-trigger {% if p.startswith('/planeamento') or p.startswith('/treino') %}is-active{% endif %}">Planeamento <span class="ds-menu-chevron">⌄</span></summary>
+        <div class="ds-dropdown ds-navigation-dropdown w-[23rem]">
+          {% if equipa_contexto_id %}
+          <p class="ds-dropdown-title">Planeamento · {{ equipa_contexto_nome }}</p>
+          <div class="ds-menu-grid">
+            {{ menu_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/anuais', 'Plano anual', 'Estratégia da época') }}
+            {{ menu_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/macrociclos', 'Macrociclos', 'Grandes períodos') }}
+            {{ menu_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/mesociclos', 'Mesociclos', 'Períodos mensais') }}
+            {{ menu_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/microciclos', 'Microciclos', 'Visão semanal') }}
+            {{ menu_link('/treino/equipas/' ~ equipa_contexto_id ~ '/planos', 'Planos de treino', 'Preparar sessões') }}
+            {{ menu_link('/calendario?equipa_id=' ~ equipa_contexto_id, 'Calendário da equipa', 'Todos os eventos') }}
+          </div>
+          {% elif nav.equipas|default([]) %}
+          <p class="ds-dropdown-title">Planeamento das equipas</p>
+          <div class="ds-team-switcher p-2">{% for item in nav.equipas %}<a href="/planeamento/equipas/{{ item.id }}/anuais"><span class="ds-team-dot"></span><span class="truncate">{{ item.nome }}</span></a>{% endfor %}</div>
+          {% endif %}
+          {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
+          <div class="ds-dropdown-section">
+            <p class="ds-dropdown-label px-2 pb-1">Planeamento do clube</p>
+            <div class="ds-menu-grid">
+              {{ menu_link('/planeamento-clube/anual', 'Anual', 'Época do clube') }}
+              {{ menu_link('/planeamento-clube/mensal', 'Mensal', 'Organização por mês') }}
+              {{ menu_link('/planeamento-clube/semanal', 'Semanal', 'Horários e publicação') }}
+              {{ menu_link('/planeamento-clube/atribuicao-espacos', 'Atribuir espaços', 'Mapa semanal') }}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </details>
+      {% endif %}
+
+      <details class="ds-menu ds-primary-menu">
+        <summary class="ds-header-trigger {% if p.startswith('/calendario') or p.startswith('/planeamento-clube/espacos') or p.startswith('/biblioteca') or p.startswith('/dashboard/clube') %}is-active{% endif %}">Operação <span class="ds-menu-chevron">⌄</span></summary>
+        <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
+          <p class="ds-dropdown-title">Trabalho diário</p>
+          {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
+          {{ menu_link('/calendario', 'Calendário operacional', 'Treinos, jogos e atividades', p.startswith('/calendario')) }}
+          {% endif %}
+          {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
+          {{ menu_link('/planeamento-clube/atribuicao-espacos', 'Atribuição de espaços', 'Distribuir horários e pavilhões') }}
+          {{ menu_link('/planeamento-clube/espacos', 'Espaços e slots', 'Disponibilidades e bloqueios') }}
+          <div class="ds-dropdown-section">
+            <p class="ds-dropdown-label px-2 pb-1">Acompanhamento</p>
+            <div class="ds-menu-grid">
+              {{ menu_link('/dashboard/clube', 'Visão do clube', 'Coberturas e operação') }}
+              {{ menu_link('/dashboard/clube/espacos', 'Conflitos', 'Choques de espaço e horário') }}
+              {{ menu_link('/dashboard/clube/carga', 'Carga de treino', 'Volume e intensidade') }}
+              {{ menu_link('/dashboard/clube/executado', 'Planeado vs estado', 'Execução das sessões') }}
+              {{ menu_link('/dashboard/clube/sincronizacao', 'Sincronização', 'Alterações do planeamento') }}
+            </div>
+          </div>
+          {% elif perfil == 'secretaria' %}
+          {{ menu_link('/planeamento-clube/semanal', 'Horários previstos', 'Consulta semanal') }}
+          {{ menu_link('/planeamento-clube/espacos', 'Espaços e slots', 'Consulta de espaços') }}
+          {% endif %}
+          {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}{{ menu_link('/biblioteca', 'Biblioteca de exercícios', 'Pesquisar e reutilizar') }}{% endif %}
+        </div>
+      </details>
+
+      {% if perfil in ['administrador', 'coordenador', 'secretaria', 'superadministrador'] %}
+      <details class="ds-menu ds-primary-menu">
+        <summary class="ds-header-trigger {% if p.startswith('/jogadores') or p.startswith('/treinadores') or p.startswith('/secretaria') or p.startswith('/admin') or p.startswith('/administracao') %}is-active{% endif %}">Gestão <span class="ds-menu-chevron">⌄</span></summary>
+        <div class="ds-dropdown ds-navigation-dropdown right-0 w-80">
+          <p class="ds-dropdown-title">Gestão do clube</p>
+          <div class="ds-menu-grid">
+            {{ menu_link('/jogadores', 'Jogadores', 'Fichas e processos') }}
+            {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}{{ menu_link('/treinadores', 'Treinadores', 'Equipa técnica') }}{% endif %}
+            {{ menu_link('/secretaria/pendencias', 'Secretaria', 'Documentos e validades') }}
+            {% if perfil == 'administrador' %}
+            {{ menu_link('/admin/utilizadores', 'Utilizadores', 'Contas e acessos') }}
+            {{ menu_link('/admin/auditoria', 'Auditoria', 'Histórico de operações') }}
+            {% endif %}
+          </div>
+          {% if perfil == 'superadministrador' and request.state.clube_atual %}<form method="POST" action="/superadmin/sair-suporte" class="border-t border-slate-100 p-2"><button class="ds-header-link w-full text-amber-800">Sair do apoio ao clube</button></form>{% endif %}
+        </div>
+      </details>
+      {% endif %}
+      {% endif %}
     </div>
+
+    {% if not modo_plataforma %}
+    <div class="ds-mobile-quick xl:hidden">
+      <p class="ds-dropdown-label">Ações rápidas</p>
+      <div>{% for acao in nav.acoes_rapidas|default([]) %}<a href="{{ acao.link }}">{{ acao.label }}</a>{% endfor %}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <span class="ml-auto"></span>
+
+  {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
+  <details class="ds-menu relative hidden md:block">
+    <summary class="ds-icon-button" aria-label="Pesquisar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></summary>
+    <div class="ds-dropdown right-0 w-80 p-3"><form action="/pesquisa" method="get"><label class="block"><span class="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Pesquisar no clube</span><input name="q" minlength="2" autofocus placeholder="Equipa, jogador, treinador..." class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"></label></form></div>
+  </details>
+
+  <details class="ds-menu relative hidden sm:block">
+    <summary class="ds-top-action" aria-label="Ações rápidas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="hidden 2xl:inline">Criar</span></summary>
+    <div class="ds-dropdown right-0 w-72"><p class="ds-dropdown-title">Ações rápidas</p>{% for acao in nav.acoes_rapidas|default([]) %}<a href="{{ acao.link }}" class="ds-dropdown-link"><strong>{{ acao.label }}</strong><span>{{ acao.descricao }}</span></a>{% else %}<p class="px-3 py-4 text-sm text-slate-500">Sem ações disponíveis.</p>{% endfor %}</div>
   </details>
 
   <details class="ds-menu relative">
-    <summary class="ds-top-action" aria-label="Pendências">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l2 2 4-4"/><path d="M5 4h14v16H5z"/></svg>
-      {% if nav.total_pendencias|default(0) %}<span class="ds-counter">{{ 99 if nav.total_pendencias > 99 else nav.total_pendencias }}</span>{% endif %}
-      <span class="hidden xl:inline">Pendências</span>
-    </summary>
-    <div class="ds-dropdown right-0 max-h-[70vh] w-[min(24rem,calc(100vw-1rem))] overflow-y-auto">
-      <div class="flex items-center justify-between border-b border-slate-100 px-3 py-3"><p class="font-bold text-slate-900">Trabalho pendente</p>{% if nav.total_urgentes %}<span class="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">{{ nav.total_urgentes }} prioritárias</span>{% endif %}</div>
-      {% for grupo in nav.pendencias|default([]) %}
-      <section class="border-b border-slate-100 p-2 last:border-0">
-        <p class="px-2 py-1 text-[0.68rem] font-bold uppercase tracking-wider text-slate-400">{{ grupo.label }}</p>
-        {% for tarefa in grupo.itens %}<a href="{{ tarefa.link }}" class="ds-task-link"><span class="ds-priority-dot {% if tarefa.urgente %}bg-red-500{% else %}bg-amber-400{% endif %}"></span><span class="min-w-0"><strong>{{ tarefa.titulo }}</strong><small>{{ tarefa.item.equipa_nome or tarefa.item.titulo }}{% if tarefa.item.data %} · {{ tarefa.item.data|data_pt }}{% endif %}</small></span></a>{% endfor %}
-      </section>
-      {% else %}<div class="px-4 py-8 text-center text-sm text-slate-500">Não há pendências neste momento.</div>{% endfor %}
-    </div>
-  </details>
-  <details class="ds-menu relative">
-    <summary class="ds-top-action" aria-label="Notificações">
+    <summary class="ds-icon-button" aria-label="Caixa de entrada">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
-      {% if nav.total_notificacoes|default(0) %}<span class="ds-counter">{{ 99 if nav.total_notificacoes > 99 else nav.total_notificacoes }}</span>{% endif %}
-      <span class="hidden xl:inline">Avisos</span>
+      {% if total_caixa_entrada %}<span class="ds-counter">{{ 99 if total_caixa_entrada > 99 else total_caixa_entrada }}</span>{% endif %}
     </summary>
-    <div class="ds-dropdown right-0 max-h-[70vh] w-[min(24rem,calc(100vw-1rem))] overflow-y-auto">
-      <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-3"><p class="font-bold text-slate-900">Avisos</p><div class="flex items-center gap-3">{% if nav.total_notificacoes %}<form method="POST" action="/notificacoes/ler-todas"><button class="text-xs font-semibold text-[var(--clube-primary,#2563eb)] hover:underline">Marcar lidas</button></form>{% endif %}{% if nav.notificacoes|default([]) %}<form method="POST" action="/notificacoes/limpar-lidas"><button class="text-xs font-semibold text-slate-500 hover:text-slate-800 hover:underline">Limpar</button></form>{% endif %}</div></div>
-      {% for notificacao in nav.notificacoes|default([]) %}
-      <form method="POST" action="/notificacoes/{{ notificacao.id }}/ler" class="border-b border-slate-100 last:border-0"><button class="block w-full px-3 py-3 text-left hover:bg-slate-50 {% if not notificacao.lida %}bg-blue-50/50{% endif %}"><strong class="block text-sm text-slate-800">{{ notificacao.titulo }}</strong><span class="mt-1 block text-xs text-slate-500">{{ notificacao.mensagem }}</span></button></form>
-      {% else %}<div class="px-4 py-8 text-center text-sm text-slate-500">Não há avisos novos.</div>{% endfor %}
+    <div class="ds-dropdown right-0 max-h-[75vh] w-[min(26rem,calc(100vw-1rem))] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 px-3 py-3"><div><p class="font-bold text-slate-900">Caixa de entrada</p><p class="text-xs text-slate-500">Pendências e avisos num só local</p></div><div class="flex gap-2">{% if nav.total_notificacoes %}<form method="POST" action="/notificacoes/ler-todas"><button class="text-xs font-semibold text-[var(--clube-primary)]">Marcar lidas</button></form>{% endif %}{% if nav.notificacoes|default([]) %}<form method="POST" action="/notificacoes/limpar-lidas"><button class="text-xs font-semibold text-slate-500">Limpar</button></form>{% endif %}</div></div>
+      {% if nav.pendencias|default([]) %}<p class="ds-inbox-heading">Pendências</p>{% for grupo in nav.pendencias %}<section class="border-b border-slate-100 p-2"><p class="px-2 py-1 text-[0.68rem] font-bold uppercase tracking-wider text-slate-400">{{ grupo.label }}</p>{% for tarefa in grupo.itens %}<a href="{{ tarefa.link }}" class="ds-task-link"><span class="ds-priority-dot {% if tarefa.urgente %}bg-red-500{% else %}bg-amber-400{% endif %}"></span><span class="min-w-0"><strong>{{ tarefa.titulo }}</strong><small>{{ tarefa.item.equipa_nome or tarefa.item.titulo }}{% if tarefa.item.data %} · {{ tarefa.item.data|data_pt }}{% endif %}</small></span></a>{% endfor %}</section>{% endfor %}{% endif %}
+      <p class="ds-inbox-heading">Avisos</p>
+      {% for notificacao in nav.notificacoes|default([]) %}<form method="POST" action="/notificacoes/{{ notificacao.id }}/ler" class="border-b border-slate-100 last:border-0"><button class="block w-full px-3 py-3 text-left hover:bg-slate-50 {% if not notificacao.lida %}bg-blue-50/50{% endif %}"><strong class="block text-sm text-slate-800">{{ notificacao.titulo }}</strong><span class="mt-1 block text-xs text-slate-500">{{ notificacao.mensagem }}</span></button></form>{% else %}<div class="px-4 py-5 text-center text-sm text-slate-500">Não há avisos novos.</div>{% endfor %}
     </div>
   </details>
-  {% else %}<span class="ml-auto"></span>{% endif %}
+  {% endif %}
 
   <details class="ds-menu relative">
-    <summary class="ds-top-action" aria-label="Menu do utilizador">
-      <span class="grid h-7 w-7 place-items-center rounded-full bg-white/20 text-xs font-bold">{{ utilizador.nome[:1]|upper }}</span><span class="hidden max-w-28 truncate xl:inline">{{ utilizador.nome }}</span>
-    </summary>
-    <div class="ds-dropdown right-0 w-56">
-      <div class="border-b border-slate-100 px-3 py-3"><p class="truncate font-bold text-slate-900">{{ utilizador.nome }}</p><p class="text-xs capitalize text-slate-500">{{ utilizador.perfil.value }}</p></div>
-      <a href="/minha-conta" class="ds-dropdown-link"><strong>Minha conta</strong><span>Perfil e palavra-passe</span></a>
-      <form method="POST" action="/logout" class="m-0 border-t border-slate-100 p-2"><button class="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50">Terminar sessão</button></form>
-    </div>
+    <summary class="ds-icon-button" aria-label="Menu do utilizador"><span class="grid h-7 w-7 place-items-center rounded-full bg-white/20 text-xs font-bold">{{ utilizador.nome[:1]|upper }}</span></summary>
+    <div class="ds-dropdown right-0 w-56"><div class="border-b border-slate-100 px-3 py-3"><p class="truncate font-bold text-slate-900">{{ utilizador.nome }}</p><p class="text-xs capitalize text-slate-500">{{ utilizador.perfil.value }}</p></div><a href="/minha-conta" class="ds-dropdown-link"><strong>Minha conta</strong><span>Perfil e palavra-passe</span></a><form method="POST" action="/logout" class="m-0 border-t border-slate-100 p-2"><button class="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50">Terminar sessão</button></form></div>
   </details>
 </nav>
+<div id="header-overlay" class="fixed inset-0 top-[4.5rem] z-40 hidden bg-slate-950/35 xl:hidden" aria-hidden="true"></div>

@@ -78,6 +78,10 @@ def test_barra_global_aparece_sem_rotulo_clube_atual(client_admin):
     assert "Pesquisar no clube" in response.text
     assert "Pendências" in response.text
     assert "Clube atual:" not in response.text
+    assert 'id="header-navigation"' in response.text
+    assert 'id="sidebar-principal"' not in response.text
+    assert "Planeamento do clube" in response.text
+    assert "Atribuir espaços" in response.text
 
 
 def test_calendario_partilhavel_gera_pdf_a4(client_admin):
