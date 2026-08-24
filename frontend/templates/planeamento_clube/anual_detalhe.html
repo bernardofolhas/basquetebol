@@ -97,10 +97,12 @@
             <h2 class="font-semibold text-gray-800">Objetivos Gerais</h2>
             <span class="text-xs text-gray-400">Base do clube</span>
         </div>
-        <p class="text-sm text-gray-700 whitespace-pre-line">{{ planeamento.objetivos_gerais or "Sem objetivos definidos." }}</p>
-        <div class="mt-5 pt-5 border-t border-gray-100">
-            <h3 class="text-sm font-semibold text-gray-700 mb-2">Observacoes</h3>
-            <p class="text-sm text-gray-600 whitespace-pre-line">{{ planeamento.observacoes or "Sem observacoes." }}</p>
+        <div class="max-h-72 space-y-5 overflow-y-auto pr-2" style="scrollbar-gutter: stable;">
+            <p class="text-sm text-gray-700 whitespace-pre-line">{{ planeamento.objetivos_gerais or "Sem objetivos definidos." }}</p>
+            <div class="border-t border-gray-100 pt-5">
+                <h3 class="mb-2 text-sm font-semibold text-gray-700">Observacoes</h3>
+                <p class="text-sm text-gray-600 whitespace-pre-line">{{ planeamento.observacoes or "Sem observacoes." }}</p>
+            </div>
         </div>
     </div>
 
@@ -110,7 +112,7 @@
             <span class="text-xs text-gray-400">{{ dashboard_planeamento.itens | length }} item(ns)</span>
         </div>
         {% if dashboard_planeamento.itens_recentes %}
-        <div class="space-y-3">
+        <div class="max-h-[25rem] space-y-3 overflow-y-auto pr-2" style="scrollbar-gutter: stable;" aria-label="Feed integrado, deslize para consultar todos os itens">
             {% for item in dashboard_planeamento.itens_recentes %}
             <div class="rounded-xl border {{ item.card_classes }} p-3">
                 <div class="flex items-start justify-between gap-3">
@@ -146,7 +148,7 @@
             <span class="text-xs text-gray-400">Macro, meso e micro</span>
         </div>
         {% if dashboard_planeamento.resumo_equipas %}
-        <div class="space-y-3">
+        <div class="max-h-[25rem] space-y-3 overflow-y-auto pr-2" style="scrollbar-gutter: stable;" aria-label="Cobertura das equipas, deslize para consultar todas as equipas">
             {% for item in dashboard_planeamento.resumo_equipas %}
             <div class="rounded-xl bg-slate-50 border border-slate-100 p-3">
                 <div class="flex items-center justify-between gap-3">
