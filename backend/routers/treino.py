@@ -988,7 +988,15 @@ async def guardar_cabecalho(
             rpe_geral = _normalizar_rpe(intensidade_rpe)
             nova_data = plano.sessao.data
             if "data" in form and data_sessao:
-                nova_data = datetime.strptime(data_sessao, "%Y-%m-%d").date()
+                nova_data = None
+                for formato in ("%d/%m/%Y", "%Y-%m-%d"):
+                    try:
+                        nova_data = datetime.strptime(data_sessao, formato).date()
+                        break
+                    except ValueError:
+                        continue
+                if nova_data is None:
+                    raise ValueError("A data deve estar no formato dd/mm/aaaa.")
                 if not plano.sessao.microciclo.data_inicio <= nova_data <= plano.sessao.microciclo.data_fim:
                     raise ValueError(
                         "A data deve permanecer dentro do microciclo "

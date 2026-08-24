@@ -359,7 +359,7 @@ def test_upload_autenticado_aplica_plano_e_abre_dashboard_editavel(client_admin)
         atualizacao = client_admin.post(
             f"/treino/planos/{plano.id}/cabecalho",
             data={
-                "data": "2026-08-25",
+                "data": "25/08/2026",
                 "hora_inicio": "19:00",
                 "hora_fim": "20:30",
                 "local": "Pavilhão editado",
