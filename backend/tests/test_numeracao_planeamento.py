@@ -6,6 +6,7 @@ from models.clube import Clube
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnualEquipa, SessaoTreino
 from models.planeamento_clube import EventoPlaneamentoClube, TipoEventoPlaneamentoClubeEnum
+from models.treino import ExercicioPlano, PlanoTreino
 from routers.planeamento import _integrar_eventos_planeados_no_microciclo
 from routers.planeamento_clube import _eliminar_evento_com_dependencias
 from services.numeracao_planeamento_service import (
@@ -140,6 +141,35 @@ def test_treino_planeado_pelo_treinador_entra_no_microciclo_existente():
         _eliminar_evento_com_dependencias(db, evento)
         db.flush()
         assert sessao.ativa is False
+
+        evento_com_ficha = EventoPlaneamentoClube(
+            clube_id=clube.id, equipa_id=equipa.id,
+            tipo=TipoEventoPlaneamentoClubeEnum.treino_equipa,
+            titulo="Treino com ficha", data=date(2026, 9, 10),
+        )
+        db.add(evento_com_ficha)
+        db.flush()
+        sessao_com_ficha = SessaoTreino(
+            clube_id=clube.id, microciclo_id=micro.id, data=date(2026, 9, 10),
+            numero_treino=2, e_jogo=False, ativa=True,
+            evento_planeamento_clube_id=evento_com_ficha.id,
+        )
+        db.add(sessao_com_ficha)
+        db.flush()
+        plano = PlanoTreino(clube_id=clube.id, sessao_id=sessao_com_ficha.id)
+        db.add(plano)
+        db.flush()
+        db.add(ExercicioPlano(clube_id=clube.id, plano_id=plano.id, ordem=1, nome="Exercício planeado"))
+        db.flush()
+
+        removidas, preservadas = _eliminar_evento_com_dependencias(
+            db,
+            evento_com_ficha,
+            preservar_sessoes_com_exercicios=True,
+        )
+        assert (removidas, preservadas) == (0, 1)
+        assert sessao_com_ficha.ativa is True
+        assert sessao_com_ficha.evento_planeamento_clube_id is None
     finally:
         db.rollback()
         db.query(EventoPlaneamentoClube).execution_options(ignorar_clube=True).filter(EventoPlaneamentoClube.clube_id == clube.id).delete(synchronize_session=False)
