@@ -57,6 +57,11 @@ def renumerar_treinos_equipa(db: Session, equipa_id: int) -> None:
 
 def renumerar_todos_os_ciclos(db: Session) -> None:
     """Alinha também os ciclos existentes quando a aplicação arranca."""
+    # O arranque é também o ponto seguro para remover sessões geradas cujo
+    # plano semanal e evento de origem já foram eliminados.
+    from services.remocao_sessoes_service import limpar_sessoes_geradas_orfas
+
+    limpar_sessoes_geradas_orfas(db)
     macrociclos = db.query(Macrociclo).execution_options(ignorar_clube=True).order_by(
         Macrociclo.equipa_id, Macrociclo.planeamento_anual_equipa_id,
         Macrociclo.data_inicio, Macrociclo.data_fim, Macrociclo.id,

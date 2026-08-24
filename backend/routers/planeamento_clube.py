@@ -64,6 +64,7 @@ from services.numeracao_planeamento_service import (
     renumerar_microciclos,
     renumerar_treinos_equipa,
 )
+from services.remocao_sessoes_service import eliminar_sessoes_treino
 from services.pdf_service import renderizar_pdf
 from services.sincronizacao_ui import (
     construir_resumo_sincronizacao_texto,
@@ -2194,26 +2195,19 @@ async def eliminar_plano_semanal(semanal_id: int, request: Request, db: Session 
     eventos = list(eventos_por_id.values())
     notificacoes_criadas = _notificar_cancelamento_plano_semanal(db, semanal, atribuicoes)
 
-    # Remove eventos e todas as sessões que vieram deste plano. Uma ficha que
-    # já tenha exercícios é trabalho técnico do treinador e mantém-se autónoma.
-    sessoes_removidas = sessoes_preservadas = 0
+    # Eliminar o plano semanal elimina definitivamente todas as sessões que
+    # nasceram das respetivas marcações, incluindo fichas e exercícios.
+    sessoes_removidas = 0
     for evento in eventos:
-        removidas_evento, preservadas_evento = _eliminar_evento_com_dependencias(
-            db,
-            evento,
-            preservar_sessoes_com_exercicios=True,
-        )
+        removidas_evento, _ = _eliminar_evento_com_dependencias(db, evento)
         sessoes_removidas += removidas_evento
-        sessoes_preservadas += preservadas_evento
 
-    removidas_diretas, preservadas_diretas = _remover_sessoes_do_plano_semanal(
+    removidas_diretas, _ = _remover_sessoes_do_plano_semanal(
         db,
         semanal_id,
         atribuicoes=atribuicoes,
-        preservar_sessoes_com_exercicios=True,
     )
     sessoes_removidas += removidas_diretas
-    sessoes_preservadas += preservadas_diretas
 
     mensal_id = semanal.planeamento_mensal_id
     registar_historico_planeamento(
@@ -2223,7 +2217,7 @@ async def eliminar_plano_semanal(semanal_id: int, request: Request, db: Session 
         semanal.id,
         "eliminado",
         f"Plano eliminado com {len(atribuicoes)} marcação(ões) anulada(s), "
-        f"{sessoes_removidas} sessão(ões) removida(s) e {sessoes_preservadas} ficha(s) preservada(s).",
+        f"{sessoes_removidas} sessão(ões) removida(s).",
     )
     registar_auditoria(
         db,
@@ -2232,7 +2226,7 @@ async def eliminar_plano_semanal(semanal_id: int, request: Request, db: Session 
         "plano_semanal",
         semanal.id,
         f"{len(atribuicoes)} marcação(ões) anulada(s); {sessoes_removidas} sessão(ões) removida(s); "
-        f"{sessoes_preservadas} ficha(s) preservada(s); {notificacoes_criadas} notificação(ões) enviada(s).",
+        f"{notificacoes_criadas} notificação(ões) enviada(s).",
         request,
     )
     db.delete(semanal)
@@ -2240,8 +2234,8 @@ async def eliminar_plano_semanal(semanal_id: int, request: Request, db: Session 
 
     set_flash(
         request,
-        f"Plano semanal eliminado. Foram anuladas {len(atribuicoes)} marcação(ões), removidas {sessoes_removidas} sessão(ões) "
-        f"e preservadas {sessoes_preservadas} ficha(s) com exercícios. Foram avisados {notificacoes_criadas} treinador(es).",
+        f"Plano semanal eliminado. Foram anuladas {len(atribuicoes)} marcação(ões) e removidas definitivamente "
+        f"{sessoes_removidas} sessão(ões). Foram avisados {notificacoes_criadas} treinador(es).",
     )
     return RedirectResponse(url=f"/planeamento-clube/mensal/{mensal_id}", status_code=303)
 
@@ -3168,6 +3162,7 @@ async def eliminar_atribuicao(
     semanal_id = atribuicao.plano_semanal_id
     equipa_id = atribuicao.equipa_id
     notificacoes_criadas = _notificar_cancelamento_atribuicao(db, atribuicao)
+    sessoes_removidas = _remover_sessoes_da_atribuicao(db, atribuicao)
     evento = atribuicao.evento
     if evento:
         outras_atribuicoes = db.query(AtribuicaoEspacoSemanal).filter(
@@ -3180,13 +3175,25 @@ async def eliminar_atribuicao(
         else:
             _eliminar_evento_com_dependencias(db, evento)
     registar_historico_planeamento(db, utilizador, "plano_semanal", semanal_id, "reserva_anulada", f"Reserva #{atribuicao.id} anulada.")
-    registar_auditoria(db, utilizador, "anular", "atribuicao_espaco_semanal", atribuicao.id, f"{notificacoes_criadas} notificação(ões) enviada(s).", request)
+    registar_auditoria(
+        db,
+        utilizador,
+        "anular",
+        "atribuicao_espaco_semanal",
+        atribuicao.id,
+        f"{sessoes_removidas} sessão(ões) removida(s); {notificacoes_criadas} notificação(ões) enviada(s).",
+        request,
+    )
     db.delete(atribuicao)
     if equipa_id:
         renumerar_treinos_equipa(db, equipa_id)
     db.commit()
 
-    set_flash(request, f"Marcação anulada. Foram avisados {notificacoes_criadas} treinador(es).")
+    set_flash(
+        request,
+        f"Marcação anulada e {sessoes_removidas} treino(s) removido(s). "
+        f"Foram avisados {notificacoes_criadas} treinador(es).",
+    )
     return RedirectResponse(
         url=_destino_retorno_seguro(request, retorno, f"/planeamento-clube/semanal/{semanal_id}"),
         status_code=303,
@@ -3276,22 +3283,13 @@ def listar_eventos(request: Request, db: Session = Depends(get_db), utilizador=D
     })
 
 
-def _sessao_tem_exercicios_planeados(sessao: SessaoTreino) -> bool:
-    """Só preservamos uma sessão quando a ficha contém exercícios reais."""
-    plano = sessao.plano_treino
-    return bool(plano and plano.exercicios)
-
-
 def _remover_sessoes_do_plano_semanal(
     db: Session,
     semanal_id: int,
     *,
     atribuicoes: list[AtribuicaoEspacoSemanal],
-    preservar_sessoes_com_exercicios: bool,
 ) -> tuple[int, int]:
-    """Retira sessões ligadas ao plano e sessões coincidentes com as reservas."""
-    removidas = preservadas = 0
-    equipas_afetadas: set[int] = set()
+    """Apaga sessões ligadas ao plano e sessões coincidentes com as reservas."""
     sessoes = db.query(SessaoTreino).filter(
         SessaoTreino.plano_semanal_clube_id == semanal_id,
     ).all()
@@ -3314,23 +3312,33 @@ def _remover_sessoes_do_plano_semanal(
                 sessao.hora_fim,
             ):
                 sessoes_por_id[sessao.id] = sessao
-    for sessao in sessoes_por_id.values():
-        equipa_id = _obter_equipa_id_por_sessao(sessao)
-        if equipa_id:
-            equipas_afetadas.add(equipa_id)
-        sessao.plano_semanal_clube_id = None
-        sessao.evento_planeamento_clube_id = None
-        sessao.sincronizada = False
-        if preservar_sessoes_com_exercicios and _sessao_tem_exercicios_planeados(sessao):
-            sessao.alterada_manual = True
-            sessao.origem = "manual"
-            preservadas += 1
-        else:
-            sessao.ativa = False
-            removidas += 1
-    for equipa_id in equipas_afetadas:
-        renumerar_treinos_equipa(db, equipa_id)
-    return removidas, preservadas
+    return eliminar_sessoes_treino(db, list(sessoes_por_id.values())), 0
+
+
+def _remover_sessoes_da_atribuicao(db: Session, atribuicao: AtribuicaoEspacoSemanal) -> int:
+    """Apaga o treino de uma marcação, mesmo quando perdeu a ligação ao evento."""
+    if not atribuicao.equipa_id:
+        return 0
+    candidatas = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == atribuicao.equipa_id,
+        SessaoTreino.data == atribuicao.data,
+        SessaoTreino.e_jogo.is_(False),
+    ).all()
+    sessoes = [
+        sessao
+        for sessao in candidatas
+        if (
+            (atribuicao.evento_id and sessao.evento_planeamento_clube_id == atribuicao.evento_id)
+            or sessao.plano_semanal_clube_id == atribuicao.plano_semanal_id
+        )
+        and _horarios_sobrepoem(
+            atribuicao.hora_inicio,
+            atribuicao.hora_fim,
+            sessao.hora_inicio,
+            sessao.hora_fim,
+        )
+    ]
+    return eliminar_sessoes_treino(db, sessoes)
 
 
 def _horarios_sobrepoem(
@@ -3348,38 +3356,18 @@ def _horarios_sobrepoem(
 def _eliminar_evento_com_dependencias(
     db: Session,
     evento: EventoPlaneamentoClube,
-    *,
-    preservar_sessoes_com_exercicios: bool = False,
 ) -> tuple[int, int]:
-    """Remove o evento e oculta todas as sessões que nasceram dessa marcação."""
+    """Remove definitivamente o evento e as sessões que nasceram dele."""
     sessoes_geradas = db.query(SessaoTreino).filter(
         SessaoTreino.evento_planeamento_clube_id == evento.id,
     ).all()
-    equipas_afetadas: set[int] = set()
-    removidas = preservadas = 0
-    for sessao in sessoes_geradas:
-        preservar = preservar_sessoes_com_exercicios and _sessao_tem_exercicios_planeados(sessao)
-        if preservar:
-            sessao.alterada_manual = True
-            sessao.origem = "manual"
-            preservadas += 1
-        else:
-            sessao.ativa = False
-            removidas += 1
-        sessao.sincronizada = False
-        sessao.evento_planeamento_clube_id = None
-        sessao.plano_semanal_clube_id = None
-        equipa_id = _obter_equipa_id_por_sessao(sessao)
-        if equipa_id:
-            equipas_afetadas.add(equipa_id)
+    removidas = eliminar_sessoes_treino(db, sessoes_geradas)
     for atribuicao in evento.atribuicoes_espaco:
         atribuicao.evento_id = None
         if atribuicao.origem == OrigemAtribuicaoEspacoEnum.evento_global:
             atribuicao.origem = OrigemAtribuicaoEspacoEnum.manual
     db.delete(evento)
-    for equipa_id in equipas_afetadas:
-        renumerar_treinos_equipa(db, equipa_id)
-    return removidas, preservadas
+    return removidas, 0
 
 
 def _notificar_cancelamento_atribuicao(db: Session, atribuicao: AtribuicaoEspacoSemanal) -> int:

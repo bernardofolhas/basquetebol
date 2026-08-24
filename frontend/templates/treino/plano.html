@@ -72,6 +72,9 @@
     <form method="POST" action="/treino/planos/{{ plano.id }}/eliminar" onsubmit="return confirm('Eliminar esta ficha de treino? A sessão e o respetivo local/horário serão mantidos.')">
         <button class="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50">Eliminar ficha</button>
     </form>
+    <form method="POST" action="/treino/sessoes/{{ sessao.id }}/eliminar" onsubmit="return confirm('Eliminar definitivamente este treino? A ficha, os exercícios e os conteúdos também serão apagados.')">
+        <button class="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700">Eliminar treino</button>
+    </form>
 {% endcall %}
 
 <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">

@@ -39,6 +39,10 @@
             <div class="flex flex-wrap gap-2">
                 <a href="/treino/sessoes/{{ sessao.id }}" class="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600">{{ 'Editar plano' if sessao.plano_treino else 'Preparar plano' }}</a>
                 {% if sessao.plano_treino %}<a href="/treino/sessoes/{{ sessao.id }}/pdf" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">PDF</a>{% endif %}
+                <form method="POST" action="/treino/sessoes/{{ sessao.id }}/eliminar" onsubmit="return confirm('Eliminar definitivamente este treino e toda a ficha associada?')">
+                    <input type="hidden" name="retorno" value="/treino/equipas/{{ equipa.id }}/planos">
+                    <button class="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50">Eliminar treino</button>
+                </form>
             </div>
         </div>
     </article>

@@ -9,7 +9,12 @@ from models.planeamento import Macrociclo, Mesociclo, Microciclo, PlaneamentoAnu
 from models.planeamento_clube import EventoPlaneamentoClube, TipoEventoPlaneamentoClubeEnum
 from models.treino import ExercicioPlano, PlanoTreino
 from routers.planeamento import _integrar_eventos_planeados_no_microciclo
-from routers.planeamento_clube import _eliminar_evento_com_dependencias, _remover_sessoes_do_plano_semanal
+from routers.planeamento_clube import (
+    _eliminar_evento_com_dependencias,
+    _remover_sessoes_da_atribuicao,
+    _remover_sessoes_do_plano_semanal,
+)
+from services.remocao_sessoes_service import limpar_sessoes_geradas_orfas
 from services.numeracao_planeamento_service import (
     renumerar_macrociclos,
     renumerar_mesociclos,
@@ -141,7 +146,7 @@ def test_treino_planeado_pelo_treinador_entra_no_microciclo_existente():
 
         _eliminar_evento_com_dependencias(db, evento)
         db.flush()
-        assert sessao.ativa is False
+        assert db.get(SessaoTreino, sessao.id) is None
 
         evento_com_ficha = EventoPlaneamentoClube(
             clube_id=clube.id, equipa_id=equipa.id,
@@ -163,14 +168,10 @@ def test_treino_planeado_pelo_treinador_entra_no_microciclo_existente():
         db.add(ExercicioPlano(clube_id=clube.id, plano_id=plano.id, ordem=1, nome="Exercício planeado"))
         db.flush()
 
-        removidas, preservadas = _eliminar_evento_com_dependencias(
-            db,
-            evento_com_ficha,
-            preservar_sessoes_com_exercicios=True,
-        )
-        assert (removidas, preservadas) == (0, 1)
-        assert sessao_com_ficha.ativa is True
-        assert sessao_com_ficha.evento_planeamento_clube_id is None
+        sessao_com_ficha_id = sessao_com_ficha.id
+        removidas, preservadas = _eliminar_evento_com_dependencias(db, evento_com_ficha)
+        assert (removidas, preservadas) == (1, 0)
+        assert db.get(SessaoTreino, sessao_com_ficha_id) is None
 
         # Algumas sessões antigas foram criadas antes de a ligação ao plano semanal
         # ficar persistida. A remoção continua a encontrá-las pela reserva publicada.
@@ -185,9 +186,23 @@ def test_treino_planeado_pelo_treinador_entra_no_microciclo_existente():
             e_jogo=False,
             ativa=True,
         )
-        sessao_com_ficha.origem = "planeamento_global"
-        db.add(sessao_orfa)
+        sessao_orfa_com_ficha = SessaoTreino(
+            clube_id=clube.id,
+            microciclo_id=micro.id,
+            data=date(2026, 9, 10),
+            numero_treino=2,
+            origem="planeamento_global",
+            e_jogo=False,
+            ativa=True,
+        )
+        db.add_all([sessao_orfa, sessao_orfa_com_ficha])
         db.flush()
+        plano_orfao = PlanoTreino(clube_id=clube.id, sessao_id=sessao_orfa_com_ficha.id)
+        db.add(plano_orfao)
+        db.flush()
+        db.add(ExercicioPlano(clube_id=clube.id, plano_id=plano_orfao.id, ordem=1, nome="Exercício órfão"))
+        db.flush()
+        ids_orfas = {sessao_orfa.id, sessao_orfa_com_ficha.id}
 
         removidas, preservadas = _remover_sessoes_do_plano_semanal(
             db,
@@ -206,11 +221,76 @@ def test_treino_planeado_pelo_treinador_entra_no_microciclo_existente():
                     hora_fim="20:00",
                 ),
             ],
-            preservar_sessoes_com_exercicios=True,
         )
-        assert (removidas, preservadas) == (1, 1)
-        assert sessao_orfa.ativa is False
-        assert sessao_com_ficha.ativa is True
+        assert (removidas, preservadas) == (2, 0)
+        assert db.query(SessaoTreino).filter(SessaoTreino.id.in_(ids_orfas)).count() == 0
+
+        sessao_orfa_arranque = SessaoTreino(
+            clube_id=clube.id,
+            microciclo_id=micro.id,
+            data=date(2026, 9, 12),
+            numero_treino=2,
+            origem="planeamento_integrado",
+            e_jogo=False,
+            ativa=True,
+        )
+        sessao_manual = SessaoTreino(
+            clube_id=clube.id,
+            microciclo_id=micro.id,
+            data=date(2026, 9, 13),
+            numero_treino=3,
+            origem="manual",
+            e_jogo=False,
+            ativa=True,
+        )
+        db.add_all([sessao_orfa_arranque, sessao_manual])
+        db.flush()
+        id_orfa_arranque = sessao_orfa_arranque.id
+        id_manual = sessao_manual.id
+
+        assert limpar_sessoes_geradas_orfas(db) == 1
+        assert db.get(SessaoTreino, id_orfa_arranque) is None
+        assert db.get(SessaoTreino, id_manual) is not None
+
+        evento_atribuicao = EventoPlaneamentoClube(
+            clube_id=clube.id,
+            equipa_id=equipa.id,
+            tipo=TipoEventoPlaneamentoClubeEnum.treino_equipa,
+            titulo="Treino atribuído",
+            data=date(2026, 9, 12),
+            hora_inicio="20:00",
+            hora_fim="21:30",
+        )
+        db.add(evento_atribuicao)
+        db.flush()
+        sessao_atribuicao = SessaoTreino(
+            clube_id=clube.id,
+            microciclo_id=micro.id,
+            data=date(2026, 9, 12),
+            hora_inicio="20:00",
+            hora_fim="21:30",
+            numero_treino=3,
+            origem="manual",
+            evento_planeamento_clube_id=evento_atribuicao.id,
+            e_jogo=False,
+            ativa=True,
+        )
+        db.add(sessao_atribuicao)
+        db.flush()
+        sessao_atribuicao_id = sessao_atribuicao.id
+
+        assert _remover_sessoes_da_atribuicao(
+            db,
+            SimpleNamespace(
+                equipa_id=equipa.id,
+                data=date(2026, 9, 12),
+                evento_id=evento_atribuicao.id,
+                plano_semanal_id=999999,
+                hora_inicio="20:00",
+                hora_fim="21:30",
+            ),
+        ) == 1
+        assert db.get(SessaoTreino, sessao_atribuicao_id) is None
     finally:
         db.rollback()
         db.query(EventoPlaneamentoClube).execution_options(ignorar_clube=True).filter(EventoPlaneamentoClube.clube_id == clube.id).delete(synchronize_session=False)

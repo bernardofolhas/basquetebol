@@ -29,6 +29,7 @@ from services.desenho_service import (
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
 from services.pdf_service import renderizar_pdf
 from services.planeamento_semanal_administrativo_service import obter_previsao_equipa, validar_local_sessao
+from services.remocao_sessoes_service import eliminar_sessoes_treino
 from services.sessao_workflow import (
     ESTADOS_SESSAO,
     normalizar_estado_sessao,
@@ -350,6 +351,30 @@ async def eliminar_plano_treino(
     db.commit()
     set_flash(request, "Plano de treino eliminado. A sessão mantém a data, local e horário para criares uma nova ficha.")
     return RedirectResponse(url=f"/treino/sessoes/{sessao_id}", status_code=303)
+
+
+@router.post("/sessoes/{sessao_id}/eliminar")
+async def eliminar_sessao_treino(
+    sessao_id: int,
+    request: Request,
+    retorno: str = Form(""),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Elimina definitivamente o treino, incluindo a respetiva ficha."""
+    equipa_id = _obter_equipa_id_por_sessao(db, sessao_id)
+    _verificar_acesso_treino(utilizador, equipa_id, db)
+    sessao = db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
+    if not sessao:
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    microciclo_id = sessao.microciclo_id
+    eliminar_sessoes_treino(db, [sessao])
+    db.commit()
+    set_flash(request, "Treino eliminado definitivamente do planeamento e do calendário.")
+
+    destino = retorno if retorno.startswith("/") and not retorno.startswith("//") else f"/planeamento/microciclos/{microciclo_id}"
+    return RedirectResponse(url=destino, status_code=303)
 
 
 @router.post("/sessoes/{sessao_id}/estado")
