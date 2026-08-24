@@ -87,3 +87,34 @@ def test_graficos_do_microciclo_usam_o_nome_do_treino():
         "volumes": [90],
         "rpes": [6.0],
     }
+
+
+def test_visao_e_graficos_incluem_treinos_manuais_e_atribuidos():
+    campos_componentes = {
+        "min_tecnica_individual_ofensiva": 0,
+        "min_tecnica_individual_defensiva": 0,
+        "min_tatica_individual_ofensiva": 0,
+        "min_tatica_individual_defensiva": 0,
+        "min_tatica_coletiva_ofensiva": 0,
+        "min_tatica_coletiva_defensiva": 0,
+        "min_fisicos": 0,
+        "min_psicologicos": 0,
+    }
+    treino_manual = SimpleNamespace(
+        id=1, data=date(2026, 7, 21), hora_inicio=None, e_jogo=False,
+        numero_treino=1, volume_minutos=75, intensidade_rpe=5, origem="manual",
+        conteudos=[], **campos_componentes,
+    )
+    treino_atribuido = SimpleNamespace(
+        id=2, data=date(2026, 7, 23), hora_inicio="19:00", e_jogo=False,
+        numero_treino=2, volume_minutos=90, intensidade_rpe=7, origem="planeamento_global",
+        conteudos=[], **campos_componentes,
+    )
+
+    visao = construir_visao_semanal_conteudos([treino_atribuido, treino_manual])
+    _, dados_graficos = _calcular_balanco_microciclo([treino_atribuido, treino_manual])
+
+    assert [treino["sessao_id"] for treino in visao] == [1, 2]
+    assert dados_graficos["labels"] == ["Treino 1", "Treino 2"]
+    assert dados_graficos["volumes"] == [75, 90]
+    assert dados_graficos["rpes"] == [5.0, 7.0]
