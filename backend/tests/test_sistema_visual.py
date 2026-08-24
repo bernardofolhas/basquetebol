@@ -43,6 +43,7 @@ def test_base_preserva_navegacao_acessivel_e_responsiva():
     assert 'aria-live="polite"' in conteudo
     assert 'wrapper.classList.add("ds-table-scroll")' in conteudo
     assert 'id="menu-mobile"' in (TEMPLATES_DIR / "partials" / "navbar_global.html").read_text(encoding="utf-8")
+    assert ".ds-team-direct-nav { display:grid;grid-template-columns:repeat(2" in CSS.read_text(encoding="utf-8")
 
 
 def test_login_mantem_recuperacao_e_melhora_utilizacao():
