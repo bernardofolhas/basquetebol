@@ -290,6 +290,53 @@ def _obter_importacao(db: Session, importacao_id: int) -> ImportacaoPlanoTreino 
     return db.query(ImportacaoPlanoTreino).filter(ImportacaoPlanoTreino.id == importacao_id).first()
 
 
+def _importacao_ativa(plano: PlanoTreino) -> ImportacaoPlanoTreino | None:
+    """Devolve apenas o documento que representa atualmente a ficha importada."""
+    return next((item for item in plano.importacoes if item.estado == "aplicada"), None)
+
+
+def _resumo_setores(sessao: SessaoTreino) -> list[dict]:
+    return [
+        {
+            "codigo": categoria,
+            "minutos": getattr(sessao, campo, 0) or 0,
+        }
+        for categoria, campo in CAMPOS_CATEGORIA.items()
+    ]
+
+
+def _texto_previsualizacao(importacao: ImportacaoPlanoTreino | None, limite: int = 30_000) -> str:
+    if not importacao or not importacao.texto_extraido:
+        return "Não foi possível gerar uma pré-visualização textual. Descarrega o original para o consultar."
+    texto = importacao.texto_extraido.strip()
+    if len(texto) <= limite:
+        return texto
+    return f"{texto[:limite].rstrip()}\n\n[Pré-visualização limitada. Descarrega o original para consultar o restante conteúdo.]"
+
+
+def _repor_ficha_importada(db: Session, plano: PlanoTreino) -> None:
+    """Repõe o conteúdo técnico sem remover a sessão logística do calendário."""
+    sessao = plano.sessao
+    for exercicio in list(plano.exercicios):
+        db.delete(exercicio)
+    db.flush()
+    for bloco in list(plano.blocos):
+        db.delete(bloco)
+    for conteudo in list(sessao.conteudos):
+        db.delete(conteudo)
+
+    plano.hora_inicio = None
+    plano.escalao = None
+    plano.objectivos = None
+    plano.reflexao = None
+    sessao.volume_minutos = 0
+    sessao.intensidade_rpe = 0
+    sessao.reflexao = None
+    sessao.estado = "planeada"
+    for campo in CAMPOS_CATEGORIA.values():
+        setattr(sessao, campo, 0)
+
+
 @router.get("/equipas/{equipa_id}/planos", response_class=HTMLResponse)
 def listar_planos_treino_equipa(
     equipa_id: int,
@@ -351,6 +398,8 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
 
     volume_planeado = sum(ex.minutos or 0 for ex in plano.exercicios)
     duracao_prevista = _duracao_prevista_minutos(sessao)
+    importacao_ativa = _importacao_ativa(plano)
+    modo_edicao_importacao = bool(importacao_ativa and request.query_params.get("editar") == "1")
     return templates.TemplateResponse(request, "treino/plano.html", {
         "utilizador": utilizador,
         "sessao": sessao,
@@ -368,6 +417,10 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "diferenca_duracao": volume_planeado - duracao_prevista if duracao_prevista is not None else None,
         "estados_sessao": opcoes_transicao_sessao(sessao.estado),
         "importacoes_plano": list(plano.importacoes[:5]),
+        "importacao_ativa": importacao_ativa,
+        "modo_edicao_importacao": modo_edicao_importacao,
+        "previsualizacao_importacao": _texto_previsualizacao(importacao_ativa),
+        "resumo_setores": _resumo_setores(sessao),
     })
 
 
@@ -468,6 +521,33 @@ def descarregar_ficheiro_importado(
             "Content-Disposition": f"attachment; filename*=UTF-8''{nome}",
             "Cache-Control": "private, no-store",
             "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/importacoes/{importacao_id}/previsualizacao")
+def previsualizar_ficheiro_importado(
+    importacao_id: int,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Mostra apenas formatos que o navegador consegue apresentar com segurança."""
+    importacao = _obter_importacao(db, importacao_id)
+    if not importacao:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, importacao.plano_id), db)
+    tipos_permitidos = {"application/pdf", "image/png", "image/jpeg"}
+    if importacao.tipo_mime not in tipos_permitidos:
+        return RedirectResponse(url=f"/treino/importacoes/{importacao.id}", status_code=303)
+    nome = quote(importacao.nome_original, safe="")
+    return Response(
+        content=importacao.ficheiro,
+        media_type=importacao.tipo_mime,
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{nome}",
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
         },
     )
 
@@ -628,8 +708,12 @@ async def aplicar_importacao_plano(
     if nova_data != data_anterior:
         renumerar_treinos_equipa(db, plano.sessao.microciclo.mesociclo.macrociclo.equipa_id)
 
+    for anterior in plano.importacoes:
+        if anterior.id != importacao.id and anterior.estado == "aplicada":
+            anterior.estado = "arquivada"
     importacao.estado = "aplicada"
     importacao.atualizado_em = datetime.now()
+    sessao.estado = "planeada"
     registar_auditoria(
         db,
         utilizador,
@@ -642,6 +726,52 @@ async def aplicar_importacao_plano(
     db.commit()
     set_flash(request, f"Plano importado e confirmado: {len(novos)} exercício(s) aplicado(s).")
     return RedirectResponse(url=f"/treino/sessoes/{sessao.id}", status_code=303)
+
+
+@router.post("/importacoes/{importacao_id}/eliminar")
+async def eliminar_importacao_plano(
+    importacao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    importacao = _obter_importacao(db, importacao_id)
+    if not importacao:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, importacao.plano_id), db)
+
+    plano = importacao.plano
+    sessao_id = plano.sessao_id
+    nome_original = importacao.nome_original
+    foi_aplicada = importacao.estado == "aplicada"
+    if foi_aplicada:
+        _repor_ficha_importada(db, plano)
+        # Compatibilidade com planos antigos que possam ter mais de uma importação ativa.
+        for anterior in plano.importacoes:
+            if anterior.id != importacao.id and anterior.estado == "aplicada":
+                anterior.estado = "arquivada"
+
+    detalhe_auditoria = (
+        f"Importação {nome_original} eliminada e ficha técnica reposta a zero."
+        if foi_aplicada
+        else f"Importação {nome_original} eliminada antes de ser aplicada."
+    )
+    registar_auditoria(
+        db,
+        utilizador,
+        "eliminar_importacao_plano_treino",
+        "ImportacaoPlanoTreino",
+        importacao.id,
+        detalhe_auditoria,
+        request,
+    )
+    db.delete(importacao)
+    db.commit()
+    if foi_aplicada:
+        set_flash(request, "Importação eliminada. A ficha de treino ficou novamente vazia.")
+    else:
+        set_flash(request, "Importação eliminada sem alterar a ficha de treino.")
+    return RedirectResponse(url=f"/treino/sessoes/{sessao_id}", status_code=303)
 
 
 @router.post("/planos/{plano_id}/eliminar")

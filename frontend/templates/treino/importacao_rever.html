@@ -40,6 +40,9 @@
 {% block conteudo %}
 {% call equipa_contexto(equipa, "Rever plano importado", "Confirma o documento antes de alterar a ficha de treino.", "planeamento", "/treino/sessoes/" ~ sessao.id, "Voltar ao plano") %}
     <a href="/treino/importacoes/{{ importacao.id }}/ficheiro" class="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Descarregar original</a>
+    <form method="POST" action="/treino/importacoes/{{ importacao.id }}/eliminar" onsubmit="return confirm('{% if importacao.estado == 'aplicada' %}Eliminar o documento e repor toda a ficha técnica a zero?{% else %}Eliminar este documento ainda não aplicado?{% endif %}')">
+        <button class="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Eliminar importação</button>
+    </form>
 {% endcall %}
 
 <div class="mx-auto max-w-6xl space-y-6">

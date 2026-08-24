@@ -11,6 +11,7 @@ from PIL import Image
 from weasyprint import HTML
 
 from services.importacao_plano_treino_service import (
+    CAMPOS_CATEGORIA,
     ErroImportacaoPlano,
     extrair_texto,
     interpretar_texto,
@@ -280,6 +281,32 @@ def test_upload_autenticado_cria_rascunho_e_abre_revisao(client_admin):
         assert original.content == memoria.getvalue()
         assert original.headers["cache-control"] == "private, no-store"
         assert original.headers["x-content-type-options"] == "nosniff"
+        preview_docx = client_admin.get(
+            f"/treino/importacoes/{importacao_id}/previsualizacao",
+            follow_redirects=False,
+        )
+        assert preview_docx.status_code == 303
+        assert preview_docx.headers["location"].endswith(f"/treino/importacoes/{importacao_id}")
+
+        preview_pdf = ImportacaoPlanoTreino(
+            clube_id=admin.clube_id,
+            plano_id=plano.id,
+            utilizador_id=admin.id,
+            nome_original="preview.pdf",
+            tipo_mime="application/pdf",
+            tamanho_bytes=15,
+            ficheiro=b"%PDF-1.4\n%%EOF",
+            dados_json="{}",
+            estado="em_revisao",
+        )
+        db.add(preview_pdf)
+        db.commit()
+        preview_pdf_id = preview_pdf.id
+        preview = client_admin.get(f"/treino/importacoes/{preview_pdf_id}/previsualizacao")
+        assert preview.status_code == 200
+        assert preview.headers["content-disposition"].startswith("inline;")
+        assert preview.headers["cache-control"] == "private, no-store"
+        assert preview.headers["content-security-policy"] == "default-src 'none'; sandbox"
         aplicacao = client_admin.post(
             f"/treino/importacoes/{importacao_id}/aplicar",
             data={
@@ -317,6 +344,21 @@ def test_upload_autenticado_cria_rascunho_e_abre_revisao(client_admin):
         assert sessao_guardada.min_tecnica_individual_ofensiva == 15
         assert sessao_guardada.min_tecnica_individual_defensiva == 20
         assert sessao_guardada.volume_minutos == 35
+        assert sessao_guardada.estado == "planeada"
+
+        dashboard_importada = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert dashboard_importada.status_code == 200
+        assert "Plano importado" in dashboard_importada.text
+        assert "Planeado" in dashboard_importada.text
+        assert "Tempo por setor" in dashboard_importada.text
+        assert "Pré-visualização do documento importado" in dashboard_importada.text
+        assert "Finalização após contra-ataque" in dashboard_importada.text
+        assert "Adicionar exercício" not in dashboard_importada.text
+
+        editor_importado = client_admin.get(f"/treino/sessoes/{sessao.id}?editar=1")
+        assert editor_importado.status_code == 200
+        assert "Voltar ao resumo" in editor_importado.text
+        assert "Adicionar exercício" in editor_importado.text
 
         repeticao = client_admin.post(
             f"/treino/importacoes/{importacao_id}/aplicar",
@@ -334,6 +376,42 @@ def test_upload_autenticado_cria_rascunho_e_abre_revisao(client_admin):
             nomes_backup = arquivo.namelist()
             assert any(nome.endswith(f"{importacao_id}_plano-teste.docx") for nome in nomes_backup)
             assert any(nome.endswith("treinos_e_planos.xlsx") for nome in nomes_backup)
+
+        eliminacao = client_admin.post(
+            f"/treino/importacoes/{importacao_id}/eliminar",
+            follow_redirects=False,
+        )
+        assert eliminacao.status_code == 303
+        assert eliminacao.headers["location"].endswith(f"/treino/sessoes/{sessao.id}")
+
+        db.expire_all()
+        assert db.query(ImportacaoPlanoTreino).execution_options(ignorar_clube=True).filter(ImportacaoPlanoTreino.id == importacao_id).first() is None
+        plano_limpo = db.query(PlanoTreino).execution_options(ignorar_clube=True).filter(PlanoTreino.id == plano.id).one()
+        sessao_limpa = db.query(SessaoTreino).execution_options(ignorar_clube=True).filter(SessaoTreino.id == sessao.id).one()
+        assert plano_limpo.exercicios == []
+        assert plano_limpo.blocos == []
+        assert plano_limpo.objectivos is None
+        assert plano_limpo.reflexao is None
+        assert sessao_limpa.volume_minutos == 0
+        assert sessao_limpa.intensidade_rpe == 0
+        assert sessao_limpa.estado == "planeada"
+        assert all(getattr(sessao_limpa, campo) == 0 for campo in CAMPOS_CATEGORIA.values())
+
+        dashboard_vazia = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert dashboard_vazia.status_code == 200
+        assert "Plano importado" not in dashboard_vazia.text
+        assert "Adicionar exercício" in dashboard_vazia.text
+
+        eliminar_rascunho = client_admin.post(
+            f"/treino/importacoes/{preview_pdf_id}/eliminar",
+            follow_redirects=False,
+        )
+        assert eliminar_rascunho.status_code == 303
+        assert eliminar_rascunho.headers["location"].endswith(f"/treino/sessoes/{sessao.id}")
+        db.expire_all()
+        assert db.query(ImportacaoPlanoTreino).execution_options(ignorar_clube=True).filter(ImportacaoPlanoTreino.id == preview_pdf_id).first() is None
+        assert db.query(PlanoTreino).execution_options(ignorar_clube=True).filter(PlanoTreino.id == plano.id).one().exercicios == []
+        importacao_id = None
     finally:
         if importacao_id:
             importacao = db.query(ImportacaoPlanoTreino).execution_options(ignorar_clube=True).filter(ImportacaoPlanoTreino.id == importacao_id).first()
