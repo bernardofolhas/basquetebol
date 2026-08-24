@@ -6,7 +6,9 @@
 # organização e coaching points
 # ─────────────────────────────────────────────────────────────
 
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Float
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -45,6 +47,36 @@ class PlanoTreino(Base):
                               cascade="all, delete",
                               order_by="ExercicioPlano.bloco, ExercicioPlano.ordem")
     blocos = relationship("BlocoTreino", back_populates="plano", cascade="all, delete-orphan", order_by="BlocoTreino.ordem")
+    importacoes = relationship(
+        "ImportacaoPlanoTreino",
+        back_populates="plano",
+        cascade="all, delete-orphan",
+        order_by="ImportacaoPlanoTreino.criado_em.desc()",
+    )
+
+
+class ImportacaoPlanoTreino(Base):
+    """Ficheiro original e rascunho reconhecido antes de entrar no plano."""
+
+    __tablename__ = "importacoes_plano_treino"
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
+    plano_id = Column(Integer, ForeignKey("planos_treino.id", ondelete="CASCADE"), nullable=False, index=True)
+    utilizador_id = Column(Integer, ForeignKey("utilizadores.id", ondelete="SET NULL"), nullable=True, index=True)
+    nome_original = Column(String(255), nullable=False)
+    tipo_mime = Column(String(120), nullable=False)
+    tamanho_bytes = Column(Integer, nullable=False)
+    ficheiro = Column(LargeBinary, nullable=False)
+    texto_extraido = Column(Text, nullable=True)
+    dados_json = Column(Text, nullable=False, default="{}", server_default="{}")
+    estado = Column(String(30), nullable=False, default="em_revisao", server_default="em_revisao")
+    confianca = Column(Float, nullable=True)
+    aviso = Column(Text, nullable=True)
+    criado_em = Column(DateTime, nullable=False, default=datetime.now)
+    atualizado_em = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+
+    plano = relationship("PlanoTreino", back_populates="importacoes")
 
 
 class BlocoTreino(Base):

@@ -50,7 +50,7 @@ from models.planeamento_clube import (
 )
 from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.treinador import Treinador, treinador_equipa
-from models.treino import BibliotecoExercicio, BlocoTreino, ExercicioPlano, PlanoTreino
+from models.treino import BibliotecoExercicio, BlocoTreino, ExercicioPlano, ImportacaoPlanoTreino, PlanoTreino
 from models.utilizador import Utilizador
 from paths import STATIC_DIR
 from services.auditoria_service import registar_auditoria
@@ -161,6 +161,18 @@ def _adicionar_fotografias(zipado: ZipFile, jogadores: list[Jogador], prefixo: s
             )
 
 
+def _adicionar_planos_importados(
+    zipado: ZipFile,
+    importacoes: list[ImportacaoPlanoTreino],
+    prefixo: str,
+) -> None:
+    for importacao in importacoes:
+        zipado.writestr(
+            f"{prefixo}/Ficheiros/Planos_importados/{importacao.id}_{_nome_seguro(importacao.nome_original)}",
+            importacao.ficheiro,
+        )
+
+
 def _adicionar_logos(zipado: ZipFile, clube, identidade: IdentidadeClube | None) -> None:
     urls = {
         "logo_principal_clube": clube.logo_principal,
@@ -180,7 +192,10 @@ def _linhas_associacao(db: Session, tabela, condicao) -> list[dict]:
     return [dict(linha) for linha in db.execute(select(tabela).where(condicao)).mappings().all()]
 
 
-def _conteudo_equipa(db: Session, equipa: Equipa) -> tuple[list[tuple[str, str, list]], list[Jogador]]:
+def _conteudo_equipa(
+    db: Session,
+    equipa: Equipa,
+) -> tuple[list[tuple[str, str, list]], list[Jogador], list[ImportacaoPlanoTreino]]:
     equipa_id = equipa.id
     jogadores = db.query(Jogador).filter(Jogador.equipa_id == equipa_id).order_by(Jogador.nome).all()
     jogadores_ids = [jogador.id for jogador in jogadores]
@@ -198,6 +213,12 @@ def _conteudo_equipa(db: Session, equipa: Equipa) -> tuple[list[tuple[str, str, 
     sessoes_ids = [sessao.id for sessao in sessoes]
     planos = db.query(PlanoTreino).filter(PlanoTreino.sessao_id.in_(sessoes_ids)).all() if sessoes_ids else []
     planos_ids = [plano.id for plano in planos]
+    importacoes = db.query(ImportacaoPlanoTreino).filter(
+        ImportacaoPlanoTreino.plano_id.in_(planos_ids)
+    ).all() if planos_ids else []
+    importacoes_metadados = [
+        _registo_para_dict(importacao, {"ficheiro"}) for importacao in importacoes
+    ]
 
     relacoes_treinadores = _linhas_associacao(db, treinador_equipa, treinador_equipa.c.equipa_id == equipa_id)
     treinadores_ids = [linha["treinador_id"] for linha in relacoes_treinadores]
@@ -255,6 +276,7 @@ def _conteudo_equipa(db: Session, equipa: Equipa) -> tuple[list[tuple[str, str, 
             ("sessoes_treino", sessoes),
             ("conteudos_sessao_treino", db.query(ConteudoSessaoTreino).filter(ConteudoSessaoTreino.sessao_id.in_(sessoes_ids)).all() if sessoes_ids else []),
             ("planos_treino", planos),
+            ("importacoes_plano_treino", importacoes_metadados),
             ("blocos_treino", db.query(BlocoTreino).filter(BlocoTreino.plano_id.in_(planos_ids)).all() if planos_ids else []),
             ("exercicios_plano", db.query(ExercicioPlano).filter(ExercicioPlano.plano_id.in_(planos_ids)).all() if planos_ids else []),
             ("registos_assiduidade", db.query(RegistoAssiduidade).filter(RegistoAssiduidade.sessao_id.in_(sessoes_ids)).all() if sessoes_ids else []),
@@ -280,16 +302,17 @@ def _conteudo_equipa(db: Session, equipa: Equipa) -> tuple[list[tuple[str, str, 
             ("biblioteca_exercicios", db.query(BibliotecoExercicio).filter(BibliotecoExercicio.clube_id == equipa.clube_id).all()),
         ]),
     ]
-    return temas, jogadores
+    return temas, jogadores, importacoes
 
 
 def _escrever_equipa(zipado: ZipFile, db: Session, equipa: Equipa, raiz: str) -> dict:
-    temas, jogadores = _conteudo_equipa(db, equipa)
+    temas, jogadores, importacoes = _conteudo_equipa(db, equipa)
     contagens = {}
     for pasta, titulo, conjuntos in temas:
         _adicionar_tema(zipado, f"{raiz}/{pasta}", titulo, conjuntos)
         contagens[pasta] = sum(len(linhas) for _, linhas in conjuntos)
     _adicionar_fotografias(zipado, jogadores, f"{raiz}/01_Plantel")
+    _adicionar_planos_importados(zipado, importacoes, f"{raiz}/03_Treinos")
     return contagens
 
 

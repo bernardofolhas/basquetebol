@@ -57,6 +57,10 @@
     "/planeamento/microciclos/" ~ sessao.microciclo_id,
     "Voltar ao microciclo"
 ) %}
+    <button type="button" onclick="document.getElementById('modal-importar-plano').showModal()"
+       class="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+        Importar plano
+    </button>
     <a href="/assiduidade/sessoes/{{ sessao.id }}"
        class="rounded-full bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50">
         Assiduidade
@@ -76,6 +80,50 @@
         <button class="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700">Eliminar treino</button>
     </form>
 {% endcall %}
+
+<dialog id="modal-importar-plano" class="w-[min(92vw,620px)] rounded-[28px] p-0 shadow-2xl backdrop:bg-slate-950/45">
+    <div class="p-6 sm:p-8">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-orange-600">Importação assistida</p>
+                <h2 class="mt-2 text-2xl font-bold text-gray-900">Carregar um plano existente</h2>
+                <p class="mt-2 text-sm leading-6 text-gray-600">Aceita PDF, Word, Excel e fotografias PNG/JPEG, digitadas ou manuscritas. O original fica guardado e nada entra no plano sem a tua confirmação.</p>
+            </div>
+            <button type="button" onclick="document.getElementById('modal-importar-plano').close()" aria-label="Fechar" class="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700">✕</button>
+        </div>
+        <form method="POST" action="/treino/planos/{{ plano.id }}/importacoes" enctype="multipart/form-data" class="mt-6 space-y-5">
+            <label class="block cursor-pointer rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-center transition hover:border-orange-400 hover:bg-orange-50">
+                <span class="block text-sm font-semibold text-gray-800">Escolher documento ou fotografia</span>
+                <span class="mt-1 block text-xs text-gray-500">PDF, DOCX, XLSX, PNG ou JPEG · máximo 12 MB</span>
+                <input type="file" name="ficheiro" required accept=".pdf,.docx,.xlsx,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" class="mt-4 block w-full text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:font-semibold file:text-gray-700 file:shadow-sm">
+            </label>
+            <div class="rounded-2xl bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+                A leitura de escrita manual depende da nitidez, iluminação e organização da folha. A página seguinte existe precisamente para rever e corrigir todos os dados.
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('modal-importar-plano').close()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button type="submit" class="rounded-xl bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600">Ler documento</button>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+{% if importacoes_plano %}
+<details class="mb-6 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+    <summary class="cursor-pointer list-none text-sm font-semibold text-gray-800">Importações recentes <span class="ml-2 text-xs font-normal text-gray-400">{{ importacoes_plano|length }}</span></summary>
+    <div class="mt-4 divide-y divide-gray-100">
+        {% for item in importacoes_plano %}
+        <div class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-gray-800">{{ item.nome_original }}</p>
+                <p class="text-xs text-gray-500">{{ item.criado_em|data_hora_pt }} · {{ 'Aplicada' if item.estado == 'aplicada' else 'A aguardar revisão' }}</p>
+            </div>
+            <a href="/treino/importacoes/{{ item.id }}" class="text-sm font-semibold text-orange-600 hover:text-orange-700">{{ 'Consultar' if item.estado == 'aplicada' else 'Rever agora' }} →</a>
+        </div>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}
 
 <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
     <div class="space-y-6">

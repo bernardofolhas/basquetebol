@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+
+{% block titulo %}Rever plano importado{% endblock %}
+
+{% macro linha_exercicio(exercicio, indice) %}
+<article class="linha-importada rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" data-linha>
+    <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+            <span class="numero-linha flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">{{ indice + 1 }}</span>
+            <p class="text-sm font-semibold text-gray-800">Exercício reconhecido</p>
+        </div>
+        <button type="button" onclick="removerLinha(this)" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Remover</button>
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-12">
+        <label class="col-span-1 lg:col-span-2"><span class="mb-1 block text-xs font-medium text-gray-500">Bloco</span>
+            <select name="exercicio_bloco" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
+                {% for bloco in blocos_plano %}<option value="d{{ bloco.id }}" {% if exercicio.bloco == ('d' ~ bloco.id) %}selected{% endif %}>{{ bloco.nome }}</option>{% endfor %}
+                {% for letra in ['A', 'B', 'C', 'D'] %}<option value="{{ letra }}" {% if exercicio.bloco|default('A', true) == letra %}selected{% endif %}>Bloco {{ letra }}</option>{% endfor %}
+            </select>
+        </label>
+        <label class="col-span-2 lg:col-span-5"><span class="mb-1 block text-xs font-medium text-gray-500">Exercício</span><input name="exercicio_nome" value="{{ exercicio.nome|default('', true) }}" placeholder="Nome do exercício" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+        <label class="col-span-1 lg:col-span-2"><span class="mb-1 block text-xs font-medium text-gray-500">Categoria</span>
+            <select name="exercicio_categoria" class="categoria-importada w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
+                <option value="">Por classificar</option>
+                {% for categoria in categorias_exercicio %}<option value="{{ categoria }}" {% if exercicio.categoria == categoria %}selected{% endif %}>{{ categoria }}</option>{% endfor %}
+            </select>
+        </label>
+        <label class="col-span-1 lg:col-span-1"><span class="mb-1 block text-xs font-medium text-gray-500">Min.</span><input type="number" name="exercicio_minutos" min="1" max="240" value="{{ exercicio.minutos|default('', true) }}" class="minutos-importados w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+        <label class="col-span-1 lg:col-span-1"><span class="mb-1 block text-xs font-medium text-gray-500">Hora</span><input type="time" name="exercicio_hora" value="{{ exercicio.hora|default('', true) }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+        <label class="col-span-1 lg:col-span-1"><span class="mb-1 block text-xs font-medium text-gray-500">RPE</span><input type="number" name="exercicio_rpe" min="1" max="10" step="0.5" value="{{ exercicio.rpe|default('', true) }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+    </div>
+    <div class="mt-3 grid gap-3 md:grid-cols-2">
+        <label><span class="mb-1 block text-xs font-medium text-gray-500">Organização</span><textarea name="exercicio_organizacao" rows="2" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" placeholder="Grupos, rotações, material...">{{ exercicio.organizacao|default('', true) }}</textarea></label>
+        <label><span class="mb-1 block text-xs font-medium text-gray-500">Coaching points</span><textarea name="exercicio_coaching_points" rows="2" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" placeholder="Pontos-chave a transmitir...">{{ exercicio.coaching_points|default('', true) }}</textarea></label>
+    </div>
+</article>
+{% endmacro %}
+
+{% block conteudo %}
+{% call equipa_contexto(equipa, "Rever plano importado", "Confirma o documento antes de alterar a ficha de treino.", "planeamento", "/treino/sessoes/" ~ sessao.id, "Voltar ao plano") %}
+    <a href="/treino/importacoes/{{ importacao.id }}/ficheiro" class="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Descarregar original</a>
+{% endcall %}
+
+<div class="mx-auto max-w-6xl space-y-6">
+    <section class="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
+        <div class="flex flex-col gap-4 bg-gray-950 px-6 py-6 text-white sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-orange-300">Documento original preservado</p>
+                <h1 class="mt-2 truncate text-2xl font-bold">{{ importacao.nome_original }}</h1>
+                <p class="mt-1 text-sm text-gray-300">{{ (importacao.tamanho_bytes / 1024)|round(1) }} KB · {{ 'Aplicado ao plano' if importacao.estado == 'aplicada' else 'Em revisão' }}</p>
+            </div>
+            <div class="rounded-2xl bg-white/10 px-5 py-3 text-center">
+                <p class="text-[11px] uppercase tracking-[0.16em] text-gray-300">Confiança de leitura</p>
+                <p class="mt-1 text-2xl font-bold">{{ (importacao.confianca|round)|int ~ '%' if importacao.confianca is not none else 'Manual' }}</p>
+            </div>
+        </div>
+        <div class="grid gap-4 p-6 md:grid-cols-3">
+            <div class="rounded-2xl bg-blue-50 p-4 text-sm leading-6 text-blue-950 md:col-span-2"><strong>O treinador decide.</strong> Revê nomes, tempos, categorias e RPE. A aplicação só calcula os totais e altera a ficha depois de carregares em “Aplicar ao plano”.</div>
+            <div class="rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-950">A escrita manual pode exigir correções. Valores pouco nítidos nunca devem ser assumidos sem revisão.</div>
+        </div>
+        {% if importacao.aviso %}<div class="mx-6 mb-6 whitespace-pre-line rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ importacao.aviso }}</div>{% endif %}
+    </section>
+
+    {% if importacao.estado != 'aplicada' %}
+    <form id="form-aplicar-importacao" method="POST" action="/treino/importacoes/{{ importacao.id }}/aplicar" class="space-y-6">
+        <section class="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+            <div><p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">1. Sessão</p><h2 class="mt-1 text-xl font-bold text-gray-900">Dados gerais reconhecidos</h2></div>
+            <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <label><span class="mb-1 block text-xs font-medium text-gray-500">Data</span><input type="date" name="data" value="{{ dados.cabecalho.data or sessao.data.isoformat() }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+                <label><span class="mb-1 block text-xs font-medium text-gray-500">Início</span><input type="time" name="hora_inicio" value="{{ dados.cabecalho.hora_inicio or sessao.hora_inicio or '' }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+                <label><span class="mb-1 block text-xs font-medium text-gray-500">Fim</span><input type="time" name="hora_fim" value="{{ dados.cabecalho.hora_fim or sessao.hora_fim or '' }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+                <label><span class="mb-1 block text-xs font-medium text-gray-500">Local</span><input name="local" value="{{ dados.cabecalho.local or sessao.local or '' }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+                <label><span class="mb-1 block text-xs font-medium text-gray-500">Escalão</span><input name="escalao" value="{{ dados.cabecalho.escalao or plano.escalao or equipa.escalao.value or '' }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+                <label><span class="mb-1 block text-xs font-medium text-gray-500">RPE geral</span><input type="number" name="rpe_geral" min="1" max="10" step="0.5" value="{{ dados.cabecalho.rpe_geral or sessao.intensidade_rpe or '' }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"></label>
+                <label><span class="mb-1 block text-xs font-medium text-gray-500">Volume total</span><div class="relative"><input id="volume-total" type="number" name="volume_minutos" min="1" max="600" value="{{ dados.cabecalho.volume_minutos or sessao.volume_minutos or '' }}" class="w-full rounded-xl border border-gray-300 px-3 py-2 pr-12 text-sm"><span class="absolute right-3 top-2.5 text-xs text-gray-400">min</span></div></label>
+            </div>
+            <label class="mt-4 block"><span class="mb-1 block text-xs font-medium text-gray-500">Objetivos</span><textarea name="objectivos" rows="3" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">{{ dados.cabecalho.objectivos or plano.objectivos or '' }}</textarea></label>
+        </section>
+
+        <section class="rounded-[28px] border border-gray-200 bg-gray-50 p-5 shadow-sm sm:p-6">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div><p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">2. Exercícios</p><h2 class="mt-1 text-xl font-bold text-gray-900">Conferir tempos e categorias</h2><p class="mt-1 text-sm text-gray-500">Cada linha é totalmente editável. TIO, TID e restantes categorias alimentam automaticamente o balanço da sessão.</p></div>
+                <button type="button" onclick="adicionarLinha()" class="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:border-orange-400 hover:text-orange-700">+ Adicionar exercício</button>
+            </div>
+            <div id="lista-exercicios" class="mt-5 space-y-4">
+                {% for exercicio in dados.exercicios %}{{ linha_exercicio(exercicio, loop.index0) }}{% else %}{{ linha_exercicio({}, 0) }}{% endfor %}
+            </div>
+        </section>
+
+        <section class="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+            <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div class="min-w-0 flex-1"><p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">3. Balanço</p><h2 class="mt-1 text-xl font-bold text-gray-900">Minutos por categoria</h2><div id="totais-categoria" class="mt-4 flex flex-wrap gap-2"></div></div>
+                <div class="w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 lg:max-w-md">
+                    <p class="text-sm font-semibold text-gray-800">Como aplicar</p>
+                    <label class="mt-3 flex cursor-pointer gap-3"><input type="radio" name="modo" value="adicionar" checked class="mt-1 accent-orange-500"><span><strong class="block text-sm text-gray-800">Adicionar ao plano</strong><span class="text-xs text-gray-500">Mantém os exercícios que já existem.</span></span></label>
+                    <label class="mt-3 flex cursor-pointer gap-3"><input type="radio" name="modo" value="substituir" class="mt-1 accent-red-500"><span><strong class="block text-sm text-gray-800">Substituir exercícios</strong><span class="text-xs text-gray-500">Remove os exercícios atuais e usa apenas estas linhas.</span></span></label>
+                </div>
+            </div>
+            <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <a href="/treino/sessoes/{{ sessao.id }}" class="rounded-xl border border-gray-300 px-5 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50">Continuar sem aplicar</a>
+                <button type="submit" onclick="return confirmarAplicacao()" class="rounded-xl bg-orange-500 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-orange-600">Aplicar ao plano</button>
+            </div>
+        </section>
+    </form>
+    {% else %}
+    <section class="rounded-[28px] border border-emerald-200 bg-emerald-50 p-8 text-center"><h2 class="text-xl font-bold text-emerald-950">Importação já aplicada</h2><p class="mt-2 text-sm text-emerald-800">O original e o registo da operação foram preservados. Qualquer correção pode ser feita diretamente na ficha.</p><a href="/treino/sessoes/{{ sessao.id }}" class="mt-5 inline-block rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white">Abrir plano de treino</a></section>
+    {% endif %}
+
+    <details class="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+        <summary class="cursor-pointer list-none text-sm font-semibold text-gray-800">Ver e corrigir o texto reconhecido</summary>
+        <form method="POST" action="/treino/importacoes/{{ importacao.id }}/reinterpretar" class="mt-4">
+            <textarea name="texto_extraido" rows="14" {% if importacao.estado == 'aplicada' %}readonly{% endif %} class="w-full rounded-2xl border border-gray-300 bg-gray-50 p-4 font-mono text-xs leading-5">{{ importacao.texto_extraido or '' }}</textarea>
+            {% if importacao.estado != 'aplicada' %}<div class="mt-3 flex justify-end"><button class="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Interpretar novamente</button></div>{% endif %}
+        </form>
+    </details>
+</div>
+
+<template id="modelo-linha-importada">{{ linha_exercicio({}, 0) }}</template>
+<script>
+const categoriasImportacao = {{ categorias_exercicio|list|tojson }};
+
+function renumerarLinhas() {
+    document.querySelectorAll('#lista-exercicios [data-linha]').forEach((linha, indice) => {
+        linha.querySelector('.numero-linha').textContent = indice + 1;
+    });
+    atualizarTotais();
+}
+
+function adicionarLinha() {
+    const fragmento = document.getElementById('modelo-linha-importada').content.cloneNode(true);
+    document.getElementById('lista-exercicios').appendChild(fragmento);
+    renumerarLinhas();
+}
+
+function removerLinha(botao) {
+    botao.closest('[data-linha]').remove();
+    if (!document.querySelector('#lista-exercicios [data-linha]')) adicionarLinha();
+    renumerarLinhas();
+}
+
+function atualizarTotais() {
+    const totais = Object.fromEntries(categoriasImportacao.map(categoria => [categoria, 0]));
+    let volume = 0;
+    document.querySelectorAll('#lista-exercicios [data-linha]').forEach(linha => {
+        const categoria = linha.querySelector('.categoria-importada').value;
+        const minutos = Number(linha.querySelector('.minutos-importados').value || 0);
+        volume += minutos;
+        if (categoria in totais) totais[categoria] += minutos;
+    });
+    document.getElementById('totais-categoria').innerHTML = categoriasImportacao.map(categoria =>
+        `<span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">${categoria} <strong>${totais[categoria]} min</strong></span>`
+    ).join('');
+    const volumeInput = document.getElementById('volume-total');
+    if (volumeInput && (!volumeInput.value || volumeInput.dataset.automatico === 'true')) {
+        volumeInput.value = volume || '';
+        volumeInput.dataset.automatico = 'true';
+    }
+}
+
+function confirmarAplicacao() {
+    const substituir = document.querySelector('input[name="modo"]:checked')?.value === 'substituir';
+    return !substituir || confirm('Substituir todos os exercícios atuais pelos exercícios revistos?');
+}
+
+document.addEventListener('input', evento => {
+    if (evento.target.matches('.minutos-importados, .categoria-importada')) atualizarTotais();
+    if (evento.target.id === 'volume-total') evento.target.dataset.automatico = 'false';
+});
+atualizarTotais();
+</script>
+{% endblock %}

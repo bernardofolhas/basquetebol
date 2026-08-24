@@ -5,9 +5,11 @@
 # organizados em blocos (A, B, C, D)
 # ─────────────────────────────────────────────────────────────
 
-from datetime import date
+from datetime import date, datetime
+import json
+from urllib.parse import quote
 
-from fastapi import APIRouter, Request, Depends, Form
+from fastapi import APIRouter, File, Form, Request, UploadFile, Depends
 from template_config import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from sqlalchemy.orm import Session
@@ -19,7 +21,13 @@ from flash import set_flash
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
 from models.equipa import Equipa
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
-from models.treino import BibliotecoExercicio, BlocoTreino, ExercicioPlano, PlanoTreino
+from models.treino import (
+    BibliotecoExercicio,
+    BlocoTreino,
+    ExercicioPlano,
+    ImportacaoPlanoTreino,
+    PlanoTreino,
+)
 from paths import STATIC_DIR, TEMPLATES_DIR
 from services.desenho_service import (
     compor_desenho_sobre_campo,
@@ -27,6 +35,19 @@ from services.desenho_service import (
     normalizar_data_uri,
 )
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
+from services.auditoria_service import registar_auditoria
+from services.importacao_plano_treino_service import (
+    CAMPOS_CATEGORIA,
+    CATEGORIAS_EXERCICIO,
+    ErroImportacaoPlano,
+    MAX_FICHEIRO_BYTES,
+    extrair_texto,
+    interpretar_texto,
+    normalizar_categoria,
+    sincronizar_minutos_categorias,
+    validar_ficheiro,
+)
+from services.numeracao_planeamento_service import renumerar_treinos_equipa
 from services.pdf_service import renderizar_pdf
 from services.planeamento_semanal_administrativo_service import obter_previsao_equipa, validar_local_sessao
 from services.remocao_sessoes_service import eliminar_sessoes_treino
@@ -253,6 +274,22 @@ def _normalizar_bloco(bloco: str | None) -> str:
     return valor
 
 
+def _dados_importacao(importacao: ImportacaoPlanoTreino) -> dict:
+    try:
+        dados = json.loads(importacao.dados_json or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        dados = {}
+    base = interpretar_texto("")
+    base.update(dados if isinstance(dados, dict) else {})
+    base["cabecalho"] = {**interpretar_texto("")["cabecalho"], **(base.get("cabecalho") or {})}
+    base["exercicios"] = base.get("exercicios") or []
+    return base
+
+
+def _obter_importacao(db: Session, importacao_id: int) -> ImportacaoPlanoTreino | None:
+    return db.query(ImportacaoPlanoTreino).filter(ImportacaoPlanoTreino.id == importacao_id).first()
+
+
 @router.get("/equipas/{equipa_id}/planos", response_class=HTMLResponse)
 def listar_planos_treino_equipa(
     equipa_id: int,
@@ -322,7 +359,7 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "exercicios_por_bloco": exercicios_por_bloco,
         "espacos_disponiveis": espacos_disponiveis,
         "validacao_local": validacao_local,
-        "categorias_exercicio": ["TIO", "TID", "TaIO", "TaID", "TCO", "TCD", "FIS"],
+        "categorias_exercicio": CATEGORIAS_EXERCICIO,
         "resumo_blocos": _construir_resumo_blocos(plano),
         "blocos_ui": [{"key": f"d{bloco.id}", "id": bloco.id, "nome": bloco.nome, "tipo": bloco.tipo, "legado": False} for bloco in plano.blocos] + [{"key": letra, "id": None, "nome": f"Bloco {letra}", "tipo": "Legado", "legado": True} for letra in ["A", "B", "C", "D"] if letra in exercicios_por_bloco],
         "total_exercicios": len(plano.exercicios),
@@ -330,7 +367,281 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "duracao_prevista": duracao_prevista,
         "diferenca_duracao": volume_planeado - duracao_prevista if duracao_prevista is not None else None,
         "estados_sessao": opcoes_transicao_sessao(sessao.estado),
+        "importacoes_plano": list(plano.importacoes[:5]),
     })
+
+
+@router.post("/planos/{plano_id}/importacoes")
+async def importar_plano_treino(
+    plano_id: int,
+    request: Request,
+    ficheiro: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Guarda o original e cria um rascunho; nunca altera o plano sem revisão."""
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
+    plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+    if not plano:
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    conteudo = await ficheiro.read(MAX_FICHEIRO_BYTES + 1)
+    try:
+        nome, tipo_mime = validar_ficheiro(ficheiro.filename or "", ficheiro.content_type, conteudo)
+        texto_extraido, confianca, avisos_extracao = extrair_texto(nome, conteudo)
+        dados = interpretar_texto(texto_extraido)
+        avisos = avisos_extracao + list(dados.get("avisos") or [])
+    except ErroImportacaoPlano as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
+
+    importacao = ImportacaoPlanoTreino(
+        clube_id=plano.clube_id,
+        plano_id=plano.id,
+        utilizador_id=utilizador.id,
+        nome_original=nome,
+        tipo_mime=tipo_mime,
+        tamanho_bytes=len(conteudo),
+        ficheiro=conteudo,
+        texto_extraido=texto_extraido or None,
+        dados_json=json.dumps(dados, ensure_ascii=False),
+        estado="em_revisao",
+        confianca=confianca,
+        aviso="\n".join(dict.fromkeys(aviso for aviso in avisos if aviso)) or None,
+    )
+    db.add(importacao)
+    db.flush()
+    registar_auditoria(
+        db,
+        utilizador,
+        "importar_plano_treino",
+        "ImportacaoPlanoTreino",
+        importacao.id,
+        f"Ficheiro {nome} guardado para revisão; nenhuma alteração aplicada automaticamente.",
+        request,
+    )
+    db.commit()
+    set_flash(request, "Documento lido. Confirma os dados reconhecidos antes de os aplicar ao plano.")
+    return RedirectResponse(url=f"/treino/importacoes/{importacao.id}", status_code=303)
+
+
+@router.get("/importacoes/{importacao_id}", response_class=HTMLResponse)
+def rever_importacao_plano(
+    importacao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    importacao = _obter_importacao(db, importacao_id)
+    if not importacao:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, importacao.plano_id), db)
+    plano = importacao.plano
+    equipa = plano.sessao.microciclo.mesociclo.macrociclo.equipa
+    return templates.TemplateResponse(request, "treino/importacao_rever.html", {
+        "utilizador": utilizador,
+        "importacao": importacao,
+        "dados": _dados_importacao(importacao),
+        "plano": plano,
+        "sessao": plano.sessao,
+        "equipa": equipa,
+        "categorias_exercicio": CATEGORIAS_EXERCICIO,
+        "blocos_plano": list(plano.blocos),
+    })
+
+
+@router.get("/importacoes/{importacao_id}/ficheiro")
+def descarregar_ficheiro_importado(
+    importacao_id: int,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    importacao = _obter_importacao(db, importacao_id)
+    if not importacao:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, importacao.plano_id), db)
+    nome = quote(importacao.nome_original, safe="")
+    return Response(
+        content=importacao.ficheiro,
+        media_type=importacao.tipo_mime,
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{nome}",
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.post("/importacoes/{importacao_id}/reinterpretar")
+async def reinterpretar_importacao_plano(
+    importacao_id: int,
+    request: Request,
+    texto_extraido: str = Form(""),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    importacao = _obter_importacao(db, importacao_id)
+    if not importacao:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, importacao.plano_id), db)
+    if importacao.estado == "aplicada":
+        set_flash(request, "Esta importação já foi aplicada e fica preservada no histórico.", "error")
+        return RedirectResponse(url=f"/treino/importacoes/{importacao.id}", status_code=303)
+    dados = interpretar_texto(texto_extraido)
+    importacao.texto_extraido = texto_extraido.strip() or None
+    importacao.dados_json = json.dumps(dados, ensure_ascii=False)
+    importacao.aviso = "\n".join(dados.get("avisos") or []) or None
+    db.commit()
+    set_flash(request, "Texto novamente interpretado. Revê os campos antes de aplicar.")
+    return RedirectResponse(url=f"/treino/importacoes/{importacao.id}", status_code=303)
+
+
+@router.post("/importacoes/{importacao_id}/aplicar")
+async def aplicar_importacao_plano(
+    importacao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    importacao = _obter_importacao(db, importacao_id)
+    if not importacao:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, importacao.plano_id), db)
+    if importacao.estado == "aplicada":
+        set_flash(request, "Esta importação já foi aplicada. Não pode ser aplicada duas vezes.", "error")
+        return RedirectResponse(url=f"/treino/importacoes/{importacao.id}", status_code=303)
+
+    plano = importacao.plano
+    sessao = plano.sessao
+    form = await request.form()
+    destino_erro = f"/treino/importacoes/{importacao.id}"
+    try:
+        data_texto = str(form.get("data") or "").strip()
+        nova_data = datetime.strptime(data_texto, "%Y-%m-%d").date() if data_texto else sessao.data
+        if not sessao.microciclo.data_inicio <= nova_data <= sessao.microciclo.data_fim:
+            raise ValueError(
+                "A data deve permanecer dentro do microciclo "
+                f"({sessao.microciclo.data_inicio.strftime('%d/%m/%Y')} a "
+                f"{sessao.microciclo.data_fim.strftime('%d/%m/%Y')})."
+            )
+        hora_inicio = normalizar_hora(str(form.get("hora_inicio") or ""))
+        hora_fim = normalizar_hora(str(form.get("hora_fim") or ""))
+        erro_horario = _validar_intervalo_horario(hora_inicio, hora_fim)
+        if erro_horario:
+            raise ValueError(erro_horario)
+        rpe_geral = _normalizar_rpe(str(form.get("rpe_geral") or ""))
+        volume_texto = str(form.get("volume_minutos") or "").strip()
+        volume_informado = int(volume_texto) if volume_texto else None
+        if volume_informado is not None and not 1 <= volume_informado <= 600:
+            raise ValueError("O volume total deve estar entre 1 e 600 minutos.")
+    except (TypeError, ValueError) as erro:
+        set_flash(request, f"Corrige o cabeçalho: {erro}", "error")
+        return RedirectResponse(url=destino_erro, status_code=303)
+
+    nomes = form.getlist("exercicio_nome")
+    blocos = form.getlist("exercicio_bloco")
+    categorias = form.getlist("exercicio_categoria")
+    horas = form.getlist("exercicio_hora")
+    minutos = form.getlist("exercicio_minutos")
+    rpes = form.getlist("exercicio_rpe")
+    organizacoes = form.getlist("exercicio_organizacao")
+    coaching = form.getlist("exercicio_coaching_points")
+    total_linhas = max((len(nomes), len(blocos), len(categorias), len(horas), len(minutos), len(rpes)), default=0)
+    if total_linhas > 200:
+        set_flash(request, "Cada importação pode ter no máximo 200 exercícios.", "error")
+        return RedirectResponse(url=destino_erro, status_code=303)
+    novos = []
+    ordens: dict[str, int] = {}
+    blocos_validos = {bloco.id for bloco in plano.blocos}
+
+    try:
+        for indice in range(total_linhas):
+            valor = lambda lista, padrao="": str(lista[indice] if indice < len(lista) else padrao).strip()
+            nome = valor(nomes)
+            minutos_exercicio = _normalizar_minutos(valor(minutos))
+            categoria_texto = valor(categorias)
+            categoria = normalizar_categoria(categoria_texto) if categoria_texto else None
+            if categoria_texto and not categoria:
+                raise ValueError(f"A categoria da linha {indice + 1} não é válida.")
+            if not any((nome, minutos_exercicio, categoria, valor(horas), valor(rpes), valor(organizacoes), valor(coaching))):
+                continue
+            if not nome:
+                nome = f"Exercício {indice + 1}"
+            bloco_ref = valor(blocos, "A") or "A"
+            bloco_id = None
+            bloco_legado = None
+            if bloco_ref.startswith("d"):
+                bloco_id = int(bloco_ref[1:])
+                if bloco_id not in blocos_validos:
+                    raise ValueError(f"O bloco da linha {indice + 1} já não existe.")
+            else:
+                bloco_legado = _normalizar_bloco(bloco_ref)
+            rpe = _normalizar_rpe(valor(rpes))
+            chave_ordem = bloco_ref
+            ordens[chave_ordem] = ordens.get(chave_ordem, 0) + 1
+            novos.append(ExercicioPlano(
+                plano_id=plano.id,
+                bloco=bloco_legado,
+                bloco_id=bloco_id,
+                ordem=ordens[chave_ordem],
+                nome=nome[:255],
+                categoria=categoria,
+                hora=normalizar_hora(valor(horas)) or None,
+                minutos=minutos_exercicio,
+                rpe=rpe,
+                organizacao=valor(organizacoes) or None,
+                coaching_points=valor(coaching) or None,
+                campos_ativos="",
+            ))
+    except (TypeError, ValueError) as erro:
+        set_flash(request, f"Corrige os exercícios: {erro}", "error")
+        return RedirectResponse(url=destino_erro, status_code=303)
+
+    modo = str(form.get("modo") or "adicionar")
+    if modo == "substituir":
+        for exercicio in list(plano.exercicios):
+            db.delete(exercicio)
+        db.flush()
+    else:
+        # Ao adicionar, as novas ordens continuam depois das já existentes.
+        for exercicio in novos:
+            if exercicio.bloco_id:
+                exercicio.ordem += db.query(ExercicioPlano).filter(ExercicioPlano.plano_id == plano.id, ExercicioPlano.bloco_id == exercicio.bloco_id).count()
+            else:
+                exercicio.ordem += db.query(ExercicioPlano).filter(ExercicioPlano.plano_id == plano.id, ExercicioPlano.bloco == exercicio.bloco).count()
+    db.add_all(novos)
+    db.flush()
+
+    data_anterior = sessao.data
+    sessao.data = nova_data
+    sessao.local = str(form.get("local") or "").strip() or None
+    sessao.hora_inicio = hora_inicio
+    sessao.hora_fim = hora_fim
+    sessao.intensidade_rpe = rpe_geral
+    sessao.volume_minutos = volume_informado if volume_informado is not None else sum(item.minutos or 0 for item in novos)
+    plano.hora_inicio = hora_inicio
+    plano.escalao = str(form.get("escalao") or "").strip() or None
+    plano.objectivos = str(form.get("objectivos") or "").strip() or None
+    _marcar_sessao_como_alterada_manual(sessao)
+    db.expire(plano, ["exercicios"])
+    sincronizar_minutos_categorias(plano, db)
+    if nova_data != data_anterior:
+        renumerar_treinos_equipa(db, plano.sessao.microciclo.mesociclo.macrociclo.equipa_id)
+
+    importacao.estado = "aplicada"
+    importacao.atualizado_em = datetime.now()
+    registar_auditoria(
+        db,
+        utilizador,
+        "aplicar_importacao_plano_treino",
+        "ImportacaoPlanoTreino",
+        importacao.id,
+        f"Aplicados {len(novos)} exercícios em modo {modo}.",
+        request,
+    )
+    db.commit()
+    set_flash(request, f"Plano importado e confirmado: {len(novos)} exercício(s) aplicado(s).")
+    return RedirectResponse(url=f"/treino/sessoes/{sessao.id}", status_code=303)
 
 
 @router.post("/planos/{plano_id}/eliminar")
@@ -347,6 +658,8 @@ async def eliminar_plano_treino(
     if not plano:
         return RedirectResponse(url="/equipas", status_code=303)
     sessao_id = plano.sessao_id
+    for campo in CAMPOS_CATEGORIA.values():
+        setattr(plano.sessao, campo, 0)
     db.delete(plano)
     db.commit()
     set_flash(request, "Plano de treino eliminado. A sessão mantém a data, local e horário para criares uma nova ficha.")
@@ -495,6 +808,7 @@ async def duplicar_bloco(bloco_id: int, request: Request, db: Session = Depends(
     db.add(copia); db.flush()
     for ex in bloco.exercicios:
         db.add(ExercicioPlano(plano_id=ex.plano_id, bloco_id=copia.id, ordem=ex.ordem, hora=ex.hora, minutos=ex.minutos, rpe=ex.rpe, nome=ex.nome, categoria=ex.categoria, desenho_1=ex.desenho_1, desenho_2=ex.desenho_2, desenho_3=ex.desenho_3, desenho_4=ex.desenho_4, campos_ativos=ex.campos_ativos, organizacao=ex.organizacao, coaching_points=ex.coaching_points))
+    db.flush(); sincronizar_minutos_categorias(bloco.plano, db)
     db.commit(); set_flash(request, "Bloco e exercícios duplicados.")
     return RedirectResponse(url=f"/treino/sessoes/{bloco.plano.sessao_id}", status_code=303)
 
@@ -603,6 +917,8 @@ async def adicionar_exercicio(
                 coaching_points=coaching_points or None,
             ))
 
+    db.flush()
+    sincronizar_minutos_categorias(plano, db)
     db.commit()
 
     return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
@@ -653,6 +969,8 @@ async def adicionar_exercicio_da_biblioteca(
     )
     _marcar_sessao_como_alterada_manual(plano.sessao)
     db.add(exercicio)
+    db.flush()
+    sincronizar_minutos_categorias(plano, db)
     db.commit()
     set_flash(request, f"Exercício '{biblioteca.nome}' reutilizado no plano.")
     return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
@@ -675,7 +993,8 @@ async def apagar_exercicio(exercicio_id: int, request: Request, db: Session = De
         bloco = exercicio.bloco or "A"
         _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
         db.delete(exercicio)
-        db.commit()
+        db.flush()
+        sincronizar_minutos_categorias(exercicio.plano, db)
         _reordenar_exercicios_bloco(db, plano_id, bloco)
         db.commit()
         return RedirectResponse(url=f"/treino/sessoes/{sessao_id}", status_code=303)
@@ -716,6 +1035,8 @@ async def duplicar_exercicio(exercicio_id: int, request: Request, db: Session = 
     )
     _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
     db.add(copia)
+    db.flush()
+    sincronizar_minutos_categorias(exercicio.plano, db)
     db.commit()
     set_flash(request, "Exercício duplicado no mesmo bloco.")
     return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#bloco-{bloco}", status_code=303)
@@ -779,6 +1100,8 @@ async def atualizar_exercicio(
         )
 
     _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+    db.flush()
+    sincronizar_minutos_categorias(exercicio.plano, db)
     db.commit()
 
     if bloco_novo != bloco_anterior:

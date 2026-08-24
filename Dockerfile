@@ -15,6 +15,9 @@ RUN apt-get update \
         libpango-1.0-0 \
         libpangocairo-1.0-0 \
         shared-mime-info \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-por \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

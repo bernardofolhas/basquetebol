@@ -13,7 +13,7 @@ from paths import TEMPLATES_DIR
 router = APIRouter(prefix="/biblioteca")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-CATEGORIAS = ["TIO", "TID", "TaIO", "TaID", "TCO", "TCD", "FIS"]
+CATEGORIAS = ["TIO", "TID", "TaIO", "TaID", "TCO", "TCD", "FIS", "PSI"]
 
 
 @router.get("", response_class=HTMLResponse)
