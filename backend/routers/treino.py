@@ -299,6 +299,7 @@ def _resumo_setores(sessao: SessaoTreino) -> list[dict]:
     return [
         {
             "codigo": categoria,
+            "campo": campo,
             "minutos": getattr(sessao, campo, 0) or 0,
         }
         for categoria, campo in CAMPOS_CATEGORIA.items()
@@ -335,6 +336,107 @@ def _repor_ficha_importada(db: Session, plano: PlanoTreino) -> None:
     sessao.estado = "planeada"
     for campo in CAMPOS_CATEGORIA.values():
         setattr(sessao, campo, 0)
+
+
+def _aplicar_importacao_automaticamente(
+    db: Session,
+    importacao: ImportacaoPlanoTreino,
+    dados: dict,
+) -> int:
+    """Transforma imediatamente os dados reconhecidos numa ficha editável."""
+    plano = importacao.plano
+    sessao = plano.sessao
+    cabecalho = dados.get("cabecalho") or {}
+
+    # O documento importado passa a representar a ficha técnica atual.
+    for exercicio in list(plano.exercicios):
+        db.delete(exercicio)
+    db.flush()
+    for bloco in list(plano.blocos):
+        db.delete(bloco)
+    db.flush()
+
+    novos: list[ExercicioPlano] = []
+    ordens: dict[str, int] = {}
+    for indice, item in enumerate((dados.get("exercicios") or [])[:200], start=1):
+        categoria = normalizar_categoria(str(item.get("categoria") or ""))
+        try:
+            minutos = _normalizar_minutos(str(item.get("minutos") or ""))
+        except ValueError:
+            minutos = None
+        try:
+            rpe = _normalizar_rpe(str(item.get("rpe") or ""))
+        except ValueError:
+            rpe = None
+        try:
+            bloco = _normalizar_bloco(str(item.get("bloco") or "A"))
+        except ValueError:
+            bloco = "A"
+        nome = str(item.get("nome") or "").strip() or f"Exercício {indice}"
+        ordens[bloco] = ordens.get(bloco, 0) + 1
+        novos.append(ExercicioPlano(
+            plano_id=plano.id,
+            bloco=bloco,
+            ordem=ordens[bloco],
+            nome=nome[:255],
+            categoria=categoria,
+            hora=normalizar_hora(str(item.get("hora") or "")) or None,
+            minutos=minutos,
+            rpe=rpe,
+            organizacao=str(item.get("organizacao") or "").strip() or None,
+            coaching_points=str(item.get("coaching_points") or "").strip() or None,
+            campos_ativos="",
+        ))
+    db.add_all(novos)
+    db.flush()
+
+    data_anterior = sessao.data
+    data_texto = str(cabecalho.get("data") or "").strip()
+    if data_texto:
+        try:
+            data_importada = datetime.strptime(data_texto, "%Y-%m-%d").date()
+            if sessao.microciclo.data_inicio <= data_importada <= sessao.microciclo.data_fim:
+                sessao.data = data_importada
+        except ValueError:
+            pass
+
+    hora_inicio = normalizar_hora(str(cabecalho.get("hora_inicio") or ""))
+    hora_fim = normalizar_hora(str(cabecalho.get("hora_fim") or ""))
+    if not _validar_intervalo_horario(hora_inicio, hora_fim):
+        sessao.hora_inicio = hora_inicio
+        sessao.hora_fim = hora_fim
+        plano.hora_inicio = hora_inicio
+    if str(cabecalho.get("local") or "").strip():
+        sessao.local = str(cabecalho["local"]).strip()[:255]
+    if str(cabecalho.get("escalao") or "").strip():
+        plano.escalao = str(cabecalho["escalao"]).strip()[:255]
+    if str(cabecalho.get("objectivos") or "").strip():
+        plano.objectivos = str(cabecalho["objectivos"]).strip()
+
+    try:
+        rpe_geral = _normalizar_rpe(str(cabecalho.get("rpe_geral") or ""))
+    except ValueError:
+        rpe_geral = None
+    try:
+        volume_importado = int(str(cabecalho.get("volume_minutos") or "").strip())
+        if not 0 <= volume_importado <= 600:
+            volume_importado = None
+    except (TypeError, ValueError):
+        volume_importado = None
+    sessao.intensidade_rpe = rpe_geral
+    sessao.volume_minutos = volume_importado if volume_importado is not None else sum(item.minutos or 0 for item in novos)
+    sincronizar_minutos_categorias(plano, db)
+    _marcar_sessao_como_alterada_manual(sessao)
+
+    for anterior in plano.importacoes:
+        if anterior.id != importacao.id and anterior.estado == "aplicada":
+            anterior.estado = "arquivada"
+    importacao.estado = "aplicada"
+    importacao.atualizado_em = datetime.now()
+    sessao.estado = "planeada"
+    if sessao.data != data_anterior:
+        renumerar_treinos_equipa(db, sessao.microciclo.mesociclo.macrociclo.equipa_id)
+    return len(novos)
 
 
 @router.get("/equipas/{equipa_id}/planos", response_class=HTMLResponse)
@@ -432,7 +534,7 @@ async def importar_plano_treino(
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_autenticacao),
 ):
-    """Guarda o original e cria um rascunho; nunca altera o plano sem revisão."""
+    """Guarda o original e transforma-o imediatamente numa ficha editável."""
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
     plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
     if not plano:
@@ -458,24 +560,25 @@ async def importar_plano_treino(
         ficheiro=conteudo,
         texto_extraido=texto_extraido or None,
         dados_json=json.dumps(dados, ensure_ascii=False),
-        estado="em_revisao",
+        estado="aplicada",
         confianca=confianca,
         aviso="\n".join(dict.fromkeys(aviso for aviso in avisos if aviso)) or None,
     )
     db.add(importacao)
     db.flush()
+    total_exercicios = _aplicar_importacao_automaticamente(db, importacao, dados)
     registar_auditoria(
         db,
         utilizador,
         "importar_plano_treino",
         "ImportacaoPlanoTreino",
         importacao.id,
-        f"Ficheiro {nome} guardado para revisão; nenhuma alteração aplicada automaticamente.",
+        f"Ficheiro {nome} importado automaticamente com {total_exercicios} exercício(s).",
         request,
     )
     db.commit()
-    set_flash(request, "Documento lido. Confirma os dados reconhecidos antes de os aplicar ao plano.")
-    return RedirectResponse(url=f"/treino/importacoes/{importacao.id}", status_code=303)
+    set_flash(request, f"Plano importado: {total_exercicios} exercício(s) reconhecido(s). Podes editar todos os dados.")
+    return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
 
 
 @router.get("/importacoes/{importacao_id}", response_class=HTMLResponse)
@@ -870,17 +973,47 @@ async def guardar_cabecalho(
     escalao: str = Form(""),
     objectivos: str = Form(""),
     intensidade_rpe: str = Form(""),
+    data_sessao: str = Form("", alias="data"),
 ):
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
 
     plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
     if plano:
+        form = await request.form()
         erro_horario = _validar_intervalo_horario(hora_inicio or None, hora_fim or None)
         if erro_horario:
             set_flash(request, erro_horario, "error")
             return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
         try:
             rpe_geral = _normalizar_rpe(intensidade_rpe)
+            nova_data = plano.sessao.data
+            if "data" in form and data_sessao:
+                nova_data = datetime.strptime(data_sessao, "%Y-%m-%d").date()
+                if not plano.sessao.microciclo.data_inicio <= nova_data <= plano.sessao.microciclo.data_fim:
+                    raise ValueError(
+                        "A data deve permanecer dentro do microciclo "
+                        f"({plano.sessao.microciclo.data_inicio.strftime('%d/%m/%Y')} a "
+                        f"{plano.sessao.microciclo.data_fim.strftime('%d/%m/%Y')})."
+                    )
+
+            volume_novo = plano.sessao.volume_minutos
+            if "volume_minutos" in form:
+                volume_texto = str(form.get("volume_minutos") or "").strip()
+                volume_novo = int(volume_texto) if volume_texto else 0
+                if not 0 <= volume_novo <= 600:
+                    raise ValueError("O volume total deve estar entre 0 e 600 minutos.")
+
+            setores_novos = {}
+            for campo in CAMPOS_CATEGORIA.values():
+                if campo not in form:
+                    continue
+                valor_texto = str(form.get(campo) or "").strip()
+                valor = int(valor_texto) if valor_texto else 0
+                if not 0 <= valor <= 600:
+                    raise ValueError("Os tempos por setor devem estar entre 0 e 600 minutos.")
+                setores_novos[campo] = valor
+            if setores_novos and volume_novo is not None and sum(setores_novos.values()) > volume_novo:
+                raise ValueError("A soma dos tempos por setor não pode ultrapassar o volume total.")
         except ValueError as erro:
             set_flash(request, str(erro), "error")
             return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
@@ -892,11 +1025,19 @@ async def guardar_cabecalho(
         plano.escalao = escalao or None
         plano.objectivos = objectivos or None
         if plano.sessao:
+            data_anterior = plano.sessao.data
+            plano.sessao.data = nova_data
             plano.sessao.local = local or None
             plano.sessao.hora_inicio = hora_inicio
             plano.sessao.hora_fim = hora_fim
             plano.sessao.intensidade_rpe = rpe_geral
+            plano.sessao.volume_minutos = volume_novo
+            for campo, valor in setores_novos.items():
+                setattr(plano.sessao, campo, valor)
+            if nova_data != data_anterior:
+                renumerar_treinos_equipa(db, plano.sessao.microciclo.mesociclo.macrociclo.equipa_id)
         db.commit()
+        set_flash(request, "Dados do plano de treino atualizados.")
 
     return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
 

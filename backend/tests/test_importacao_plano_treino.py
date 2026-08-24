@@ -22,7 +22,7 @@ from services.importacao_plano_treino_service import (
 from template_config import Jinja2Templates
 from paths import TEMPLATES_DIR
 from database import SessionLocal
-from models.treino import ImportacaoPlanoTreino, PlanoTreino
+from models.treino import ExercicioPlano, ImportacaoPlanoTreino, PlanoTreino
 from models.utilizador import Utilizador
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
@@ -217,7 +217,7 @@ def test_templates_de_upload_e_revisao_sao_validos():
     assert revisao is not None
 
 
-def test_upload_autenticado_cria_rascunho_e_abre_revisao(client_admin):
+def test_upload_autenticado_aplica_plano_e_abre_dashboard_editavel(client_admin):
     db = SessionLocal()
     importacao_id = None
     equipa_id = None
@@ -257,6 +257,17 @@ def test_upload_autenticado_cria_rascunho_e_abre_revisao(client_admin):
         assert "Importar plano" in pagina_plano.text
         assert "multipart/form-data" in pagina_plano.text
 
+        db.add(ExercicioPlano(
+            clube_id=admin.clube_id,
+            plano_id=plano.id,
+            bloco="A",
+            ordem=1,
+            nome="Exercício manual anterior",
+            categoria="FIS",
+            minutos=10,
+        ))
+        db.commit()
+
         documento = Document()
         documento.add_paragraph(TEXTO_PLANO)
         memoria = BytesIO()
@@ -268,13 +279,18 @@ def test_upload_autenticado_cria_rascunho_e_abre_revisao(client_admin):
         )
 
         assert resposta.status_code == 303
-        assert resposta.headers["location"].startswith("/treino/importacoes/")
-        importacao_id = int(resposta.headers["location"].rsplit("/", 1)[-1])
-        revisao = client_admin.get(resposta.headers["location"])
-        assert revisao.status_code == 200
-        assert "Rever plano importado" in revisao.text
-        assert "Finalização após contra-ataque" in revisao.text
-        assert "Aplicar ao plano" in revisao.text
+        assert resposta.headers["location"].endswith(f"/treino/sessoes/{sessao.id}")
+        db.expire_all()
+        importacao = (
+            db.query(ImportacaoPlanoTreino)
+            .execution_options(ignorar_clube=True)
+            .filter(ImportacaoPlanoTreino.plano_id == plano.id)
+            .order_by(ImportacaoPlanoTreino.id.desc())
+            .first()
+        )
+        assert importacao is not None
+        importacao_id = importacao.id
+        assert importacao.estado == "aplicada"
 
         original = client_admin.get(f"/treino/importacoes/{importacao_id}/ficheiro")
         assert original.status_code == 200
@@ -307,43 +323,22 @@ def test_upload_autenticado_cria_rascunho_e_abre_revisao(client_admin):
         assert preview.headers["content-disposition"].startswith("inline;")
         assert preview.headers["cache-control"] == "private, no-store"
         assert preview.headers["content-security-policy"] == "default-src 'none'; sandbox"
-        aplicacao = client_admin.post(
-            f"/treino/importacoes/{importacao_id}/aplicar",
-            data={
-                "data": "2026-08-24",
-                "hora_inicio": "18:30",
-                "hora_fim": "20:00",
-                "local": "Pavilhão de teste",
-                "escalao": "Sub-18",
-                "rpe_geral": "7",
-                "volume_minutos": "35",
-                "objectivos": "Validar a importação",
-                "modo": "adicionar",
-                "exercicio_bloco": ["A", "A"],
-                "exercicio_nome": ["Finalização", "Defesa 1x1"],
-                "exercicio_categoria": ["TIO", "TID"],
-                "exercicio_minutos": ["15", "20"],
-                "exercicio_hora": ["18:30", "18:45"],
-                "exercicio_rpe": ["6", "7"],
-                "exercicio_organizacao": ["Duas filas", "Meio-campo"],
-                "exercicio_coaching_points": ["Finalizar alto", "Conter a bola"],
-            },
-            follow_redirects=False,
-        )
-        assert aplicacao.status_code == 303
-        assert aplicacao.headers["location"].endswith(f"/treino/sessoes/{sessao.id}")
-
         db.expire_all()
         importacao = db.query(ImportacaoPlanoTreino).execution_options(ignorar_clube=True).filter(ImportacaoPlanoTreino.id == importacao_id).one()
         sessao_guardada = db.query(SessaoTreino).execution_options(ignorar_clube=True).filter(SessaoTreino.id == sessao.id).one()
-        assert importacao.estado == "aplicada"
         assert [(item.nome, item.categoria, item.minutos) for item in importacao.plano.exercicios] == [
-            ("Finalização", "TIO", 15),
-            ("Defesa 1x1", "TID", 20),
+            ("Finalização após contra-ataque", "TIO", 15),
+            ("Defesa do bloqueio direto", "TID", 20),
+            ("Jogo condicionado", "TCO", 25),
         ]
+        assert all(item.nome != "Exercício manual anterior" for item in importacao.plano.exercicios)
+        assert sessao_guardada.hora_inicio == "18:30"
+        assert sessao_guardada.hora_fim == "20:00"
+        assert sessao_guardada.local == "Pavilhão Fidelidade"
         assert sessao_guardada.min_tecnica_individual_ofensiva == 15
         assert sessao_guardada.min_tecnica_individual_defensiva == 20
-        assert sessao_guardada.volume_minutos == 35
+        assert sessao_guardada.min_tatica_coletiva_ofensiva == 25
+        assert sessao_guardada.volume_minutos == 60
         assert sessao_guardada.estado == "planeada"
 
         dashboard_importada = client_admin.get(f"/treino/sessoes/{sessao.id}")
@@ -353,7 +348,51 @@ def test_upload_autenticado_cria_rascunho_e_abre_revisao(client_admin):
         assert "Tempo por setor" in dashboard_importada.text
         assert "Pré-visualização do documento importado" in dashboard_importada.text
         assert "Finalização após contra-ataque" in dashboard_importada.text
+        assert 'name="data"' in dashboard_importada.text
+        assert 'name="hora_inicio"' in dashboard_importada.text
+        assert 'name="hora_fim"' in dashboard_importada.text
+        assert 'name="local"' in dashboard_importada.text
+        assert 'name="volume_minutos"' in dashboard_importada.text
+        assert 'name="min_tecnica_individual_ofensiva"' in dashboard_importada.text
         assert "Adicionar exercício" not in dashboard_importada.text
+
+        atualizacao = client_admin.post(
+            f"/treino/planos/{plano.id}/cabecalho",
+            data={
+                "data": "2026-08-25",
+                "hora_inicio": "19:00",
+                "hora_fim": "20:30",
+                "local": "Pavilhão editado",
+                "escalao": "Sub-18",
+                "intensidade_rpe": "7.5",
+                "volume_minutos": "90",
+                "objectivos": "Dados corrigidos pelo treinador",
+                "min_tecnica_individual_ofensiva": "18",
+                "min_tecnica_individual_defensiva": "22",
+                "min_tatica_individual_ofensiva": "0",
+                "min_tatica_individual_defensiva": "0",
+                "min_tatica_coletiva_ofensiva": "30",
+                "min_tatica_coletiva_defensiva": "0",
+                "min_fisicos": "10",
+                "min_psicologicos": "0",
+            },
+            follow_redirects=False,
+        )
+        assert atualizacao.status_code == 303
+        assert atualizacao.headers["location"].endswith(f"/treino/sessoes/{sessao.id}")
+
+        db.expire_all()
+        sessao_guardada = db.query(SessaoTreino).execution_options(ignorar_clube=True).filter(SessaoTreino.id == sessao.id).one()
+        assert sessao_guardada.data == date(2026, 8, 25)
+        assert sessao_guardada.hora_inicio == "19:00"
+        assert sessao_guardada.hora_fim == "20:30"
+        assert sessao_guardada.local == "Pavilhão editado"
+        assert sessao_guardada.intensidade_rpe == 7.5
+        assert sessao_guardada.volume_minutos == 90
+        assert sessao_guardada.min_tecnica_individual_ofensiva == 18
+        assert sessao_guardada.min_tecnica_individual_defensiva == 22
+        assert sessao_guardada.min_tatica_coletiva_ofensiva == 30
+        assert sessao_guardada.min_fisicos == 10
 
         editor_importado = client_admin.get(f"/treino/sessoes/{sessao.id}?editar=1")
         assert editor_importado.status_code == 200
@@ -368,7 +407,7 @@ def test_upload_autenticado_cria_rascunho_e_abre_revisao(client_admin):
         assert repeticao.status_code == 303
         db.expire_all()
         plano_guardado = db.query(PlanoTreino).execution_options(ignorar_clube=True).filter(PlanoTreino.id == plano.id).one()
-        assert len(plano_guardado.exercicios) == 2
+        assert len(plano_guardado.exercicios) == 3
 
         backup = client_admin.get(f"/exportacoes/equipas/{equipa_id}/dados")
         assert backup.status_code == 200
