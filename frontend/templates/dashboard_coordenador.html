@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% block titulo %}Dashboard - Coordenador{% endblock %}
 {% block conteudo %}
-<div class="mb-6">
-    <p class="ds-section-label">Coordenação</p>
-    <h1 class="mt-1 text-2xl font-bold text-slate-900">Visão operacional</h1>
-    <p class="mt-1 text-sm text-slate-500">Acompanhamento simples do clube e acessos diretos à gestão diária.</p>
+<div class="ds-page-header">
+    <div><p class="ds-section-label">Coordenação</p>
+    <h1 class="mt-1">Visão operacional</h1>
+    <p>Acompanhamento simples do clube e acessos diretos à gestão diária.</p></div>
 </div>
 
-<section class="mb-6 rounded-[28px] border border-orange-100 bg-white p-5 shadow-sm md:p-6">
+<section class="ds-panel mb-6 p-5 md:p-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-orange-500">Centro de ação</p>
+            <p class="ds-section-label">Centro de ação</p>
             <h2 class="mt-2 text-xl font-bold text-slate-900">O que precisa de atenção</h2>
             <p class="mt-1 text-sm text-slate-500">Conflitos, jogos e decisões operacionais do clube.</p>
         </div>
@@ -18,7 +18,7 @@
     </div>
     <div class="mt-5 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
         {% for tarefa in tarefas[:6] %}
-        <a href="{{ tarefa.link or '/calendario' }}" class="rounded-2xl border px-4 py-3 transition hover:border-orange-300 hover:bg-orange-50 {% if tarefa.urgente %}border-orange-200 bg-orange-50{% else %}border-slate-200 bg-slate-50{% endif %}">
+        <a href="{{ tarefa.link or '/calendario' }}" class="ds-card-interactive rounded-xl border px-4 py-3 {% if tarefa.urgente %}border-[var(--clube-primary-border)] bg-[var(--clube-primary-surface)]{% else %}border-slate-200 bg-slate-50{% endif %}">
             <p class="text-xs text-slate-500">{{ tarefa.item.data|data_pt }} · {{ tarefa.item.equipa_nome or 'Clube' }}</p>
             <p class="mt-1 text-sm font-semibold text-slate-800">{{ tarefa.titulo }}</p>
             <p class="mt-1 truncate text-xs text-slate-500">{{ tarefa.item.titulo }}</p>
@@ -29,8 +29,8 @@
     </div>
 </section>
 
-<section class="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-    <div class="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-[0.25em] text-orange-500">Calendário do clube</p><h2 class="mt-1 text-xl font-bold text-slate-900">{{ calendario_mes.label }}</h2><p class="mt-1 text-sm text-slate-500">Atividades, jogos e treinos do mês corrente.</p></div><a href="/calendario" class="text-sm font-semibold text-orange-600 hover:underline">Ver calendário completo →</a></div>
+<section class="ds-panel p-5 md:p-6">
+    <div class="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p class="ds-section-label">Calendário do clube</p><h2 class="mt-1 text-xl font-bold text-slate-900">{{ calendario_mes.label }}</h2><p class="mt-1 text-sm text-slate-500">Atividades, jogos e treinos do mês corrente.</p></div><a href="/calendario" class="ds-quiet-link">Ver calendário completo</a></div>
     <div class="hidden overflow-x-auto rounded-2xl border border-slate-200 md:block"><div class="grid min-w-[760px] grid-cols-7 bg-slate-50 text-center text-xs font-bold uppercase tracking-wide text-slate-500">{% for nome in ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] %}<div class="border-b border-r border-slate-200 px-2 py-3 last:border-r-0">{{ nome }}</div>{% endfor %}</div>{% for semana in calendario_mes.semanas %}<div class="grid min-w-[760px] grid-cols-7">{% for dia in semana %}<div class="min-h-28 border-b border-r border-slate-100 p-2 last:border-r-0 {% if not dia.do_mes_atual %}bg-slate-50 text-slate-300{% endif %}"><p class="text-xs font-semibold">{{ dia.dia }}</p><div class="mt-2 space-y-1">{% for item in dia.itens[:3] %}<a href="{{ item.acao_link or item.link or '/calendario' }}" class="block truncate rounded px-1.5 py-1 text-[10px] font-semibold {{ item.pill_classes }}" title="{{ item.titulo }}">{{ item.hora_inicio or '' }} {{ item.titulo }}</a>{% endfor %}{% if dia.itens|length > 3 %}<span class="text-[10px] text-slate-400">+{{ dia.itens|length - 3 }} itens</span>{% endif %}</div></div>{% endfor %}</div>{% endfor %}</div>
     <div class="space-y-3 md:hidden">{% for semana in calendario_mes.semanas %}{% for dia in semana if dia.do_mes_atual %}<div class="rounded-xl border border-slate-200 p-3"><div class="flex justify-between"><span class="font-semibold text-slate-800">{{ dia.nome_semana }} {{ dia.dia }}</span><span class="text-xs text-slate-400">{{ dia.itens|length }} item(ns)</span></div><div class="mt-2 space-y-1">{% for item in dia.itens %}<a href="{{ item.acao_link or item.link or '/calendario' }}" class="block rounded px-2 py-1.5 text-xs font-semibold {{ item.pill_classes }}">{{ item.hora_inicio or '' }} {{ item.titulo }}</a>{% else %}<p class="text-xs text-slate-400">Sem atividade.</p>{% endfor %}</div></div>{% endfor %}{% endfor %}</div>
 </section>

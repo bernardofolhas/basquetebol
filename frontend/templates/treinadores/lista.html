@@ -4,21 +4,22 @@
 
 {% block conteudo %}
 
-<div class="flex items-center justify-between mb-6">
+<div class="ds-page-header">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800">Treinadores</h1>
-        <p class="text-gray-500 mt-1">Gerir os treinadores do clube</p>
+        <p class="ds-section-label">Equipa técnica</p>
+        <h1 class="mt-1">Treinadores</h1>
+        <p>Perfis, contactos e equipas associadas.</p>
     </div>
     <a href="/treinadores/novo"
-       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
-        + Novo Treinador
+       class="ds-button ds-button-primary">
+        + Novo treinador
     </a>
 </div>
 
 {% if treinadores %}
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for treinador in treinadores %}
-    <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hover:shadow-md transition">
+    <div class="ds-record-card">
         <div class="flex items-start justify-between">
             <div>
                 <h2 class="font-bold text-gray-800 text-lg">{{ treinador.nome }}</h2>
@@ -29,13 +30,13 @@
                 <p class="text-gray-500 text-sm">{{ treinador.telefone }}</p>
                 {% endif %}
             </div>
-            <span class="text-3xl">👤</span>
+            <span class="ds-record-mark">TR</span>
         </div>
 
         {% if treinador.equipas %}
         <div class="mt-3">
             {% for equipa in treinador.equipas %}
-            <span class="inline-block bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full mr-1">
+            <span class="mb-1 mr-1 inline-block rounded-full border border-[var(--clube-primary-border)] bg-[var(--clube-primary-surface)] px-2 py-1 text-xs font-semibold text-[var(--clube-primary-dark)]">
                 {{ equipa.nome }}
             </span>
             {% endfor %}
@@ -44,8 +45,8 @@
 
         <div class="mt-4 pt-4 border-t border-gray-100">
             <a href="/treinadores/{{ treinador.id }}"
-               class="text-orange-500 hover:text-orange-600 text-sm font-medium">
-                Ver treinador →
+               class="ds-quiet-link">
+                Abrir treinador
             </a>
         </div>
     </div>
@@ -53,11 +54,11 @@
 </div>
 
 {% else %}
-<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
-    <span class="text-5xl">👤</span>
-    <p class="text-gray-500 mt-4">Ainda não há treinadores registados.</p>
+<div class="ds-empty">
+    <strong>Ainda não há treinadores registados.</strong>
+    <p>Adiciona o primeiro elemento da equipa técnica.</p>
     <a href="/treinadores/novo"
-       class="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+       class="ds-button ds-button-primary mt-4">
         Registar primeiro treinador
     </a>
 </div>

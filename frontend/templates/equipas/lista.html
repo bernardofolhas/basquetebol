@@ -21,7 +21,7 @@
 </div>
 
 {% if equipas %}
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
     {% for equipa in equipas %}
     <div class="ds-record-card">
         <div class="flex items-start justify-between gap-3">
@@ -31,29 +31,31 @@
             </div>
             <span class="ds-record-mark">EQ</span>
         </div>
-        <div class="mt-4 grid grid-cols-2 gap-2 text-sm">
+        <div class="mt-5 flex flex-wrap gap-2 text-sm">
             <a href="/equipas/{{ equipa.id }}"
-               class="ds-button ds-button-primary">
-                Resumo
+               class="ds-button ds-button-primary flex-1">
+                Abrir equipa
             </a>
             <a href="/planeamento/equipas/{{ equipa.id }}/anuais"
-               class="ds-button ds-button-secondary">
+               class="ds-button ds-button-secondary flex-1">
                 Planeamento
             </a>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-3 text-xs font-bold text-slate-500">
             <a href="/jogos/equipas/{{ equipa.id }}"
-               class="ds-button ds-button-secondary">
+               class="hover:text-[var(--clube-primary-dark)]">
                 Jogos
             </a>
             <a href="/playbook/equipas/{{ equipa.id }}"
-               class="ds-button ds-button-secondary">
+               class="hover:text-[var(--clube-primary-dark)]">
                 Playbook
             </a>
             <a href="/fisico/equipas/{{ equipa.id }}"
-               class="ds-button ds-button-secondary">
+               class="hover:text-[var(--clube-primary-dark)]">
                 Físico
             </a>
             <a href="/equipas/{{ equipa.id }}/plantel"
-               class="ds-button ds-button-secondary">
+               class="hover:text-[var(--clube-primary-dark)]">
                 Plantel
             </a>
         </div>
@@ -62,12 +64,12 @@
 </div>
 
 {% else %}
-<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
-    <span class="text-5xl">🏀</span>
-    <p class="text-gray-500 mt-4">Ainda não há equipas criadas.</p>
+<div class="ds-empty">
+    <strong>Ainda não há equipas criadas.</strong>
+    <p>Cria a primeira equipa para começar a organizar o clube.</p>
     {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}
     <a href="/equipas/nova"
-       class="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
+       class="ds-button ds-button-primary mt-4">
         Criar primeira equipa
     </a>
     {% endif %}

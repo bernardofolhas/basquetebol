@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block titulo %}Plataforma de Basquetebol{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
   {% set identidade = request.state.identidade_clube|default({}, true) %}
@@ -17,6 +20,7 @@
   </script>
 </head>
 <body class="min-h-screen bg-slate-100 {% if modo_plataforma %}modo-plataforma{% endif %}">
+  <a href="#conteudo-principal" class="ds-skip-link">Saltar para o conteúdo</a>
   {% set perfil = utilizador.perfil.value %}
   {% set p = request.url.path %}
   {% set equipa_contexto_id = none %}{% set equipa_contexto_nome = none %}
@@ -33,14 +37,15 @@
 
   {% include "partials/navbar_global.html" %}
 
-  <main id="conteudo-principal" class="relative z-0 mx-auto min-w-0 max-w-[1600px] px-4 pb-8 pt-24 sm:px-6">
-    {% if request.state.flash %}<div id="flash-msg" class="mb-4 flex items-center justify-between rounded-xl border px-4 py-3 {% if request.state.flash.tipo == 'error' %}border-red-200 bg-red-50 text-red-800{% else %}border-emerald-200 bg-emerald-50 text-emerald-800{% endif %}"><span>{{ request.state.flash.mensagem }}</span><button onclick="this.parentElement.remove()" class="ml-4 text-xl opacity-60" aria-label="Fechar">&times;</button></div>{% endif %}
+  <main id="conteudo-principal" class="relative z-0 mx-auto min-w-0 max-w-[1680px] px-4 pb-10 pt-24 sm:px-6 lg:px-8">
+    {% if request.state.flash %}<div id="flash-msg" role="status" aria-live="polite" class="ds-flash {% if request.state.flash.tipo == 'error' %}ds-flash-error{% else %}ds-flash-success{% endif %}"><span class="ds-flash-mark" aria-hidden="true"></span><span class="min-w-0 flex-1">{{ request.state.flash.mensagem }}</span><button type="button" onclick="this.parentElement.remove()" class="ds-flash-close" aria-label="Fechar notificação">&times;</button></div>{% endif %}
     {% block conteudo %}{% endblock %}
   </main>
 
   <script>
     document.addEventListener("DOMContentLoaded",function(){
       var menu=document.getElementById("menu-mobile"),navigation=document.getElementById("header-navigation"),overlay=document.getElementById("header-overlay");
+      document.querySelectorAll(".overflow-x-auto").forEach(function(wrapper){if(wrapper.querySelector("table"))wrapper.classList.add("ds-table-scroll")});
       function closeMenu(){navigation.classList.remove("is-open");overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}
       function openMenu(){navigation.classList.add("is-open");overlay.classList.remove("hidden");if(menu)menu.setAttribute("aria-expanded","true")}
       if(menu)menu.addEventListener("click",function(){navigation.classList.contains("is-open")?closeMenu():openMenu()});if(overlay)overlay.addEventListener("click",closeMenu);navigation.querySelectorAll("a").forEach(function(link){link.addEventListener("click",closeMenu)});

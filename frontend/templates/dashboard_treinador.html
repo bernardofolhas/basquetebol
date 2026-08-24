@@ -3,8 +3,8 @@
 {% block conteudo %}
 
 <div class="ds-page-header">
-    <div><h1>Olá, {{ utilizador.nome }}</h1>
-    <p>O essencial das tuas equipas para hoje.</p></div>
+    <div><p class="ds-section-label">O meu trabalho</p><h1 class="mt-1">Olá, {{ utilizador.nome }}</h1>
+    <p>Próximos compromissos e acesso direto às tuas equipas.</p></div>
 </div>
 
 {% include "partials/painel_operacional.html" %}
@@ -12,33 +12,29 @@
 <!-- Equipas -->
 {% if dados_equipas %}
 {% for item in dados_equipas %}
-<div class="mb-8">
+<section class="ds-panel mb-6 overflow-hidden">
 
     <!-- Cabeçalho da equipa -->
-    <div class="flex items-center justify-between gap-3 mb-4">
-        <div>
-            <h2 class="text-xl font-bold text-gray-800">{{ item.equipa.nome }}</h2>
-            <p class="text-gray-400 text-sm">{{ item.equipa.escalao.value }} — {{ item.equipa.genero.value }}</p>
+    <div class="ds-panel-header">
+        <div class="min-w-0">
+            <p class="ds-section-label">{{ item.equipa.escalao.value }} · {{ item.equipa.genero.value }}</p>
+            <h2 class="mt-1 truncate text-xl font-extrabold text-slate-900">{{ item.equipa.nome }}</h2>
         </div>
-        <a href="/equipas/{{ item.equipa.id }}"
-           class="ds-button ds-button-primary">
-            Ver equipa →
-        </a>
-        <a href="/exportacoes/equipas/{{ item.equipa.id }}/dados"
-           class="ds-button ds-button-secondary">
-            Criar backup da equipa
-        </a>
+        <div class="ds-action-bar shrink-0">
+            <a href="/exportacoes/equipas/{{ item.equipa.id }}/dados" class="ds-button ds-button-secondary ds-button-sm">Backup</a>
+            <a href="/equipas/{{ item.equipa.id }}" class="ds-button ds-button-primary">Abrir equipa</a>
+        </div>
     </div>
 
     <!-- Cards de resumo -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    <div class="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
 
         <!-- Próximo jogo -->
-        <div class="ds-panel p-5">
-            <p class="text-xs font-semibold text-gray-400 uppercase mb-3">Próximo Jogo</p>
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <p class="ds-kpi-label mb-3">Próximo jogo</p>
             {% if item.proximo_jogo %}
             <p class="font-bold text-gray-800">vs {{ item.proximo_jogo.adversario }}</p>
-            <p class="text-sm text-gray-500 mt-1">{{ item.proximo_jogo.data }}
+            <p class="text-sm text-gray-500 mt-1">{{ item.proximo_jogo.data|data_pt }}
                 {% if item.proximo_jogo.hora %} — {{ item.proximo_jogo.hora }}{% endif %}
             </p>
             <div class="flex items-center gap-2 mt-2">
@@ -49,16 +45,15 @@
                 <span class="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{{ item.proximo_jogo.competicao }}</span>
                 {% endif %}
             </div>
-            <a href="/jogos/{{ item.proximo_jogo.id }}"
-               class="text-orange-500 text-xs mt-3 block hover:underline">Ver jogo →</a>
+            <a href="/jogos/{{ item.proximo_jogo.id }}" class="ds-quiet-link mt-3 block">Abrir jogo</a>
             {% else %}
             <p class="text-gray-400 text-sm">Sem jogos agendados</p>
             {% endif %}
         </div>
 
         <!-- Último resultado -->
-        <div class="ds-panel p-5">
-            <p class="text-xs font-semibold text-gray-400 uppercase mb-3">Último Resultado</p>
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <p class="ds-kpi-label mb-3">Último resultado</p>
             {% if item.ultimo_resultado %}
             <p class="font-bold text-gray-800">vs {{ item.ultimo_resultado.adversario }}</p>
             <p class="text-2xl font-bold mt-2
@@ -66,31 +61,29 @@
                 {% else %}text-red-600{% endif %}">
                 {{ item.ultimo_resultado.pontos_nos }} — {{ item.ultimo_resultado.pontos_adversario }}
             </p>
-            <p class="text-xs text-gray-400 mt-1">{{ item.ultimo_resultado.data }}</p>
+            <p class="text-xs text-gray-400 mt-1">{{ item.ultimo_resultado.data|data_pt }}</p>
             {% else %}
             <p class="text-gray-400 text-sm">Sem resultados</p>
             {% endif %}
         </div>
 
         <!-- Jogadores -->
-        <div class="ds-panel p-5">
-            <p class="text-xs font-semibold text-gray-400 uppercase mb-3">Equipa</p>
-            <p class="text-3xl font-bold text-gray-800">{{ item.total_jogadores }}</p>
-            <p class="text-sm text-gray-500 mt-1">jogadores</p>
-            <a href="/jogadores"
-               class="text-orange-500 text-xs mt-3 block hover:underline">Ver jogadores →</a>
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <p class="ds-kpi-label mb-3">Plantel</p>
+            <p class="text-2xl font-extrabold text-slate-900">{{ item.total_jogadores }}</p>
+            <p class="text-sm text-slate-500">jogadores associados</p>
+            <a href="/equipas/{{ item.equipa.id }}/plantel" class="ds-quiet-link mt-3 block">Abrir plantel</a>
         </div>
 
     </div>
 
-</div>
+</section>
 {% endfor %}
 
 {% else %}
-<div class="ds-panel p-12 text-center">
-    <span class="text-5xl">🏀</span>
-    <p class="text-gray-500 mt-4">Ainda não tens equipas associadas.</p>
-    <p class="text-gray-400 text-sm mt-2">Contacta o administrador para associar uma equipa à tua conta.</p>
+<div class="ds-empty">
+    <strong>Ainda não tens equipas associadas.</strong>
+    <p>Contacta o administrador para associar uma equipa à tua conta.</p>
 </div>
 {% endif %}
 

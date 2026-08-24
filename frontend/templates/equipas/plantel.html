@@ -60,6 +60,6 @@ function eliminarPlantelCompleto(){if(confirm('Eliminar todos os {{ equipa.jogad
 </script>
 {% endif %}
 {% else %}
-<div class="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center"><p class="text-slate-500">Ainda não existem jogadores associados a esta equipa.</p><a href="/jogadores/novo?equipa_id={{ equipa.id }}" class="ds-button ds-button-primary mt-4">Registar jogador</a></div>
+<div class="ds-empty"><strong>Plantel ainda vazio</strong><p>Regista o primeiro jogador para começar a construir a equipa.</p><a href="/jogadores/novo?equipa_id={{ equipa.id }}" class="ds-button ds-button-primary mt-4">Registar jogador</a></div>
 {% endif %}
 {% endblock %}
