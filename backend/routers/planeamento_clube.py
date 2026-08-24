@@ -2209,6 +2209,7 @@ async def eliminar_plano_semanal(semanal_id: int, request: Request, db: Session 
     removidas_diretas, preservadas_diretas = _remover_sessoes_do_plano_semanal(
         db,
         semanal_id,
+        atribuicoes=atribuicoes,
         preservar_sessoes_com_exercicios=True,
     )
     sessoes_removidas += removidas_diretas
@@ -3285,15 +3286,35 @@ def _remover_sessoes_do_plano_semanal(
     db: Session,
     semanal_id: int,
     *,
+    atribuicoes: list[AtribuicaoEspacoSemanal],
     preservar_sessoes_com_exercicios: bool,
 ) -> tuple[int, int]:
-    """Retira da operação todas as sessões ligadas a um plano semanal."""
+    """Retira sessões ligadas ao plano e sessões coincidentes com as reservas."""
     removidas = preservadas = 0
     equipas_afetadas: set[int] = set()
     sessoes = db.query(SessaoTreino).filter(
         SessaoTreino.plano_semanal_clube_id == semanal_id,
     ).all()
-    for sessao in sessoes:
+    sessoes_por_id = {sessao.id: sessao for sessao in sessoes}
+    for atribuicao in atribuicoes:
+        if not atribuicao.equipa_id:
+            continue
+        candidatas = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.equipa_id == atribuicao.equipa_id,
+            SessaoTreino.data == atribuicao.data,
+            SessaoTreino.e_jogo.is_(False),
+            SessaoTreino.ativa.is_(True),
+            SessaoTreino.origem.in_(("planeamento_global", "planeamento_integrado")),
+        ).all()
+        for sessao in candidatas:
+            if _horarios_sobrepoem(
+                atribuicao.hora_inicio,
+                atribuicao.hora_fim,
+                sessao.hora_inicio,
+                sessao.hora_fim,
+            ):
+                sessoes_por_id[sessao.id] = sessao
+    for sessao in sessoes_por_id.values():
         equipa_id = _obter_equipa_id_por_sessao(sessao)
         if equipa_id:
             equipas_afetadas.add(equipa_id)
@@ -3310,6 +3331,18 @@ def _remover_sessoes_do_plano_semanal(
     for equipa_id in equipas_afetadas:
         renumerar_treinos_equipa(db, equipa_id)
     return removidas, preservadas
+
+
+def _horarios_sobrepoem(
+    inicio_a: str | None,
+    fim_a: str | None,
+    inicio_b: str | None,
+    fim_b: str | None,
+) -> bool:
+    """Sessões sem horário definido são tratadas como coincidentes nesse dia."""
+    if not inicio_a or not fim_a or not inicio_b or not fim_b:
+        return True
+    return inicio_a < fim_b and fim_a > inicio_b
 
 
 def _eliminar_evento_com_dependencias(
