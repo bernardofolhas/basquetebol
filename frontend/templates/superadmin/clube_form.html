@@ -2,8 +2,7 @@
 {% block titulo %}Criar clube{% endblock %}
 {% block conteudo %}
 <div class="mx-auto max-w-4xl">
-  <a href="/superadmin/clubes" class="text-sm font-semibold text-orange-600">← Voltar aos clubes</a>
-  <h1 class="mt-2 text-3xl font-bold">Criar clube</h1><p class="mt-1 text-gray-500">O clube fica pronto a usar com identidade e administrador principal.</p>
+  <h1 class="text-3xl font-bold">Criar clube</h1><p class="mt-1 text-gray-500">O clube fica pronto a usar com identidade e administrador principal.</p>
   {% if erro %}<div class="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{{ erro }}</div>{% endif %}
   <form method="POST" enctype="multipart/form-data" class="mt-6 space-y-6">
     <section class="rounded-2xl bg-white p-6 shadow-sm"><h2 class="text-lg font-bold">1. Identificação</h2><div class="mt-4 grid gap-4 md:grid-cols-2"><label class="text-sm font-semibold">Nome oficial<input name="nome_oficial" required class="mt-1 w-full rounded-lg border p-3"></label><label class="text-sm font-semibold">Nome curto<input name="nome_curto" required class="mt-1 w-full rounded-lg border p-3"></label><label class="text-sm font-semibold">Identificador único<input name="identificador" placeholder="gerado pelo nome curto" class="mt-1 w-full rounded-lg border p-3"></label><label class="text-sm font-semibold">Época inicial<input name="epoca_inicial" placeholder="2026/2027" class="mt-1 w-full rounded-lg border p-3"></label></div></section>

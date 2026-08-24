@@ -1,10 +1,6 @@
 {% macro equipa_contexto(equipa, titulo, subtitulo="", ativo="resumo", voltar_href="/equipas", voltar_label="Voltar às equipas") %}
 <div class="mb-6">
-    <a href="{{ voltar_href }}" class="inline-flex items-center gap-2 text-sm font-medium text-orange-500 hover:text-orange-600">
-        <span>←</span> {{ voltar_label }}
-    </a>
-
-    <div class="ds-team-hero mt-3">
+    <div class="ds-team-hero">
         <div class="ds-team-hero-main flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-3xl">
                 <p class="ds-team-hero-kicker">Área da equipa</p>

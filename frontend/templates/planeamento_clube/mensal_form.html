@@ -5,8 +5,7 @@
 {% block conteudo %}
 
 <div class="mb-6">
-    <a href="{{ '/planeamento-clube/anual/' ~ mensal.planeamento_anual_id if mensal else '/planeamento-clube/mensal' }}" class="text-orange-500 text-sm">← Voltar aos planeamentos</a>
-    <h1 class="text-2xl font-bold text-gray-800 mt-2">{{ "Editar Planeamento Mensal" if modo == "editar" else "Novo Planeamento Mensal" }}</h1>
+    <h1 class="text-2xl font-bold text-gray-800">{{ "Editar Planeamento Mensal" if modo == "editar" else "Novo Planeamento Mensal" }}</h1>
     <p class="text-gray-500 mt-1">Ajustar a estrutura mensal do clube</p>
 </div>
 

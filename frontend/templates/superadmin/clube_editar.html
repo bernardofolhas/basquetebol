@@ -2,8 +2,7 @@
 {% block titulo %}Editar {{ clube.nome_curto }}{% endblock %}
 {% block conteudo %}
 <div class="mx-auto max-w-4xl">
-  <a href="/superadmin/clubes" class="text-sm font-semibold text-slate-600">← Voltar aos clubes</a>
-  <div class="mt-2"><p class="text-sm font-semibold uppercase tracking-wider text-slate-500">Superadministração</p><h1 class="text-3xl font-bold text-slate-900">Editar clube</h1><p class="mt-1 text-slate-500">Identidade, estado e apresentação do clube.</p></div>
+  <div><p class="text-sm font-semibold uppercase tracking-wider text-slate-500">Superadministração</p><h1 class="text-3xl font-bold text-slate-900">Editar clube</h1><p class="mt-1 text-slate-500">Identidade, estado e apresentação do clube.</p></div>
   {% if erro %}<div class="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{{ erro }}</div>{% endif %}
 
   <form method="POST" enctype="multipart/form-data" action="/superadmin/clubes/{{ clube.id }}/editar" class="mt-6 space-y-6">

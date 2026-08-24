@@ -5,8 +5,7 @@
 {% block conteudo %}
 <div class="flex flex-col gap-4 mb-6 md:flex-row md:items-end md:justify-between">
     <div>
-        <a href="/planeamento-clube/anual/{{ planeamento.id }}" class="text-sm font-medium text-orange-600">← Voltar ao planeamento anual</a>
-        <h1 class="mt-2 text-2xl font-bold text-gray-900">Calendário da época</h1>
+        <h1 class="text-2xl font-bold text-gray-900">Calendário da época</h1>
         <p class="mt-1 text-gray-500">{{ planeamento.titulo }} · {{ planeamento.epoca }} · clique num dia para criar uma atividade.</p>
     </div>
     <a href="/planeamento-clube/anual/{{ planeamento.id }}/calendario/pdf" class="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700">Exportar PDF</a>
