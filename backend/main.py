@@ -188,19 +188,31 @@ app.include_router(auth_web.router)
 
 @app.exception_handler(NaoAutenticado)
 async def handle_nao_autenticado(request: Request, exc: NaoAutenticado):
-    return RedirectResponse(url="/login", status_code=302)
+    return RedirectResponse(
+        url="/login",
+        status_code=302,
+        headers={"X-Context-Redirect-Locked": "1"},
+    )
 
 
 @app.exception_handler(SemPermissao)
 async def handle_sem_permissao(request: Request, exc: SemPermissao):
     if exc.status_code == 403:
         return JSONResponse(status_code=403, content={"detail": "Sem permissao para esta operacao."})
-    return RedirectResponse(url=exc.redirect_para, status_code=exc.status_code)
+    return RedirectResponse(
+        url=exc.redirect_para,
+        status_code=exc.status_code,
+        headers={"X-Context-Redirect-Locked": "1"},
+    )
 
 
 @app.exception_handler(AcessoNegado)
 async def handle_acesso_negado(request: Request, exc: AcessoNegado):
-    return RedirectResponse(url=exc.redirect_para, status_code=303)
+    return RedirectResponse(
+        url=exc.redirect_para,
+        status_code=303,
+        headers={"X-Context-Redirect-Locked": "1"},
+    )
 
 
 @app.exception_handler(Exception)
