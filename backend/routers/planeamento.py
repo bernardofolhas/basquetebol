@@ -349,9 +349,10 @@ def _calcular_balanco_microciclo(sessoes_ativas: list[SessaoTreino]) -> tuple[di
     sessoes_ordenadas = _ordenar_sessoes_microciclo(sessoes_ativas)
     treinos = [s for s in sessoes_ordenadas if not s.e_jogo]
     jogos = [s for s in sessoes_ordenadas if s.e_jogo]
+    sessoes_carga = sessoes_ordenadas
 
     volume_total = sum(s.volume_minutos or 0 for s in treinos)
-    rpes_validos = [s.intensidade_rpe for s in treinos if s.intensidade_rpe]
+    rpes_validos = [s.intensidade_rpe for s in sessoes_carga if s.intensidade_rpe is not None]
     media_rpe = round(sum(rpes_validos) / len(rpes_validos), 1) if rpes_validos else 0
 
     componentes = {
@@ -376,9 +377,9 @@ def _calcular_balanco_microciclo(sessoes_ativas: list[SessaoTreino]) -> tuple[di
     }
 
     dados_graficos = {
-        "labels": [_obter_tipo_legivel_sessao(sessao) for sessao in treinos],
-        "volumes": [sessao.volume_minutos if sessao.volume_minutos else 0 for sessao in treinos],
-        "rpes": [float(sessao.intensidade_rpe) if sessao.intensidade_rpe else 0 for sessao in treinos],
+        "labels": [_obter_tipo_legivel_sessao(sessao) for sessao in sessoes_carga],
+        "volumes": [sessao.volume_minutos if sessao.volume_minutos else 0 for sessao in sessoes_carga],
+        "rpes": [float(sessao.intensidade_rpe) if sessao.intensidade_rpe is not None else 0 for sessao in sessoes_carga],
     }
 
     return balanco, dados_graficos

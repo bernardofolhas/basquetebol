@@ -7,6 +7,7 @@ from services.conteudos_sessao_service import (
     categorias_conteudo_para_ui,
     construir_visao_semanal_conteudos,
 )
+from services.volume_sessao_service import atualizar_volume_automatico
 from routers.planeamento import _calcular_balanco_microciclo
 
 
@@ -76,17 +77,31 @@ def test_graficos_do_microciclo_usam_o_nome_do_treino():
     )
     jogo = SimpleNamespace(
         id=2, data=date(2026, 7, 23), hora_inicio="18:00", e_jogo=True,
-        numero_treino=None, volume_minutos=None, intensidade_rpe=None,
+        numero_treino=None, volume_minutos=None, intensidade_rpe=10,
         **campos_componentes,
     )
 
     _, dados_graficos = _calcular_balanco_microciclo([jogo, treino])
 
     assert dados_graficos == {
-        "labels": ["Treino 3"],
-        "volumes": [90],
-        "rpes": [6.0],
+        "labels": ["Treino 3", "Jogo"],
+        "volumes": [90, 0],
+        "rpes": [6.0, 10.0],
     }
+
+
+def test_jogo_assume_rpe_dez_automaticamente():
+    jogo = SimpleNamespace(
+        e_jogo=True,
+        intensidade_rpe=None,
+        volume_minutos=None,
+        hora_inicio="18:00",
+        hora_fim="19:30",
+    )
+
+    atualizar_volume_automatico(jogo)
+
+    assert jogo.intensidade_rpe == 10
 
 
 def test_visao_e_graficos_incluem_treinos_manuais_e_atribuidos():
