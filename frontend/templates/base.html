@@ -112,6 +112,11 @@
         activate(initial,false);
       });
     });
+    // O browser pode restaurar uma página antiga do histórico sem consultar o
+    // servidor. Nessa situação, recarregamos para apresentar os dados atuais.
+    window.addEventListener("pageshow", function(event){
+      if(event.persisted) window.location.reload();
+    });
   </script>
 </body>
 </html>

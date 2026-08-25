@@ -42,6 +42,7 @@ def test_dashboard_com_login_responde_com_sucesso():
     response = client.get("/dashboard")
 
     assert response.status_code == 200
+    assert "no-store" in response.headers["cache-control"]
 
 
 def test_atividades_com_login_responde_com_sucesso():

@@ -38,6 +38,7 @@ from middleware_identidade import IdentidadeClubeMiddleware
 from middleware_clube import ClubeContextoMiddleware
 from middleware_navegacao import NavegacaoGlobalMiddleware
 from middleware_retorno_criacao import RetornoAposCriacaoMiddleware
+from middleware_cache import PaginasDinamicasSemCacheMiddleware
 from database import (
     Base,
     actualizar_estrutura_assiduidade,
@@ -133,6 +134,7 @@ app.add_middleware(FlashMiddleware)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(ClubeContextoMiddleware)
 app.add_middleware(RetornoAposCriacaoMiddleware)
+app.add_middleware(PaginasDinamicasSemCacheMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=config.session_secret_key,
