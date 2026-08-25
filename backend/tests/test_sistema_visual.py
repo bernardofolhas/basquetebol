@@ -85,6 +85,16 @@ def test_paginas_operacionais_longas_usam_o_mesmo_padrao_de_abas():
             assert f'data-workspace-panel="{grupo}:{aba}"' in conteudo
 
 
+def test_microciclo_adiciona_conteudos_individualmente_em_cada_celula():
+    conteudo = (
+        TEMPLATES_DIR / "planeamento" / "microciclos" / "detalhe.html"
+    ).read_text(encoding="utf-8")
+
+    assert "Gerir conteúdos" not in conteudo
+    assert "adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}" in conteudo
+    assert "Use o sinal + de cada célula" in conteudo
+
+
 def test_login_mantem_recuperacao_e_melhora_utilizacao():
     conteudo = (TEMPLATES_DIR / "login.html").read_text(encoding="utf-8")
 
