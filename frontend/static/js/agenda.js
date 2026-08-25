@@ -96,6 +96,9 @@
     }
 
     document.addEventListener('click', function (evento) {
+        // Os cartões do calendário também criam atividades; links internos têm prioridade.
+        const link = evento.target.closest('a[href]');
+        if (link && !link.dataset.agendaEventId) return;
         const existente = evento.target.closest('[data-agenda-event-id]');
         if (existente) {
             evento.preventDefault();

@@ -70,6 +70,13 @@ def test_mesociclo_envia_os_dados_da_serie_para_o_editor_de_agenda():
     assert "campo('agenda-escopo').value = 'serie'" in script
 
 
+def test_link_do_plano_de_treino_tem_prioridade_sobre_o_clique_no_dia_do_calendario():
+    raiz = Path(__file__).resolve().parents[2]
+    script = (raiz / "frontend" / "static" / "js" / "agenda.js").read_text(encoding="utf-8")
+
+    assert "if (link && !link.dataset.agendaEventId) return;" in script
+
+
 def test_admin_consegue_criar_atividade_comum_de_dia_inteiro(client_admin):
     resposta = client_admin.post(
         "/agenda/atividades",

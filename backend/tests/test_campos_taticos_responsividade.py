@@ -157,6 +157,7 @@ def test_treino_da_agenda_aponta_para_resolucao_do_plano():
     item = _item_evento(evento, equipa_id=730)
 
     assert item["link"] == "/agenda/atividades/91/plano?equipa_id=730"
+    assert item["plano_treino_link"] == "/agenda/atividades/91/plano?equipa_id=730"
     assert item["agenda_editavel"] is True
 
 

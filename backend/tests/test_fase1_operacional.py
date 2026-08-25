@@ -45,6 +45,7 @@ def test_item_integrado_de_sessao_mostra_estado_e_proxima_acao():
     assert item["estado_label"] == "Executada"
     assert item["acao_label"] == "Registar sessão"
     assert item["acao_link"] == f"/assiduidade/sessoes/{sessao.id}"
+    assert item["plano_treino_link"] == f"/treino/sessoes/{sessao.id}"
 
 
 def test_admin_avanca_e_bloqueia_saltos_no_estado_da_sessao(client_admin):

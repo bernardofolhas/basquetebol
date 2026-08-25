@@ -170,6 +170,7 @@ def _criar_item_base(
         "estado_classes": "",
         "acao_label": "Abrir",
         "acao_link": link,
+        "plano_treino_link": None,
         "agenda_id": None,
         "agenda_editavel": False,
     }
@@ -210,6 +211,7 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
     estado_visual = estado_sessao_visual(estado)
     item.update({
         "sessao_id": sessao.id,
+        "plano_treino_link": f"/treino/sessoes/{sessao.id}" if not sessao.e_jogo else None,
         "microciclo_id": sessao.microciclo_id,
         "numero_treino": sessao.numero_treino,
         "volume_minutos": sessao.volume_minutos,
@@ -323,9 +325,10 @@ def _item_evento(evento: EventoPlaneamentoClube, equipa_id: int | None = None) -
         if len(evento.equipas) > 2:
             equipa_nome += f" +{len(evento.equipas) - 2}"
 
+    equipa_para_plano = equipa_id or evento.equipa_id
     link = f"/planeamento-clube/eventos/{evento.id}"
-    if equipa_id and evento.tipo in TIPOS_EVENTO_TREINO:
-        link = f"/agenda/atividades/{evento.id}/plano?equipa_id={equipa_id}"
+    if equipa_para_plano and evento.tipo in TIPOS_EVENTO_TREINO:
+        link = f"/agenda/atividades/{evento.id}/plano?equipa_id={equipa_para_plano}"
 
     item = _criar_item_base(
         item_id=f"evento-{evento.id}",
@@ -357,6 +360,7 @@ def _item_evento(evento: EventoPlaneamentoClube, equipa_id: int | None = None) -
         "agenda_serie_id": evento.serie_id or "",
         "agenda_data_fim": evento.data_fim or "",
         "agenda_recorrencia": evento.recorrencia_frequencia or "unica",
+        "plano_treino_link": link if evento.tipo in TIPOS_EVENTO_TREINO and equipa_para_plano else None,
     })
     return item
 

@@ -35,11 +35,12 @@
             {% if agenda_proxima %}
             <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {% for item in agenda_proxima[:6] %}
-                <a href="{{ item.acao_link or item.link or '/calendario' }}" class="flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-2 hover:border-[var(--clube-primary-border)] hover:bg-[var(--clube-primary-surface)]">
+                <div class="flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-2 hover:border-[var(--clube-primary-border)] hover:bg-[var(--clube-primary-surface)]">
                     <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ item.dot_classes }}"></span>
-                    <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-gray-800">{{ item.titulo }}</p><p class="text-xs text-gray-400">{{ item.data|data_pt }} · {{ item.horario }} · {{ item.equipa_nome or 'Global' }}</p></div>
+                    <a href="{{ item.acao_link or item.link or '/calendario' }}" class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-gray-800">{{ item.titulo }}</p><p class="text-xs text-gray-400">{{ item.data|data_pt }} · {{ item.horario }} · {{ item.equipa_nome or 'Global' }}</p></a>
                     {% if item.estado_label %}<span class="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold {{ item.estado_classes }}">{{ item.estado_label }}</span>{% endif %}
-                </a>
+                    {% if item.plano_treino_link %}<a href="{{ item.plano_treino_link }}" class="shrink-0 rounded border border-emerald-200 bg-white px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50">Plano</a>{% endif %}
+                </div>
                 {% endfor %}
             </div>
             {% else %}<p class="rounded-xl bg-gray-50 px-3 py-4 text-sm text-gray-400">Sem itens na agenda próxima.</p>{% endif %}
