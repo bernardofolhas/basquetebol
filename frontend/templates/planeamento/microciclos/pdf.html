@@ -4,304 +4,152 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <title>Microciclo {{ microciclo.numero }} — {{ equipa.nome }}</title>
+    <title>Microciclo {{ microciclo.numero }} - {{ equipa.nome }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @page { size: A4 landscape; margin: 10mm; }
-        body { font-family: Arial, sans-serif; font-size: 9px; color: #111827; }
-        .header { border-bottom: 3px solid #16a34a; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: end; }
-        .title { font-size: 17px; font-weight: bold; color: var(--pdf-primary-dark); }
-        .subtitle { margin-top: 4px; color: #4b5563; font-size: 10px; }
-        .meta { text-align: right; color: #6b7280; font-size: 8px; }
-        .badge { display: inline-block; background: #dcfce7; color: #166534; font-weight: bold; padding: 4px 10px; border-radius: 999px; margin-right: 8px; }
-        .section { margin-bottom: 14px; page-break-inside: avoid; }
-        .section-title { font-size: 11px; font-weight: bold; color: var(--pdf-primary-dark); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 8px; border-bottom: 1px solid var(--pdf-primary-border); padding-bottom: 3px; }
-        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-        .stat-box { border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px; text-align: center; }
-        .stat-value { font-size: 16px; font-weight: bold; color: var(--pdf-primary-dark); }
-        .stat-label { font-size: 8px; color: #6b7280; margin-top: 2px; text-transform: uppercase; }
-        .obj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .obj-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 7px; }
-        .obj-label { font-size: 8px; font-weight: bold; color: #166534; text-transform: uppercase; margin-bottom: 2px; }
+        body { font-family: Arial, sans-serif; font-size: 8.5px; color: #172033; }
+        .section { margin: 0 0 10px; page-break-inside: avoid; }
+        .section-title { color: var(--pdf-primary-dark); font-size: 10px; font-weight: 800; letter-spacing: .45px; margin: 0 0 5px; text-transform: uppercase; }
+        .summary { display: grid; grid-template-columns: 1.15fr .8fr .8fr 1fr; border: 1px solid #d9e1eb; border-radius: 8px; overflow: hidden; }
+        .metric { min-height: 42px; border-right: 1px solid #d9e1eb; padding: 7px 10px; }
+        .metric:last-child { border-right: 0; }
+        .metric-value { color: var(--pdf-primary-dark); font-size: 16px; font-weight: 800; line-height: 1; }
+        .metric-label { color: #64748b; font-size: 7px; font-weight: 700; letter-spacing: .35px; margin-top: 4px; text-transform: uppercase; }
+        .objectives { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+        .objective { border-left: 3px solid var(--pdf-primary); background: #f8fafc; min-height: 30px; padding: 5px 7px; }
+        .objective-label { color: var(--pdf-primary-dark); font-size: 7px; font-weight: 800; letter-spacing: .3px; margin-bottom: 2px; text-transform: uppercase; }
+        .objective-text { color: #334155; font-size: 8px; line-height: 1.25; }
+        .microciclo-pdf .pdf-agenda { margin-top: 0; }
+        .microciclo-pdf .pdf-agenda-legend { display: none; }
+        .microciclo-pdf .pdf-agenda-day { min-height: 52px; }
+        .microciclo-pdf .pdf-agenda-item { margin-top: 2px; padding: 2px; }
+        .microciclo-pdf .pdf-agenda-item strong { display: none; }
+        .microciclo-pdf .pdf-agenda-item small { font-size: 5.5px; }
         table { width: 100%; border-collapse: collapse; }
-        th { background: #f0fdf4; color: #166534; font-size: 8px; text-transform: uppercase; letter-spacing: .4px; text-align: left; padding: 6px 7px; border: 1px solid #86efac; }
-        td { border: 1px solid #e5e7eb; padding: 6px 7px; vertical-align: top; }
-        tr:nth-child(even) td { background: #fafafa; }
-        .session { border: 1px solid #d1d5db; border-radius: 8px; margin-bottom: 12px; page-break-inside: avoid; }
-        .session-header { background: #f8fafc; padding: 8px 10px; border-bottom: 1px solid #d1d5db; display: flex; justify-content: space-between; gap: 10px; }
-        .session-title { font-size: 11px; font-weight: bold; color: #111827; }
-        .session-meta { color: #4b5563; font-size: 8px; margin-top: 2px; }
-        .session-body { padding: 10px; }
-        .pill { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 8px; font-weight: bold; }
-        .pill.train { background: #dcfce7; color: #166534; }
-        .pill.game { background: #fee2e2; color: #991b1b; }
-        .mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
-        .mini-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px; }
-        .mini-label { font-size: 7px; text-transform: uppercase; color: #6b7280; margin-bottom: 2px; }
-        .mini-value { font-size: 9px; font-weight: bold; color: #111827; }
-        .text-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 7px; margin-bottom: 8px; }
-        .text-label { font-size: 8px; font-weight: bold; text-transform: uppercase; color: #166534; margin-bottom: 3px; }
-        .block-title { font-size: 9px; font-weight: bold; color: #166534; margin: 8px 0 5px; }
-        .load-grid { display: grid; grid-template-columns: 1.35fr .9fr; gap: 8px; }
-        .chart-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 7px; }
-        .chart-title { font-size: 8px; font-weight: bold; color: #166534; text-transform: uppercase; margin-bottom: 6px; }
-        .chart-row { display: grid; grid-template-columns: 58px 1fr 34px; gap: 5px; align-items: center; margin-bottom: 4px; }
-        .chart-label, .chart-value { font-size: 7px; color: #4b5563; }
-        .chart-value { text-align: right; font-weight: bold; }
-        .chart-track { height: 7px; background: #f0fdf4; border-radius: 4px; overflow: hidden; }
-        .chart-bar { height: 100%; background: var(--pdf-primary); border-radius: 4px; }
-        .chart-bar.rpe { background: #f97316; }
-        .component-table th, .component-table td { padding: 4px 5px; text-align: center; }
-        .empty { color: #6b7280; font-style: italic; }
-        .legacy-calendar, .sessions-detail { display: none; }
-        .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 8px; color: #9ca3af; display: flex; justify-content: space-between; }
+        th { background: var(--pdf-primary-light); border-bottom: 1px solid var(--pdf-primary-border); color: var(--pdf-primary-dark); font-size: 7px; letter-spacing: .3px; padding: 4px 6px; text-align: left; text-transform: uppercase; }
+        td { border-bottom: 1px solid #e5eaf0; padding: 4px 6px; vertical-align: top; }
+        tr:last-child td { border-bottom: 0; }
+        .content-table { border: 1px solid #d9e1eb; border-radius: 7px; overflow: hidden; }
+        .content-table td:first-child { color: var(--pdf-primary-dark); font-weight: 700; white-space: nowrap; }
+        .content-table td:last-child { color: #475569; text-align: right; white-space: nowrap; }
+        .content-empty { color: #94a3b8; font-style: italic; }
+        .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+        .chart-card { border: 1px solid #d9e1eb; border-radius: 8px; overflow: hidden; padding: 7px 8px 6px; }
+        .chart-heading { align-items: baseline; display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .chart-title { color: #334155; font-size: 8px; font-weight: 800; }
+        .chart-scale { color: #94a3b8; font-size: 6px; }
+        .chart-table { border-bottom: 1px solid #cbd5e1; table-layout: fixed; }
+        .chart-table td { border: 0; padding: 0 3px; text-align: center; }
+        .chart-value { color: #475569; font-size: 6px; font-weight: 700; height: 11px; vertical-align: bottom; }
+        .bar-wrap { height: 66px; position: relative; }
+        .bar { background: var(--pdf-primary); bottom: 0; left: 28%; min-height: 2px; position: absolute; border-radius: 3px 3px 0 0; width: 44%; }
+        .bar.rpe { background: #f97316; }
+        .chart-label { color: #64748b; font-size: 6px; height: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chart-empty { color: #94a3b8; font-size: 8px; padding: 28px 0; text-align: center; }
+        .balance { display: grid; grid-template-columns: 1.25fr .75fr; gap: 9px; }
+        .component-grid { display: grid; grid-template-columns: repeat(8, 1fr); border: 1px solid #d9e1eb; border-radius: 7px; overflow: hidden; }
+        .component { border-right: 1px solid #e5eaf0; padding: 5px; text-align: center; }
+        .component:last-child { border-right: 0; }
+        .component small { color: #64748b; display: block; font-size: 6px; font-weight: 700; }
+        .component strong { color: #172033; display: block; font-size: 10px; margin-top: 2px; }
+        .attendance { border: 1px solid #d9e1eb; border-radius: 7px; padding: 6px 8px; }
+        .attendance strong { color: var(--pdf-primary-dark); font-size: 15px; }
+        .attendance span { color: #64748b; display: block; font-size: 7px; margin-top: 2px; }
+        .reflection { border-left: 3px solid var(--pdf-primary); color: #334155; line-height: 1.35; padding: 5px 8px; }
+        .empty { color: #94a3b8; font-style: italic; }
     </style>
     {{ estilo_pdf() }}
     {{ estilos_agenda_pdf() }}
 </head>
-<body>
-    {{ cabecalho_pdf('Microciclo ' ~ microciclo.numero, equipa.nome ~ ' · ' ~ (microciclo.data_inicio|data_pt) ~ ' → ' ~ (microciclo.data_fim|data_pt) ~ (' · ' ~ microciclo.tipo if microciclo.tipo else '') ~ ' · Meso ' ~ microciclo.mesociclo.numero, 'PDF completo · ' ~ data_exportacao) }}
+<body class="microciclo-pdf">
+    {{ cabecalho_pdf('Microciclo ' ~ microciclo.numero, equipa.nome ~ ' - ' ~ (microciclo.data_inicio|data_pt) ~ ' a ' ~ (microciclo.data_fim|data_pt) ~ (' - ' ~ microciclo.tipo if microciclo.tipo else '') ~ ' - Mesociclo ' ~ microciclo.mesociclo.numero, data_exportacao) }}
 
-    <div class="section">
-        <div class="section-title">Resumo</div>
-        <div class="stats-grid">
-            <div class="stat-box">
-                <div class="stat-value">{{ calendario_semanal | length }}</div>
-                <div class="stat-label">Sessões Ativas</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value">{{ balanco.treinos_realizados }}</div>
-                <div class="stat-label">Treinos</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value" style="color:#dc2626">{{ balanco.jogos_realizados }}</div>
-                <div class="stat-label">Jogos</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value">{{ balanco.volume_total }}</div>
-                <div class="stat-label">Volume Total (min)</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value">{{ balanco.media_rpe }}</div>
-                <div class="stat-label">RPE Médio</div>
-            </div>
+    <section class="section">
+        <div class="summary">
+            <div class="metric"><div class="metric-value">{{ balanco.treinos_realizados }}</div><div class="metric-label">Treinos</div></div>
+            <div class="metric"><div class="metric-value">{{ balanco.jogos_realizados }}</div><div class="metric-label">Jogos</div></div>
+            <div class="metric"><div class="metric-value">{{ balanco.volume_total }}</div><div class="metric-label">Volume (min)</div></div>
+            <div class="metric"><div class="metric-value">{{ balanco.media_rpe }}</div><div class="metric-label">Intensidade média (RPE)</div></div>
         </div>
-    </div>
+    </section>
 
-    {% set tem_obj = objetivos_por_categoria %}
-    {% if tem_obj %}
-    <div class="section">
-        <div class="section-title">Objetivos do Microciclo</div>
-        <div class="obj-grid">
-            {% for objetivo in objetivos_por_categoria %}<div class="obj-box"><div class="obj-label">{{ objetivo.label }}</div>{{ objetivo.texto }}</div>{% endfor %}
+    {% if objetivos_por_categoria %}
+    <section class="section">
+        <div class="section-title">Objetivos e prioridades</div>
+        <div class="objectives">
+            {% for objetivo in objetivos_por_categoria %}
+            <div class="objective"><div class="objective-label">{{ objetivo.label }}</div><div class="objective-text">{{ objetivo.texto }}</div></div>
+            {% endfor %}
         </div>
-    </div>
+    </section>
     {% endif %}
 
-    <div class="section">
+    <section class="section">
         {{ agenda_grelha_pdf(dashboard_planeamento.semanas, 'Calendário semanal') }}
-        {% if calendario_semanal %}
-        <table class="legacy-calendar">
-            <thead>
-                <tr>
-                    <th style="width: 19%">Dia</th>
-                    <th style="width: 12%">Data</th>
-                    <th style="width: 15%">Horário</th>
-                    <th style="width: 30%">Local</th>
-                    <th style="width: 12%">Tipo</th>
-                    <th style="width: 12%">Volume</th>
-                </tr>
-            </thead>
+    </section>
+
+    <section class="section">
+        <div class="section-title">Distribuição de conteúdos</div>
+        {% set treinos_pdf = sessoes_pdf | rejectattr('sessao.e_jogo') | list %}
+        {% if treinos_pdf %}
+        <table class="content-table">
+            <thead><tr><th style="width:16%">Sessão</th><th>Conteúdos previstos</th><th style="width:12%">Minutos</th></tr></thead>
             <tbody>
-                {% for item in calendario_semanal %}
+                {% for item in treinos_pdf %}
+                {% set conteudos = item.sessao.conteudos %}
                 <tr>
-                    <td>{{ item.dia_semana }}</td>
-                    <td>{{ item.sessao.data|data_pt }}</td>
-                    <td>{{ item.intervalo_horario }}</td>
-                    <td>{{ item.sessao.local or "Local por definir" }}</td>
-                    <td><span class="pill {% if item.sessao.e_jogo %}game{% else %}train{% endif %}">{{ item.tipo_label }}</span></td>
-                    <td>{{ item.sessao.volume_minutos if item.sessao.volume_minutos is not none else "—" }}</td>
+                    <td>{{ item.tipo_label }}<br><small>{{ item.sessao.data|data_pt }}</small></td>
+                    <td>{% for conteudo in conteudos %}{{ conteudo.descricao }}{% if not loop.last %} · {% endif %}{% else %}<span class="content-empty">Por definir</span>{% endfor %}</td>
+                    <td>{% set total = namespace(valor=0) %}{% for conteudo in conteudos %}{% set total.valor = total.valor + (conteudo.minutos or 0) %}{% endfor %}{{ total.valor if conteudos else '—' }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% else %}
-        <div class="empty">Sem sessões ativas neste microciclo.</div>
-        {% endif %}
-    </div>
+        {% else %}<div class="empty">Sem treinos previstos neste microciclo.</div>{% endif %}
+    </section>
 
-    <div class="section">
-        <div class="section-title">Distribuição de conteúdos</div>
-        {% set treinos_pdf = sessoes_pdf | rejectattr('sessao.e_jogo') | list %}
-        {% if treinos_pdf %}
-        <table>
-            <thead><tr><th style="width:18%">Treino</th><th style="width:18%">Data</th><th>Conteúdos previstos</th><th style="width:12%">Minutos</th></tr></thead>
-            <tbody>
-            {% for item in treinos_pdf %}
-                {% set conteudos = item.sessao.conteudos %}
-                <tr>
-                    <td>{{ item.tipo_label }}</td>
-                    <td>{{ item.sessao.data|data_pt }}</td>
-                    <td>{% for conteudo in conteudos %}{{ conteudo.descricao }}{% if not loop.last %}<br>{% endif %}{% else %}<span class="empty">Por definir</span>{% endfor %}</td>
-                    <td>{% for conteudo in conteudos %}{{ conteudo.minutos }}{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="empty">Sem treinos previstos neste microciclo.</div>
-        {% endif %}
-    </div>
-
-    <div class="section">
-        <div class="section-title">Carga, intensidade e assiduidade</div>
-        <div class="load-grid">
+    <section class="section">
+        <div class="section-title">Carga prevista</div>
+        <div class="charts">
             <div class="chart-card">
-                <div class="chart-title">Volume por sessão (minutos)</div>
+                <div class="chart-heading"><span class="chart-title">Volume por treino</span><span class="chart-scale">Minutos</span></div>
                 {% set volume_max = (dados_graficos.volumes | max) if dados_graficos.volumes else 0 %}
                 {% if dados_graficos.labels %}
-                    {% for indice in range(dados_graficos.labels | length) %}
-                    <div class="chart-row">
-                        <span class="chart-label">{{ dados_graficos.labels[indice] }}</span>
-                        <div class="chart-track"><div class="chart-bar" style="width:{{ ((dados_graficos.volumes[indice] * 100 / volume_max) if volume_max else 0) | int }}%"></div></div>
-                        <span class="chart-value">{{ dados_graficos.volumes[indice] or 0 }}</span>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty">Sem volume registado.</div>
-                {% endif %}
+                <table class="chart-table"><tbody><tr>{% for indice in range(dados_graficos.labels | length) %}<td class="chart-value">{{ dados_graficos.volumes[indice] or 0 }}</td>{% endfor %}</tr><tr>{% for indice in range(dados_graficos.labels | length) %}<td><div class="bar-wrap"><div class="bar" style="height:{{ ((dados_graficos.volumes[indice] * 100 / volume_max) if volume_max else 0) | int }}%"></div></div></td>{% endfor %}</tr><tr>{% for indice in range(dados_graficos.labels | length) %}<td class="chart-label">{{ dados_graficos.labels[indice] }}</td>{% endfor %}</tr></tbody></table>
+                {% else %}<div class="chart-empty">Sem volume registado.</div>{% endif %}
             </div>
             <div class="chart-card">
-                <div class="chart-title">Intensidade RPE por sessão (1–10)</div>
+                <div class="chart-heading"><span class="chart-title">Intensidade por sessão</span><span class="chart-scale">RPE 0-10</span></div>
                 {% if dados_graficos.labels %}
-                    {% for indice in range(dados_graficos.labels | length) %}
-                    <div class="chart-row">
-                        <span class="chart-label">{{ dados_graficos.labels[indice] }}</span>
-                        <div class="chart-track"><div class="chart-bar rpe" style="width:{{ ((dados_graficos.rpes[indice] * 10) if dados_graficos.rpes[indice] else 0) | int }}%"></div></div>
-                        <span class="chart-value">{{ dados_graficos.rpes[indice] or 0 }}</span>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty">Sem RPE registado.</div>
-                {% endif %}
+                <table class="chart-table"><tbody><tr>{% for indice in range(dados_graficos.labels | length) %}<td class="chart-value">{{ dados_graficos.rpes[indice] or 0 }}</td>{% endfor %}</tr><tr>{% for indice in range(dados_graficos.labels | length) %}<td><div class="bar-wrap"><div class="bar rpe" style="height:{{ ((dados_graficos.rpes[indice] * 10) if dados_graficos.rpes[indice] else 0) | int }}%"></div></div></td>{% endfor %}</tr><tr>{% for indice in range(dados_graficos.labels | length) %}<td class="chart-label">{{ dados_graficos.labels[indice] }}</td>{% endfor %}</tr></tbody></table>
+                {% else %}<div class="chart-empty">Sem intensidade registada.</div>{% endif %}
             </div>
         </div>
-        <table class="component-table" style="margin-top:8px;">
-            <thead><tr><th colspan="7">Minutos por componente</th></tr></thead>
-            <tbody><tr>
-                <td>TIO<br><strong>{{ balanco.componentes.TIO }}</strong></td>
-                <td>TID<br><strong>{{ balanco.componentes.TID }}</strong></td>
-                <td>TaIO<br><strong>{{ balanco.componentes.TaIO }}</strong></td>
-                <td>TaID<br><strong>{{ balanco.componentes.TaID }}</strong></td>
-                <td>TCO<br><strong>{{ balanco.componentes.TCO }}</strong></td>
-                <td>TCD<br><strong>{{ balanco.componentes.TCD }}</strong></td>
-                <td>Físico<br><strong>{{ balanco.componentes['FÍS'] }}</strong></td>
-            </tr></tbody>
-        </table>
-        <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:8px;">
-            <div class="stat-box"><div class="stat-value">{{ resumo_assiduidade.registos }}</div><div class="stat-label">Registos de presença</div></div>
-            <div class="stat-box"><div class="stat-value">{{ resumo_assiduidade.presentes }}</div><div class="stat-label">Presenças</div></div>
-            <div class="stat-box"><div class="stat-value">{{ resumo_assiduidade.percentagem }}%</div><div class="stat-label">Presença registada</div></div>
-        </div>
-    </div>
+    </section>
 
-    <div class="section sessions-detail">
-        <div class="section-title">Sessões e Planos</div>
-        {% if sessoes_pdf %}
-            {% for item in sessoes_pdf %}
-            <div class="session">
-                <div class="session-header">
-                    <div>
-                        <div class="session-title">{{ item.tipo_label }} · {{ item.dia_semana }} · {{ item.sessao.data|data_pt }}</div>
-                        <div class="session-meta">{{ item.intervalo_horario }} · {{ item.sessao.local or "Local por definir" }}</div>
-                    </div>
-                    <div>
-                        <span class="pill {% if item.sessao.e_jogo %}game{% else %}train{% endif %}">{{ item.tipo_label }}</span>
-                    </div>
-                </div>
-                <div class="session-body">
-                    <div class="mini-grid">
-                        <div class="mini-box">
-                            <div class="mini-label">Nº treino</div>
-                            <div class="mini-value">{{ item.sessao.numero_treino if item.sessao.numero_treino is not none else "—" }}</div>
-                        </div>
-                        <div class="mini-box">
-                            <div class="mini-label">Volume</div>
-                            <div class="mini-value">{{ item.sessao.volume_minutos if item.sessao.volume_minutos is not none else "—" }}</div>
-                        </div>
-                        <div class="mini-box">
-                            <div class="mini-label">RPE</div>
-                            <div class="mini-value">{{ item.sessao.intensidade_rpe if item.sessao.intensidade_rpe is not none else "—" }}</div>
-                        </div>
-                        <div class="mini-box">
-                        </div>
-                    </div>
-
-                    {% if item.plano and item.plano.objectivos %}
-                    <div class="text-box">
-                        <div class="text-label">Objetivos do Treino</div>
-                        {{ item.plano.objectivos }}
-                    </div>
-                    {% endif %}
-
-                    {% for bloco in ["A", "B", "C", "D"] %}
-                        {% set exercicios = item.exercicios_por_bloco[bloco] %}
-                        {% if exercicios %}
-                        <div class="block-title">Bloco {{ bloco }}</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style="width: 10%">Hora</th>
-                                    <th style="width: 8%">Min</th>
-                                    <th style="width: 8%">RPE</th>
-                                    <th style="width: 22%">Exercício</th>
-                                    <th style="width: 10%">Cat.</th>
-                                    <th style="width: 25%">Organização</th>
-                                    <th style="width: 25%">Coaching Points</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for ex in exercicios %}
-                                <tr>
-                                    <td>{{ ex.hora or "—" }}</td>
-                                    <td>{{ ex.minutos if ex.minutos is not none else "—" }}</td>
-                                    <td>{{ ex.rpe if ex.rpe is not none else "—" }}</td>
-                                    <td>{{ ex.nome or "Exercício sem nome" }}</td>
-                                    <td>{{ ex.categoria or "—" }}</td>
-                                    <td>{{ ex.organizacao or "—" }}</td>
-                                    <td>{{ ex.coaching_points or "—" }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
-                    {% endfor %}
-
-                    {% if not item.plano or not item.plano.exercicios %}
-                    <div class="empty">Esta sessão ainda não tem exercícios detalhados no plano.</div>
-                    {% endif %}
-
-                    {% if (item.plano and item.plano.reflexao) or item.sessao.reflexao %}
-                    <div class="text-box" style="margin-top: 8px;">
-                        <div class="text-label">Reflexão</div>
-                        {{ item.plano.reflexao if item.plano and item.plano.reflexao else item.sessao.reflexao }}
-                    </div>
-                    {% endif %}
-                </div>
+    <section class="section balance">
+        <div>
+            <div class="section-title">Minutos por componente</div>
+            <div class="component-grid">
+                {% for sigla, minutos in [('TIO', balanco.componentes.TIO), ('TID', balanco.componentes.TID), ('TaIO', balanco.componentes.TaIO), ('TaID', balanco.componentes.TaID), ('TCO', balanco.componentes.TCO), ('TCD', balanco.componentes.TCD), ('FÍS', balanco.componentes['FÍS']), ('PSI', balanco.componentes.PSI)] %}
+                <div class="component"><small>{{ sigla }}</small><strong>{{ minutos }}</strong></div>
+                {% endfor %}
             </div>
-            {% endfor %}
-        {% else %}
-        <div class="empty">Sem sessões ativas para exportar.</div>
-        {% endif %}
-    </div>
+        </div>
+        <div>
+            <div class="section-title">Presenças</div>
+            <div class="attendance"><strong>{{ resumo_assiduidade.percentagem }}%</strong><span>{{ resumo_assiduidade.presentes }} presenças em {{ resumo_assiduidade.registos }} registos</span></div>
+        </div>
+    </section>
 
     {% if microciclo.reflexao %}
-    <div class="section">
-        <div class="section-title">Reflexão do Microciclo</div>
-        <div class="text-box">{{ microciclo.reflexao }}</div>
-    </div>
+    <section class="section">
+        <div class="section-title">Reflexão</div>
+        <div class="reflection">{{ microciclo.reflexao }}</div>
+    </section>
     {% endif %}
 
-    {{ rodape_pdf(equipa.nome ~ ' · Microciclo ' ~ microciclo.numero) }}
+    {{ rodape_pdf(equipa.nome ~ ' - Microciclo ' ~ microciclo.numero) }}
 </body>
 </html>

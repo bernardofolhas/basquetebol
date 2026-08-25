@@ -1,4 +1,5 @@
 from datetime import date
+from pathlib import Path
 from types import SimpleNamespace
 
 from services.conteudos_sessao_service import (
@@ -133,3 +134,15 @@ def test_visao_e_graficos_incluem_treinos_manuais_e_atribuidos():
     assert dados_graficos["labels"] == ["Treino 1", "Treino físico 1"]
     assert dados_graficos["volumes"] == [75, 90]
     assert dados_graficos["rpes"] == [5.0, 7.0]
+
+
+def test_pdf_completo_do_microciclo_prioriza_carga_sem_detalhe_repetido():
+    raiz_projeto = Path(__file__).resolve().parents[2]
+    template = raiz_projeto / "frontend" / "templates" / "planeamento" / "microciclos" / "pdf.html"
+    conteudo = template.read_text(encoding="utf-8")
+
+    assert "Volume por treino" in conteudo
+    assert "Intensidade por sessão" in conteudo
+    assert 'class="chart-table"' in conteudo
+    assert "sessions-detail" not in conteudo
+    assert "legacy-calendar" not in conteudo
