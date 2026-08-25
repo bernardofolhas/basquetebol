@@ -59,6 +59,9 @@ def test_shell_profissional_agrupa_acoes_e_completa_o_perfil():
     assert ".ds-team-context:has(.ds-page-actions[open])" in estilos
     assert ".ds-page-actions[open]" in estilos
     assert ".ds-user-menu-trigger" in estilos
+    assert "ds-user-menu-dropdown" in navegacao
+    assert 'name="csrf_token" value="{{ request.session.get(\'_csrf\', \'\') }}"' in navegacao
+    assert ".ds-user-menu-dropdown" in estilos
 
 
 def test_shell_autenticado_renderiza_header_completo(client_admin):
