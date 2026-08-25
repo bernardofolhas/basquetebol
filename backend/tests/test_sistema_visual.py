@@ -56,6 +56,8 @@ def test_shell_profissional_agrupa_acoes_e_completa_o_perfil():
     assert 'class="ds-user-summary"' in navegacao
     assert "{{ utilizador.nome }}" in navegacao
     assert ".ds-page-actions-menu" in estilos
+    assert ".ds-team-context:has(.ds-page-actions[open])" in estilos
+    assert ".ds-page-actions[open]" in estilos
     assert ".ds-user-menu-trigger" in estilos
 
 
