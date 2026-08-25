@@ -20,7 +20,7 @@ from models.espaco_treino import (
     TipoEspacoTreinoEnum,
 )
 from models.indisponibilidade_treinador import IndisponibilidadeTreinador
-from models.planeamento import SessaoTreino
+from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.planeamento_clube import PlaneamentoClubeAnual, PlaneamentoClubeMensal, PlanoSemanalClube
 from models.treinador import Treinador
 from services.planeamento_semanal_administrativo_service import (
@@ -244,6 +244,75 @@ def test_reserva_publicada_cria_previsao_na_agenda_sem_criar_sessao_tecnica():
         assert evento.hora_inicio == "18:00"
         assert "agenda da equipa" in mensagem
         assert db.query(SessaoTreino).count() == 0
+    finally:
+        db.close()
+        repor_clube_atual(token)
+
+
+def test_reserva_do_clube_sobrepoe_horario_e_local_de_treino_do_treinador():
+    """O clube define a logística, mesmo quando o treinador já preencheu a sessão."""
+    db, token, espaco, equipa, treinador, semanal = _contexto()
+    try:
+        espaco.nome = "Vergílio"
+        macro = Macrociclo(
+            clube_id=1, equipa_id=equipa.id, numero=1,
+            data_inicio=date(2026, 8, 3), data_fim=date(2026, 8, 9),
+        )
+        db.add(macro)
+        db.flush()
+        meso = Mesociclo(
+            clube_id=1, macrociclo_id=macro.id, numero=1,
+            data_inicio=date(2026, 8, 3), data_fim=date(2026, 8, 9),
+        )
+        db.add(meso)
+        db.flush()
+        micro = Microciclo(
+            clube_id=1, mesociclo_id=meso.id, numero=1,
+            data_inicio=date(2026, 8, 3), data_fim=date(2026, 8, 9),
+        )
+        db.add(micro)
+        db.flush()
+        sessao_completa = SessaoTreino(
+            clube_id=1, microciclo_id=micro.id, data=date(2026, 8, 3),
+            local="Doroteias", hora_inicio="18:30", hora_fim="20:00",
+            volume_minutos=90, numero_treino=1, e_jogo=False, ativa=True,
+        )
+        sessao_sem_logistica = SessaoTreino(
+            clube_id=1, microciclo_id=micro.id, data=date(2026, 8, 4),
+            local=None, hora_inicio=None, hora_fim=None,
+            numero_treino=2, e_jogo=False, ativa=True,
+        )
+        db.add_all([sessao_completa, sessao_sem_logistica])
+        db.flush()
+
+        atribuicao_completa = AtribuicaoEspacoSemanal(
+            clube_id=1, plano_semanal_id=semanal.id, espaco_id=espaco.id,
+            equipa_id=equipa.id, treinador_id=treinador.id, data=date(2026, 8, 3),
+            hora_inicio="20:00", hora_fim="21:30",
+            tipo_ocupacao=TipoOcupacaoEspacoEnum.treino_equipa,
+            estado=EstadoAtribuicaoEspacoEnum.publicado,
+        )
+        atribuicao_sem_logistica = AtribuicaoEspacoSemanal(
+            clube_id=1, plano_semanal_id=semanal.id, espaco_id=espaco.id,
+            equipa_id=equipa.id, treinador_id=treinador.id, data=date(2026, 8, 4),
+            hora_inicio="18:00", hora_fim="19:30",
+            tipo_ocupacao=TipoOcupacaoEspacoEnum.treino_equipa,
+            estado=EstadoAtribuicaoEspacoEnum.publicado,
+        )
+        db.add_all([atribuicao_completa, atribuicao_sem_logistica])
+        db.flush()
+
+        assert "atualizados" in sincronizar_atribuicao_com_agenda(db, atribuicao_completa)
+        assert "atualizados" in sincronizar_atribuicao_com_agenda(db, atribuicao_sem_logistica)
+
+        assert (sessao_completa.local, sessao_completa.hora_inicio, sessao_completa.hora_fim) == (
+            "Vergílio", "20:00", "21:30"
+        )
+        assert (sessao_sem_logistica.local, sessao_sem_logistica.hora_inicio, sessao_sem_logistica.hora_fim) == (
+            "Vergílio", "18:00", "19:30"
+        )
+        # A carga que o treinador já planeou não é alterada pela reserva logística.
+        assert sessao_completa.volume_minutos == 90
     finally:
         db.close()
         repor_clube_atual(token)
