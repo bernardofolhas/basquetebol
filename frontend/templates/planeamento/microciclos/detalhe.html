@@ -162,7 +162,7 @@
     <div class="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 md:flex-row md:items-end md:justify-between">
         <div>
             <h2 class="font-semibold text-gray-800">Visão semanal dos conteúdos</h2>
-            <p class="mt-1 text-sm text-gray-500">A grelha mostra apenas o conteúdo e os minutos. Use “Gerir conteúdos” no treino para adicionar ou remover entradas.</p>
+            <p class="mt-1 text-sm text-gray-500">Use o sinal + de cada célula para acrescentar um conteúdo e os respetivos minutos.</p>
         </div>
         <span class="text-xs text-slate-400">No telemóvel, desliza o quadro para ver todos os treinos.</span>
     </div>
@@ -179,7 +179,6 @@
                         {% if treino.hora_inicio or treino.local %}
                         <span class="mt-1 block text-[10px] font-normal text-slate-300">{{ treino.hora_inicio or 'Hora por definir' }}{% if treino.local %} · {{ treino.local }}{% endif %}</span>
                         {% endif %}
-                        <button type="button" onclick="document.getElementById('conteudos-treino-{{ treino.sessao_id }}').showModal()" class="mt-2 rounded-md border border-slate-500 px-2 py-1 text-[10px] font-semibold text-white hover:bg-slate-700">Gerir conteúdos</button>
                     </th>
                     {% endfor %}
                 </tr>
@@ -197,13 +196,14 @@
                         {% if conteudos %}
                         <div class="space-y-1.5">
                             {% for conteudo in conteudos %}
-                            <div class="rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700">
-                                <span class="block break-words">{{ conteudo.descricao }}</span>
-                                <span class="mt-0.5 block font-semibold text-slate-500">{{ conteudo.minutos }} min</span>
+                            <div class="flex gap-1 rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700">
+                                <span class="min-w-0 flex-1 break-words">{{ conteudo.descricao }} <span class="font-semibold text-slate-500">· {{ conteudo.minutos }} min</span></span>
+                                <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ treino.sessao_id }}/conteudos/{{ conteudo.id }}/eliminar" class="shrink-0" onsubmit="return confirm('Remover este conteúdo?')"><button type="submit" class="rounded px-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Remover conteúdo" aria-label="Remover {{ conteudo.descricao }}">×</button></form>
                             </div>
                             {% endfor %}
                         </div>
                         {% else %}<span class="text-[11px] text-slate-300">—</span>{% endif %}
+                        <button type="button" onclick="document.getElementById('adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}').showModal()" class="mt-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-orange-200 text-sm font-bold leading-none text-orange-600 hover:bg-orange-50" title="Adicionar conteúdo" aria-label="Adicionar conteúdo de {{ categoria.label }} ao {{ treino.titulo_treino }}">+</button>
                     </td>
                     {% endfor %}
                 </tr>
@@ -219,27 +219,17 @@
     {% endif %}
 </section>
 
-{% for treino in visao_semanal_conteudos %}
-<dialog id="conteudos-treino-{{ treino.sessao_id }}" class="w-[min(94vw,680px)] rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-900/45">
-    <div class="max-h-[85vh] overflow-y-auto p-5 sm:p-6">
-        <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
-            <div><h2 class="text-lg font-bold text-slate-900">Conteúdos do {{ treino.titulo_treino }}</h2><p class="mt-1 text-sm text-slate-500">{{ treino.dia_semana }} · {{ treino.data|data_pt }}</p></div>
-            <button type="button" onclick="document.getElementById('conteudos-treino-{{ treino.sessao_id }}').close()" aria-label="Fechar" class="rounded-lg px-2 py-1 text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">×</button>
-        </div>
-        <div class="mt-5 space-y-5">
-            {% for categoria in categorias_conteudo %}
-            {% set conteudos = treino.conteudos_por_categoria[categoria.codigo] %}
-            <section class="rounded-xl border border-slate-200 p-4">
-                <div class="flex items-center gap-2"><span class="rounded bg-orange-50 px-2 py-1 text-xs font-bold text-orange-700">{{ categoria.sigla }}</span><h3 class="text-sm font-semibold text-slate-800">{{ categoria.label }}</h3></div>
-                {% if conteudos %}<div class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-100">{% for conteudo in conteudos %}<div class="flex items-center justify-between gap-3 px-3 py-2 text-sm"><span class="min-w-0 break-words text-slate-700">{{ conteudo.descricao }}</span><div class="flex shrink-0 items-center gap-3"><span class="font-semibold text-slate-500">{{ conteudo.minutos }} min</span><form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ treino.sessao_id }}/conteudos/{{ conteudo.id }}/eliminar" onsubmit="return confirm('Remover este conteúdo?')"><button type="submit" class="font-semibold text-rose-600 hover:text-rose-800">Remover</button></form></div></div>{% endfor %}</div>{% endif %}
-                <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ treino.sessao_id }}/conteudos" class="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_96px_auto]" aria-label="Adicionar conteúdo de {{ categoria.label }} ao {{ treino.titulo_treino|lower }}"><input type="hidden" name="categoria" value="{{ categoria.codigo }}"><input type="text" name="descricao" required maxlength="500" placeholder="Conteúdo" class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-100"><input type="number" name="minutos" required min="1" max="600" inputmode="numeric" placeholder="Minutos" class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-100"><button type="submit" class="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600">Adicionar</button></form>
-            </section>
-            {% endfor %}
-        </div>
-        <div class="mt-5 flex justify-end"><button type="button" onclick="document.getElementById('conteudos-treino-{{ treino.sessao_id }}').close()" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Fechar</button></div>
-    </div>
+{% for treino in visao_semanal_conteudos %}{% for categoria in categorias_conteudo %}
+<dialog id="adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}" class="w-[min(92vw,420px)] rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-900/45">
+    <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ treino.sessao_id }}/conteudos" class="p-5">
+        <input type="hidden" name="categoria" value="{{ categoria.codigo }}">
+        <div class="flex items-start justify-between gap-3"><div><h2 class="text-lg font-bold text-slate-900">Adicionar conteúdo</h2><p class="mt-1 text-sm text-slate-500">{{ treino.titulo_treino }} · {{ categoria.sigla }} — {{ categoria.label }}</p></div><button type="button" onclick="document.getElementById('adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}').close()" aria-label="Fechar" class="rounded-lg px-2 py-1 text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">×</button></div>
+        <label class="mt-5 block text-sm font-semibold text-slate-700">Conteúdo<input type="text" name="descricao" required maxlength="500" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-100"></label>
+        <label class="mt-4 block text-sm font-semibold text-slate-700">Minutos<input type="number" name="minutos" required min="1" max="600" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-100"></label>
+        <div class="mt-5 flex justify-end gap-2"><button type="button" onclick="document.getElementById('adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}').close()" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button><button type="submit" class="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600">Adicionar</button></div>
+    </form>
 </dialog>
-{% endfor %}
+{% endfor %}{% endfor %}
 
 {{ graficos_carga() }}
 
