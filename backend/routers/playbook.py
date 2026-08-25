@@ -11,6 +11,11 @@ from models.equipa import Equipa
 from models.playbook import Playbook, PassoSetPlay, SetPlay
 from services.desenho_service import compor_desenho_sobre_campo, normalizar_data_uri
 from services.imagem_playbook_service import preparar_imagem_passo
+from services.importacao_ebp_service import (
+    MAX_FICHEIRO_EBP_BYTES,
+    interpretar_ebp,
+    renderizar_sequencia_ebp,
+)
 from paths import STATIC_DIR, TEMPLATES_DIR
 from services.pdf_service import renderizar_pdf
 
@@ -83,6 +88,55 @@ async def criar_setplay(equipa_id: int, request: Request, db: Session = Depends(
     db.commit()
     db.refresh(setplay)
     set_flash(request, f"Setplay '{nome}' criado.")
+    return RedirectResponse(url=f"/playbook/setplays/{setplay.id}", status_code=303)
+
+
+@router.post("/equipas/{equipa_id}/setplays/importar-ebp")
+async def importar_setplay_ebp(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    ficheiro: UploadFile = File(...),
+    categoria: str = Form(""),
+):
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    try:
+        conteudo = await ficheiro.read(MAX_FICHEIRO_EBP_BYTES + 1)
+        jogada = interpretar_ebp(conteudo)
+        imagens = [renderizar_sequencia_ebp(sequencia) for sequencia in jogada.sequencias]
+    except ValueError as erro:
+        set_flash(request, str(erro), tipo="error")
+        return RedirectResponse(url=f"/playbook/equipas/{equipa_id}", status_code=303)
+
+    playbook = db.query(Playbook).filter(Playbook.equipa_id == equipa_id).first()
+    if not playbook:
+        playbook = Playbook(equipa_id=equipa_id, nome=f"Playbook — {equipa.nome}")
+        db.add(playbook)
+        db.flush()
+
+    setplay = SetPlay(
+        playbook_id=playbook.id,
+        nome=jogada.nome,
+        categoria=categoria or "Outro",
+        descricao=jogada.descricao or None,
+        ordem=len(playbook.setplays),
+    )
+    db.add(setplay)
+    db.flush()
+    for ordem, (sequencia, imagem) in enumerate(zip(jogada.sequencias, imagens)):
+        db.add(PassoSetPlay(
+            setplay_id=setplay.id,
+            ordem=ordem,
+            observacao=sequencia.texto or None,
+            imagem_coach=imagem,
+        ))
+    db.commit()
+    set_flash(request, f"'{jogada.nome}' importada com {len(imagens)} passos editáveis.")
     return RedirectResponse(url=f"/playbook/setplays/{setplay.id}", status_code=303)
 
 
