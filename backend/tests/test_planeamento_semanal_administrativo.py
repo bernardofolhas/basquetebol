@@ -25,6 +25,7 @@ from models.planeamento_clube import PlaneamentoClubeAnual, PlaneamentoClubeMens
 from models.treinador import Treinador
 from services.planeamento_semanal_administrativo_service import (
     gerar_grelha_slots,
+    intervalos_operacionais,
     validar_local_sessao,
     validar_reserva,
 )
@@ -61,14 +62,14 @@ def test_slots_sao_gerados_sem_criar_sessoes_tecnicas():
     try:
         db.add(DisponibilidadeEspacoTreino(
             clube_id=1, espaco_id=espaco.id, dia_semana=0,
-            hora_inicio="18:00", hora_fim="21:00", duracao_slot_minutos=90,
+            hora_inicio="18:30", hora_fim="21:30", duracao_slot_minutos=90,
         ))
         db.commit()
         antes = db.query(SessaoTreino).count()
         grelha = gerar_grelha_slots(db, semanal)
-        assert grelha["total"] == 63
-        assert grelha["dias"][0]["slots"][0]["hora_inicio"] == "10:00"
-        assert grelha["dias"][0]["slots"][-1]["hora_fim"] == "23:00"
+        assert grelha["total"] == 2
+        assert grelha["dias"][0]["slots"][0]["hora_inicio"] == "18:30"
+        assert grelha["dias"][0]["slots"][-1]["hora_fim"] == "21:30"
         assert db.query(SessaoTreino).count() == antes
     finally:
         db.close()
@@ -146,7 +147,7 @@ def test_horario_pontual_e_livre_dentro_do_periodo_operacional_e_aceite():
             hora_inicio="09:30",
             hora_fim="11:00",
         )
-        assert any("entre 10:00 e 23:00" in erro for erro in erros)
+        assert erros == []
     finally:
         db.close()
         repor_clube_atual(token)
@@ -367,6 +368,14 @@ def test_rascunho_nao_aparece_na_agenda_antes_do_envio():
 def test_horas_escritas_com_h_sao_normalizadas_para_slots():
     assert normalizar_hora("18h30") == "18:30"
     assert normalizar_hora("20H00") == "20:00"
+
+
+def test_grelha_operacional_tem_blocos_de_noventa_minutos_das_0930_as_2300():
+    intervalos = intervalos_operacionais()
+
+    assert intervalos[0] == ("09:30", "11:00")
+    assert intervalos[-1] == ("21:30", "23:00")
+    assert len(intervalos) == 9
 
 
 def test_cada_espaco_recebe_uma_cor_estavel_no_mapa():

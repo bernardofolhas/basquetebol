@@ -11,7 +11,7 @@ from models.espaco_treino import (
 )
 from models.indisponibilidade_treinador import IndisponibilidadeTreinador
 
-HORA_INICIO_OPERACIONAL = "10:00"
+HORA_INICIO_OPERACIONAL = "09:30"
 HORA_FIM_OPERACIONAL = "23:00"
 DURACAO_SLOT_PADRAO = 90
 NOMES_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
@@ -144,8 +144,8 @@ def validar_reserva(
     return erros
 
 
-def _intervalos_operacionais() -> list[tuple[str, str]]:
-    """Cria uma grelha-base de 90 minutos; o horário final pode ser ajustado no modal."""
+def intervalos_operacionais() -> list[tuple[str, str]]:
+    """Cria a grelha operacional fixa de blocos de noventa minutos."""
     intervalos = []
     cursor = _minutos(HORA_INICIO_OPERACIONAL)
     limite = _minutos(HORA_FIM_OPERACIONAL)
@@ -158,8 +158,16 @@ def _intervalos_operacionais() -> list[tuple[str, str]]:
 
 
 def gerar_grelha_slots(db: Session, semanal) -> dict:
-    """Gera uma grelha operacional completa e mantém visíveis horários excecionais."""
+    """Gera apenas slots disponíveis e mantém visíveis reservas excecionais."""
     espacos = db.query(EspacoTreino).filter(EspacoTreino.ativo.is_(True)).order_by(EspacoTreino.nome).all()
+    disponibilidades = db.query(DisponibilidadeEspacoTreino).filter(
+        DisponibilidadeEspacoTreino.espaco_id.in_([espaco.id for espaco in espacos]),
+        DisponibilidadeEspacoTreino.ativo.is_(True),
+    ).all() if espacos else []
+    disponibilidades_por_espaco_dia = {}
+    for disponibilidade in disponibilidades:
+        chave = (disponibilidade.espaco_id, disponibilidade.dia_semana)
+        disponibilidades_por_espaco_dia.setdefault(chave, []).append(disponibilidade)
     reservas = db.query(AtribuicaoEspacoSemanal).filter(
         AtribuicaoEspacoSemanal.plano_semanal_id == semanal.id,
         AtribuicaoEspacoSemanal.estado != EstadoAtribuicaoEspacoEnum.cancelado,
@@ -170,7 +178,15 @@ def gerar_grelha_slots(db: Session, semanal) -> dict:
         dia = {"data": atual, "nome": NOMES_DIAS[atual.weekday()], "slots": []}
         for espaco in espacos:
             reservas_espaco = [r for r in reservas if r.espaco_id == espaco.id and r.data == atual]
-            for inicio, fim in _intervalos_operacionais():
+            regras_dia = disponibilidades_por_espaco_dia.get((espaco.id, atual.weekday()), [])
+            for inicio, fim in intervalos_operacionais():
+                # A grelha apresenta só horários que o espaço declarou disponíveis.
+                # Reservas fora dessas regras são acrescentadas abaixo como exceções.
+                if not any(
+                    regra.hora_inicio <= inicio and regra.hora_fim >= fim
+                    for regra in regras_dia
+                ):
+                    continue
                 atribuicao = next((
                     r for r in reservas_espaco
                     if r.hora_inicio == inicio and r.hora_fim == fim

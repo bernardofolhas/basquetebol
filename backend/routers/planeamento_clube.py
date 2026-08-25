@@ -45,7 +45,11 @@ from services.operacao_clube_service import (
     construir_mapa_espacos_semanal,
     obter_resumo_operacional_mensal,
 )
-from services.planeamento_semanal_administrativo_service import gerar_grelha_slots, validar_reserva
+from services.planeamento_semanal_administrativo_service import (
+    gerar_grelha_slots,
+    intervalos_operacionais,
+    validar_reserva,
+)
 from services.atribuicao_espaco_agenda_service import sincronizar_atribuicao_com_agenda
 from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.atribuicao_espaco_visual_service import (
@@ -2297,7 +2301,14 @@ def painel_atribuicao_espacos(
 
     grelha_slots = gerar_grelha_slots(db, semanal) if semanal else None
     slots = [slot for dia in grelha_slots["dias"] for slot in dia["slots"]] if grelha_slots else []
-    horarios_slots = sorted({(slot["hora_inicio"], slot["hora_fim"]) for slot in slots})
+    # Mantém todos os blocos da grelha visíveis, mesmo quando nenhum espaço tem
+    # disponibilidade configurada. Assim é possível criar uma exceção no próprio mapa.
+    horarios_slots = list(intervalos_operacionais()) if grelha_slots else []
+    horarios_slots.extend(
+        horario for horario in {(slot["hora_inicio"], slot["hora_fim"]) for slot in slots}
+        if horario not in horarios_slots
+    )
+    horarios_slots.sort()
     slots_por_chave = {}
     for dia in (grelha_slots["dias"] if grelha_slots else []):
         for slot in dia["slots"]:
