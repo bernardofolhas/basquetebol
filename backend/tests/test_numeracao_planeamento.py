@@ -14,7 +14,7 @@ from routers.planeamento_clube import (
     _remover_sessoes_da_atribuicao,
     _remover_sessoes_do_plano_semanal,
 )
-from services.remocao_sessoes_service import limpar_sessoes_geradas_orfas
+from services.remocao_sessoes_service import eliminar_sessoes_treino, limpar_sessoes_geradas_orfas
 from services.numeracao_planeamento_service import (
     renumerar_macrociclos,
     renumerar_mesociclos,
@@ -66,7 +66,17 @@ def test_ciclos_sao_renumerados_pela_data_de_inicio():
             clube_id=clube.id, microciclo_id=micro_cedo.id, data=date(2026, 1, 3),
             hora_inicio="18:00", numero_treino=7, tipo_treino="fisico", e_jogo=False, ativa=True,
         )
-        db.add_all([sessao_tardia, sessao_cedo, treino_fisico])
+        sessao_sem_dados = SessaoTreino(
+            clube_id=clube.id, microciclo_id=micro_tardio.id, data=date(2026, 1, 9),
+            local=None, hora_inicio=None, hora_fim=None, volume_minutos=None,
+            numero_treino=20, e_jogo=False, ativa=True,
+        )
+        treino_fisico_sem_dados = SessaoTreino(
+            clube_id=clube.id, microciclo_id=micro_tardio.id, data=date(2026, 1, 10),
+            local=None, hora_inicio=None, hora_fim=None, volume_minutos=None,
+            numero_treino=20, tipo_treino="fisico", e_jogo=False, ativa=True,
+        )
+        db.add_all([sessao_tardia, sessao_cedo, treino_fisico, sessao_sem_dados, treino_fisico_sem_dados])
         db.flush()
         renumerar_treinos_equipa(db, equipa.id)
         renumerar_todos_os_ciclos(db)
@@ -75,8 +85,12 @@ def test_ciclos_sao_renumerados_pela_data_de_inicio():
         assert (macro_cedo.numero, macro_tardio.numero) == (1, 2)
         assert (meso_cedo.numero, meso_tardio.numero) == (1, 2)
         assert (micro_cedo.numero, micro_tardio.numero) == (1, 2)
-        assert (sessao_cedo.numero_treino, sessao_tardia.numero_treino) == (1, 2)
-        assert treino_fisico.numero_treino == 1
+        assert (sessao_cedo.numero_treino, sessao_tardia.numero_treino, sessao_sem_dados.numero_treino) == (1, 2, 3)
+        assert (treino_fisico.numero_treino, treino_fisico_sem_dados.numero_treino) == (1, 2)
+
+        eliminar_sessoes_treino(db, [sessao_cedo])
+        db.flush()
+        assert (sessao_tardia.numero_treino, sessao_sem_dados.numero_treino) == (1, 2)
     finally:
         db.rollback()
         db.query(SessaoTreino).execution_options(ignorar_clube=True).filter(SessaoTreino.clube_id == clube.id).delete(synchronize_session=False)

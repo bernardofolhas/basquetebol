@@ -1,5 +1,6 @@
 """Mantém a numeração dos ciclos coerente com a cronologia do planeamento."""
 
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
@@ -35,21 +36,27 @@ def renumerar_microciclos(db: Session, mesociclo_id: int) -> None:
 
 
 def renumerar_treinos_equipa(db: Session, equipa_id: int) -> None:
-    """Numera separadamente treinos normais e físicos em cada microciclo."""
+    """Numera cronologicamente os treinos da época, separados por tipo.
+
+    Local, horário, volume e plano técnico são opcionais e nunca condicionam
+    a entrada de uma sessão na sequência.
+    """
     sessoes = db.query(SessaoTreino).execution_options(ignorar_clube=True).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
         Macrociclo.equipa_id == equipa_id,
         SessaoTreino.e_jogo.is_(False),
         SessaoTreino.ativa.is_(True),
     ).order_by(
-        SessaoTreino.microciclo_id,
+        Macrociclo.planeamento_anual_equipa_id,
         SessaoTreino.data,
+        case((SessaoTreino.hora_inicio.is_(None), 1), else_=0),
         SessaoTreino.hora_inicio,
         SessaoTreino.id,
     ).all()
-    grupos: dict[tuple[int, str], list[SessaoTreino]] = {}
+    grupos: dict[tuple[int | None, str], list[SessaoTreino]] = {}
     for sessao in sessoes:
         tipo_treino = getattr(sessao, "tipo_treino", None) or "normal"
-        grupos.setdefault((sessao.microciclo_id, tipo_treino), []).append(sessao)
+        anual_id = sessao.microciclo.mesociclo.macrociclo.planeamento_anual_equipa_id
+        grupos.setdefault((anual_id, tipo_treino), []).append(sessao)
     for grupo in grupos.values():
         for numero, sessao in enumerate(grupo, start=1):
             sessao.numero_treino = numero

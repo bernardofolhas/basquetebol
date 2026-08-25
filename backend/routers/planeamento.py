@@ -1047,6 +1047,7 @@ async def eliminar_macrociclo(macro_id: int, request: Request, db: Session = Dep
         db.delete(macrociclo)
         db.flush()
         renumerar_macrociclos(db, equipa_id, anual_id)
+        renumerar_treinos_equipa(db, equipa_id)
         db.commit()
         set_flash(request, "Macrociclo eliminado.")
     retorno = f"/planeamento/anuais/{anual_id}" if anual_id else f"/planeamento/equipas/{equipa_id}/anuais"
@@ -1359,12 +1360,15 @@ async def editar_mesociclo(
 async def eliminar_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_db),
                               utilizador=Depends(exigir_autenticacao)):
     macro_id = None
+    equipa_id = _obter_equipa_id_por_mesociclo(db, meso_id)
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
     mesociclo = db.query(Mesociclo).filter(Mesociclo.id == meso_id).first()
     if mesociclo:
         macro_id = mesociclo.macrociclo_id
         db.delete(mesociclo)
         db.flush()
         renumerar_mesociclos(db, macro_id)
+        renumerar_treinos_equipa(db, equipa_id)
         db.commit()
         set_flash(request, "Mesociclo eliminado.")
     return RedirectResponse(url=f"/planeamento/macrociclos/{macro_id}" if macro_id else "/equipas", status_code=303)
@@ -1549,12 +1553,15 @@ async def editar_microciclo(
 async def eliminar_microciclo(micro_id: int, request: Request, db: Session = Depends(get_db),
                                utilizador=Depends(exigir_autenticacao)):
     meso_id = None
+    equipa_id = _obter_equipa_id_por_microciclo(db, micro_id)
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
     microciclo = db.query(Microciclo).filter(Microciclo.id == micro_id).first()
     if microciclo:
         meso_id = microciclo.mesociclo_id
         db.delete(microciclo)
         db.flush()
         renumerar_microciclos(db, meso_id)
+        renumerar_treinos_equipa(db, equipa_id)
         db.commit()
         set_flash(request, "Microciclo eliminado.")
     return RedirectResponse(url=f"/planeamento/mesociclos/{meso_id}" if meso_id else "/equipas", status_code=303)

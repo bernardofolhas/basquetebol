@@ -1089,6 +1089,7 @@ def _desativar_sessoes_orfas_ou_fora_de_escopo(
 ) -> int:
     """Desactiva sessões cujo evento desapareceu ou deixou de se aplicar à equipa."""
     total_inativadas = 0
+    equipas_afetadas: set[int] = set()
     for sessao in _obter_sessoes_sincronizadas_semanal(db, semanal_id):
         equipa_id = _obter_equipa_id_por_sessao(sessao)
         if not sessao.evento_planeamento_clube_id or not equipa_id:
@@ -1096,7 +1097,12 @@ def _desativar_sessoes_orfas_ou_fora_de_escopo(
         if (sessao.evento_planeamento_clube_id, equipa_id) not in pares_evento_equipa_ativos:
             sessao.ativa = False
             sessao.sincronizada = False
+            equipas_afetadas.add(equipa_id)
             total_inativadas += 1
+    if total_inativadas:
+        db.flush()
+        for equipa_id in equipas_afetadas:
+            renumerar_treinos_equipa(db, equipa_id)
     return total_inativadas
 
 
