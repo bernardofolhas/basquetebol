@@ -28,6 +28,15 @@
     </form>
 {% endcall %}
 
+<nav class="ds-workspace-tabs" data-workspace-tabs="meso" data-workspace-default="calendario" aria-label="Áreas do mesociclo">
+    <div class="ds-workspace-tabs-list" role="tablist">
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="calendario">Calendário</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="microciclos">Microciclos <span class="text-xs opacity-60">{{ microciclos|length }}</span></button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="objetivos">Objetivos</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="reflexao">Reflexão</button>
+    </div>
+</nav>
+
 <!-- ── STATS ─────────────────────────────────── -->
 {% set total_sessoes = namespace(n=0) %}
 {% for micro in microciclos %}{% for s in micro.sessoes %}{% if s.ativa %}{% set total_sessoes.n = total_sessoes.n + 1 %}{% endif %}{% endfor %}{% endfor %}
@@ -46,7 +55,7 @@
   {% endfor %}
 {% endfor %}
 
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+<div data-workspace-panel="meso:calendario" role="tabpanel" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
     <div class="hidden bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
         <p class="text-2xl font-bold text-indigo-600">{{ microciclos | length }}</p>
         <p class="text-xs text-gray-400 mt-1">Microciclos</p>
@@ -72,7 +81,7 @@
 </div>
 
 {% if objetivos_superiores.macrociclo or objetivos_por_categoria %}
-<details class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6 group">
+<details data-workspace-panel="meso:objetivos" role="tabpanel" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6 group">
     <summary class="cursor-pointer list-none flex items-center justify-between">
         <span class="font-semibold text-gray-700">Objetivos e prioridades do mesociclo</span>
         <span class="text-xs text-gray-400 group-open:hidden">Abrir contexto</span>
@@ -211,7 +220,7 @@
 
 {% endif %}
 <!-- ── AGENDA INTEGRADA ───────────────────────── -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+<div data-workspace-panel="meso:calendario" role="tabpanel" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
         <div>
             <h2 class="font-semibold text-gray-700">📅 Agenda do mesociclo</h2>
@@ -270,7 +279,7 @@
 
 <!-- ── GRÁFICO VOLUME / RPE ───────────────────── -->
 {% if chart_labels != '[]' %}
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+<div data-workspace-panel="meso:calendario" role="tabpanel" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
     <h2 class="font-semibold text-gray-700 mb-4">📊 Volume e Intensidade por Microciclo</h2>
     <div style="position:relative; height:220px">
         <canvas id="graficoMeso"></canvas>
@@ -335,7 +344,7 @@
 {% endif %}
 
 <!-- ── MICROCICLOS ────────────────────────────── -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+<div data-workspace-panel="meso:microciclos" role="tabpanel" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
     <div class="flex items-center justify-between mb-4">
         <h2 class="font-semibold text-gray-700">
             🗓 Microciclos
@@ -427,7 +436,7 @@
 </div>
 
 <!-- ── OBJETIVOS ──────────────────────────────── -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+<div data-workspace-panel="meso:objetivos" role="tabpanel" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
     <div class="flex items-center justify-between mb-4">
         <h2 class="font-semibold text-gray-700">🎯 Objetivos do Mesociclo</h2>
         <a href="/planeamento/mesociclos/{{ mesociclo.id }}/editar"
@@ -461,7 +470,7 @@
 </div>
 
 <!-- ── REFLEXÃO ───────────────────────────────── -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+<div data-workspace-panel="meso:reflexao" role="tabpanel" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
     <h2 class="font-semibold text-gray-700 mb-3">📝 Reflexão do Mesociclo</h2>
     <form method="POST" action="/planeamento/mesociclos/{{ mesociclo.id }}/reflexao">
         <textarea name="reflexao" rows="4" placeholder="Avaliação geral do mesociclo, aprendizagens, ajustes para o próximo..."

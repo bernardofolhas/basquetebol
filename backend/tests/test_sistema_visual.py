@@ -46,6 +46,45 @@ def test_base_preserva_navegacao_acessivel_e_responsiva():
     assert ".ds-team-direct-nav { display:grid;grid-template-columns:repeat(2" in CSS.read_text(encoding="utf-8")
 
 
+def test_planeamentos_longos_usam_abas_internas_sem_alterar_exportacoes():
+    base = (TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
+    css = CSS.read_text(encoding="utf-8")
+    detalhes = {
+        "anuais/detalhe.html": ("anual", "calendario", "macrociclos", "objetivos", "estado"),
+        "macrociclos/detalhe.html": ("macro", "calendario", "mesociclos", "objetivos"),
+        "mesociclos/detalhe.html": ("meso", "calendario", "microciclos", "objetivos", "reflexao"),
+        "microciclos/detalhe.html": ("micro", "agenda", "conteudos", "carga", "objetivos", "reflexao"),
+    }
+
+    assert "[data-workspace-tabs]" in base
+    assert "window.sessionStorage.setItem(storageKey,name)" in base
+    assert ".ds-workspace-tabs" in css
+    assert "[data-workspace-panel][hidden]" in css
+
+    for caminho, (grupo, *abas) in detalhes.items():
+        conteudo = (TEMPLATES_DIR / "planeamento" / caminho).read_text(encoding="utf-8")
+        assert f'data-workspace-tabs="{grupo}"' in conteudo
+        for aba in abas:
+            assert f'data-workspace-tab="{aba}"' in conteudo
+            assert f'data-workspace-panel="{grupo}:{aba}"' in conteudo
+
+
+def test_paginas_operacionais_longas_usam_o_mesmo_padrao_de_abas():
+    detalhes = {
+        "equipas/detalhe.html": ("equipa", "atividade", "equipa", "logistica"),
+        "jogos/detalhe.html": ("jogo", "resultado", "convocatoria"),
+        "jogadores/detalhe.html": ("jogador", "resumo", "perfil", "evolucao", "processo"),
+        "treino/plano.html": ("treino", "dados", "exercicios", "reflexao", "resumo"),
+    }
+
+    for caminho, (grupo, *abas) in detalhes.items():
+        conteudo = (TEMPLATES_DIR / caminho).read_text(encoding="utf-8")
+        assert f'data-workspace-tabs="{grupo}"' in conteudo
+        for aba in abas:
+            assert f'data-workspace-tab="{aba}"' in conteudo
+            assert f'data-workspace-panel="{grupo}:{aba}"' in conteudo
+
+
 def test_login_mantem_recuperacao_e_melhora_utilizacao():
     conteudo = (TEMPLATES_DIR / "login.html").read_text(encoding="utf-8")
 

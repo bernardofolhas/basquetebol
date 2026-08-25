@@ -23,8 +23,17 @@
     {% endif %}
 </div>
 
+<nav class="ds-workspace-tabs" data-workspace-tabs="jogador" data-workspace-default="resumo" aria-label="Áreas da ficha do jogador">
+    <div class="ds-workspace-tabs-list" role="tablist">
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resumo">Resumo</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="perfil">Perfil e contactos</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="evolucao">Evolução desportiva</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="processo">Processo administrativo</button>
+    </div>
+</nav>
+
 <!-- Ficha integrada de evolução: leitura rápida antes dos históricos detalhados. -->
-<section class="mb-6 rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-white p-5 shadow-sm">
+<section data-workspace-panel="jogador:resumo" role="tabpanel" class="mb-6 rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-white p-5 shadow-sm">
     <div class="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
         <div>
             <p class="text-xs font-semibold uppercase tracking-widest text-orange-500">Acompanhamento desportivo</p>
@@ -79,7 +88,7 @@
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
     <!-- Informações básicas -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div data-workspace-panel="jogador:perfil" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 class="font-semibold text-gray-700 mb-4">Informações Básicas</h2>
         <div class="space-y-3 text-sm">
             <div class="flex justify-between">
@@ -103,7 +112,7 @@
     </div>
 
     <!-- Contactos -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div data-workspace-panel="jogador:perfil" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 class="font-semibold text-gray-700 mb-4">Contactos</h2>
         <div class="space-y-3 text-sm">
             <div class="flex justify-between">
@@ -146,7 +155,7 @@
     </div>
 
     <!-- Registo antropométrico -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div data-workspace-panel="jogador:evolucao" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-semibold text-gray-700">Registos Antropométricos</h2>
         </div>
@@ -200,7 +209,7 @@
     </div>
 
     <!-- Avaliação técnica -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div data-workspace-panel="jogador:evolucao" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 class="font-semibold text-gray-700 mb-4">Avaliação Técnica</h2>
         <div class="space-y-4">
             <div>
@@ -219,7 +228,7 @@
     </div>
 
 </div>
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
+<div data-workspace-panel="jogador:evolucao" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
     <div class="flex items-center justify-between">
         <div>
             <h2 class="font-semibold text-gray-700">Testes Físicos</h2>
@@ -232,7 +241,7 @@
     </div>
 </div>
 <!-- Documentos administrativos do processo. -->
-<div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
+<div data-workspace-panel="jogador:processo" role="tabpanel" class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
     <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
             <h2 class="font-semibold text-gray-700">Documentos do processo</h2>
@@ -259,7 +268,7 @@
     {% endif %}
 </div>
 <!-- Inscrições e Exames Médicos -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
+<div data-workspace-panel="jogador:processo" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 md:col-span-2 mt-2">
     <h2 class="font-semibold text-gray-700 mb-4">Inscrições e Exames Médicos</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 

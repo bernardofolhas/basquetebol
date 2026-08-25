@@ -32,10 +32,17 @@
     </form>
 {% endcall %}
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<nav class="ds-workspace-tabs" data-workspace-tabs="jogo" data-workspace-default="resultado" aria-label="Áreas do jogo">
+    <div class="ds-workspace-tabs-list" role="tablist">
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resultado">Resultado</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="convocatoria">Convocatória</button>
+    </div>
+</nav>
+
+<div class="contents">
 
     <!-- Resultado -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div data-workspace-panel="jogo:resultado" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 class="font-semibold text-gray-700 mb-4">Resultado</h2>
         {% if jogo.pontos_nos is not none and jogo.pontos_adversario is not none %}
         <div class="text-center mb-4">
@@ -77,7 +84,7 @@
     </div>
 
     <!-- Convocatória -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div data-workspace-panel="jogo:convocatoria" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 class="font-semibold text-gray-700 mb-4">Convocatória</h2>
         <form method="POST" action="/jogos/{{ jogo.id }}/convocatoria">
             <div class="grid grid-cols-2 gap-3 mb-4">
@@ -146,13 +153,13 @@
     </div>
 
 </div>
-<div class="mt-6">
+<div data-workspace-panel="jogo:resultado" role="tabpanel" class="mt-6">
     <a href="/jogos/{{ jogo.id }}/plano"
        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition">
         📋 Plano de Jogo
     </a>
 </div>
-<div class="mt-4">
+<div data-workspace-panel="jogo:convocatoria" role="tabpanel" class="mt-4">
     <a href="/jogos/{{ jogo.id }}/convocatoria/print" target="_blank"
        class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
         🖨️ Imprimir Convocatória

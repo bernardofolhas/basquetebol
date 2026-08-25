@@ -93,6 +93,20 @@
     </form>
 {% endcall %}
 
+<nav class="ds-workspace-tabs" data-workspace-tabs="treino" data-workspace-default="{% if importacao_ativa and not modo_edicao_importacao %}dados-importados{% else %}dados{% endif %}" aria-label="Áreas do plano de treino">
+    <div class="ds-workspace-tabs-list" role="tablist">
+        {% if importacao_ativa and not modo_edicao_importacao %}
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="dados-importados">Dados e setores</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="documento">Documento importado</button>
+        {% else %}
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="dados">Dados do treino</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="exercicios">Exercícios</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="reflexao">Reflexão</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resumo">Resumo</button>
+        {% endif %}
+    </div>
+</nav>
+
 <dialog id="modal-importar-plano" class="w-[min(92vw,620px)] rounded-[28px] p-0 shadow-2xl backdrop:bg-slate-950/45">
     <div class="p-6 sm:p-8">
         <div class="flex items-start justify-between gap-4">
@@ -121,7 +135,7 @@
 </dialog>
 
 {% if importacoes_plano and not importacao_ativa %}
-<details class="mb-6 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+<details data-workspace-panel="treino:resumo" role="tabpanel" class="mb-6 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
     <summary class="cursor-pointer list-none text-sm font-semibold text-gray-800">Importações recentes <span class="ml-2 text-xs font-normal text-gray-400">{{ importacoes_plano|length }}</span></summary>
     <div class="mt-4 divide-y divide-gray-100">
         {% for item in importacoes_plano %}
@@ -139,7 +153,7 @@
 
 {% if importacao_ativa and not modo_edicao_importacao %}
 <div class="space-y-6">
-    <section class="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
+    <section data-workspace-panel="treino:dados-importados" role="tabpanel" class="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
         <div class="flex flex-col gap-4 border-b border-gray-100 bg-[var(--clube-primary-surface)] px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-2">
@@ -191,7 +205,7 @@
         </form>
     </section>
 
-    <section class="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+    <section data-workspace-panel="treino:documento" role="tabpanel" class="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div><p class="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--clube-primary-dark)]">Documento original</p><h2 class="mt-1 text-xl font-bold text-gray-900">Pré-visualização do documento importado</h2></div>
             <p class="text-xs text-gray-400">{{ (importacao_ativa.tamanho_bytes / 1024)|round(1) }} KB</p>
@@ -208,9 +222,9 @@
     </section>
 </div>
 {% else %}
-<div class="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
-    <div class="space-y-6">
-        <div class="overflow-hidden rounded-[28px] border border-orange-100 bg-white shadow-sm">
+<div>
+    <div class="contents">
+        <div data-workspace-panel="treino:dados" role="tabpanel" class="overflow-hidden rounded-[28px] border border-orange-100 bg-white shadow-sm">
             <div class="border-b border-orange-100 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 px-6 py-5 text-white">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
@@ -327,13 +341,13 @@
             </form>
         </div>
 
-        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+        <div data-workspace-panel="treino:exercicios" role="tabpanel" class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h2 class="text-xl font-semibold text-gray-800">Blocos do treino</h2><p class="mt-1 text-sm text-gray-500">Cria apenas os blocos necessários.</p></div><form method="POST" action="/treino/planos/{{ plano.id }}/blocos" class="flex flex-wrap gap-2"><input name="nome" required placeholder="Ex: Aquecimento" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><input name="tipo" placeholder="Tipo opcional" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><button class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white">Criar bloco</button></form></div>
             <div class="mt-4 flex flex-wrap gap-2 text-sm"><span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Previsto: {{ duracao_prevista ~ ' min' if duracao_prevista is not none else 'por definir' }}</span><span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Exercícios: {{ volume_planeado }} min</span>{% if diferenca_duracao is not none %}<span class="rounded-full px-3 py-1 font-semibold {% if diferenca_duracao == 0 %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-800{% endif %}">{% if diferenca_duracao == 0 %}Duração coerente{% elif diferenca_duracao > 0 %}+{{ diferenca_duracao }} min acima{% else %}{{ diferenca_duracao|abs }} min por preencher{% endif %}</span>{% endif %}</div>
             {% if not blocos_ui %}<div class="mt-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500">O treino está vazio. Cria o primeiro bloco para começar.</div>{% endif %}
         </div>
 
-        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+        <div data-workspace-panel="treino:exercicios" role="tabpanel" class="mt-6 rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h2 class="text-xl font-semibold text-gray-800">Adicionar exercício</h2>
@@ -397,7 +411,7 @@
             </form>
         </div>
 
-        <div class="space-y-4">
+        <div data-workspace-panel="treino:exercicios" role="tabpanel" class="mt-6 space-y-4">
             {% for bloco_ui in blocos_ui %}
             {% set bloco_letra = bloco_ui.key %}
             {% set resumo_minutos = exercicios_por_bloco[bloco_letra]|map(attribute='minutos')|select|sum %}
@@ -537,7 +551,7 @@
             {% endfor %}
         </div>
 
-        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+        <div data-workspace-panel="treino:reflexao" role="tabpanel" class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
             <h2 class="text-xl font-semibold text-gray-800">Reflexão</h2>
             <p class="mt-1 text-sm text-gray-500">Mantém aqui o que funcionou, o que queres ajustar e o que deve transitar para a próxima sessão.</p>
             <form method="POST" action="/treino/planos/{{ plano.id }}/reflexao" class="mt-4">
@@ -549,8 +563,8 @@
         </div>
     </div>
 
-    <aside class="space-y-6">
-        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+    <aside class="contents">
+        <div data-workspace-panel="treino:resumo" role="tabpanel" class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
             <h2 class="text-lg font-semibold text-gray-800">Acessos rápidos</h2>
             <div class="mt-4 space-y-3">
                 <a href="/planeamento/microciclos/{{ sessao.microciclo_id }}" class="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:border-orange-300 hover:bg-orange-50">
@@ -572,7 +586,7 @@
             </div>
         </div>
 
-        <div class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+        <div data-workspace-panel="treino:resumo" role="tabpanel" class="mt-6 rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
             <h2 class="text-lg font-semibold text-gray-800">Leitura rápida</h2>
             <div class="mt-4 space-y-4">
                 <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">

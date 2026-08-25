@@ -25,7 +25,17 @@
     </form>
 {% endcall %}
 
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+<nav class="ds-workspace-tabs" data-workspace-tabs="macro" data-workspace-default="calendario" aria-label="Áreas do macrociclo">
+    <div class="ds-workspace-tabs-list" role="tablist">
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="calendario">Calendário</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="mesociclos">Mesociclos <span class="text-xs opacity-60">{{ mesociclos|length }}</span></button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="objetivos">Objetivos</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="atividade">Atividade e reflexão</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resumo">Resumo</button>
+    </div>
+</nav>
+
+<div data-workspace-panel="macro:resumo" role="tabpanel" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
     <div class="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
         <p class="text-xs uppercase tracking-[0.2em] text-indigo-600">Mesociclos</p>
         <p class="mt-3 text-3xl font-bold text-gray-900">{{ mesociclos | length }}</p>
@@ -48,8 +58,8 @@
     </div>
 </div>
 
-<div class="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-6 mb-6">
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+<div class="contents">
+    <div data-workspace-panel="macro:objetivos" role="tabpanel" class="mb-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-semibold text-gray-800">Objetivos do Macrociclo</h2>
             <span class="text-xs text-gray-400">Visao global da epoca</span>
@@ -79,7 +89,7 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <div data-workspace-panel="macro:atividade" role="tabpanel" class="mb-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-semibold text-gray-800">Feed Integrado</h2>
             <span class="text-xs text-gray-400">{{ dashboard_planeamento.periodo.label }}</span>
@@ -118,7 +128,7 @@
     </div>
 </div>
 
-<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+<div data-workspace-panel="macro:calendario" role="tabpanel" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
     <div class="flex items-center justify-between mb-4">
         <h2 class="font-semibold text-gray-800">Calendario Integrado do Macrociclo</h2>
         <span class="text-sm text-gray-400">Treinos, jogos e atividades com a mesma leitura</span>
@@ -183,7 +193,7 @@
 
 {{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, equipas_agenda|default([]), request.session.get('_csrf', '')) }}
 
-<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+<div data-workspace-panel="macro:mesociclos" role="tabpanel" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
     <div class="flex items-center justify-between mb-4">
         <h2 class="font-semibold text-gray-700">
             Mesociclos

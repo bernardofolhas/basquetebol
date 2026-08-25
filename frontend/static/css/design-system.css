@@ -457,6 +457,62 @@ body { background:radial-gradient(circle at 92% 5%,color-mix(in srgb,var(--clube
 dialog { color:var(--text-main); }
 dialog::backdrop { background:rgb(15 23 42 / .42);backdrop-filter:blur(3px); }
 
+/* Abas de trabalho: alternam áreas extensas sem navegar nem alongar a página. */
+.ds-workspace-tabs {
+    position:sticky;
+    top:calc(var(--topbar-height) + .55rem);
+    z-index:32;
+    margin:1rem 0 1.25rem;
+    border:1px solid var(--border-soft);
+    border-radius:1rem;
+    background:rgb(255 255 255 / .96);
+    padding:.38rem;
+    box-shadow:0 10px 28px rgb(15 23 42 / .08);
+    backdrop-filter:blur(12px);
+}
+.ds-workspace-tabs-list {
+    display:flex;
+    align-items:center;
+    gap:.28rem;
+    overflow-x:auto;
+    scrollbar-width:none;
+    overscroll-behavior-inline:contain;
+}
+.ds-workspace-tabs-list::-webkit-scrollbar { display:none; }
+.ds-workspace-tab {
+    display:inline-flex;
+    min-height:2.55rem;
+    flex:0 0 auto;
+    align-items:center;
+    justify-content:center;
+    gap:.42rem;
+    border:1px solid transparent;
+    border-radius:.72rem;
+    padding:.62rem .9rem;
+    color:#667388;
+    font-size:.8rem;
+    font-weight:800;
+    line-height:1;
+    white-space:nowrap;
+    transition:background .15s,border-color .15s,color .15s,box-shadow .15s;
+}
+.ds-workspace-tab:hover { background:#f7f9fb;color:var(--text-main); }
+.ds-workspace-tab[aria-selected="true"] {
+    border-color:var(--clube-primary-border);
+    background:var(--clube-primary-surface);
+    color:var(--clube-primary-dark);
+    box-shadow:inset 0 -2px 0 var(--clube-primary);
+}
+.ds-workspace-tab:focus-visible { outline:2px solid var(--clube-primary);outline-offset:2px; }
+[data-workspace-panel][hidden] { display:none!important; }
+[data-workspace-panel].is-active { animation:ds-workspace-reveal .18s ease-out; }
+@keyframes ds-workspace-reveal { from { opacity:.55;transform:translateY(3px); } to { opacity:1;transform:none; } }
+
+@media (max-width:767px) {
+    .ds-workspace-tabs { top:calc(var(--topbar-height) + .35rem);margin:.75rem 0 1rem;border-radius:.85rem;padding:.3rem; }
+    .ds-workspace-tab { min-height:2.4rem;padding:.58rem .72rem;font-size:.75rem; }
+}
+
 @media (max-width:640px) {
     #conteudo-principal { font-size:.94rem; }
     #conteudo-principal .p-6 { padding:1rem; }
