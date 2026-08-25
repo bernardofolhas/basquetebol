@@ -30,6 +30,7 @@ class SetPlay(Base):
     nome = Column(String, nullable=False)
     categoria = Column(String, nullable=True)   # Ataque, Defesa, Transição, Zona, Bola parada
     descricao = Column(Text, nullable=True)
+    origem = Column(String, nullable=False, default="manual")
     ordem = Column(Integer, nullable=False, default=0)
     criado_em = Column(DateTime, default=datetime.now, nullable=False)
 

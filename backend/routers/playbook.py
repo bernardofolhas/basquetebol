@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from auth import verificar_acesso_equipa
@@ -119,24 +120,51 @@ async def importar_setplay_ebp(
         db.add(playbook)
         db.flush()
 
-    setplay = SetPlay(
-        playbook_id=playbook.id,
-        nome=jogada.nome,
-        categoria=categoria or "Outro",
-        descricao=jogada.descricao or None,
-        ordem=len(playbook.setplays),
+    setplay = (
+        db.query(SetPlay)
+        .filter(
+            SetPlay.playbook_id == playbook.id,
+            SetPlay.nome == jogada.nome,
+            or_(SetPlay.origem == "ebp", SetPlay.descricao.like("Categoria de origem:%")),
+        )
+        .order_by(SetPlay.id.desc())
+        .first()
     )
-    db.add(setplay)
-    db.flush()
+    atualizacao = setplay is not None
+    if setplay:
+        setplay.origem = "ebp"
+        setplay.categoria = categoria or setplay.categoria or "Outro"
+        if not setplay.descricao:
+            setplay.descricao = jogada.descricao or None
+    else:
+        setplay = SetPlay(
+            playbook_id=playbook.id,
+            nome=jogada.nome,
+            categoria=categoria or "Outro",
+            descricao=jogada.descricao or None,
+            origem="ebp",
+            ordem=len(playbook.setplays),
+        )
+        db.add(setplay)
+        db.flush()
+
+    passos_existentes = {passo.ordem: passo for passo in setplay.passos}
     for ordem, (sequencia, imagem) in enumerate(zip(jogada.sequencias, imagens)):
-        db.add(PassoSetPlay(
-            setplay_id=setplay.id,
-            ordem=ordem,
-            observacao=sequencia.texto or None,
-            imagem_coach=imagem,
-        ))
+        passo = passos_existentes.get(ordem)
+        if passo:
+            passo.imagem_coach = imagem
+            if not passo.observacao:
+                passo.observacao = sequencia.texto or None
+        else:
+            db.add(PassoSetPlay(
+                setplay_id=setplay.id,
+                ordem=ordem,
+                observacao=sequencia.texto or None,
+                imagem_coach=imagem,
+            ))
     db.commit()
-    set_flash(request, f"'{jogada.nome}' importada com {len(imagens)} passos editáveis.")
+    acao = "atualizada" if atualizacao else "importada"
+    set_flash(request, f"'{jogada.nome}' {acao} com {len(imagens)} passos editáveis.")
     return RedirectResponse(url=f"/playbook/setplays/{setplay.id}", status_code=303)
 
 

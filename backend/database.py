@@ -208,23 +208,42 @@ def actualizar_estrutura_campos_desenho() -> None:
 
 
 def actualizar_estrutura_playbook() -> None:
-    """Mantém instalações existentes compatíveis com imagens por passo."""
+    """Mantém instalações existentes compatíveis com importações e imagens."""
     inspector = inspect(engine)
-    if not inspector.has_table("passos_setplay"):
-        return
-    colunas = {coluna["name"] for coluna in inspector.get_columns("passos_setplay")}
-    if "imagem_coach" in colunas:
-        return
-    with engine.begin() as ligacao:
-        if engine.dialect.name == "postgresql":
+    dialecto = engine.dialect.name
+    if inspector.has_table("passos_setplay"):
+        colunas = {coluna["name"] for coluna in inspector.get_columns("passos_setplay")}
+        if "imagem_coach" not in colunas:
+            with engine.begin() as ligacao:
+                if dialecto == "postgresql":
+                    ligacao.execute(text(
+                        "ALTER TABLE passos_setplay ADD COLUMN IF NOT EXISTS imagem_coach TEXT NULL"
+                    ))
+                else:
+                    ligacao.execute(text(
+                        "ALTER TABLE passos_setplay ADD COLUMN imagem_coach TEXT NULL"
+                    ))
+            logger.info("Imagem alternativa adicionada aos passos do playbook.")
+
+    if inspector.has_table("setplays"):
+        colunas = {coluna["name"] for coluna in inspector.get_columns("setplays")}
+        if "origem" not in colunas:
+            with engine.begin() as ligacao:
+                if dialecto == "postgresql":
+                    ligacao.execute(text(
+                        "ALTER TABLE setplays ADD COLUMN IF NOT EXISTS "
+                        "origem VARCHAR NOT NULL DEFAULT 'manual'"
+                    ))
+                else:
+                    ligacao.execute(text(
+                        "ALTER TABLE setplays ADD COLUMN origem VARCHAR NOT NULL DEFAULT 'manual'"
+                    ))
+            logger.info("Origem adicionada às jogadas do playbook.")
+        with engine.begin() as ligacao:
             ligacao.execute(text(
-                "ALTER TABLE passos_setplay ADD COLUMN IF NOT EXISTS imagem_coach TEXT NULL"
+                "UPDATE setplays SET origem = 'ebp' "
+                "WHERE descricao LIKE 'Categoria de origem:%' AND origem <> 'ebp'"
             ))
-        else:
-            ligacao.execute(text(
-                "ALTER TABLE passos_setplay ADD COLUMN imagem_coach TEXT NULL"
-            ))
-    logger.info("Imagem alternativa adicionada aos passos do playbook.")
 
 
 def actualizar_estrutura_objetivos_planeamento() -> None:

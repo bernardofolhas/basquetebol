@@ -1,8 +1,10 @@
+import base64
 import io
 import zipfile
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from database import SessionLocal
 from models.equipa import Equipa
@@ -61,7 +63,10 @@ def test_interpreta_e_renderiza_cada_sequencia_do_ebp():
     assert len(jogada.sequencias) == 2
     assert jogada.sequencias[0].texto == "Primeiro movimento"
     assert jogada.sequencias[1].texto == "Segundo movimento"
-    assert renderizar_sequencia_ebp(jogada.sequencias[0]).startswith("data:image/png;base64,")
+    imagem = renderizar_sequencia_ebp(jogada.sequencias[0])
+    assert imagem.startswith("data:image/png;base64,")
+    with Image.open(io.BytesIO(base64.b64decode(imagem.split(",", 1)[1]))) as desenho:
+        assert desenho.size == (1400, 1200)
 
 
 @pytest.mark.parametrize("conteudo", (b"", b"nao-e-ebp", b"EBP\x04invalido"))
@@ -100,11 +105,34 @@ def test_administrador_importa_ebp_com_imagem_independente_por_passo(client_admi
         assert setplay is not None
         setplay_id = setplay.id
         assert setplay.categoria == "Ataque"
+        assert setplay.origem == "ebp"
         passos = db.query(PassoSetPlay).filter(PassoSetPlay.setplay_id == setplay.id).order_by(PassoSetPlay.ordem).all()
         assert len(passos) == 2
         assert all(passo.imagem_coach for passo in passos)
         assert [passo.observacao for passo in passos] == ["Primeiro movimento", "Segundo movimento"]
         assert resposta.headers["location"] == f"/playbook/setplays/{setplay.id}"
+
+        detalhe = client_admin.get(f"/playbook/setplays/{setplay.id}")
+        assert detalhe.status_code == 200
+        assert "Imagem original do passo importado." in detalhe.text
+        assert "Desenho tático" not in detalhe.text
+        assert f'id="canvas_{passos[0].id}"' not in detalhe.text
+
+        repetida = client_admin.post(
+            f"/playbook/equipas/{equipa.id}/setplays/importar-ebp",
+            data={"categoria": "Ataque"},
+            files={"ficheiro": ("wave-flare.ebp", _ficheiro_ebp(), "application/octet-stream")},
+            follow_redirects=False,
+        )
+        assert repetida.status_code == 303
+        assert repetida.headers["location"] == f"/playbook/setplays/{setplay.id}"
+        total = (
+            db.query(SetPlay)
+            .join(Playbook)
+            .filter(Playbook.equipa_id == equipa.id, SetPlay.nome == "Wave + Flare")
+            .count()
+        )
+        assert total == 1
     finally:
         if setplay_id:
             setplay = db.query(SetPlay).filter(SetPlay.id == setplay_id).first()
@@ -114,13 +142,14 @@ def test_administrador_importa_ebp_com_imagem_independente_por_passo(client_admi
         db.close()
 
 
-def test_interface_expoe_importacao_ebp_sem_remover_os_outros_visuais():
+def test_interface_mantem_desenho_manual_e_isola_importacoes_ebp():
     lista = (ROOT / "frontend/templates/playbook/lista.html").read_text(encoding="utf-8")
     detalhe = (ROOT / "frontend/templates/playbook/detalhe.html").read_text(encoding="utf-8")
 
     assert "Importar ficheiro EBP" in lista
     assert 'accept=".ebp,application/octet-stream"' in lista
+    assert "setplay.origem == 'ebp'" in detalhe
+    assert "Imagem original do passo importado." in detalhe
     assert "Desenho tático" in detalhe
     assert 'name="imagem"' in detalhe
     assert "/imagem/eliminar" in detalhe
-

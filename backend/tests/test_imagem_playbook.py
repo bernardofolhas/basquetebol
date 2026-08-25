@@ -43,6 +43,7 @@ def test_playbook_expoe_imagem_e_desenho_em_cada_passo():
     pdf = (ROOT / "frontend/templates/playbook/pdf.html").read_text(encoding="utf-8")
 
     assert hasattr(PassoSetPlay, "imagem_coach")
+    assert hasattr(SetPlay, "origem")
     assert "Desenho tático" in template
     assert 'name="imagem"' in template
     assert "/imagem/eliminar" in template

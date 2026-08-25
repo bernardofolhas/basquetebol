@@ -16,7 +16,7 @@ MAX_SEQUENCIAS = 100
 MAX_GRAFICOS_POR_SEQUENCIA = 500
 LARGURA_COORDENADAS = 7000
 ALTURA_COORDENADAS = 6000
-TAMANHO_IMAGEM = (1260, 980)
+TAMANHO_IMAGEM = (1400, 1200)
 
 
 @dataclass(frozen=True)
@@ -27,7 +27,13 @@ class GraficoEbp:
     y1: int
     x2: int
     y2: int
+    espessura: int
+    rotacao: int
+    seta: int
     cor: int
+    cor_secundaria: int
+    etiqueta: int
+    nivel: int
     texto: str = ""
 
 
@@ -134,7 +140,13 @@ def interpretar_ebp(conteudo: bytes) -> JogadaEbp:
                 y1=_inteiro(dados.get("y1")),
                 x2=_inteiro(dados.get("x2")),
                 y2=_inteiro(dados.get("y2")),
+                espessura=_inteiro(dados.get("thickness"), 1),
+                rotacao=_inteiro(dados.get("rotation")),
+                seta=_inteiro(dados.get("arrow")),
                 cor=_inteiro(dados.get("color")),
+                cor_secundaria=_inteiro(dados.get("color2")),
+                etiqueta=_inteiro(dados.get("tagnr")),
+                nivel=_inteiro(dados.get("level")),
                 texto=(dados.get("playtext") or "").strip()[:200],
             ))
             if len(graficos) == quantidade:
@@ -172,16 +184,34 @@ def _cor_bgr(valor: int) -> tuple[int, int, int]:
     return valor & 255, (valor >> 8) & 255, (valor >> 16) & 255
 
 
-def _seta(desenho: ImageDraw.ImageDraw, inicio: tuple[int, int], fim: tuple[int, int], cor, largura=7) -> None:
-    desenho.line((inicio, fim), fill=cor, width=largura)
+def _cabeca_seta(
+    desenho: ImageDraw.ImageDraw,
+    inicio: tuple[float, float],
+    fim: tuple[float, float],
+    cor,
+    largura: int = 6,
+) -> None:
     angulo = math.atan2(fim[1] - inicio[1], fim[0] - inicio[0])
-    tamanho = 22
-    pontos = [
+    tamanho = 25
+    desenho.line((
         fim,
         (fim[0] - tamanho * math.cos(angulo - .48), fim[1] - tamanho * math.sin(angulo - .48)),
+    ), fill=cor, width=largura)
+    desenho.line((
+        fim,
         (fim[0] - tamanho * math.cos(angulo + .48), fim[1] - tamanho * math.sin(angulo + .48)),
-    ]
-    desenho.polygon(pontos, fill=cor)
+    ), fill=cor, width=largura)
+
+
+def _seta(
+    desenho: ImageDraw.ImageDraw,
+    inicio: tuple[int, int],
+    fim: tuple[int, int],
+    cor,
+    largura: int = 6,
+) -> None:
+    desenho.line((inicio, fim), fill=cor, width=largura)
+    _cabeca_seta(desenho, inicio, fim, cor, largura)
 
 
 def _linha_tracejada(desenho: ImageDraw.ImageDraw, inicio: tuple[int, int], fim: tuple[int, int], cor) -> None:
@@ -193,26 +223,99 @@ def _linha_tracejada(desenho: ImageDraw.ImageDraw, inicio: tuple[int, int], fim:
         p1 = (inicio[0] + (fim[0] - inicio[0]) * a, inicio[1] + (fim[1] - inicio[1]) * a)
         p2 = (inicio[0] + (fim[0] - inicio[0]) * b, inicio[1] + (fim[1] - inicio[1]) * b)
         desenho.line((p1, p2), fill=cor, width=6)
-    _seta(desenho, (
+    _cabeca_seta(desenho, (
         round(inicio[0] + (fim[0] - inicio[0]) * .86),
         round(inicio[1] + (fim[1] - inicio[1]) * .86),
-    ), fim, cor, 1)
+    ), fim, cor, 5)
 
 
-def _linha_ziguezague(desenho: ImageDraw.ImageDraw, inicio: tuple[int, int], fim: tuple[int, int], cor) -> None:
-    distancia = max(1, math.dist(inicio, fim))
-    segmentos = max(4, int(distancia / 30))
+def _suavizar_percurso(pontos: list[tuple[int, int]]) -> list[tuple[float, float]]:
+    if len(pontos) < 3:
+        return list(pontos)
+    resultado: list[tuple[float, float]] = list(pontos)
+    for _ in range(3):
+        novos = [resultado[0]]
+        for inicio, fim in zip(resultado, resultado[1:]):
+            novos.append((inicio[0] * .75 + fim[0] * .25, inicio[1] * .75 + fim[1] * .25))
+            novos.append((inicio[0] * .25 + fim[0] * .75, inicio[1] * .25 + fim[1] * .75))
+        novos.append(resultado[-1])
+        resultado = novos
+    return resultado
+
+
+def _agrupar_percursos(
+    graficos: list[GraficoEbp],
+    tipos: set[str],
+) -> list[list[tuple[int, int]]]:
+    percursos: list[list[tuple[int, int]]] = []
+    atual: list[tuple[int, int]] = []
+    for grafico in graficos:
+        if grafico.tipo not in tipos:
+            continue
+        inicio, fim = _ponto(grafico.x1, grafico.y1), _ponto(grafico.x2, grafico.y2)
+        if atual and math.dist(atual[-1], inicio) <= 3:
+            atual.append(fim)
+        else:
+            if atual:
+                percursos.append(atual)
+            atual = [inicio, fim]
+    if atual:
+        percursos.append(atual)
+    return percursos
+
+
+def _desenhar_percurso(
+    desenho: ImageDraw.ImageDraw,
+    pontos: list[tuple[int, int]],
+    cor,
+    largura: int = 6,
+) -> None:
+    percurso = _suavizar_percurso(pontos)
+    desenho.line(percurso, fill=cor, width=largura, joint="curve")
+    _cabeca_seta(desenho, percurso[-2], percurso[-1], cor, largura)
+
+
+def _desenhar_drible(
+    desenho: ImageDraw.ImageDraw,
+    pontos: list[tuple[int, int]],
+    cor,
+) -> None:
+    percurso = _suavizar_percurso(pontos)
+    ziguezague: list[tuple[float, float]] = [percurso[0]]
+    lado = 1
+    for inicio, fim in zip(percurso, percurso[1:]):
+        distancia = max(1, math.dist(inicio, fim))
+        segmentos = max(1, int(distancia / 24))
+        dx, dy = fim[0] - inicio[0], fim[1] - inicio[1]
+        comprimento = max(1, math.hypot(dx, dy))
+        normal = (-dy / comprimento * 7, dx / comprimento * 7)
+        for indice in range(1, segmentos + 1):
+            t = indice / segmentos
+            deslocamento = 0 if indice == segmentos else lado
+            ziguezague.append((
+                inicio[0] + dx * t + normal[0] * deslocamento,
+                inicio[1] + dy * t + normal[1] * deslocamento,
+            ))
+            lado *= -1
+    desenho.line(ziguezague, fill=cor, width=5, joint="curve")
+    _cabeca_seta(desenho, ziguezague[-2], ziguezague[-1], cor, 5)
+
+
+def _desenhar_lancamento(
+    desenho: ImageDraw.ImageDraw,
+    inicio: tuple[int, int],
+    fim: tuple[int, int],
+    cor,
+) -> None:
     dx, dy = fim[0] - inicio[0], fim[1] - inicio[1]
     comprimento = max(1, math.hypot(dx, dy))
-    normal = (-dy / comprimento * 8, dx / comprimento * 8)
-    pontos = [inicio]
-    for indice in range(1, segmentos):
-        t = indice / segmentos
-        lado = 1 if indice % 2 else -1
-        pontos.append((inicio[0] + dx * t + normal[0] * lado, inicio[1] + dy * t + normal[1] * lado))
-    pontos.append(fim)
-    desenho.line(pontos, fill=cor, width=5, joint="curve")
-    _seta(desenho, pontos[-2], fim, cor, 2)
+    normal = (-dy / comprimento * 4, dx / comprimento * 4)
+    for lado in (-1, 1):
+        desenho.line((
+            (inicio[0] + normal[0] * lado, inicio[1] + normal[1] * lado),
+            (fim[0] + normal[0] * lado, fim[1] + normal[1] * lado),
+        ), fill=cor, width=3)
+    _cabeca_seta(desenho, inicio, fim, cor, 5)
 
 
 def _imagem_campo() -> Image.Image:
@@ -271,18 +374,24 @@ def renderizar_sequencia_ebp(sequencia: SequenciaEbp) -> str:
 
     for grafico in linhas:
         inicio, fim = _ponto(grafico.x1, grafico.y1), _ponto(grafico.x2, grafico.y2)
-        if grafico.tipo in {"ppass", "pshot"}:
+        largura = max(4, min(10, grafico.espessura * 5))
+        if grafico.tipo == "ppass":
             _linha_tracejada(desenho, inicio, fim, cor_linha)
-        elif grafico.tipo in {"dribbel", "pdribbel"}:
-            _linha_ziguezague(desenho, inicio, fim, cor_linha)
+        elif grafico.tipo == "pshot":
+            _desenhar_lancamento(desenho, inicio, fim, cor_linha)
         elif grafico.tipo == "pscreen":
-            desenho.line((inicio, fim), fill=cor_linha, width=7)
+            desenho.line((inicio, fim), fill=cor_linha, width=largura)
             angulo = math.atan2(fim[1] - inicio[1], fim[0] - inicio[0]) + math.pi / 2
             deslocamento = (math.cos(angulo) * 18, math.sin(angulo) * 18)
             desenho.line((fim[0] - deslocamento[0], fim[1] - deslocamento[1],
-                          fim[0] + deslocamento[0], fim[1] + deslocamento[1]), fill=cor_linha, width=7)
-        else:
-            _seta(desenho, inicio, fim, cor_linha)
+                          fim[0] + deslocamento[0], fim[1] + deslocamento[1]), fill=cor_linha, width=largura)
+        elif grafico.tipo not in {"loop", "ploop", "dribbel", "pdribbel"}:
+            _seta(desenho, inicio, fim, cor_linha, largura)
+
+    for percurso in _agrupar_percursos(linhas, {"loop", "ploop"}):
+        _desenhar_percurso(desenho, percurso, cor_linha)
+    for percurso in _agrupar_percursos(linhas, {"dribbel", "pdribbel"}):
+        _desenhar_drible(desenho, percurso, cor_linha)
 
     for grafico in simbolos:
         centro = _ponto(grafico.x1, grafico.y1)
