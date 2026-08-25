@@ -108,7 +108,11 @@
           });
         });
         var initial=navigation.dataset.workspaceDefault||tabs[0].dataset.workspaceTab;
-        try{initial=window.sessionStorage.getItem(storageKey)||initial}catch(error){}
+        if(navigation.dataset.workspaceAlwaysDefault!=="true"){
+          try{initial=window.sessionStorage.getItem(storageKey)||initial}catch(error){}
+        }else{
+          try{window.sessionStorage.removeItem(storageKey)}catch(error){}
+        }
         activate(initial,false);
       });
     });

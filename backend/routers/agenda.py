@@ -504,6 +504,8 @@ async def editar_atividade_agenda(
     titulo: str = Form(""),
     data_evento: str = Form(...),
     data_fim: str = Form(""),
+    recorrencia: str = Form("unica"),
+    recorrencia_intervalo: int = Form(1),
     escopo_recorrencia: str = Form("ocorrencia"),
     hora_inicio: str = Form(""),
     hora_fim: str = Form(""),
@@ -522,7 +524,7 @@ async def editar_atividade_agenda(
     try:
         tipo_valido = TipoEventoPlaneamentoClubeEnum(tipo)
         data_convertida = _data(data_evento)
-        inicio, fim = _horas(hora_inicio, hora_fim)
+        hora_inicio_normalizada, hora_fim_normalizada = _horas(hora_inicio, hora_fim)
         equipa_convertida, macrociclo, mesociclo, microciclo = _resolver_contexto(
             db,
             _id(equipa_id),
@@ -533,6 +535,19 @@ async def editar_atividade_agenda(
         aplica = aplica_a_todas_equipas == "true"
         _verificar_acesso(utilizador, equipa_convertida or evento.equipa_id, db, aplica)
         titulo_final = titulo.strip() or metadados_tipo_agenda(tipo_valido)["label"]
+        fim_recorrencia = _fim_recorrencia(
+            _data(data_fim) if data_fim else None,
+            recorrencia,
+            _fim_contexto_planeamento(db, macrociclo_id, mesociclo_id, microciclo_id),
+        )
+        datas_recorrencia = _datas_recorrencia(
+            data_convertida,
+            fim_recorrencia,
+            recorrencia,
+            recorrencia_intervalo,
+        )
+        nova_serie = not evento.serie_id and len(datas_recorrencia) > 1
+        serie_id = evento.serie_id or (str(uuid4()) if nova_serie else None)
         alvos = [evento]
         if evento.serie_id and escopo_recorrencia in {"futuro", "serie"}:
             query = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.serie_id == evento.serie_id, EventoPlaneamentoClube.ativo.is_(True))
@@ -545,9 +560,12 @@ async def editar_atividade_agenda(
             alvo.tipo = tipo_valido
             alvo.titulo = titulo_final
             alvo.data = alvo.data + deslocamento
-            alvo.data_fim = _data(data_fim) if data_fim else alvo.data_fim
-            alvo.hora_inicio = inicio
-            alvo.hora_fim = fim
+            alvo.data_fim = fim_recorrencia if (nova_serie or escopo_recorrencia != "ocorrencia") else alvo.data_fim
+            alvo.recorrencia_frequencia = recorrencia if nova_serie else alvo.recorrencia_frequencia
+            alvo.recorrencia_intervalo = recorrencia_intervalo if nova_serie else alvo.recorrencia_intervalo
+            alvo.serie_id = serie_id if nova_serie else alvo.serie_id
+            alvo.hora_inicio = hora_inicio_normalizada
+            alvo.hora_fim = hora_fim_normalizada
             alvo.descricao = descricao.strip() or None
             alvo.espaco_id = _id(espaco_id)
             alvo.equipa_id = None if aplica else equipa_convertida
@@ -558,6 +576,31 @@ async def editar_atividade_agenda(
             alvo.alterado_por = utilizador.username
             _atualizar_sessao_ligada(db, alvo, tipo)
             conflitos.extend(conflitos_do_evento(db, alvo))
+        if nova_serie:
+            for data_ocorrencia in datas_recorrencia[1:]:
+                novo_evento, _ = _preparar_evento(
+                    db,
+                    utilizador,
+                    tipo=tipo,
+                    titulo=titulo,
+                    data_evento=data_ocorrencia.isoformat(),
+                    hora_inicio=hora_inicio,
+                    hora_fim=hora_fim,
+                    descricao=descricao,
+                    espaco_id=espaco_id,
+                    equipa_id=equipa_id,
+                    macrociclo_id=macrociclo_id,
+                    mesociclo_id=mesociclo_id,
+                    microciclo_id=microciclo_id,
+                    aplica_a_todas_equipas=aplica_a_todas_equipas,
+                    retorno=retorno,
+                )
+                novo_evento.data_fim = fim_recorrencia
+                novo_evento.serie_id = serie_id
+                novo_evento.recorrencia_frequencia = recorrencia
+                novo_evento.recorrencia_intervalo = recorrencia_intervalo
+                novo_evento.alterado_por = utilizador.username
+                conflitos.extend(conflitos_do_evento(db, novo_evento))
         db.commit()
     except ValueError as erro:
         db.rollback()

@@ -1,4 +1,5 @@
 from datetime import date
+from pathlib import Path
 
 from database import SessionLocal
 from models.planeamento_clube import EventoPlaneamentoClube, TipoEventoPlaneamentoClubeEnum
@@ -44,6 +45,29 @@ def test_recorrencia_semanal_sem_data_final_usa_o_fim_do_mesociclo():
 
 def test_data_final_indicada_pelo_utilizador_tem_prioridade_na_recorrencia():
     assert _fim_recorrencia(date(2026, 9, 21), "semanal", date(2026, 10, 4)) == date(2026, 9, 21)
+
+
+def test_atividade_unica_pode_ser_transformada_numa_serie_semanal():
+    datas = _datas_recorrencia(
+        date(2026, 9, 14),
+        _fim_recorrencia(None, "semanal", date(2026, 9, 28)),
+        "semanal",
+        1,
+    )
+
+    assert datas == [date(2026, 9, 14), date(2026, 9, 21), date(2026, 9, 28)]
+
+
+def test_mesociclo_envia_os_dados_da_serie_para_o_editor_de_agenda():
+    raiz = Path(__file__).resolve().parents[2]
+    modelo = (raiz / "frontend" / "templates" / "planeamento" / "mesociclos" / "detalhe.html").read_text(encoding="utf-8")
+    script = (raiz / "frontend" / "static" / "js" / "agenda.js").read_text(encoding="utf-8")
+
+    assert 'data-workspace-always-default="true"' in modelo
+    assert "data-agenda-data-fim" in modelo
+    assert "data-agenda-serie-id" in modelo
+    assert "data-agenda-recorrencia" in modelo
+    assert "campo('agenda-escopo').value = 'serie'" in script
 
 
 def test_admin_consegue_criar_atividade_comum_de_dia_inteiro(client_admin):
