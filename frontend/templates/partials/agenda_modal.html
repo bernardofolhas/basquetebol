@@ -35,6 +35,7 @@
         <input type="hidden" name="macrociclo_id" value="{{ agenda_contexto.macrociclo_id|default('') }}">
         <input type="hidden" name="mesociclo_id" value="{{ agenda_contexto.mesociclo_id|default('') }}">
         <input type="hidden" name="microciclo_id" value="{{ agenda_contexto.microciclo_id|default('') }}">
+        <input type="hidden" id="agenda-limite-recorrencia" value="{{ agenda_contexto.data_fim|default('')|data_iso }}">
         <input type="hidden" id="agenda-evento-id" value="">
 
         <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -52,7 +53,7 @@
                 <input id="agenda-data" type="date" name="data_evento" min="{{ agenda_contexto.data_inicio|default('')|data_iso }}" max="{{ agenda_contexto.data_fim|default('')|data_iso }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2" required>
             </label>
             <label class="text-sm font-medium text-slate-700">Data final
-                <input id="agenda-data-fim" type="date" name="data_fim" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+                <input id="agenda-data-fim" type="date" name="data_fim" max="{{ agenda_contexto.data_fim|default('')|data_iso }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
             </label>
             <label class="text-sm font-medium text-slate-700">Programação
                 <select id="agenda-recorrencia" name="recorrencia" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"><option value="unica">Atividade única</option><option value="diaria">Diária</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option></select>

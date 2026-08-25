@@ -7,6 +7,7 @@ from services.agenda_service import (
     intervalo_sobreposto,
     metadados_tipo_agenda,
 )
+from routers.agenda import _datas_recorrencia, _fim_recorrencia
 
 
 def test_todos_os_tipos_de_evento_tem_metadados_de_agenda():
@@ -25,6 +26,24 @@ def test_conflito_de_agenda_considera_dia_inteiro_e_intervalos():
     assert not intervalo_sobreposto(dia, "18:00", "19:00", dia, "19:00", "20:00")
     assert intervalo_sobreposto(dia, None, None, dia, "19:00", "20:00")
     assert not intervalo_sobreposto(dia, "18:00", "19:00", date(2026, 8, 4), "18:00", "19:00")
+
+
+def test_recorrencia_semanal_sem_data_final_usa_o_fim_do_mesociclo():
+    inicio = date(2026, 9, 7)
+    fim_mesociclo = date(2026, 10, 4)
+
+    fim = _fim_recorrencia(None, "semanal", fim_mesociclo)
+
+    assert _datas_recorrencia(inicio, fim, "semanal", 1) == [
+        date(2026, 9, 7),
+        date(2026, 9, 14),
+        date(2026, 9, 21),
+        date(2026, 9, 28),
+    ]
+
+
+def test_data_final_indicada_pelo_utilizador_tem_prioridade_na_recorrencia():
+    assert _fim_recorrencia(date(2026, 9, 21), "semanal", date(2026, 10, 4)) == date(2026, 9, 21)
 
 
 def test_admin_consegue_criar_atividade_comum_de_dia_inteiro(client_admin):

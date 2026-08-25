@@ -46,6 +46,15 @@ def _datas_recorrencia(inicio: date, fim: date | None, frequencia: str, interval
     return datas
 
 
+def _fim_recorrencia(fim_indicado: date | None, frequencia: str, fim_contexto: date | None) -> date | None:
+    """Usa o limite do ciclo quando uma recorrência não indica data final."""
+    if fim_indicado:
+        return fim_indicado
+    if (frequencia or "unica").strip().lower() == "unica":
+        return None
+    return fim_contexto
+
+
 def _id(valor: str | int | None) -> int | None:
     if valor in (None, ""):
         return None
@@ -134,6 +143,30 @@ def _resolver_contexto(
     if macrociclo:
         equipa_id = equipa_id or macrociclo.equipa_id
     return equipa_id, macrociclo, mesociclo, microciclo
+
+
+def _fim_contexto_planeamento(
+    db: Session,
+    macrociclo_id: str | int | None,
+    mesociclo_id: str | int | None,
+    microciclo_id: str | int | None,
+) -> date | None:
+    """Obtém o fim do ciclo mais específico para limitar uma recorrência."""
+    micro_id = _id(microciclo_id)
+    if micro_id:
+        microciclo = db.query(Microciclo).filter(Microciclo.id == micro_id).first()
+        return microciclo.data_fim if microciclo else None
+
+    meso_id = _id(mesociclo_id)
+    if meso_id:
+        mesociclo = db.query(Mesociclo).filter(Mesociclo.id == meso_id).first()
+        return mesociclo.data_fim if mesociclo else None
+
+    macro_id = _id(macrociclo_id)
+    if macro_id:
+        macrociclo = db.query(Macrociclo).filter(Macrociclo.id == macro_id).first()
+        return macrociclo.data_fim if macrociclo else None
+    return None
 
 
 def _verificar_acesso(utilizador, equipa_id: int | None, db: Session, aplica_a_todas: bool = False) -> None:
@@ -407,7 +440,12 @@ async def criar_atividade_agenda(
 ):
     try:
         inicio = _data(data_evento)
-        fim = _data(data_fim) if data_fim else None
+        fim_indicado = _data(data_fim) if data_fim else None
+        fim = _fim_recorrencia(
+            fim_indicado,
+            recorrencia,
+            _fim_contexto_planeamento(db, macrociclo_id, mesociclo_id, microciclo_id),
+        )
         datas = _datas_recorrencia(inicio, fim, recorrencia, recorrencia_intervalo)
         serie_id = str(uuid4()) if len(datas) > 1 else None
         conflitos = []

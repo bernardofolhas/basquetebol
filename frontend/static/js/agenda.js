@@ -14,6 +14,14 @@
         else elemento.setAttribute('open', 'open');
     }
 
+    function aplicarLimiteDaRecorrencia() {
+        const recorrencia = campo('agenda-recorrencia');
+        const dataFim = campo('agenda-data-fim');
+        const limite = campo('agenda-limite-recorrencia');
+        if (!recorrencia || !dataFim || !limite || recorrencia.value === 'unica') return;
+        if (!dataFim.value && limite.value) dataFim.value = limite.value;
+    }
+
     function abrirNovaAgenda(data) {
         const formulario = campo('agenda-form');
         if (!formulario) return;
@@ -101,6 +109,10 @@
             abrirNovaAgenda(novo.dataset.agendaNewDate);
             return;
         }
+    });
+
+    document.addEventListener('change', function (evento) {
+        if (evento.target.id === 'agenda-recorrencia') aplicarLimiteDaRecorrencia();
     });
 
     window.abrirNovaAgenda = abrirNovaAgenda;
