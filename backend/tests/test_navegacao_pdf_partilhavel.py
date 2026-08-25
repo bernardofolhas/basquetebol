@@ -138,3 +138,17 @@ def test_calendario_partilhavel_de_mesociclo_mantem_apenas_dias_do_intervalo(mon
     dias = [dia["data"] for semana in agenda["semanas_intervalo"] for dia in semana if dia]
     assert dias == [date(2026, 1, 31), date(2026, 2, 1), date(2026, 2, 2)]
     assert agenda["meses_intervalo"] == "Janeiro 2026 · Fevereiro 2026"
+
+
+def test_microciclo_partilhavel_usa_modelo_semanal_legivel():
+    from paths import TEMPLATES_DIR
+
+    rota = (TEMPLATES_DIR.parent.parent / "backend" / "routers" / "pdf_partilhavel.py").read_text(encoding="utf-8")
+    modelo = (
+        TEMPLATES_DIR / "planeamento" / "microciclos" / "partilhavel_pdf.html"
+    ).read_text(encoding="utf-8")
+
+    assert 'template="planeamento/microciclos/partilhavel_pdf.html"' in rota
+    assert "font-size:18pt" in modelo
+    assert "height:{{ altura_semana }}mm" in modelo
+    assert "Documento para partilha" not in modelo

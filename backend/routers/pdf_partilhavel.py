@@ -157,7 +157,16 @@ def micro_partilhavel(micro_id: int, request: Request, db: Session = Depends(get
         return RedirectResponse("/equipas", status_code=303)
     equipa = micro.mesociclo.macrociclo.equipa
     verificar_ou_negar_equipa(utilizador, equipa.id, db)
-    return _responder(request, db, utilizador, titulo=f"Microciclo {micro.numero} · agenda semanal", data_inicio=micro.data_inicio, data_fim=micro.data_fim, nome=f"microciclo_{micro.id}_partilhavel.pdf", equipa=equipa, equipa_ids=[equipa.id])
+    return _responder(
+        request, db, utilizador,
+        titulo=f"Microciclo {micro.numero} - Agenda semanal",
+        data_inicio=micro.data_inicio,
+        data_fim=micro.data_fim,
+        nome=f"microciclo_{micro.id}_partilhavel.pdf",
+        equipa=equipa,
+        equipa_ids=[equipa.id],
+        template="planeamento/microciclos/partilhavel_pdf.html",
+    )
 
 
 @router.get("/anual/{anual_id}/pdf")
