@@ -21,6 +21,7 @@ from models.planeamento_clube import (
 from services.agenda_service import conflitos_do_evento, metadados_tipo_agenda
 from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.numeracao_planeamento_service import renumerar_treinos_equipa
+from services.remocao_sessoes_service import eliminar_sessoes_treino
 
 
 router = APIRouter(prefix="/agenda")
@@ -327,6 +328,25 @@ def _preparar_evento(
         meso_convertido,
         micro_convertido,
     )
+    if not microciclo and equipa_convertida and tipo in {
+        TipoEventoPlaneamentoClubeEnum.treino_equipa.value,
+        TipoEventoPlaneamentoClubeEnum.treino_fisico.value,
+        TipoEventoPlaneamentoClubeEnum.treino_individual.value,
+        TipoEventoPlaneamentoClubeEnum.jogo.value,
+    }:
+        consulta_micro = db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.equipa_id == equipa_convertida,
+            Microciclo.data_inicio <= data_convertida,
+            Microciclo.data_fim >= data_convertida,
+        )
+        if mesociclo:
+            consulta_micro = consulta_micro.filter(Microciclo.mesociclo_id == mesociclo.id)
+        elif macrociclo:
+            consulta_micro = consulta_micro.filter(Mesociclo.macrociclo_id == macrociclo.id)
+        microciclo = consulta_micro.order_by(Microciclo.data_inicio.desc(), Microciclo.id.desc()).first()
+        if microciclo:
+            mesociclo = microciclo.mesociclo
+            macrociclo = mesociclo.macrociclo
     _verificar_acesso(utilizador, equipa_convertida, db, aplica)
 
     evento = EventoPlaneamentoClube(
@@ -535,7 +555,10 @@ async def apagar_atividade_agenda(
             query = query.filter(EventoPlaneamentoClube.data >= evento.data)
         alvos = query.all()
     for alvo in alvos:
-        tem_historico = bool(alvo.sessoes_geradas or alvo.jogo_id or alvo.atividade_id)
+        sessoes = list(alvo.sessoes_geradas)
+        if sessoes:
+            eliminar_sessoes_treino(db, sessoes)
+        tem_historico = bool(alvo.jogo_id or alvo.atividade_id or alvo.atribuicoes_espaco)
         if tem_historico:
             alvo.ativo = False
             alvo.desativado_em = datetime.now()

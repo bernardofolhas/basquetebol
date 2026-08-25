@@ -80,7 +80,7 @@
     function apagarAgenda() {
         const id = campo('agenda-evento-id').value;
         const formulario = campo('agenda-form');
-        if (!id || !formulario || !window.confirm('Remover esta atividade do calendário? O histórico associado será preservado.')) return;
+        if (!id || !formulario || !window.confirm('Remover esta atividade do calendário? As sessões de treino associadas também serão eliminadas.')) return;
         formulario.action = '/agenda/atividades/' + id + '/apagar';
         formulario.querySelectorAll('[required]').forEach(function (input) { input.removeAttribute('required'); });
         formulario.submit();

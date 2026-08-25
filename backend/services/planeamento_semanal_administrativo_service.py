@@ -11,6 +11,11 @@ from models.espaco_treino import (
 )
 from models.indisponibilidade_treinador import IndisponibilidadeTreinador
 
+HORA_INICIO_OPERACIONAL = "10:00"
+HORA_FIM_OPERACIONAL = "23:00"
+DURACAO_SLOT_PADRAO = 90
+NOMES_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+
 
 def _minutos(hora: str) -> int:
     horas, minutos = map(int, hora.split(":"))
@@ -96,8 +101,20 @@ def validar_reserva(
 ) -> list[str]:
     """Valida disponibilidade, bloqueios e sobreposições da reserva."""
     erros = []
-    if not horario_corresponde_slot(db, espaco_id, data_slot, hora_inicio, hora_fim):
-        erros.append("O horário não corresponde a um slot disponível configurado para o espaço.")
+    try:
+        inicio_minutos = _minutos(hora_inicio)
+        fim_minutos = _minutos(hora_fim)
+    except (TypeError, ValueError):
+        inicio_minutos = fim_minutos = -1
+    if (
+        inicio_minutos < _minutos(HORA_INICIO_OPERACIONAL)
+        or fim_minutos > _minutos(HORA_FIM_OPERACIONAL)
+        or inicio_minutos >= fim_minutos
+    ):
+        erros.append(
+            f"O horário deve ficar entre {HORA_INICIO_OPERACIONAL} e {HORA_FIM_OPERACIONAL}, "
+            "com a hora de início anterior à hora de fim."
+        )
     bloqueio = obter_bloqueio(db, espaco_id, data_slot, hora_inicio, hora_fim)
     if bloqueio:
         erros.append(f"O espaço está indisponível neste período: {bloqueio.motivo or 'bloqueio do clube'}.")
@@ -127,8 +144,21 @@ def validar_reserva(
     return erros
 
 
+def _intervalos_operacionais() -> list[tuple[str, str]]:
+    """Cria uma grelha-base de 90 minutos; o horário final pode ser ajustado no modal."""
+    intervalos = []
+    cursor = _minutos(HORA_INICIO_OPERACIONAL)
+    limite = _minutos(HORA_FIM_OPERACIONAL)
+    while cursor + DURACAO_SLOT_PADRAO <= limite:
+        intervalos.append((_hora(cursor), _hora(cursor + DURACAO_SLOT_PADRAO)))
+        cursor += DURACAO_SLOT_PADRAO
+    if intervalos and intervalos[-1][1] < HORA_FIM_OPERACIONAL:
+        intervalos.append((_hora(limite - DURACAO_SLOT_PADRAO), HORA_FIM_OPERACIONAL))
+    return intervalos
+
+
 def gerar_grelha_slots(db: Session, semanal) -> dict:
-    """Gera slots visuais, incluindo reservas criadas fora de uma disponibilidade."""
+    """Gera uma grelha operacional completa e mantém visíveis horários excecionais."""
     espacos = db.query(EspacoTreino).filter(EspacoTreino.ativo.is_(True)).order_by(EspacoTreino.nome).all()
     reservas = db.query(AtribuicaoEspacoSemanal).filter(
         AtribuicaoEspacoSemanal.plano_semanal_id == semanal.id,
@@ -137,31 +167,36 @@ def gerar_grelha_slots(db: Session, semanal) -> dict:
     dias = []
     atual = semanal.data_inicio
     while atual <= semanal.data_fim:
-        dia = {"data": atual, "slots": []}
+        dia = {"data": atual, "nome": NOMES_DIAS[atual.weekday()], "slots": []}
         for espaco in espacos:
-            regras = [r for r in espaco.disponibilidades if r.ativo and r.dia_semana == atual.weekday()]
-            for regra in regras:
-                cursor = _minutos(regra.hora_inicio)
-                limite = _minutos(regra.hora_fim)
-                while cursor + regra.duracao_slot_minutos <= limite:
-                    inicio = _hora(cursor)
-                    fim = _hora(cursor + regra.duracao_slot_minutos)
-                    bloqueio = obter_bloqueio(db, espaco.id, atual, inicio, fim)
-                    dia["slots"].append({
-                        "espaco": espaco,
-                        "hora_inicio": inicio,
-                        "hora_fim": fim,
-                        "bloqueio": bloqueio,
-                        "atribuicao": next((r for r in reservas if r.espaco_id == espaco.id and r.data == atual and _sobrepoe(inicio, fim, r.hora_inicio, r.hora_fim)), None),
-                    })
-                    cursor += regra.duracao_slot_minutos
+            reservas_espaco = [r for r in reservas if r.espaco_id == espaco.id and r.data == atual]
+            for inicio, fim in _intervalos_operacionais():
+                atribuicao = next((
+                    r for r in reservas_espaco
+                    if r.hora_inicio == inicio and r.hora_fim == fim
+                ), None)
+                ocupacao_sobreposta = next((
+                    r for r in reservas_espaco
+                    if not atribuicao and _sobrepoe(inicio, fim, r.hora_inicio, r.hora_fim)
+                ), None)
+                dia["slots"].append({
+                    "espaco": espaco,
+                    "hora_inicio": inicio,
+                    "hora_fim": fim,
+                    "bloqueio": obter_bloqueio(db, espaco.id, atual, inicio, fim),
+                    "atribuicao": atribuicao,
+                    "ocupacao_sobreposta": ocupacao_sobreposta,
+                })
 
         # Uma reserva pode ter sido criada antes de o horário do espaço existir,
         # ou ter sido autorizada como exceção. Nunca a ocultamos do mapa.
         for reserva in (item for item in reservas if item.data == atual):
             ja_visivel = any(
                 slot["espaco"].id == reserva.espaco_id
-                and _sobrepoe(slot["hora_inicio"], slot["hora_fim"], reserva.hora_inicio, reserva.hora_fim)
+                and slot["hora_inicio"] == reserva.hora_inicio
+                and slot["hora_fim"] == reserva.hora_fim
+                and slot["atribuicao"]
+                and slot["atribuicao"].id == reserva.id
                 for slot in dia["slots"]
             )
             if not ja_visivel:
@@ -171,7 +206,7 @@ def gerar_grelha_slots(db: Session, semanal) -> dict:
                     "hora_fim": reserva.hora_fim,
                     "bloqueio": obter_bloqueio(db, reserva.espaco_id, atual, reserva.hora_inicio, reserva.hora_fim),
                     "atribuicao": reserva,
-                    "fora_disponibilidade": True,
+                    "horario_ajustado": True,
                 })
         dia["slots"].sort(key=lambda slot: (slot["hora_inicio"], slot["espaco"].nome.casefold()))
         dias.append(dia)

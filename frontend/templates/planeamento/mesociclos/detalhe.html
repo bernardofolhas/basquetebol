@@ -259,6 +259,17 @@
                         {% if item.link %}
                         <a href="{{ item.link }}" {% if item.agenda_editavel %}data-agenda-event-id="{{ item.agenda_id }}" data-agenda-tipo="{{ item.agenda_tipo }}" data-agenda-titulo="{{ item.agenda_titulo|e }}" data-agenda-data="{{ item.data|data_iso }}" data-agenda-hora-inicio="{{ item.hora_inicio or '' }}" data-agenda-hora-fim="{{ item.hora_fim or '' }}" data-agenda-descricao="{{ item.agenda_descricao|e }}" data-agenda-espaco-id="{{ item.agenda_espaco_id }}" data-agenda-equipa-id="{{ item.agenda_equipa_id }}" data-agenda-aplica-todas="{{ 'true' if item.agenda_equipa_id == '' else 'false' }}"{% endif %} class="inline-block mt-1 text-[10px] text-orange-500 hover:text-orange-600">Abrir →</a>
                         {% endif %}
+                        {% if item.sessao_id and not item.e_jogo %}
+                        <details class="mt-2 border-t border-current/10 pt-1">
+                            <summary class="cursor-pointer text-[10px] font-semibold text-slate-500">Carga: {{ item.volume_minutos or 0 }} min · RPE {{ item.intensidade_rpe if item.intensidade_rpe is not none else 0 }}</summary>
+                            <form method="POST" action="/planeamento/microciclos/{{ item.microciclo_id or '' }}/sessoes/{{ item.sessao_id }}/carga" class="mt-2 grid grid-cols-2 gap-1">
+                                <input type="hidden" name="retorno" value="/planeamento/mesociclos/{{ mesociclo.id }}">
+                                <input type="number" name="volume_minutos" min="1" max="600" value="{{ item.volume_minutos if item.volume_minutos is not none else '' }}" placeholder="Min" class="min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px]">
+                                <input type="number" name="intensidade_rpe" min="0" max="10" step="0.5" value="{{ item.intensidade_rpe if item.intensidade_rpe is not none else 0 }}" placeholder="RPE" class="min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px]">
+                                <button class="col-span-2 rounded border border-orange-200 bg-white px-2 py-1 text-[10px] font-semibold text-orange-700">Atualizar</button>
+                            </form>
+                        </details>
+                        {% endif %}
                     </div>
                     {% endfor %}
                     {% if dia.itens | length > 3 %}
@@ -276,6 +287,7 @@
 </div>
 
 {{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, equipas_agenda|default([]), request.session.get('_csrf', '')) }}
+<script>window.addEventListener('pageshow', (event) => { if (event.persisted) window.location.reload(); });</script>
 
 <!-- ── GRÁFICO VOLUME / RPE ───────────────────── -->
 {% if chart_labels != '[]' %}

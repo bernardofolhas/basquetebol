@@ -21,6 +21,7 @@ from flash import set_flash
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
 from models.equipa import Equipa
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
+from models.planeamento_clube import EventoPlaneamentoClube
 from models.treino import (
     BibliotecoExercicio,
     BlocoTreino,
@@ -915,7 +916,14 @@ async def eliminar_sessao_treino(
         return RedirectResponse(url="/equipas", status_code=303)
 
     microciclo_id = sessao.microciclo_id
+    evento = sessao.evento_planeamento_clube
     eliminar_sessoes_treino(db, [sessao])
+    if evento and not evento.plano_semanal_id:
+        evento_persistido = db.query(EventoPlaneamentoClube).filter(
+            EventoPlaneamentoClube.id == evento.id,
+        ).first()
+        if evento_persistido:
+            db.delete(evento_persistido)
     db.commit()
     set_flash(request, "Treino eliminado definitivamente do planeamento e do calendário.")
 

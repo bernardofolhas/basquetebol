@@ -218,6 +218,10 @@ def _integrar_eventos_planeados_no_microciclo(db: Session, microciclo: Microcicl
             alteracoes += 1
         if existe:
             continue
+        # Uma reserva logística publicada pelo clube continua na agenda, mas
+        # não cria uma sessão técnica. Apenas completa uma sessão já planeada.
+        if evento.plano_semanal_id:
+            continue
         e_jogo = evento.tipo == TipoEventoPlaneamentoClubeEnum.jogo
         tipo_treino = "fisico" if evento.tipo == TipoEventoPlaneamentoClubeEnum.treino_fisico else "normal"
         numero = None if e_jogo else (
@@ -1187,7 +1191,7 @@ def detalhe_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_
         mesociclo.data_fim,
     )
 
-    return templates.TemplateResponse(request, "planeamento/mesociclos/detalhe.html", {
+    resposta = templates.TemplateResponse(request, "planeamento/mesociclos/detalhe.html", {
         "utilizador": utilizador,
         "mesociclo": mesociclo,
         "microciclos": microciclos,
@@ -1214,6 +1218,8 @@ def detalhe_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_
         "agenda_tipos": tipos_agenda_formulario(),
         "espacos_agenda": db.query(EspacoTreino).filter(EspacoTreino.ativo.is_(True)).order_by(EspacoTreino.nome).all(),
     })
+    resposta.headers["Cache-Control"] = "private, no-store, max-age=0"
+    return resposta
 
 
 # ─────────────────────────────────────────
@@ -1766,6 +1772,7 @@ async def atualizar_carga_rapida_sessao(
     utilizador=Depends(exigir_autenticacao),
     volume_minutos: str = Form(""),
     intensidade_rpe: str = Form(""),
+    retorno: str = Form(""),
 ):
     """Atualiza a previsão de carga diretamente na agenda do microciclo."""
     equipa_id = _obter_equipa_id_por_microciclo(db, micro_id)
@@ -1776,7 +1783,8 @@ async def atualizar_carga_rapida_sessao(
         SessaoTreino.ativa.is_(True),
     ).first()
     if not sessao:
-        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+        destino = retorno if retorno.startswith("/") and not retorno.startswith("//") else f"/planeamento/microciclos/{micro_id}"
+        return RedirectResponse(url=destino, status_code=303)
     try:
         volume = int(volume_minutos)
         rpe = float(intensidade_rpe)
@@ -1784,14 +1792,16 @@ async def atualizar_carga_rapida_sessao(
             raise ValueError
     except (TypeError, ValueError):
         set_flash(request, "Indica um volume entre 1 e 600 minutos e um RPE entre 0 e 10.", "error")
-        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+        destino = retorno if retorno.startswith("/") and not retorno.startswith("//") else f"/planeamento/microciclos/{micro_id}"
+        return RedirectResponse(url=destino, status_code=303)
     sessao.volume_minutos = volume
     sessao.intensidade_rpe = rpe
     sessao.alterada_manual = True
     sessao.sincronizada = False
     db.commit()
     set_flash(request, "Volume e RPE atualizados.")
-    return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+    destino = retorno if retorno.startswith("/") and not retorno.startswith("//") else f"/planeamento/microciclos/{micro_id}"
+    return RedirectResponse(url=destino, status_code=303)
 
 
 @router.post("/microciclos/{micro_id}/sessoes/{sessao_id}/conteudos")

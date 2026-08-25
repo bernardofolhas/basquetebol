@@ -210,6 +210,8 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
     estado_visual = estado_sessao_visual(estado)
     item.update({
         "sessao_id": sessao.id,
+        "microciclo_id": sessao.microciclo_id,
+        "numero_treino": sessao.numero_treino,
         "volume_minutos": sessao.volume_minutos,
         "intensidade_rpe": sessao.intensidade_rpe,
         "e_jogo": sessao.e_jogo,
@@ -252,6 +254,8 @@ def apresentar_treinos_por_perfil(itens: list[dict], perfil: str | None) -> list
         if item.get("categoria") not in {"treino", "fisico"}:
             continue
         nome_treino = "Treino físico" if item.get("categoria") == "fisico" else "Treino"
+        if item.get("numero_treino"):
+            nome_treino = f"{nome_treino} {item['numero_treino']}"
         if perfil in {"administrador", "coordenador", "superadministrador"} and item.get("equipa_nome"):
             escalao = item.get("equipa_escalao")
             sufixo = f" ({escalao})" if escalao else ""

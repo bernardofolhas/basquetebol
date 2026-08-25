@@ -66,7 +66,9 @@ def test_slots_sao_gerados_sem_criar_sessoes_tecnicas():
         db.commit()
         antes = db.query(SessaoTreino).count()
         grelha = gerar_grelha_slots(db, semanal)
-        assert grelha["total"] == 2
+        assert grelha["total"] == 63
+        assert grelha["dias"][0]["slots"][0]["hora_inicio"] == "10:00"
+        assert grelha["dias"][0]["slots"][-1]["hora_fim"] == "23:00"
         assert db.query(SessaoTreino).count() == antes
     finally:
         db.close()
@@ -118,6 +120,33 @@ def test_reserva_deteta_conflitos_de_espaco_equipa_e_treinador():
         assert any("espaço já está ocupado" in erro for erro in erros)
         assert any("equipa já tem" in erro for erro in erros)
         assert any("treinador já está" in erro for erro in erros)
+    finally:
+        db.close()
+        repor_clube_atual(token)
+
+
+def test_horario_pontual_e_livre_dentro_do_periodo_operacional_e_aceite():
+    db, token, espaco, equipa, treinador, _ = _contexto()
+    try:
+        assert validar_reserva(
+            db,
+            espaco_id=espaco.id,
+            equipa_id=equipa.id,
+            treinador_id=treinador.id,
+            data_slot=date(2026, 8, 3),
+            hora_inicio="18:00",
+            hora_fim="19:30",
+        ) == []
+        erros = validar_reserva(
+            db,
+            espaco_id=espaco.id,
+            equipa_id=equipa.id,
+            treinador_id=treinador.id,
+            data_slot=date(2026, 8, 3),
+            hora_inicio="09:30",
+            hora_fim="11:00",
+        )
+        assert any("entre 10:00 e 23:00" in erro for erro in erros)
     finally:
         db.close()
         repor_clube_atual(token)

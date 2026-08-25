@@ -107,10 +107,6 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
         sessao.local = atribuicao.espaco.nome
         sessao.hora_inicio = atribuicao.hora_inicio
         sessao.hora_fim = atribuicao.hora_fim
-        if sessao.volume_minutos is None:
-            sessao.volume_minutos = _duracao_minutos(atribuicao.hora_inicio, atribuicao.hora_fim)
-        if sessao.intensidade_rpe is None:
-            sessao.intensidade_rpe = 0
         sessao.plano_semanal_clube_id = atribuicao.plano_semanal_id
         sessao.evento_planeamento_clube_id = evento.id
         renumerar_treinos_equipa(db, atribuicao.equipa_id)
