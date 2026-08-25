@@ -46,5 +46,6 @@ class PassoSetPlay(Base):
     ordem = Column(Integer, nullable=False, default=0)
     observacao = Column(Text, nullable=True)
     desenho = Column(Text, nullable=True)   # base64 PNG data URL
+    imagem_coach = Column(Text, nullable=True)  # fotografia/imagem alternativa otimizada
 
     setplay = relationship("SetPlay", back_populates="passos")

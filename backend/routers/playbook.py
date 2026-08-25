@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from flash import set_flash
 from models.equipa import Equipa
 from models.playbook import Playbook, PassoSetPlay, SetPlay
 from services.desenho_service import compor_desenho_sobre_campo, normalizar_data_uri
+from services.imagem_playbook_service import preparar_imagem_passo
 from paths import STATIC_DIR, TEMPLATES_DIR
 from services.pdf_service import renderizar_pdf
 
@@ -217,6 +218,46 @@ async def guardar_desenho_passo(passo_id: int, request: Request, db: Session = D
         return JSONResponse({"sucesso": False, "erro": str(exc)})
 
 
+@router.post("/passos/{passo_id}/imagem")
+async def guardar_imagem_passo(
+    passo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    imagem: UploadFile = File(...),
+):
+    equipa_id = _equipa_id_por_passo(db, passo_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    passo = db.query(PassoSetPlay).filter(PassoSetPlay.id == passo_id).first()
+    if not passo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    try:
+        passo.imagem_coach = preparar_imagem_passo(await imagem.read())
+        db.commit()
+        set_flash(request, "Imagem adicionada ao passo.")
+    except ValueError as erro:
+        set_flash(request, str(erro), tipo="error")
+    return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}#passo-{passo.id}", status_code=303)
+
+
+@router.post("/passos/{passo_id}/imagem/eliminar")
+async def eliminar_imagem_passo(
+    passo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _equipa_id_por_passo(db, passo_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    passo = db.query(PassoSetPlay).filter(PassoSetPlay.id == passo_id).first()
+    if not passo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    passo.imagem_coach = None
+    db.commit()
+    set_flash(request, "Imagem removida. O desenho tático mantém-se disponível.")
+    return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}#passo-{passo.id}", status_code=303)
+
+
 # ── MOVER PASSO PARA CIMA/BAIXO ───────────────────────────────────────────────
 @router.post("/passos/{passo_id}/mover/{direcao}")
 async def mover_passo(passo_id: int, direcao: str, request: Request,
@@ -255,7 +296,7 @@ def exportar_pdf_setplay(setplay_id: int, request: Request, db: Session = Depend
 
     caminho_campo = STATIC_DIR / "campos" / "campo_meio.png"
     for passo in setplay.passos:
-        passo.imagem_composta_pdf = compor_desenho_sobre_campo(caminho_campo, passo.desenho)
+        passo.imagem_composta_pdf = passo.imagem_coach or compor_desenho_sobre_campo(caminho_campo, passo.desenho)
 
     pdf_bytes = renderizar_pdf(request, "playbook/pdf.html", {
         "setplay": setplay,

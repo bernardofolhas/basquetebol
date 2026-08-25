@@ -17,9 +17,17 @@
             </div>
 
             {% if caller is defined %}
-            <div class="ds-team-actions flex flex-wrap gap-2 lg:max-w-xl lg:justify-end">
-                {{ caller() }}
-            </div>
+            <details class="ds-menu ds-page-actions">
+                <summary class="ds-button ds-button-secondary ds-page-actions-trigger" aria-label="Abrir ações desta página">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+                    <span>Ações</span>
+                    <span class="ds-menu-chevron" aria-hidden="true">⌄</span>
+                </summary>
+                <div class="ds-dropdown ds-page-actions-menu">
+                    <p class="ds-dropdown-title">Ações da página</p>
+                    <div class="ds-team-actions">{{ caller() }}</div>
+                </div>
+            </details>
             {% endif %}
         </div>
 

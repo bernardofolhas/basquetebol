@@ -46,6 +46,29 @@ def test_base_preserva_navegacao_acessivel_e_responsiva():
     assert ".ds-team-direct-nav { display:grid;grid-template-columns:repeat(2" in CSS.read_text(encoding="utf-8")
 
 
+def test_shell_profissional_agrupa_acoes_e_completa_o_perfil():
+    estilos = CSS.read_text(encoding="utf-8")
+    contexto = (TEMPLATES_DIR / "partials" / "equipa_contexto.html").read_text(encoding="utf-8")
+    navegacao = (TEMPLATES_DIR / "partials" / "navbar_global.html").read_text(encoding="utf-8")
+
+    assert 'class="ds-menu ds-page-actions"' in contexto
+    assert "Ações da página" in contexto
+    assert 'class="ds-user-summary"' in navegacao
+    assert "{{ utilizador.nome }}" in navegacao
+    assert ".ds-page-actions-menu" in estilos
+    assert ".ds-user-menu-trigger" in estilos
+
+
+def test_shell_autenticado_renderiza_header_completo(client_admin):
+    resposta = client_admin.get("/dashboard")
+
+    assert resposta.status_code == 200
+    assert 'id="header-navigation"' in resposta.text
+    assert 'aria-label="Caixa de entrada"' in resposta.text
+    assert 'class="ds-user-summary"' in resposta.text
+    assert "Ações rápidas" in resposta.text
+
+
 def test_planeamentos_longos_usam_abas_internas_sem_alterar_exportacoes():
     base = (TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
     css = CSS.read_text(encoding="utf-8")

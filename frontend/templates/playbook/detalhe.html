@@ -58,7 +58,13 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-0">
 
         <!-- CANVAS MEIO-CAMPO -->
-        <div class="p-4 border-b lg:border-b-0 lg:border-r border-gray-100">
+        <div class="p-4 border-b lg:border-b-0 lg:border-r border-gray-100 ds-playbook-visual">
+            <div class="ds-visual-switch" role="group" aria-label="Visual do passo {{ loop.index }}">
+                <button type="button" class="is-active" data-visual-trigger="desenho" onclick="mostrarModoPasso({{ passo.id }}, 'desenho')">Desenho tático</button>
+                <button type="button" data-visual-trigger="imagem" onclick="mostrarModoPasso({{ passo.id }}, 'imagem')">Imagem{% if passo.imagem_coach %}<span class="ds-visual-ready">Pronta</span>{% endif %}</button>
+            </div>
+
+            <div id="modo_desenho_{{ passo.id }}" data-visual-panel="desenho">
             <!-- Toolbar -->
             <div id="toolbar_canvas_{{ passo.id }}" class="flex flex-wrap gap-1 mb-2">
                 {% set ferramentas = [
@@ -111,6 +117,31 @@
                 </button>
                 {% if passo.desenho %}
                 <span class="text-xs text-green-600 font-medium">✓ Desenho guardado</span>
+                {% endif %}
+            </div>
+            </div>
+
+            <div id="modo_imagem_{{ passo.id }}" data-visual-panel="imagem" class="hidden">
+                {% if passo.imagem_coach %}
+                <div class="ds-coach-image-preview">
+                    <img src="{{ passo.imagem_coach }}" alt="Imagem do treinador para o passo {{ loop.index }}">
+                    <span>Esta imagem será usada no PDF deste passo.</span>
+                </div>
+                {% else %}
+                <div class="ds-upload-empty">
+                    <strong>Acrescentar uma imagem do treinador</strong>
+                    <span>Fotografia de quadro, esquema, documento ou imagem preparada. PNG ou JPEG, até 8 MB.</span>
+                </div>
+                {% endif %}
+                <form method="POST" action="/playbook/passos/{{ passo.id }}/imagem" enctype="multipart/form-data" class="ds-coach-image-form">
+                    <label for="imagem_passo_{{ passo.id }}">{{ 'Substituir imagem' if passo.imagem_coach else 'Selecionar imagem' }}</label>
+                    <input id="imagem_passo_{{ passo.id }}" type="file" name="imagem" accept="image/png,image/jpeg" required>
+                    <button type="submit" class="ds-button ds-button-primary">Guardar imagem</button>
+                </form>
+                {% if passo.imagem_coach %}
+                <form method="POST" action="/playbook/passos/{{ passo.id }}/imagem/eliminar" onsubmit="return confirm('Remover a imagem deste passo? O desenho tático será preservado.')">
+                    <button type="submit" class="ds-button ds-button-danger mt-2">Remover imagem</button>
+                </form>
                 {% endif %}
             </div>
         </div>
@@ -194,6 +225,25 @@
 <!-- ── DRAWING ENGINE (same as plano.html) ──────────────────────── -->
 <script>
 const CANVAS_ESTADO = {};
+
+function mostrarModoPasso(passoId, modo) {
+    const raiz = document.getElementById('passo-' + passoId);
+    if (!raiz) return;
+    raiz.querySelectorAll('[data-visual-panel]').forEach(painel => painel.classList.toggle('hidden', painel.dataset.visualPanel !== modo));
+    raiz.querySelectorAll('[data-visual-trigger]').forEach(botao => botao.classList.toggle('is-active', botao.dataset.visualTrigger === modo));
+    if (modo === 'desenho') {
+        const canvasId = 'canvas_' + passoId;
+        const canvas = document.getElementById(canvasId);
+        if (canvas && CANVAS_ESTADO[canvasId]) {
+            const imagem = document.getElementById('img_campo_' + passoId);
+            if (imagem && imagem.offsetWidth && canvas.width !== imagem.offsetWidth) {
+                canvas.width = imagem.offsetWidth;
+                canvas.height = imagem.offsetHeight;
+                redesenhar(canvasId);
+            }
+        }
+    }
+}
 
 function inicializarDesenho(canvasId) {
     const canvas = document.getElementById(canvasId);
