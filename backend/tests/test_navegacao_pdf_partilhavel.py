@@ -151,4 +151,7 @@ def test_microciclo_partilhavel_usa_modelo_semanal_legivel():
     assert 'template="planeamento/microciclos/partilhavel_pdf.html"' in rota
     assert "font-size:18pt" in modelo
     assert "height:{{ altura_semana }}mm" in modelo
+    assert '<table class="calendar"' in modelo
+    assert "summary-item" not in modelo
+    assert "Sem atividade" not in modelo
     assert "Documento para partilha" not in modelo

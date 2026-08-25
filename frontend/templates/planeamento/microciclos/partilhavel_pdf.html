@@ -5,40 +5,33 @@
 <meta charset="UTF-8">
 {{ estilo_pdf() }}
 <style>
-@page { size:A4 landscape; margin:10mm 11mm 13mm; }
+@page { size:A4 landscape; margin:9mm 10mm 13mm; }
 * { box-sizing:border-box; }
 body { margin:0; color:#172033; font-family:Arial,sans-serif; font-size:9pt; }
-.header { display:flex; align-items:center; justify-content:space-between; gap:8mm; min-height:20mm; padding-bottom:4mm; border-bottom:1.2mm solid var(--pdf-primary); }
-.brand { display:flex; align-items:center; gap:4mm; min-width:0; }
-.logo { width:16mm; height:16mm; object-fit:contain; }
+.header { display:flex; align-items:center; justify-content:space-between; gap:8mm; min-height:18mm; padding:0 0 3.5mm; border-bottom:1.1mm solid var(--pdf-primary); }
+.brand { display:flex; align-items:center; gap:3.5mm; min-width:0; }
+.logo { width:15mm; height:15mm; object-fit:contain; }
 .club { color:#526174; font-size:8pt; font-weight:700; }
-.title { margin-top:1mm; color:var(--pdf-primary-dark); font-size:18pt; font-weight:800; line-height:1.05; }
-.meta { min-width:60mm; text-align:right; color:#526174; font-size:8.5pt; line-height:1.45; }
+.title { margin-top:.7mm; color:var(--pdf-primary-dark); font-size:18pt; font-weight:800; line-height:1.05; }
+.meta { min-width:59mm; color:#526174; font-size:8.5pt; line-height:1.45; text-align:right; }
 .meta strong { color:#172033; font-size:10pt; }
-.summary { display:flex; gap:3mm; margin:4mm 0; }
-.summary-item { min-width:30mm; padding:2.5mm 4mm; border:0.3mm solid var(--pdf-primary-border); border-radius:2.5mm; background:var(--pdf-primary-light); }
-.summary-value { color:var(--pdf-primary-dark); font-size:13pt; font-weight:800; }
-.summary-label { margin-left:1.5mm; color:#526174; font-size:7.5pt; font-weight:700; text-transform:uppercase; }
-.calendar { overflow:hidden; border:0.35mm solid #aebaca; border-radius:2.5mm; }
-.week { display:table; width:100%; table-layout:fixed; border-collapse:collapse; break-inside:avoid; }
-.head, .day { display:table-cell; width:14.285%; vertical-align:top; }
-.head { padding:2.8mm 2mm; border-right:0.25mm solid #64748b; background:var(--pdf-secondary); color:var(--pdf-on-secondary); text-align:center; font-size:8.5pt; font-weight:800; }
-.head:last-child, .day:last-child { border-right:0; }
-.day { padding:3mm 2.5mm; border-top:0.25mm solid #cbd5e1; border-right:0.25mm solid #cbd5e1; background:#fff; }
-.day.empty { background:#f8fafc; }
-.date { display:flex; align-items:center; justify-content:space-between; margin-bottom:2.5mm; }
+.calendar-wrap { margin-top:4mm; border:0.35mm solid #94a3b8; border-radius:2mm; overflow:hidden; }
+.calendar { width:100%; height:154mm; border-collapse:collapse; table-layout:fixed; }
+.calendar th { height:11mm; padding:2.2mm 1.5mm; border:0.25mm solid #64748b; background:var(--pdf-secondary); color:var(--pdf-on-secondary); font-size:8.5pt; font-weight:800; text-align:center; }
+.calendar td { padding:2.5mm; border:0.25mm solid #cbd5e1; vertical-align:top; background:#fff; }
+.calendar td.empty { background:#f8fafc; }
+.date { display:flex; align-items:baseline; justify-content:space-between; gap:2mm; margin-bottom:2.4mm; }
 .date strong { color:var(--pdf-primary-dark); font-size:11pt; }
 .date span { color:#718096; font-size:7pt; font-weight:700; text-transform:uppercase; }
-.event { display:block; margin-bottom:2.2mm; padding:2.4mm 2.5mm; border:0.25mm solid #dbe3ed; border-left:1.2mm solid var(--pdf-accent); border-radius:1.8mm; background:#f8fafc; line-height:1.28; overflow-wrap:anywhere; }
+.event { display:block; margin-bottom:2mm; padding:2.2mm 2.3mm; border:0.25mm solid #dbe3ed; border-left:1.15mm solid var(--pdf-accent); border-radius:1.6mm; background:#f8fafc; line-height:1.25; overflow-wrap:anywhere; }
 .event.treino { border-left-color:#059669; background:#ecfdf5; }
 .event.jogo { border-left-color:#e11d48; background:#fff1f2; }
 .event.atividade { border-left-color:#d97706; background:#fffbeb; }
 .event.outro { border-left-color:#64748b; }
-.event-time { display:block; margin-bottom:0.6mm; color:#526174; font-size:7pt; font-weight:700; }
+.event-time { display:block; margin-bottom:.5mm; color:#526174; font-size:7pt; font-weight:700; }
 .event-title { display:block; color:#172033; font-size:8.5pt; font-weight:800; }
-.event-meta { display:block; margin-top:1mm; color:#526174; font-size:7.3pt; line-height:1.3; }
-.more { display:block; margin-top:1.5mm; color:#526174; font-size:7.5pt; font-weight:700; }
-.no-events { display:block; padding-top:4mm; color:#a0aec0; font-size:8pt; text-align:center; }
+.event-meta { display:block; margin-top:.8mm; color:#526174; font-size:7.2pt; line-height:1.3; }
+.more { display:block; margin-top:1.5mm; color:#526174; font-size:7.3pt; font-weight:700; }
 .footer { position:fixed; right:0; bottom:-8mm; left:0; padding-top:2.5mm; border-top:0.25mm solid var(--pdf-primary-border); color:#526174; font-size:8pt; font-weight:700; text-align:center; }
 </style>
 </head>
@@ -46,38 +39,41 @@ body { margin:0; color:#172033; font-family:Arial,sans-serif; font-size:9pt; }
 <header class="header">
     <div class="brand">
         {% if identidade.logo_principal %}<img class="logo" src="{{ identidade.logo_principal }}" alt="Logótipo">{% endif %}
-        <div><div class="club">{{ identidade.nome_oficial|default('Clube de Basquetebol') }}</div><div class="title">{{ titulo_documento }}</div></div>
+        <div>
+            <div class="club">{{ identidade.nome_oficial|default('Clube de Basquetebol') }}</div>
+            <div class="title">{{ titulo_documento|replace(' - Agenda semanal', '') }}</div>
+        </div>
     </div>
     <div class="meta"><strong>{{ equipa_documento.nome }}</strong><br>{{ agenda.meses_intervalo }}<br>{{ agenda.data_inicio|data_pt }} a {{ agenda.data_fim|data_pt }}</div>
 </header>
-<div class="summary">
-    <div class="summary-item"><span class="summary-value">{{ agenda.totais.treinos }}</span><span class="summary-label">Treinos</span></div>
-    <div class="summary-item"><span class="summary-value">{{ agenda.totais.jogos }}</span><span class="summary-label">Jogos</span></div>
-    <div class="summary-item"><span class="summary-value">{{ agenda.totais.atividades }}</span><span class="summary-label">Atividades</span></div>
-</div>
-<main class="calendar">
-    <div class="week">{% for nome in ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'] %}<div class="head">{{ nome }}</div>{% endfor %}</div>
-    {% set altura_semana = 128 / (agenda.semanas_intervalo|length if agenda.semanas_intervalo|length else 1) %}
-    {% for semana in agenda.semanas_intervalo %}
-    <div class="week" style="height:{{ altura_semana }}mm">
-        {% for dia in semana %}
-        <div class="day {% if not dia %}empty{% endif %}">
-            {% if dia %}
-            <div class="date"><strong>{{ dia.data.day }}/{{ '%02d'|format(dia.data.month) }}</strong><span>{{ ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'][dia.data.weekday()] }}</span></div>
-            {% for item in dia.itens[:6] %}
-            <span class="event {{ item.categoria }}">
-                {% if item.hora_inicio %}<span class="event-time">{{ item.hora_inicio }}{% if item.hora_fim %}-{{ item.hora_fim }}{% endif %}</span>{% endif %}
-                <span class="event-title">{{ item.titulo }}</span>
-                <span class="event-meta">{{ item.local }}</span>
-            </span>
+<main class="calendar-wrap">
+    <table class="calendar" aria-label="Calendário semanal do microciclo">
+        <thead>
+            <tr>{% for nome in ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'] %}<th>{{ nome }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+            {% set altura_semana = 143 / (agenda.semanas_intervalo|length if agenda.semanas_intervalo|length else 1) %}
+            {% for semana in agenda.semanas_intervalo %}
+            <tr style="height:{{ altura_semana }}mm">
+                {% for dia in semana %}
+                <td class="{% if not dia %}empty{% endif %}">
+                    {% if dia %}
+                    <div class="date"><strong>{{ dia.data.day }}/{{ '%02d'|format(dia.data.month) }}</strong><span>{{ ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'][dia.data.weekday()] }}</span></div>
+                    {% for item in dia.itens[:5] %}
+                    <span class="event {{ item.categoria }}">
+                        {% if item.hora_inicio %}<span class="event-time">{{ item.hora_inicio }}{% if item.hora_fim %}-{{ item.hora_fim }}{% endif %}</span>{% endif %}
+                        <span class="event-title">{{ item.titulo }}</span>
+                        {% if item.local %}<span class="event-meta">{{ item.local }}</span>{% endif %}
+                    </span>
+                    {% endfor %}
+                    {% if dia.itens|length > 5 %}<span class="more">+ {{ dia.itens|length - 5 }} atividade(s)</span>{% endif %}
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
             {% endfor %}
-            {% if dia.itens|length > 6 %}<span class="more">+ {{ dia.itens|length - 6 }} atividade(s)</span>{% endif %}
-            {% if not dia.itens %}<span class="no-events">Sem atividade</span>{% endif %}
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    {% endfor %}
+        </tbody>
+    </table>
 </main>
 <div class="footer">{{ nome_treinador }} · {{ identidade.nome_oficial|default('Clube de Basquetebol') }}</div>
 </body>
