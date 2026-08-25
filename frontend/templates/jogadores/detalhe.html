@@ -361,7 +361,7 @@
     {% if utilizador.perfil.value == 'administrador' %}
     <form method="POST" action="/jogadores/{{ jogador.id }}/apagar">
         <button type="button"
-                onclick="if(confirm('Tens a certeza que queres apagar este jogador?')) this.closest('form').submit()"
+                onclick="if(confirm('Tens a certeza que queres apagar este {{ termo_jogador(jogador.equipa, capitalizar=False) }}?')) this.closest('form').submit()"
                 class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
             🗑️ Apagar
         </button>

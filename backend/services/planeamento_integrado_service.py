@@ -184,11 +184,7 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
     treino_fisico = (getattr(sessao, "tipo_treino", None) or "normal") == "fisico"
     categoria = "jogo" if sessao.e_jogo else ("fisico" if treino_fisico else "treino")
     subtipo = "jogo_sessao" if sessao.e_jogo else ("treino_fisico_sessao" if treino_fisico else "treino_sessao")
-    titulo = "Jogo da equipa" if sessao.e_jogo else (
-        f"Treino físico {sessao.numero_treino}" if (getattr(sessao, "tipo_treino", None) or "normal") == "fisico" and sessao.numero_treino else
-        "Treino físico" if (getattr(sessao, "tipo_treino", None) or "normal") == "fisico" else
-        f"Treino {sessao.numero_treino}" if sessao.numero_treino else "Treino"
-    )
+    titulo = _titulo_sessao(sessao)
     detalhe = None
     if sessao.reflexao:
         detalhe = sessao.reflexao.splitlines()[0]
@@ -231,7 +227,6 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
     if evento_agenda:
         metadados = metadados_tipo_agenda(evento_agenda.tipo)
         item.update({
-            "titulo": evento_agenda.titulo,
             "badge": metadados["label"],
             "agenda_id": evento_agenda.id,
             "agenda_editavel": True,
@@ -250,13 +245,24 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
     return item
 
 
+def _titulo_sessao(sessao: SessaoTreino) -> str:
+    """Mantém a numeração visível em todas as agendas internas."""
+    if sessao.e_jogo:
+        return "Jogo da equipa"
+    treino_fisico = (getattr(sessao, "tipo_treino", None) or "normal") == "fisico"
+    base = "Treino físico" if treino_fisico else "Treino"
+    if sessao.numero_treino is not None:
+        return f"{base} {sessao.numero_treino}"
+    return base
+
+
 def apresentar_treinos_por_perfil(itens: list[dict], perfil: str | None) -> list[dict]:
     """Mantém o treino simples para técnicos e identificável na visão global."""
     for item in itens:
         if item.get("categoria") not in {"treino", "fisico"}:
             continue
         nome_treino = "Treino físico" if item.get("categoria") == "fisico" else "Treino"
-        if item.get("numero_treino"):
+        if item.get("numero_treino") is not None:
             nome_treino = f"{nome_treino} {item['numero_treino']}"
         if perfil in {"administrador", "coordenador", "superadministrador"} and item.get("equipa_nome"):
             escalao = item.get("equipa_escalao")

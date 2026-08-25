@@ -110,7 +110,7 @@
                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ jogo.convocados[0].observacoes if jogo.convocados and jogo.convocados[0].observacoes else '' }}</textarea>
             </div>
 
-            <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Jogadores convocados</p>
+            <p class="text-xs font-semibold text-gray-500 uppercase mb-2">{{ termo_jogador(jogo.equipa, plural=True) }} convocados</p>
             {% if jogadores %}
             <div class="space-y-2 mb-4 max-h-48 overflow-y-auto">
                 {% for jogador in jogadores %}
@@ -131,7 +131,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-gray-400 text-sm mb-4">Sem jogadores na equipa.</p>
+            <p class="text-gray-400 text-sm mb-4">Sem {{ termo_jogador(jogo.equipa, plural=True, capitalizar=False) }} na equipa.</p>
             {% endif %}
 
             <button type="submit"

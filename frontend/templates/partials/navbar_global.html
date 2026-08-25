@@ -141,7 +141,7 @@
         <div class="ds-dropdown ds-navigation-dropdown right-0 w-80">
           <p class="ds-dropdown-title">Gestão do clube</p>
           <div class="ds-menu-grid">
-            {{ menu_link('/jogadores', 'Jogadores', 'Fichas e processos') }}
+            {{ menu_link('/jogadores', 'Atletas', 'Fichas e processos') }}
             {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}{{ menu_link('/treinadores', 'Treinadores', 'Equipa técnica') }}{% endif %}
             {{ menu_link('/secretaria/pendencias', 'Secretaria', 'Documentos e validades') }}
             {% if perfil == 'administrador' %}
@@ -169,7 +169,7 @@
   {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
   <details class="ds-menu relative hidden md:block">
     <summary class="ds-icon-button" aria-label="Pesquisar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></summary>
-    <div class="ds-dropdown right-0 w-80 p-3"><form action="/pesquisa" method="get"><label class="block"><span class="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Pesquisar no clube</span><input name="q" minlength="2" autofocus placeholder="Equipa, jogador, treinador..." class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"></label></form></div>
+    <div class="ds-dropdown right-0 w-80 p-3"><form action="/pesquisa" method="get"><label class="block"><span class="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Pesquisar no clube</span><input name="q" minlength="2" autofocus placeholder="Equipa, atleta, treinador..." class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"></label></form></div>
   </details>
 
   <details class="ds-menu relative hidden sm:block">

@@ -7,7 +7,7 @@
     <div>
         <p class="text-xs font-semibold uppercase tracking-widest text-orange-500">Área operacional</p>
         <h1 class="text-3xl font-bold text-gray-800 mt-1">Assiduidade</h1>
-        <p class="text-gray-500 mt-1">Resumo por jogadora, com estados claros e histórico registado.</p>
+        <p class="text-gray-500 mt-1">Resumo por {{ termo_jogador(equipa, capitalizar=False) }}, com estados claros e histórico registado.</p>
     </div>
     <a href="/assiduidade/equipas/{{ equipa.id }}/pdf{% if data_inicio %}?inicio={{ data_inicio|data_iso }}{% if data_fim %}&amp;fim={{ data_fim|data_iso }}{% endif %}{% elif data_fim %}?fim={{ data_fim|data_iso }}{% endif %}"
        class="inline-flex items-center justify-center rounded-xl bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-900">
@@ -47,7 +47,7 @@
         <p class="text-xs text-gray-500 mt-1">Com motivo administrativo</p>
     </div>
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <p class="text-xs uppercase tracking-wide text-gray-400">Lesionadas</p>
+        <p class="text-xs uppercase tracking-wide text-gray-400">Por lesão</p>
         <p class="text-3xl font-bold text-purple-600 mt-2">{{ resumo.por_estado.lesionada }}</p>
         <p class="text-xs text-gray-500 mt-1">Acompanhar no perfil</p>
     </div>
@@ -56,7 +56,7 @@
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="flex flex-col gap-2 border-b border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
         <div>
-            <h2 class="font-semibold text-gray-800">Resumo por jogadora</h2>
+            <h2 class="font-semibold text-gray-800">Resumo por {{ termo_jogador(equipa, capitalizar=False) }}</h2>
             <p class="text-sm text-gray-500">Só entram no cálculo os registos efetivamente guardados.</p>
         </div>
         <a href="/jogadores" class="text-sm font-medium text-orange-600 hover:underline">Abrir plantel →</a>
@@ -66,7 +66,7 @@
         <table class="min-w-full text-sm">
             <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-400">
                 <tr>
-                    <th class="px-5 py-3">Jogadora</th>
+                    <th class="px-5 py-3">{{ termo_jogador(equipa) }}</th>
                     <th class="px-3 py-3 text-center">Registos</th>
                     <th class="px-3 py-3 text-center">Presenças</th>
                     <th class="px-3 py-3 text-center">Atrasadas</th>
@@ -94,7 +94,7 @@
         </table>
     </div>
     {% else %}
-    <div class="px-5 py-12 text-center text-gray-500">Ainda não existem jogadoras nesta equipa.</div>
+    <div class="px-5 py-12 text-center text-gray-500">Ainda não existem {{ termo_jogador(equipa, plural=True, capitalizar=False) }} nesta equipa.</div>
     {% endif %}
 </div>
 

@@ -60,7 +60,7 @@
 {% endif %}
 
 <div class="jogadores">
-    <h2>Jogadores Convocados ({{ jogadores_convocados | length }})</h2>
+    <h2>{{ termo_jogador(jogo.equipa, plural=True) }} Convocados ({{ jogadores_convocados | length }})</h2>
     {% for jogador in jogadores_convocados %}
     <div class="jogador">
         <span class="numero">{% if jogador.numero_camisola %}#{{ jogador.numero_camisola }}{% else %}—{% endif %}</span>

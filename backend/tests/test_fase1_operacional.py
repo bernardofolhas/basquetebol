@@ -48,6 +48,16 @@ def test_item_integrado_de_sessao_mostra_estado_e_proxima_acao():
     assert item["plano_treino_link"] == f"/treino/sessoes/{sessao.id}"
 
 
+def test_item_integrado_mantem_o_numero_do_treino():
+    equipa = Equipa(nome="Equipa com numeração", escalao=EscalaoEnum.senior, genero=GeneroEnum.masculino)
+    macro = Macrociclo(numero=1, data_inicio=date(2035, 1, 1), data_fim=date(2035, 12, 31), equipa=equipa)
+    meso = Mesociclo(numero=1, data_inicio=date(2035, 1, 1), data_fim=date(2035, 3, 31), macrociclo=macro)
+    micro = Microciclo(numero=1, data_inicio=date(2035, 1, 6), data_fim=date(2035, 1, 12), mesociclo=meso)
+    sessao = SessaoTreino(id=54321, data=date(2035, 1, 8), numero_treino=4, microciclo=micro, estado="planeada")
+
+    assert _item_sessao(sessao)["titulo"] == "Treino 4"
+
+
 def test_admin_avanca_e_bloqueia_saltos_no_estado_da_sessao(client_admin):
     db = SessionLocal()
     clube_id = db.query(Equipa.clube_id).filter(Equipa.clube_id.isnot(None)).scalar()

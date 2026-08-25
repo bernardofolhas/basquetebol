@@ -1,6 +1,7 @@
 from fastapi.templating import Jinja2Templates as _Jinja2Templates
 
 from formatacao import data_hora_pt, data_iso, data_pt, finalizar_valor_template
+from services.linguagem_service import termo_jogador
 
 
 class Jinja2Templates(_Jinja2Templates):
@@ -11,4 +12,5 @@ class Jinja2Templates(_Jinja2Templates):
         self.env.filters["data_pt"] = data_pt
         self.env.filters["data_hora_pt"] = data_hora_pt
         self.env.filters["data_iso"] = data_iso
+        self.env.globals["termo_jogador"] = termo_jogador
         self.env.finalize = finalizar_valor_template

@@ -197,7 +197,7 @@ async def criar_jogador(
 
     db.add(jogador)
     db.commit()
-    set_flash(request, f"Jogador '{nome}' registado com sucesso.")
+    set_flash(request, f"Atleta '{nome}' registado com sucesso.")
     return RedirectResponse(url="/jogadores", status_code=303)
 
 

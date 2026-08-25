@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block titulo %}{{ "Editar" if jogador else "Novo" }} Jogador{% endblock %}
+{% block titulo %}{{ "Editar" if jogador else "Novo" }} atleta{% endblock %}
 {% block conteudo %}
 
 <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-800">{{ "Editar Jogador" if jogador else "Novo Jogador" }}</h1>
+    <h1 class="text-2xl font-bold text-gray-800">{{ "Editar" if jogador else "Novo" }} <span data-termo-jogador>{{ termo_jogador(jogador.equipa if jogador and jogador.equipa else none, capitalizar=False) }}</span></h1>
 </div>
 
 <form method="POST" enctype="multipart/form-data" action="{{ '/jogadores/' ~ jogador.id ~ '/editar' if jogador else '/jogadores/novo' }}">
@@ -22,7 +22,7 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
             <input type="text" name="nome" required
                    value="{{ jogador.nome if jogador else '' }}"
-                   placeholder="Nome do jogador"
+                   placeholder="Nome do atleta"
                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
         </div>
 
@@ -71,10 +71,10 @@
 
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Equipa</label>
-            <select name="equipa_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-                <option value="">Sem equipa</option>
+            <select id="equipa-jogador" name="equipa_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <option value="" data-termo="atleta">Sem equipa</option>
                 {% for equipa in equipas %}
-                <option value="{{ equipa.id }}" {% if (jogador and jogador.equipa_id == equipa.id) or (not jogador and equipa_preselecionada|default(none) == equipa.id) %}selected{% endif %}>
+                <option value="{{ equipa.id }}" data-termo="{{ termo_jogador(equipa, capitalizar=False) }}" {% if (jogador and jogador.equipa_id == equipa.id) or (not jogador and equipa_preselecionada|default(none) == equipa.id) %}selected{% endif %}>
                     {{ equipa.nome }} — {{ equipa.escalao.value }}
                 </option>
                 {% endfor %}
@@ -153,7 +153,7 @@
 <div class="flex gap-3 mt-6">
     <button type="submit"
             class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
-        {{ "Guardar alterações" if jogador else "Registar Jogador" }}
+        {{ "Guardar alterações" if jogador else "Registar atleta" }}
     </button>
     <a href="{{ '/jogadores/' ~ jogador.id if jogador else '/jogadores' }}"
        class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition">
@@ -162,5 +162,10 @@
 </div>
 
 </form>
-<script>document.getElementById('fotografia')?.addEventListener('change',function(){const ficheiro=this.files[0];if(ficheiro)document.getElementById('fotografia-preview').src=URL.createObjectURL(ficheiro);});</script>
+<script>
+document.getElementById('fotografia')?.addEventListener('change',function(){const ficheiro=this.files[0];if(ficheiro)document.getElementById('fotografia-preview').src=URL.createObjectURL(ficheiro);});
+const equipaJogador=document.getElementById('equipa-jogador');
+function atualizarTermoJogador(){const opcao=equipaJogador?.selectedOptions[0];document.querySelectorAll('[data-termo-jogador]').forEach(item=>item.textContent=opcao?.dataset.termo||'atleta');}
+equipaJogador?.addEventListener('change',atualizarTermoJogador);atualizarTermoJogador();
+</script>
 {% endblock %}

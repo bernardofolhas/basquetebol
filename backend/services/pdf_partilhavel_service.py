@@ -32,13 +32,18 @@ def _sanitizar_item(item: dict, descricoes_publicas: dict[str, str]) -> dict:
     descricao = descricoes_publicas.get(item["id"])
     if item["id"].startswith("jogo-"):
         descricao = item.get("detalhe")  # competição ou indicação casa/fora
+    titulo = item["titulo"]
+    # A agenda partilhável privilegia a leitura por dia, hora e local; a
+    # numeração é uma referência de trabalho interno do treinador.
+    if item.get("categoria") in {"treino", "fisico"}:
+        titulo = "Treino físico" if item.get("categoria") == "fisico" else "Treino"
     return {
         "id": item["id"],
         "data": item["data"],
         "hora_inicio": item.get("hora_inicio"),
         "hora_fim": item.get("hora_fim"),
         "horario": item.get("horario") or "Hora por definir",
-        "titulo": item["titulo"],
+        "titulo": titulo,
         "tipo": item.get("badge") or item.get("categoria", "Evento").title(),
         "categoria": item.get("categoria", "outro"),
         "local": item.get("local") or "Local por definir",

@@ -4,7 +4,7 @@
 {% block conteudo %}
 {% set pode_eliminar = utilizador.perfil.value in ['administrador', 'coordenador'] %}
 {% call equipa_contexto(equipa, "Plantel", "Lista operacional da equipa com acesso direto às fichas.", "plantel", "/equipas/" ~ equipa.id, "Voltar ao resumo") %}
-  <a href="/jogadores/novo?equipa_id={{ equipa.id }}" class="ds-button ds-button-primary">+ Novo jogador</a>
+  <a href="/jogadores/novo?equipa_id={{ equipa.id }}" class="ds-button ds-button-primary">+ Novo {{ termo_jogador(equipa, capitalizar=False) }}</a>
 {% endcall %}
 
 {% if equipa.jogadores %}
@@ -26,7 +26,7 @@
 
   <div class="ds-roster-list overflow-hidden rounded-2xl border border-slate-200 bg-white">
     <div class="hidden grid-cols-[2.2rem_minmax(15rem,2fr)_minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 bg-slate-50 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 md:grid {% if not pode_eliminar %}md:grid-cols-[minmax(15rem,2fr)_minmax(10rem,1fr)_8rem_7rem_9rem]{% endif %}">
-      {% if pode_eliminar %}<span></span>{% endif %}<span>Jogador</span><span>Equipa</span><span>Nascimento</span><span>Altura</span><span class="text-right">Ações</span>
+      {% if pode_eliminar %}<span></span>{% endif %}<span>{{ termo_jogador(equipa) }}</span><span>Equipa</span><span>Nascimento</span><span>Altura</span><span class="text-right">Ações</span>
     </div>
     <div class="divide-y divide-slate-100">
       {% for jogador in equipa.jogadores|sort(attribute='nome') %}
@@ -55,11 +55,11 @@ const checksPlantel=()=>Array.from(document.querySelectorAll('.plantel-check'));
 const atualizarPlantel=()=>document.getElementById('total-plantel-selecionado').textContent=checksPlantel().filter(item=>item.checked).length;
 document.getElementById('selecionar-plantel')?.addEventListener('change',evento=>{checksPlantel().forEach(item=>item.checked=evento.target.checked);atualizarPlantel();});
 checksPlantel().forEach(item=>item.addEventListener('change',atualizarPlantel));
-function eliminarPlantelSelecionado(){const total=checksPlantel().filter(item=>item.checked).length;if(!total)return alert('Seleciona pelo menos um jogador.');if(confirm(`Eliminar ${total} jogador(es) desta equipa?`)){const confirmacao=document.createElement('input');confirmacao.type='hidden';confirmacao.name='confirmar_total';confirmacao.value=total;document.getElementById('plantel-massa').appendChild(confirmacao);document.getElementById('plantel-massa').submit();}}
-function eliminarPlantelCompleto(){if(confirm('Eliminar todos os {{ equipa.jogadores|length }} jogadores desta equipa?'))document.getElementById('eliminar-plantel-form').submit();}
+function eliminarPlantelSelecionado(){const total=checksPlantel().filter(item=>item.checked).length;if(!total)return alert('Seleciona pelo menos um {{ termo_jogador(equipa, capitalizar=False) }}.');if(confirm(`Eliminar ${total} {{ termo_jogador(equipa, plural=True, capitalizar=False) }} desta equipa?`)){const confirmacao=document.createElement('input');confirmacao.type='hidden';confirmacao.name='confirmar_total';confirmacao.value=total;document.getElementById('plantel-massa').appendChild(confirmacao);document.getElementById('plantel-massa').submit();}}
+function eliminarPlantelCompleto(){if(confirm('Eliminar todos os {{ equipa.jogadores|length }} {{ termo_jogador(equipa, plural=True, capitalizar=False) }} desta equipa?'))document.getElementById('eliminar-plantel-form').submit();}
 </script>
 {% endif %}
 {% else %}
-<div class="ds-empty"><strong>Plantel ainda vazio</strong><p>Regista o primeiro jogador para começar a construir a equipa.</p><a href="/jogadores/novo?equipa_id={{ equipa.id }}" class="ds-button ds-button-primary mt-4">Registar jogador</a></div>
+<div class="ds-empty"><strong>Plantel ainda vazio</strong><p>Regista o primeiro {{ termo_jogador(equipa, capitalizar=False) }} para começar a construir a equipa.</p><a href="/jogadores/novo?equipa_id={{ equipa.id }}" class="ds-button ds-button-primary mt-4">Registar {{ termo_jogador(equipa, capitalizar=False) }}</a></div>
 {% endif %}
 {% endblock %}

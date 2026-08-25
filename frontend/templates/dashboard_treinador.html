@@ -71,7 +71,7 @@
         <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
             <p class="ds-kpi-label mb-3">Plantel</p>
             <p class="text-2xl font-extrabold text-slate-900">{{ item.total_jogadores }}</p>
-            <p class="text-sm text-slate-500">jogadores associados</p>
+            <p class="text-sm text-slate-500">{{ termo_jogador(item.equipa, plural=True, capitalizar=False) }} associados</p>
             <a href="/equipas/{{ item.equipa.id }}/plantel" class="ds-quiet-link mt-3 block">Abrir plantel</a>
         </div>
 

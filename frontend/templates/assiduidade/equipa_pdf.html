@@ -31,7 +31,7 @@
         <div class="card"><div class="label">Faltas justificadas</div><div class="value">{{ resumo.por_estado.justificada }}</div></div>
     </div>
     <table>
-        <thead><tr><th>Jogadora</th><th class="number">Registos</th><th class="number">Presenças</th><th class="number">Atrasadas</th><th class="number">Ausentes</th><th class="number">Justificadas</th><th class="number">Lesionadas</th><th class="number">Taxa</th></tr></thead>
+        <thead><tr><th>{{ termo_jogador(equipa) }}</th><th class="number">Registos</th><th class="number">Presenças</th><th class="number">Atrasadas</th><th class="number">Ausentes</th><th class="number">Justificadas</th><th class="number">Por lesão</th><th class="number">Taxa</th></tr></thead>
         <tbody>
         {% for linha in linhas %}
             <tr>

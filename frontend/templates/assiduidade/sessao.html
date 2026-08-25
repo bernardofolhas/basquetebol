@@ -27,7 +27,7 @@
     <!-- Total de jogadores -->
     <div class="bg-white rounded-xl shadow-sm p-4 text-center border border-gray-100">
         <p class="text-3xl font-bold text-gray-800">{{ total_jogadores }}</p>
-        <p class="text-xs text-gray-500 mt-1">Total de Jogadores</p>
+        <p class="text-xs text-gray-500 mt-1">Total de {{ termo_jogador(equipa, plural=True) }}</p>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm p-4 text-center border border-gray-100">
@@ -62,7 +62,7 @@
     <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
             <h2 class="font-semibold text-gray-700">Registo de Presenças</h2>
-            <p class="mt-1 text-xs text-gray-500">{{ resumo_assiduidade.registados }} de {{ total_jogadores }} jogadores com estado definido.</p>
+            <p class="mt-1 text-xs text-gray-500">{{ resumo_assiduidade.registados }} de {{ total_jogadores }} {{ termo_jogador(equipa, plural=True, capitalizar=False) }} com estado definido.</p>
         </div>
         <div class="flex flex-wrap gap-2">
             <button type="button" data-marcar-todos="presente" class="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100">Todos presentes</button>
@@ -129,10 +129,10 @@
     <!-- Mensagem quando não há jogadores na equipa -->
     <div class="text-center py-8">
         <span class="text-4xl">🏃</span>
-        <p class="text-gray-500 mt-3">Ainda não há jogadores associados a esta equipa.</p>
+        <p class="text-gray-500 mt-3">Ainda não há {{ termo_jogador(equipa, plural=True, capitalizar=False) }} associados a esta equipa.</p>
         <a href="/jogadores/novo"
            class="inline-block mt-3 text-orange-500 hover:text-orange-600 text-sm">
-            Adicionar jogadores →
+            Adicionar {{ termo_jogador(equipa, plural=True, capitalizar=False) }} →
         </a>
     </div>
     {% endif %}

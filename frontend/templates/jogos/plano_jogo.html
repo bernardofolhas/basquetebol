@@ -22,7 +22,7 @@
         <div class="flex items-center gap-2 mb-2">
             <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full w-6 text-center">{{ i }}</span>
             <select name="titular_{{ i }}" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                <option value="">Selecciona jogador</option>
+                <option value="">Seleciona {{ termo_jogador(jogo.equipa, capitalizar=False) }}</option>
                 {% for jogador in jogadores %}
                 <option value="{{ jogador.id }}" {% if plano and plano['titular_' ~ i]|string == jogador.id|string %}selected{% endif %}>
                     {% if jogador.numero_camisola %}#{{ jogador.numero_camisola }} — {% endif %}{{ jogador.nome }}

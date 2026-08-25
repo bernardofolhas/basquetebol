@@ -127,7 +127,7 @@ def criar_documento_jogador(
     db.add(documento)
     registar_auditoria(db, utilizador, "criar", "documento_jogador", jogador_id, f"Documento: {nome}", request)
     db.commit()
-    set_flash(request, "Documento adicionado ao processo da jogadora.")
+    set_flash(request, "Documento adicionado ao processo do atleta.")
     return RedirectResponse(url=f"/jogadores/{jogador_id}", status_code=303)
 
 
