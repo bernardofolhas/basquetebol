@@ -59,6 +59,17 @@ def _isolar_consultas_por_clube(execute_state):
 
 
 @event.listens_for(ORMSession, "before_flush")
+def _sincronizar_volume_dos_treinos(session, _flush_context, _instances):
+    """Calcula o volume sempre que uma sessão de treino é criada ou alterada."""
+    from models.planeamento import SessaoTreino
+    from services.volume_sessao_service import atualizar_volume_automatico
+
+    for objeto in session.new.union(session.dirty):
+        if isinstance(objeto, SessaoTreino):
+            atualizar_volume_automatico(objeto)
+
+
+@event.listens_for(ORMSession, "before_flush")
 def _atribuir_e_validar_clube(session, flush_context, instances):
     """A pertença é imposta pelo servidor, nunca por campos do formulário."""
     from clube_contexto import clube_atual_id

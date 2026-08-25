@@ -280,15 +280,16 @@ def test_reserva_do_clube_sobrepoe_horario_e_local_de_treino_do_treinador():
         sessao_sem_logistica = SessaoTreino(
             clube_id=1, microciclo_id=micro.id, data=date(2026, 8, 4),
             local=None, hora_inicio=None, hora_fim=None,
-            numero_treino=2, e_jogo=False, ativa=True,
+            volume_minutos=45, numero_treino=2, e_jogo=False, ativa=True,
         )
         db.add_all([sessao_completa, sessao_sem_logistica])
         db.flush()
+        assert sessao_sem_logistica.volume_minutos is None
 
         atribuicao_completa = AtribuicaoEspacoSemanal(
             clube_id=1, plano_semanal_id=semanal.id, espaco_id=espaco.id,
             equipa_id=equipa.id, treinador_id=treinador.id, data=date(2026, 8, 3),
-            hora_inicio="20:00", hora_fim="21:30",
+            hora_inicio="20:00", hora_fim="21:15",
             tipo_ocupacao=TipoOcupacaoEspacoEnum.treino_equipa,
             estado=EstadoAtribuicaoEspacoEnum.publicado,
         )
@@ -306,13 +307,13 @@ def test_reserva_do_clube_sobrepoe_horario_e_local_de_treino_do_treinador():
         assert "atualizados" in sincronizar_atribuicao_com_agenda(db, atribuicao_sem_logistica)
 
         assert (sessao_completa.local, sessao_completa.hora_inicio, sessao_completa.hora_fim) == (
-            "Vergílio", "20:00", "21:30"
+            "Vergílio", "20:00", "21:15"
         )
         assert (sessao_sem_logistica.local, sessao_sem_logistica.hora_inicio, sessao_sem_logistica.hora_fim) == (
             "Vergílio", "18:00", "19:30"
         )
-        # A carga que o treinador já planeou não é alterada pela reserva logística.
-        assert sessao_completa.volume_minutos == 90
+        assert sessao_completa.volume_minutos == 75
+        assert sessao_sem_logistica.volume_minutos == 90
     finally:
         db.close()
         repor_clube_atual(token)

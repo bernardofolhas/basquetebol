@@ -338,7 +338,7 @@ def test_upload_autenticado_aplica_plano_e_abre_dashboard_editavel(client_admin)
         assert sessao_guardada.min_tecnica_individual_ofensiva == 15
         assert sessao_guardada.min_tecnica_individual_defensiva == 20
         assert sessao_guardada.min_tatica_coletiva_ofensiva == 25
-        assert sessao_guardada.volume_minutos == 60
+        assert sessao_guardada.volume_minutos == 90
         assert sessao_guardada.estado == "planeada"
 
         dashboard_importada = client_admin.get(f"/treino/sessoes/{sessao.id}")
@@ -431,7 +431,7 @@ def test_upload_autenticado_aplica_plano_e_abre_dashboard_editavel(client_admin)
         assert plano_limpo.blocos == []
         assert plano_limpo.objectivos is None
         assert plano_limpo.reflexao is None
-        assert sessao_limpa.volume_minutos == 0
+        assert sessao_limpa.volume_minutos == 90
         assert sessao_limpa.intensidade_rpe == 0
         assert sessao_limpa.estado == "planeada"
         assert all(getattr(sessao_limpa, campo) == 0 for campo in CAMPOS_CATEGORIA.values())

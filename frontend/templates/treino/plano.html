@@ -180,7 +180,7 @@
                     <label><span class="mb-1 block text-xs font-semibold text-gray-500">Hora de término</span><input type="time" name="hora_fim" value="{{ sessao.hora_fim or '' }}" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-[var(--clube-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--clube-primary-soft)]"></label>
                     <label><span class="mb-1 block text-xs font-semibold text-gray-500">Local</span><input type="text" name="local" value="{{ sessao.local or '' }}" placeholder="Local do treino" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-[var(--clube-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--clube-primary-soft)]"></label>
                     <label><span class="mb-1 block text-xs font-semibold text-gray-500">Escalão</span><input type="text" name="escalao" value="{{ plano.escalao or '' }}" placeholder="Ex: Sub-18" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-[var(--clube-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--clube-primary-soft)]"></label>
-                    <label><span class="mb-1 block text-xs font-semibold text-gray-500">Volume total (min)</span><input type="number" name="volume_minutos" min="0" max="600" value="{{ sessao.volume_minutos or 0 }}" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-[var(--clube-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--clube-primary-soft)]"></label>
+                    <label><span class="mb-1 block text-xs font-semibold text-gray-500">Volume total (min) · automático</span><input data-volume-automatico type="number" name="volume_minutos" min="0" max="600" value="{{ sessao.volume_minutos if sessao.volume_minutos is not none else '' }}" readonly aria-describedby="ajuda-volume-automatico" class="w-full cursor-not-allowed rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600"></label>
                     <label><span class="mb-1 block text-xs font-semibold text-gray-500">RPE geral (1-10)</span><input type="number" name="intensidade_rpe" min="1" max="10" step="0.5" value="{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else '' }}" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-[var(--clube-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--clube-primary-soft)]"></label>
                     <label class="sm:col-span-2 xl:col-span-4"><span class="mb-1 block text-xs font-semibold text-gray-500">Objetivos</span><textarea name="objectivos" rows="3" placeholder="Objetivos do treino" class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-[var(--clube-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--clube-primary-soft)]">{{ plano.objectivos or '' }}</textarea></label>
                 </div>
@@ -203,6 +203,7 @@
                 <button class="rounded-xl bg-[var(--clube-primary)] px-5 py-2.5 text-sm font-bold text-[var(--clube-on-primary)] transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[var(--clube-primary)] focus:ring-offset-2">Guardar alterações</button>
             </div>
         </form>
+        <p id="ajuda-volume-automatico" class="px-6 pb-6 text-xs text-gray-400">Calculado a partir da hora de início e de término. Sem horário completo, fica em branco.</p>
     </section>
 
     <section data-workspace-panel="treino:documento" role="tabpanel" class="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
@@ -615,6 +616,26 @@
     </aside>
 </div>
 {% endif %}
+
+<script>
+document.querySelectorAll('form').forEach(function(formulario) {
+    var inicio = formulario.querySelector('input[name="hora_inicio"]');
+    var fim = formulario.querySelector('input[name="hora_fim"]');
+    var volume = formulario.querySelector('[data-volume-automatico]');
+    if (!inicio || !fim || !volume) return;
+    function atualizarVolume() {
+        if (!inicio.value || !fim.value || inicio.value >= fim.value) {
+            volume.value = '';
+            return;
+        }
+        var inicioMinutos = Number(inicio.value.slice(0, 2)) * 60 + Number(inicio.value.slice(3));
+        var fimMinutos = Number(fim.value.slice(0, 2)) * 60 + Number(fim.value.slice(3));
+        volume.value = String(fimMinutos - inicioMinutos);
+    }
+    inicio.addEventListener('input', atualizarVolume);
+    fim.addEventListener('input', atualizarVolume);
+});
+</script>
 
 <script>
 const CANVAS_ESTADO = {};

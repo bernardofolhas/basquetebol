@@ -60,6 +60,7 @@ from formatacao import data_hora_pt, data_iso, data_pt, finalizar_valor_template
 from logging_config import obter_logger
 from paths import STATIC_DIR, TEMPLATES_DIR
 from services.numeracao_planeamento_service import renumerar_todos_os_ciclos
+from services.volume_sessao_service import sincronizar_volumes_automaticos
 from routers import admin
 from routers import agenda
 from routers import assiduidade
@@ -114,6 +115,7 @@ try:
     actualizar_estrutura_jogadores()
     with SessionLocal() as db:
         renumerar_todos_os_ciclos(db)
+        sincronizar_volumes_automaticos(db)
         db.commit()
     logger.info("Infraestrutura inicial da aplicação preparada com sucesso.")
 except Exception:

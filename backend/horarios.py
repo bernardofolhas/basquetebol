@@ -39,3 +39,18 @@ def hora_eh_anterior(hora_inicio: str | None, hora_fim: str | None) -> bool:
     if not hora_inicio_normalizada or not hora_fim_normalizada:
         return False
     return hora_inicio_normalizada < hora_fim_normalizada
+
+
+def duracao_minutos(hora_inicio: str | None, hora_fim: str | None) -> int | None:
+    """Calcula a duração entre duas horas válidas no mesmo dia.
+
+    Devolve ``None`` quando o horário ainda está incompleto, para que o volume
+    do treino se mantenha em branco até existir uma duração concreta.
+    """
+    inicio = normalizar_hora(hora_inicio, permitir_vazio=False)
+    fim = normalizar_hora(hora_fim, permitir_vazio=False)
+    if not inicio or not fim or inicio >= fim:
+        return None
+    inicio_minutos = int(inicio[:2]) * 60 + int(inicio[3:])
+    fim_minutos = int(fim[:2]) * 60 + int(fim[3:])
+    return fim_minutos - inicio_minutos
