@@ -356,6 +356,18 @@ body { background:radial-gradient(circle at 92% 5%,color-mix(in srgb,var(--clube
 .ds-brand-name { display:none;max-width:10rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem;font-weight:800;letter-spacing:-.01em; }
 .ds-header-navigation { display:none;min-width:0;align-items:center; }
 .ds-primary-nav,.ds-team-direct-nav { display:flex;align-items:center;gap:.12rem; }
+.ds-primary-nav > .ds-team-direct-nav { display:contents; }
+.ds-nav-order-resumo { order:1; }
+.ds-nav-order-planeamento { order:2; }
+.ds-nav-order-fisico { order:3; }
+.ds-nav-order-jogos { order:4; }
+.ds-nav-order-assiduidade { order:5; }
+.ds-nav-order-plantel { order:6; }
+.ds-nav-order-playbook { order:7; }
+.ds-nav-order-operacao { order:8; }
+.ds-nav-order-eventos { order:9; }
+.ds-nav-order-equipa { order:10; }
+.ds-nav-order-gestao { order:11; }
 .ds-primary-menu { position:relative; }
 .ds-header-trigger { display:flex;min-height:2.5rem;align-items:center;justify-content:center;gap:.35rem;border-radius:.62rem;padding:.55rem .68rem;color:inherit;font-size:.77rem;font-weight:750;line-height:1;list-style:none;white-space:nowrap;transition:background .15s,color .15s,box-shadow .15s;cursor:pointer; }
 .ds-header-trigger::-webkit-details-marker { display:none; }
@@ -407,7 +419,7 @@ body { background:radial-gradient(circle at 92% 5%,color-mix(in srgb,var(--clube
     .ds-header-navigation { position:fixed;left:.75rem;right:.75rem;top:calc(var(--topbar-height) + .55rem);z-index:60;max-height:calc(100dvh - var(--topbar-height) - 1.1rem);overflow-y:auto;overscroll-behavior:contain;border:1px solid rgb(255 255 255 / .7);border-radius:1rem;background:#fff;padding:.65rem;color:#334155;box-shadow:0 22px 60px rgb(15 23 42 / .24); }
     .ds-header-navigation.is-open { display:block; }
     .ds-primary-nav { align-items:stretch;flex-direction:column;gap:.15rem; }
-    .ds-team-direct-nav { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.15rem;border-block:1px solid var(--border-soft);margin:.35rem 0;padding:.35rem 0; }
+    .ds-team-direct-nav { display:contents; }
     .ds-team-direct-nav .ds-header-trigger { justify-content:flex-start;min-width:0;overflow:hidden;text-overflow:ellipsis; }
     .ds-header-trigger { justify-content:space-between;color:#3f4e62;padding:.75rem .8rem;font-size:.86rem; }
     .ds-header-trigger:hover,.ds-header-trigger.is-active,.ds-primary-menu[open]>.ds-header-trigger { background:var(--clube-primary-surface);color:var(--clube-primary-dark); }

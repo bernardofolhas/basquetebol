@@ -32,7 +32,7 @@
       <a href="{{ nav.dashboard_url|default('/dashboard') }}" class="ds-header-trigger {% if p == '/dashboard' %}is-active{% endif %}">Início</a>
 
       {% if modo_plataforma %}
-      <details class="ds-menu ds-primary-menu">
+      <details class="ds-menu ds-primary-menu ds-nav-order-equipa">
         <summary class="ds-header-trigger {% if p.startswith('/superadmin') %}is-active{% endif %}">Plataforma <span class="ds-menu-chevron">⌄</span></summary>
         <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
           <p class="ds-dropdown-title">Gestão global</p>
@@ -43,9 +43,9 @@
       </details>
       {% else %}
       {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
-      <details class="ds-menu ds-primary-menu">
+      <details class="ds-menu ds-primary-menu ds-nav-order-equipa">
         <summary class="ds-header-trigger {% if not equipa_contexto_id and p.startswith('/equipas') %}is-active{% endif %}">
-          <span class="truncate">{{ equipa_contexto_nome or 'Equipas' }}</span><span class="ds-menu-chevron">⌄</span>
+          <span>Equipa</span><span class="ds-menu-chevron">⌄</span>
         </summary>
         <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
           <p class="ds-dropdown-title">{{ 'Mudar de equipa' if equipa_contexto_id else 'Selecionar equipa' }}</p>
@@ -55,23 +55,27 @@
               {% for item in nav.equipas|default([]) %}<a href="/equipas/{{ item.id }}" class="{% if item.id == equipa_contexto_id %}is-current{% endif %}"><span class="ds-team-dot"></span><span class="truncate">{{ item.nome }}</span></a>{% else %}<p>Sem equipas disponíveis.</p>{% endfor %}
             </div>
           </div>
+          {% if equipa_contexto_id %}
+          <div class="ds-dropdown-section">
+            {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/equipa-tecnica', 'Equipa técnica', 'Treinadores associados', p.endswith('/equipa-tecnica')) }}
+          </div>
+          {% endif %}
         </div>
       </details>
 
       {% if equipa_contexto_id %}
       <div class="ds-team-direct-nav" aria-label="Área da equipa">
-        <a href="/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link {% if p == '/equipas/' ~ equipa_contexto_id %}is-active{% endif %}">Resumo</a>
-        <a href="/equipas/{{ equipa_contexto_id }}/plantel" class="ds-header-trigger ds-team-direct-link {% if p.endswith('/plantel') %}is-active{% endif %}">Plantel</a>
-        <a href="/jogos/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link {% if p.startswith('/jogos') %}is-active{% endif %}">Jogos</a>
-        <a href="/assiduidade/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link {% if p.startswith('/assiduidade') %}is-active{% endif %}">Assiduidade</a>
-        <a href="/equipas/{{ equipa_contexto_id }}/equipa-tecnica" class="ds-header-trigger ds-team-direct-link {% if p.endswith('/equipa-tecnica') %}is-active{% endif %}">Equipa técnica</a>
-        <a href="/equipas/{{ equipa_contexto_id }}/eventos" class="ds-header-trigger ds-team-direct-link {% if p.endswith('/eventos') %}is-active{% endif %}">Eventos</a>
-        <a href="/fisico/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link {% if p.startswith('/fisico') %}is-active{% endif %}">Físico</a>
-        <a href="/playbook/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link {% if p.startswith('/playbook') %}is-active{% endif %}">Playbook</a>
+        <a href="/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-resumo {% if p == '/equipas/' ~ equipa_contexto_id %}is-active{% endif %}">Resumo</a>
+        <a href="/fisico/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-fisico {% if p.startswith('/fisico') %}is-active{% endif %}">Físico</a>
+        <a href="/jogos/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-jogos {% if p.startswith('/jogos') %}is-active{% endif %}">Jogos</a>
+        <a href="/assiduidade/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-assiduidade {% if p.startswith('/assiduidade') %}is-active{% endif %}">Assiduidade</a>
+        <a href="/equipas/{{ equipa_contexto_id }}/plantel" class="ds-header-trigger ds-team-direct-link ds-nav-order-plantel {% if p.endswith('/plantel') %}is-active{% endif %}">Plantel</a>
+        <a href="/playbook/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-playbook {% if p.startswith('/playbook') %}is-active{% endif %}">Playbook</a>
+        <a href="/equipas/{{ equipa_contexto_id }}/eventos" class="ds-header-trigger ds-team-direct-link ds-nav-order-eventos {% if p.endswith('/eventos') %}is-active{% endif %}">Eventos</a>
       </div>
       {% endif %}
 
-      <details class="ds-menu ds-primary-menu">
+      <details class="ds-menu ds-primary-menu ds-nav-order-planeamento">
         <summary class="ds-header-trigger {% if p.startswith('/planeamento') or p.startswith('/treino') %}is-active{% endif %}">Planeamento <span class="ds-menu-chevron">⌄</span></summary>
         <div class="ds-dropdown ds-navigation-dropdown w-[23rem]">
           {% if equipa_contexto_id %}
@@ -103,7 +107,7 @@
       </details>
       {% endif %}
 
-      <details class="ds-menu ds-primary-menu">
+      <details class="ds-menu ds-primary-menu ds-nav-order-operacao">
         <summary class="ds-header-trigger {% if p.startswith('/calendario') or p.startswith('/planeamento-clube/espacos') or p.startswith('/biblioteca') or p.startswith('/dashboard/clube') %}is-active{% endif %}">Operação <span class="ds-menu-chevron">⌄</span></summary>
         <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
           <p class="ds-dropdown-title">Trabalho diário</p>
@@ -132,7 +136,7 @@
       </details>
 
       {% if perfil in ['administrador', 'coordenador', 'secretaria', 'superadministrador'] %}
-      <details class="ds-menu ds-primary-menu">
+      <details class="ds-menu ds-primary-menu ds-nav-order-gestao">
         <summary class="ds-header-trigger {% if p.startswith('/jogadores') or p.startswith('/treinadores') or p.startswith('/secretaria') or p.startswith('/admin') or p.startswith('/administracao') %}is-active{% endif %}">Gestão <span class="ds-menu-chevron">⌄</span></summary>
         <div class="ds-dropdown ds-navigation-dropdown right-0 w-80">
           <p class="ds-dropdown-title">Gestão do clube</p>

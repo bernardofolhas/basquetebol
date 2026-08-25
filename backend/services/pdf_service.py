@@ -13,6 +13,14 @@ from services.identidade_clube_service import CORES_PADRAO, caminho_ficheiro_log
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+def nome_curto_pessoa(nome: str | None) -> str:
+    """Mantém os rodapés legíveis com o primeiro e último nome."""
+    partes = (nome or "").split()
+    if len(partes) <= 2:
+        return " ".join(partes)
+    return f"{partes[0]} {partes[-1]}"
+
+
 def _identidade_para_pdf(identidade: dict) -> dict:
     """Embebe logos locais para que o WeasyPrint não dependa de HTTP."""
     resultado = dict(identidade)
@@ -34,6 +42,8 @@ def preparar_contexto_pdf(request, contexto: dict | None = None, identidade: dic
     resultado["identidade"] = _identidade_para_pdf(identidade_origem)
     resultado.setdefault("hoje", date.today())
     resultado.setdefault("data_exportacao", date.today())
+    if "nome_treinador" in resultado:
+        resultado["nome_treinador"] = nome_curto_pessoa(resultado["nome_treinador"])
     resultado["request"] = request
     return resultado
 

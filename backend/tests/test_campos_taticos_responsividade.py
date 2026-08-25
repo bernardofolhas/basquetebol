@@ -105,10 +105,12 @@ def test_header_liga_todos_os_niveis_a_listas_independentes():
     assert "'/planeamento/equipas/' ~ equipa_contexto_id ~ '/microciclos'" in navegacao
     assert "'/treino/equipas/' ~ equipa_contexto_id ~ '/planos'" in navegacao
     assert "'/calendario?equipa_id=' ~ equipa_contexto_id" in navegacao
-    assert 'class="ds-menu ds-primary-menu"' in navegacao
+    assert 'class="ds-menu ds-primary-menu ds-nav-order-planeamento"' in navegacao
     assert 'class="ds-team-switcher"' in navegacao
     assert 'class="ds-team-direct-nav"' in navegacao
-    for area in ("Resumo", "Plantel", "Jogos", "Assiduidade", "Equipa técnica", "Eventos", "Físico", "Playbook"):
+    assert 'ds-menu ds-primary-menu ds-nav-order-equipa' in navegacao
+    assert "'/equipas/' ~ equipa_contexto_id ~ '/equipa-tecnica'" in navegacao
+    for area in ("Resumo", "Plantel", "Jogos", "Assiduidade", "Eventos", "Físico", "Playbook"):
         assert f'>{area}</a>' in navegacao
     assert 'class="ds-tabs"' not in contexto_equipa
     assert 'data-planning-menu' not in contexto_equipa
@@ -119,6 +121,20 @@ def test_header_liga_todos_os_niveis_a_listas_independentes():
     base = (ROOT / "frontend/templates/base.html").read_text(encoding="utf-8")
     assert ".ds-header-navigation.is-open" in estilos
     assert ".ds-primary-menu>.ds-dropdown" in estilos
+    assert ".ds-primary-nav > .ds-team-direct-nav { display:contents; }" in estilos
+    for classe, ordem in (
+        ("resumo", 1),
+        ("planeamento", 2),
+        ("fisico", 3),
+        ("jogos", 4),
+        ("assiduidade", 5),
+        ("plantel", 6),
+        ("playbook", 7),
+        ("operacao", 8),
+        ("eventos", 9),
+        ("equipa", 10),
+    ):
+        assert f".ds-nav-order-{classe} {{ order:{ordem}; }}" in estilos
     assert 'menuDetails.addEventListener("mouseleave"' in base
     assert "document.body.appendChild(submenu)" not in base
 

@@ -29,3 +29,14 @@ def test_contexto_pdf_descarta_logo_inacessivel(monkeypatch, tmp_path):
     }))
 
     assert contexto["identidade"]["logo_principal"] is None
+
+
+def test_contexto_pdf_abrevia_nome_do_treinador_no_rodape():
+    contexto = pdf_service.preparar_contexto_pdf(
+        _request(pdf_service.CORES_PADRAO),
+        {"nome_treinador": "Bernardo Manuel da Silva Folhas"},
+    )
+
+    assert contexto["nome_treinador"] == "Bernardo Folhas"
+    assert pdf_service.nome_curto_pessoa("Bernardo Folhas") == "Bernardo Folhas"
+    assert pdf_service.nome_curto_pessoa("Bernardo") == "Bernardo"
