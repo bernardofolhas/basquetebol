@@ -137,6 +137,7 @@ async def criar_equipa(
     return RedirectResponse(url="/equipas", status_code=303)
 
 
+@router.get("/{equipa_id}/resumo", response_class=HTMLResponse)
 @router.get("/{equipa_id}", response_class=HTMLResponse)
 def detalhe_equipa(
     equipa_id: int,

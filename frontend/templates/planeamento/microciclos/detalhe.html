@@ -67,11 +67,11 @@
     </div>
     <div class="rounded-2xl border border-sky-100 bg-sky-50 p-4">
         <p class="text-xs uppercase tracking-[0.2em] text-sky-600">Volume</p>
-        <p class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.volume_total }}</p>
+        <p data-balanco-volume class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.volume_total }}</p>
     </div>
     <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
         <p class="text-xs uppercase tracking-[0.2em] text-slate-600">Media RPE</p>
-        <p class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.media_rpe }}</p>
+        <p data-balanco-rpe class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.media_rpe }}</p>
     </div>
 </div>
 
@@ -116,7 +116,11 @@
             <p class="text-sm text-gray-400 mt-1">Quadro único com treinos, jogos e atividades, sempre com acesso direto ao detalhe correspondente.</p>
             <div class="mt-3">{{ agenda_legenda(agenda_tipos) }}</div>
         </div>
-        <span class="text-sm text-gray-400">{{ dashboard_planeamento.estatisticas.total_itens }} item(ns)</span>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+            <span id="estado-cargas" class="text-xs text-slate-400" aria-live="polite"></span>
+            <span class="text-sm text-gray-400">{{ dashboard_planeamento.estatisticas.total_itens }} item(ns)</span>
+            <button id="guardar-cargas" type="button" class="ds-button ds-button-primary ds-button-sm" disabled>Guardar cargas</button>
+        </div>
     </div>
 
     <div class="ds-week-agenda grid grid-cols-1 gap-4 xl:grid-cols-7">
@@ -136,10 +140,9 @@
                     <p class="text-xs font-medium text-gray-700 mt-1">{{ item.titulo }}</p>
                     <p class="text-[10px] text-gray-500 mt-1">{{ item.local }}</p>
                     {% if item.sessao_id|default(false) and not item.e_jogo %}
-                    <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ item.sessao_id }}/carga" class="mt-2 grid grid-cols-2 gap-1" aria-label="Carga prevista do treino">
-                        <input type="number" name="volume_minutos" min="1" max="600" value="{{ item.volume_minutos if item.volume_minutos is not none else '' }}" placeholder="Minutos" class="min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px]">
-                        <input type="number" name="intensidade_rpe" min="0" max="10" step="0.5" value="{{ item.intensidade_rpe if item.intensidade_rpe is not none else '' }}" placeholder="RPE 0–10" class="min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px]">
-                        <button class="col-span-2 rounded border border-orange-200 bg-white px-2 py-1 text-[10px] font-semibold text-orange-700 hover:bg-orange-50">Guardar carga</button>
+                    <form data-carga-form data-sessao-id="{{ item.sessao_id }}" class="mt-2 grid grid-cols-2 gap-1" aria-label="Carga prevista do treino" onsubmit="return false">
+                        <input data-carga-campo type="number" name="volume_minutos" min="1" max="600" value="{{ item.volume_minutos if item.volume_minutos is not none else '' }}" placeholder="Minutos" class="min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px]">
+                        <input data-carga-campo type="number" name="intensidade_rpe" min="0" max="10" step="0.5" value="{{ item.intensidade_rpe if item.intensidade_rpe is not none else '' }}" placeholder="RPE 0–10" class="min-w-0 rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px]">
                     </form>
                     {% endif %}
                     {% if item.link %}
@@ -180,6 +183,9 @@
                         {% if treino.hora_inicio or treino.local %}
                         <span class="mt-1 block text-[10px] font-normal text-slate-300">{{ treino.hora_inicio or 'Hora por definir' }}{% if treino.local %} · {{ treino.local }}{% endif %}</span>
                         {% endif %}
+                        <span data-minutos-balanco="{{ treino.sessao_id }}" data-minutos-limite="{{ treino.minutos_limite if treino.minutos_limite is not none else '' }}" class="mt-2 inline-flex rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold text-white">
+                            {{ treino.minutos_atribuidos }}/{{ treino.minutos_limite if treino.minutos_limite is not none else '—' }} min
+                        </span>
                     </th>
                     {% endfor %}
                 </tr>
@@ -193,18 +199,19 @@
                     </th>
                     {% for treino in visao_semanal_conteudos %}
                     {% set conteudos = treino.conteudos_por_categoria[categoria.codigo] %}
-                    <td class="min-w-52 border-r border-slate-200 p-2 align-top last:border-r-0">
+                    <td data-conteudo-celula="{{ treino.sessao_id }}:{{ categoria.codigo }}" class="min-w-52 border-r border-slate-200 p-2 align-top last:border-r-0">
                         {% if conteudos %}
-                        <div class="space-y-1.5">
+                        <div data-conteudo-lista class="space-y-1.5">
                             {% for conteudo in conteudos %}
-                            <div class="flex gap-1 rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700">
+                            <div data-conteudo-id="{{ conteudo.id }}" class="flex items-start gap-1 rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700">
                                 <span class="min-w-0 flex-1 break-words">{{ conteudo.descricao }} <span class="font-semibold text-slate-500">· {{ conteudo.minutos }} min</span></span>
-                                <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ treino.sessao_id }}/conteudos/{{ conteudo.id }}/eliminar" class="shrink-0" onsubmit="return confirm('Remover este conteúdo?')"><button type="submit" class="rounded px-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Remover conteúdo" aria-label="Remover {{ conteudo.descricao }}">×</button></form>
+                                <button type="button" data-editar-conteudo onclick='abrirConteudoDialog({{ treino.sessao_id }}, {{ categoria.codigo|tojson }}, {{ treino.titulo_treino|tojson }}, {{ categoria.sigla|tojson }}, {{ categoria.label|tojson }}, {{ conteudo.id }}, {{ conteudo.descricao|tojson }}, {{ conteudo.minutos }})' class="shrink-0 rounded px-1 text-slate-400 hover:bg-white hover:text-orange-700" title="Editar conteúdo" aria-label="Editar {{ conteudo.descricao }}">✎</button>
+                                <button type="button" onclick="eliminarConteudo({{ treino.sessao_id }}, {{ conteudo.id }})" class="shrink-0 rounded px-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Remover conteúdo" aria-label="Remover {{ conteudo.descricao }}">×</button>
                             </div>
                             {% endfor %}
                         </div>
-                        {% else %}<span class="text-[11px] text-slate-300">—</span>{% endif %}
-                        <button type="button" onclick="document.getElementById('adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}').showModal()" class="mt-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-orange-200 text-sm font-bold leading-none text-orange-600 hover:bg-orange-50" title="Adicionar conteúdo" aria-label="Adicionar conteúdo de {{ categoria.label }} ao {{ treino.titulo_treino }}">+</button>
+                        {% else %}<div data-conteudo-lista class="space-y-1.5"></div><span data-conteudo-vazio class="text-[11px] text-slate-300">—</span>{% endif %}
+                        <button type="button" onclick='abrirConteudoDialog({{ treino.sessao_id }}, {{ categoria.codigo|tojson }}, {{ treino.titulo_treino|tojson }}, {{ categoria.sigla|tojson }}, {{ categoria.label|tojson }})' class="mt-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-orange-200 text-sm font-bold leading-none text-orange-600 hover:bg-orange-50" title="Adicionar conteúdo" aria-label="Adicionar conteúdo de {{ categoria.label }} ao {{ treino.titulo_treino }}">+</button>
                     </td>
                     {% endfor %}
                 </tr>
@@ -220,31 +227,33 @@
     {% endif %}
 </section>
 
-{% for treino in visao_semanal_conteudos %}{% for categoria in categorias_conteudo %}
-<dialog id="adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}" class="w-[min(92vw,420px)] rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-900/45">
-    <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/sessoes/{{ treino.sessao_id }}/conteudos" class="p-5">
-        <input type="hidden" name="categoria" value="{{ categoria.codigo }}">
-        <div class="flex items-start justify-between gap-3"><div><h2 class="text-lg font-bold text-slate-900">Adicionar conteúdo</h2><p class="mt-1 text-sm text-slate-500">{{ treino.titulo_treino }} · {{ categoria.sigla }} — {{ categoria.label }}</p></div><button type="button" onclick="document.getElementById('adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}').close()" aria-label="Fechar" class="rounded-lg px-2 py-1 text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">×</button></div>
+<dialog id="conteudo-dialog" class="w-[min(92vw,420px)] rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-900/45">
+    <form id="conteudo-form" class="p-5">
+        <input type="hidden" name="categoria">
+        <div class="flex items-start justify-between gap-3"><div><h2 id="conteudo-dialog-titulo" class="text-lg font-bold text-slate-900">Adicionar conteúdo</h2><p id="conteudo-dialog-contexto" class="mt-1 text-sm text-slate-500"></p><p id="conteudo-dialog-balanco" class="mt-2 text-xs font-semibold text-orange-700"></p></div><button type="button" onclick="document.getElementById('conteudo-dialog').close()" aria-label="Fechar" class="rounded-lg px-2 py-1 text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">×</button></div>
         <label class="mt-5 block text-sm font-semibold text-slate-700">Conteúdo<input type="text" name="descricao" required maxlength="500" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-100"></label>
         <label class="mt-4 block text-sm font-semibold text-slate-700">Minutos<input type="number" name="minutos" required min="1" max="600" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-100"></label>
-        <div class="mt-5 flex justify-end gap-2"><button type="button" onclick="document.getElementById('adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}').close()" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button><button type="submit" class="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600">Adicionar</button></div>
+        <p id="conteudo-form-erro" class="mt-3 hidden rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" aria-live="polite"></p>
+        <div class="mt-5 flex justify-end gap-2"><button type="button" onclick="document.getElementById('conteudo-dialog').close()" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button><button id="conteudo-submit" type="submit" class="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600">Adicionar</button></div>
     </form>
 </dialog>
-{% endfor %}{% endfor %}
 
 {{ graficos_carga() }}
 
 <!-- Reflexão do microciclo -->
 <div data-workspace-panel="micro:reflexao" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
     <h2 class="font-semibold text-gray-700 mb-4">Reflexão</h2>
-    <form method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/reflexao">
+    <form id="reflexao-form" method="POST" action="/planeamento/microciclos/{{ microciclo.id }}/reflexao">
         <textarea name="reflexao" rows="4"
                   placeholder="Reflexão sobre o microciclo..."
                   class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ microciclo.reflexao if microciclo.reflexao else "" }}</textarea>
-        <button type="submit"
+        <div class="mt-3 flex items-center gap-3">
+        <button id="guardar-reflexao" type="submit"
                 class="mt-3 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
             Guardar reflexão
         </button>
+        <span id="estado-reflexao" class="mt-3 text-xs text-slate-400" aria-live="polite"></span>
+        </div>
     </form>
 </div>
 
@@ -288,7 +297,7 @@
         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
             <span class="text-xs font-semibold text-gray-500">{{ componente }}</span>
             <!-- Se tiver minutos mostra em laranja, senão mostra 0 em cinzento -->
-            <span class="text-sm font-bold {{ 'text-orange-500' if minutos > 0 else 'text-gray-300' }}">
+            <span data-componente-total="{{ componente }}" class="text-sm font-bold {{ 'text-orange-500' if minutos > 0 else 'text-gray-300' }}">
                 {{ minutos }} min
             </span>
         </div>
@@ -309,13 +318,13 @@
     // Os dados das sessões são passados do servidor para o browser
 
     // Labels — identificação dos treinos (eixo X dos gráficos)
-    const labels = {{ dados_graficos.labels | tojson }};
+    let labels = {{ dados_graficos.labels | tojson }};
 
     // Dados de volume — minutos de cada sessão
-    const volumes = {{ dados_graficos.volumes | tojson }};
+    let volumes = {{ dados_graficos.volumes | tojson }};
 
     // Dados de RPE — intensidade de cada sessão
-    const rpes = {{ dados_graficos.rpes | tojson }};
+    let rpes = {{ dados_graficos.rpes | tojson }};
 
     // ─────────────────────────────
     // GRÁFICO DE VOLUME (barras)
@@ -324,7 +333,7 @@
     // getContext('2d') prepara o canvas para desenho 2D
     const ctxVolume = document.getElementById('grafico-volume').getContext('2d');
 
-    new Chart(ctxVolume, {
+    const graficoVolume = new Chart(ctxVolume, {
         // 'bar' = gráfico de barras
         type: 'bar',
         data: {
@@ -368,7 +377,7 @@
     // ─────────────────────────────
     const ctxRpe = document.getElementById('grafico-rpe').getContext('2d');
 
-    new Chart(ctxRpe, {
+    const graficoRpe = new Chart(ctxRpe, {
         // 'line' = gráfico de linha
         type: 'line',
         data: {
@@ -413,6 +422,223 @@
 </script>
 
 <script>
+const _MICROCICLO_ID = {{ microciclo.id }};
+const _CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+const guardarCargas = document.getElementById('guardar-cargas');
+const estadoCargas = document.getElementById('estado-cargas');
+const formulariosCarga = Array.from(document.querySelectorAll('[data-carga-form]'));
+
+function marcarCargasPendentes() {
+    guardarCargas.disabled = false;
+    estadoCargas.textContent = 'Alterações por guardar';
+    estadoCargas.className = 'text-xs font-semibold text-amber-700';
+}
+
+formulariosCarga.forEach(formulario => {
+    formulario.querySelectorAll('[data-carga-campo]').forEach(campo => campo.addEventListener('input', marcarCargasPendentes));
+});
+
+function atualizarBalancoMinutos(dados) {
+    const indicador = document.querySelector(`[data-minutos-balanco="${dados.sessao_id}"]`);
+    if (!indicador) return;
+    indicador.dataset.minutosLimite = dados.minutos_limite ?? '';
+    indicador.textContent = `${dados.minutos_atribuidos}/${dados.minutos_limite ?? '—'} min`;
+}
+
+function atualizarComponentes(componentes) {
+    const siglas = {
+        tecnica_individual_ofensiva: 'TIO', tecnica_individual_defensiva: 'TID',
+        tatica_individual_ofensiva: 'TaIO', tatica_individual_defensiva: 'TaID',
+        tatica_coletiva_ofensiva: 'TCO', tatica_coletiva_defensiva: 'TCD',
+        capacidades_motoras: 'FÍS', psicologia: 'PSI'
+    };
+    Object.entries(componentes || {}).forEach(([codigo, minutos]) => {
+        const elemento = document.querySelector(`[data-componente-total="${siglas[codigo]}"]`);
+        if (!elemento) return;
+        elemento.textContent = `${minutos} min`;
+        elemento.classList.toggle('text-orange-500', minutos > 0);
+        elemento.classList.toggle('text-gray-300', minutos <= 0);
+    });
+}
+
+function atualizarGraficos(dados) {
+    labels = dados.labels || [];
+    volumes = dados.volumes || [];
+    rpes = dados.rpes || [];
+    graficoVolume.data.labels = labels;
+    graficoVolume.data.datasets[0].data = volumes;
+    graficoVolume.update();
+    graficoRpe.data.labels = labels;
+    graficoRpe.data.datasets[0].data = rpes;
+    graficoRpe.update();
+}
+
+guardarCargas.addEventListener('click', async () => {
+    guardarCargas.disabled = true;
+    guardarCargas.textContent = 'A guardar…';
+    estadoCargas.textContent = '';
+    try {
+        const sessoes = formulariosCarga.map(formulario => ({
+            sessao_id: Number(formulario.dataset.sessaoId),
+            volume_minutos: formulario.elements.volume_minutos.value || null,
+            intensidade_rpe: formulario.elements.intensidade_rpe.value || null,
+        }));
+        const resposta = await fetch(`/planeamento/microciclos/${_MICROCICLO_ID}/cargas`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({sessoes}),
+        });
+        const dados = await resposta.json();
+        if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível guardar as cargas.');
+        document.querySelector('[data-balanco-volume]').textContent = dados.balanco.volume_total;
+        document.querySelector('[data-balanco-rpe]').textContent = dados.balanco.media_rpe;
+        (dados.sessoes || []).forEach(atualizarBalancoMinutos);
+        atualizarGraficos(dados.dados_graficos);
+        estadoCargas.textContent = 'Cargas guardadas';
+        estadoCargas.className = 'text-xs font-semibold text-emerald-700';
+    } catch (erro) {
+        guardarCargas.disabled = false;
+        estadoCargas.textContent = erro.message;
+        estadoCargas.className = 'text-xs font-semibold text-red-700';
+    } finally {
+        guardarCargas.textContent = 'Guardar cargas';
+    }
+});
+
+const conteudoDialog = document.getElementById('conteudo-dialog');
+const conteudoForm = document.getElementById('conteudo-form');
+const conteudoErro = document.getElementById('conteudo-form-erro');
+
+function escaparHtml(valor) {
+    const elemento = document.createElement('span');
+    elemento.textContent = valor;
+    return elemento.innerHTML;
+}
+
+function limiteConteudo(sessaoId, minutosAtuais = 0) {
+    const indicador = document.querySelector(`[data-minutos-balanco="${sessaoId}"]`);
+    if (!indicador) return {maximo: 600, texto: ''};
+    const [atribuidosTexto] = indicador.textContent.trim().split('/');
+    const atribuidos = Number(atribuidosTexto) || 0;
+    const limite = indicador.dataset.minutosLimite === '' ? null : Number(indicador.dataset.minutosLimite);
+    if (limite === null) return {maximo: 600, texto: `${atribuidos} min distribuídos · volume por definir`};
+    return {maximo: Math.max(1, limite - atribuidos + minutosAtuais), texto: `${atribuidos}/${limite} min distribuídos`};
+}
+
+function abrirConteudoDialog(sessaoId, categoria, treino, sigla, label, conteudoId = null, descricao = '', minutos = '') {
+    conteudoForm.dataset.sessaoId = sessaoId;
+    conteudoForm.dataset.conteudoId = conteudoId || '';
+    conteudoForm.elements.categoria.value = categoria;
+    conteudoForm.elements.descricao.value = descricao;
+    conteudoForm.elements.minutos.value = minutos;
+    const limite = limiteConteudo(sessaoId, Number(minutos) || 0);
+    conteudoForm.elements.minutos.max = limite.maximo;
+    document.getElementById('conteudo-dialog-titulo').textContent = conteudoId ? 'Editar conteúdo' : 'Adicionar conteúdo';
+    document.getElementById('conteudo-dialog-contexto').textContent = `${treino} · ${sigla} — ${label}`;
+    document.getElementById('conteudo-dialog-balanco').textContent = limite.texto;
+    document.getElementById('conteudo-submit').textContent = conteudoId ? 'Guardar alterações' : 'Adicionar';
+    conteudoErro.classList.add('hidden');
+    conteudoErro.textContent = '';
+    conteudoDialog.showModal();
+    window.setTimeout(() => conteudoForm.elements.descricao.focus(), 30);
+}
+
+function htmlConteudo(sessaoId, conteudo) {
+    const categoria = conteudo.categoria;
+    const celula = document.querySelector(`[data-conteudo-celula="${sessaoId}:${categoria}"]`);
+    const botaoAdicionar = celula?.querySelector('button[title="Adicionar conteúdo"]');
+    const titulo = botaoAdicionar?.getAttribute('aria-label')?.replace(/^Adicionar conteúdo de .+ ao /, '') || 'Treino';
+    const categoriaTitulo = celula?.closest('tr')?.querySelector('th span:nth-child(2)')?.textContent?.trim() || categoria;
+    const sigla = celula?.closest('tr')?.querySelector('th span:first-child')?.textContent?.trim() || categoria;
+    return `<div data-conteudo-id="${conteudo.id}" class="flex items-start gap-1 rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700"><span class="min-w-0 flex-1 break-words">${escaparHtml(conteudo.descricao)} <span class="font-semibold text-slate-500">· ${conteudo.minutos} min</span></span><button type="button" data-editar-conteudo class="shrink-0 rounded px-1 text-slate-400 hover:bg-white hover:text-orange-700" title="Editar conteúdo" aria-label="Editar ${escaparHtml(conteudo.descricao)}">✎</button><button type="button" data-eliminar-conteudo class="shrink-0 rounded px-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Remover conteúdo" aria-label="Remover ${escaparHtml(conteudo.descricao)}">×</button><span hidden data-conteudo-meta data-treino="${escaparHtml(titulo)}" data-sigla="${escaparHtml(sigla)}" data-label="${escaparHtml(categoriaTitulo)}" data-categoria="${categoria}" data-descricao="${escaparHtml(conteudo.descricao)}" data-minutos="${conteudo.minutos}" data-sessao-id="${sessaoId}"></span></div>`;
+}
+
+function ligarAcoesConteudo(elemento) {
+    const meta = elemento.querySelector('[data-conteudo-meta]');
+    if (!meta) return;
+    elemento.querySelector('[data-editar-conteudo]').addEventListener('click', () => abrirConteudoDialog(Number(meta.dataset.sessaoId), meta.dataset.categoria, meta.dataset.treino, meta.dataset.sigla, meta.dataset.label, Number(elemento.dataset.conteudoId), meta.dataset.descricao, Number(meta.dataset.minutos)));
+    elemento.querySelector('[data-eliminar-conteudo]').addEventListener('click', () => eliminarConteudo(Number(meta.dataset.sessaoId), Number(elemento.dataset.conteudoId)));
+}
+
+conteudoForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const sessaoId = Number(conteudoForm.dataset.sessaoId);
+    const conteudoId = conteudoForm.dataset.conteudoId;
+    const endpoint = conteudoId
+        ? `/planeamento/microciclos/${_MICROCICLO_ID}/sessoes/${sessaoId}/conteudos/${conteudoId}/editar`
+        : `/planeamento/microciclos/${_MICROCICLO_ID}/sessoes/${sessaoId}/conteudos`;
+    const botao = document.getElementById('conteudo-submit');
+    botao.disabled = true;
+    botao.textContent = 'A guardar…';
+    try {
+        const resposta = await fetch(endpoint, {method: 'POST', headers: {'X-CSRF-Token': _CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest'}, body: new FormData(conteudoForm)});
+        const dados = await resposta.json();
+        if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível guardar o conteúdo.');
+        const existente = conteudoId ? document.querySelector(`[data-conteudo-id="${conteudoId}"]`) : null;
+        if (existente) existente.remove();
+        const celula = document.querySelector(`[data-conteudo-celula="${sessaoId}:${dados.conteudo.categoria}"]`);
+        celula.querySelector('[data-conteudo-vazio]')?.remove();
+        const lista = celula.querySelector('[data-conteudo-lista]');
+        lista.insertAdjacentHTML('beforeend', htmlConteudo(sessaoId, dados.conteudo));
+        ligarAcoesConteudo(lista.lastElementChild);
+        atualizarBalancoMinutos(dados);
+        atualizarComponentes(dados.componentes);
+        conteudoDialog.close();
+    } catch (erro) {
+        conteudoErro.textContent = erro.message;
+        conteudoErro.classList.remove('hidden');
+    } finally {
+        botao.disabled = false;
+        botao.textContent = conteudoId ? 'Guardar alterações' : 'Adicionar';
+    }
+});
+
+async function eliminarConteudo(sessaoId, conteudoId) {
+    if (!window.confirm('Remover este conteúdo?')) return;
+    const elemento = document.querySelector(`[data-conteudo-id="${conteudoId}"]`);
+    try {
+        const resposta = await fetch(`/planeamento/microciclos/${_MICROCICLO_ID}/sessoes/${sessaoId}/conteudos/${conteudoId}/eliminar`, {method: 'POST', headers: {'X-CSRF-Token': _CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest'}});
+        const dados = await resposta.json();
+        if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível remover o conteúdo.');
+        const lista = elemento?.parentElement;
+        elemento?.remove();
+        if (lista && !lista.children.length) lista.insertAdjacentHTML('afterend', '<span data-conteudo-vazio class="text-[11px] text-slate-300">—</span>');
+        atualizarBalancoMinutos(dados);
+        atualizarComponentes(dados.componentes);
+    } catch (erro) {
+        window.alert(erro.message);
+    }
+}
+
+const reflexaoForm = document.getElementById('reflexao-form');
+if (reflexaoForm) {
+    const botaoReflexao = document.getElementById('guardar-reflexao');
+    const estadoReflexao = document.getElementById('estado-reflexao');
+    reflexaoForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        botaoReflexao.disabled = true;
+        botaoReflexao.textContent = 'A guardar…';
+        estadoReflexao.textContent = '';
+        try {
+            const resposta = await fetch(reflexaoForm.action, {
+                method: 'POST',
+                headers: {'X-CSRF-Token': _CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest'},
+                body: new FormData(reflexaoForm),
+            });
+            const dados = await resposta.json();
+            if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível guardar a reflexão.');
+            estadoReflexao.textContent = dados.mensagem;
+            estadoReflexao.className = 'mt-3 text-xs font-semibold text-emerald-700';
+        } catch (erro) {
+            estadoReflexao.textContent = erro.message;
+            estadoReflexao.className = 'mt-3 text-xs font-semibold text-red-700';
+        } finally {
+            botaoReflexao.disabled = false;
+            botaoReflexao.textContent = 'Guardar reflexão';
+        }
+    });
+}
+
 // ── ESPAÇOS DE TREINO ATRIBUÍDOS ──────────────────────────────
 const _EQUIPA_ID = {{ microciclo.mesociclo.macrociclo.equipa_id }};
 const _INPUT_CLASSES = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400";

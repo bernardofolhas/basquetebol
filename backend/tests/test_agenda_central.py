@@ -77,6 +77,33 @@ def test_link_do_plano_de_treino_tem_prioridade_sobre_o_clique_no_dia_do_calenda
     assert "if (link && !link.dataset.agendaEventId) return;" in script
 
 
+def test_agenda_guarda_no_proprio_ecra_sem_criar_navegacao_intermedia():
+    raiz = Path(__file__).resolve().parents[2]
+    script = (raiz / "frontend" / "static" / "js" / "agenda.js").read_text(encoding="utf-8")
+
+    assert "async function submeterAgenda" in script
+    assert "evento.preventDefault();" in script
+    assert "window.location.reload();" in script
+    assert "agenda:retorno" in script
+
+
+def test_agenda_assincrona_devolve_erro_sem_redirecionar(client_admin):
+    resposta = client_admin.post(
+        "/agenda/atividades",
+        data={
+            "tipo": "treino_equipa",
+            "data_evento": "data-invalida",
+            "retorno": "/calendario",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+        follow_redirects=False,
+    )
+
+    assert resposta.status_code == 400
+    assert resposta.json()["sucesso"] is False
+    assert "data" in resposta.json()["erro"].lower()
+
+
 def test_admin_consegue_criar_atividade_comum_de_dia_inteiro(client_admin):
     resposta = client_admin.post(
         "/agenda/atividades",

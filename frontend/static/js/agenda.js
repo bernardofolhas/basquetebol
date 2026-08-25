@@ -14,6 +14,44 @@
         else elemento.setAttribute('open', 'open');
     }
 
+    function guardarPosicao() {
+        sessionStorage.setItem('agenda:retorno', JSON.stringify({
+            caminho: window.location.pathname + window.location.search,
+            scrollY: window.scrollY,
+        }));
+    }
+
+    async function submeterAgenda(formulario, action) {
+        const botao = campo('agenda-submit');
+        const textoOriginal = botao ? botao.textContent : '';
+        if (botao) {
+            botao.disabled = true;
+            botao.textContent = 'A guardar…';
+        }
+        try {
+            const resposta = await fetch(action || formulario.action, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: new FormData(formulario),
+            });
+            const dados = await resposta.json();
+            if (!resposta.ok || !dados.sucesso) {
+                throw new Error(dados.erro || 'Não foi possível concluir a operação.');
+            }
+            guardarPosicao();
+            window.location.reload();
+        } catch (erro) {
+            window.alert(erro.message);
+            if (botao) {
+                botao.disabled = false;
+                botao.textContent = textoOriginal;
+            }
+        }
+    }
+
     function aplicarLimiteDaRecorrencia() {
         const recorrencia = campo('agenda-recorrencia');
         const dataFim = campo('agenda-data-fim');
@@ -83,7 +121,7 @@
         formulario.querySelectorAll('[required]').forEach(function (input) {
             input.removeAttribute('required');
         });
-        formulario.submit();
+        submeterAgenda(formulario, formulario.action);
     }
 
     function apagarAgenda() {
@@ -92,7 +130,7 @@
         if (!id || !formulario || !window.confirm('Remover esta atividade do calendário? As sessões de treino associadas também serão eliminadas.')) return;
         formulario.action = '/agenda/atividades/' + id + '/apagar';
         formulario.querySelectorAll('[required]').forEach(function (input) { input.removeAttribute('required'); });
-        formulario.submit();
+        submeterAgenda(formulario, formulario.action);
     }
 
     document.addEventListener('click', function (evento) {
@@ -117,6 +155,26 @@
 
     document.addEventListener('change', function (evento) {
         if (evento.target.id === 'agenda-recorrencia') aplicarLimiteDaRecorrencia();
+    });
+
+    document.addEventListener('submit', function (evento) {
+        const formulario = evento.target;
+        if (formulario.id !== 'agenda-form') return;
+        evento.preventDefault();
+        submeterAgenda(formulario, formulario.action);
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            const retorno = JSON.parse(sessionStorage.getItem('agenda:retorno') || 'null');
+            const caminho = window.location.pathname + window.location.search;
+            if (retorno && retorno.caminho === caminho) {
+                sessionStorage.removeItem('agenda:retorno');
+                window.requestAnimationFrame(function () { window.scrollTo(0, retorno.scrollY || 0); });
+            }
+        } catch (_) {
+            sessionStorage.removeItem('agenda:retorno');
+        }
     });
 
     window.abrirNovaAgenda = abrirNovaAgenda;

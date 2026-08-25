@@ -47,6 +47,21 @@ def atualizar_minutos_por_componente(sessao) -> None:
         setattr(sessao, dados["campo_minutos"], totais[codigo])
 
 
+def calcular_balanco_minutos(sessao, ignorar_conteudo_id: int | None = None) -> dict[str, int | None]:
+    """Resume os minutos distribuídos e o limite definido para o treino."""
+    atribuidos = sum(
+        conteudo.minutos or 0
+        for conteudo in sessao.conteudos
+        if ignorar_conteudo_id is None or getattr(conteudo, "id", None) != ignorar_conteudo_id
+    )
+    limite = getattr(sessao, "volume_minutos", None)
+    return {
+        "atribuidos": atribuidos,
+        "limite": limite,
+        "disponiveis": max(0, limite - atribuidos) if limite is not None else None,
+    }
+
+
 def construir_visao_semanal_conteudos(
     sessoes: list,
 ) -> list[dict]:
@@ -64,6 +79,7 @@ def construir_visao_semanal_conteudos(
                     "descricao": conteudo.descricao,
                     "minutos": conteudo.minutos,
                 })
+        balanco_minutos = calcular_balanco_minutos(sessao)
         treinos.append({
             "sessao_id": sessao.id,
             "numero_treino": sessao.numero_treino,
@@ -78,6 +94,9 @@ def construir_visao_semanal_conteudos(
             "hora_inicio": getattr(sessao, "hora_inicio", None),
             "hora_fim": getattr(sessao, "hora_fim", None),
             "local": getattr(sessao, "local", None),
+            "minutos_atribuidos": balanco_minutos["atribuidos"],
+            "minutos_limite": balanco_minutos["limite"],
+            "minutos_disponiveis": balanco_minutos["disponiveis"],
             "conteudos_por_categoria": conteudos_por_categoria,
         })
     return treinos

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from services.conteudos_sessao_service import (
     CATEGORIAS_POR_CODIGO,
     atualizar_minutos_por_componente,
+    calcular_balanco_minutos,
     categorias_conteudo_para_ui,
     construir_visao_semanal_conteudos,
 )
@@ -41,6 +42,7 @@ def test_visao_semanal_organiza_conteudos_por_dia_e_categoria():
         id=12,
         data=date(2026, 7, 22),
         numero_treino=3,
+        volume_minutos=90,
         conteudos=[SimpleNamespace(
             categoria="tatica_coletiva_ofensiva",
             descricao="Saída de pressão",
@@ -57,6 +59,30 @@ def test_visao_semanal_organiza_conteudos_por_dia_e_categoria():
         "id": None,
         "descricao": "Saída de pressão",
         "minutos": 18,
+    }
+    assert treinos[0]["minutos_atribuidos"] == 18
+    assert treinos[0]["minutos_limite"] == 90
+    assert treinos[0]["minutos_disponiveis"] == 72
+
+
+def test_balanco_de_conteudos_respeita_volume_e_edicao_existente():
+    sessao = SimpleNamespace(
+        volume_minutos=90,
+        conteudos=[
+            SimpleNamespace(id=1, minutos=30),
+            SimpleNamespace(id=2, minutos=20),
+        ],
+    )
+
+    assert calcular_balanco_minutos(sessao) == {
+        "atribuidos": 50,
+        "limite": 90,
+        "disponiveis": 40,
+    }
+    assert calcular_balanco_minutos(sessao, ignorar_conteudo_id=2) == {
+        "atribuidos": 30,
+        "limite": 90,
+        "disponiveis": 60,
     }
 
 
@@ -144,5 +170,7 @@ def test_pdf_completo_do_microciclo_prioriza_carga_sem_detalhe_repetido():
     assert "Volume por treino" in conteudo
     assert "Intensidade por sessão" in conteudo
     assert 'class="chart-table"' in conteudo
+    assert 'class="component-table"' in conteudo
+    assert "{{ minutos }} min" in conteudo
     assert "sessions-detail" not in conteudo
     assert "legacy-calendar" not in conteudo

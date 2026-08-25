@@ -77,7 +77,7 @@
         {% if treinador.equipas %}
         <div class="flex flex-wrap gap-2">
             {% for equipa in treinador.equipas %}
-            <a href="/equipas/{{ equipa.id }}"
+            <a href="/equipas/{{ equipa.id }}/resumo"
                class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm hover:bg-orange-200 transition">
                 {{ equipa.nome }} — {{ equipa.escalao.value }}
             </a>

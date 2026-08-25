@@ -13,7 +13,7 @@ from io import BytesIO
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from template_config import Jinja2Templates
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -59,6 +59,7 @@ from services.numeracao_planeamento_service import (
 from services.conteudos_sessao_service import (
     CATEGORIAS_POR_CODIGO,
     atualizar_minutos_por_componente,
+    calcular_balanco_minutos,
     categorias_conteudo_para_ui,
     construir_visao_semanal_conteudos,
 )
@@ -75,6 +76,39 @@ def _verificar_acesso_planeamento(utilizador, equipa_id: int | None, db: Session
     """Valida se o utilizador pode aceder ao planeamento; lança AcessoNegado se não."""
     if not equipa_id or not verificar_acesso_equipa(utilizador, equipa_id, db):
         raise AcessoNegado("/equipas")
+
+
+def _pedido_assincrono(request: Request) -> bool:
+    return request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+
+def _erro_acao_microciclo(request: Request, micro_id: int, mensagem: str, status_code: int = 400):
+    if _pedido_assincrono(request):
+        return JSONResponse({"sucesso": False, "erro": mensagem}, status_code=status_code)
+    set_flash(request, mensagem, "error")
+    return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+
+
+def _resumo_carga_microciclo(sessoes_ativas: list[SessaoTreino]) -> dict:
+    balanco, dados_graficos = _calcular_balanco_microciclo(sessoes_ativas)
+    return {
+        "balanco": balanco,
+        "dados_graficos": dados_graficos,
+    }
+
+
+def _dados_conteudos_sessao(sessao: SessaoTreino) -> dict:
+    balanco = calcular_balanco_minutos(sessao)
+    return {
+        "sessao_id": sessao.id,
+        "minutos_atribuidos": balanco["atribuidos"],
+        "minutos_limite": balanco["limite"],
+        "minutos_disponiveis": balanco["disponiveis"],
+        "componentes": {
+            codigo: getattr(sessao, dados["campo_minutos"], 0) or 0
+            for codigo, dados in CATEGORIAS_POR_CODIGO.items()
+        },
+    }
 
 
 def _obter_equipa_id_por_macrociclo(db: Session, macro_id: int) -> int | None:
@@ -1812,6 +1846,95 @@ async def atualizar_carga_rapida_sessao(
     return RedirectResponse(url=destino, status_code=303)
 
 
+@router.post("/microciclos/{micro_id}/cargas")
+async def atualizar_cargas_microciclo(
+    micro_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Guarda todas as cargas editadas sem recarregar o microciclo."""
+    equipa_id = _obter_equipa_id_por_microciclo(db, micro_id)
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    try:
+        payload = await request.json()
+        entradas = payload.get("sessoes", [])
+        if not isinstance(entradas, list) or len(entradas) > 100:
+            raise ValueError
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JSONResponse({"sucesso": False, "erro": "Pedido de cargas inválido."}, status_code=400)
+
+    ids = []
+    for entrada in entradas:
+        try:
+            ids.append(int(entrada.get("sessao_id")))
+        except (AttributeError, TypeError, ValueError):
+            return JSONResponse({"sucesso": False, "erro": "Foi indicada uma sessão inválida."}, status_code=400)
+
+    sessoes = db.query(SessaoTreino).filter(
+        SessaoTreino.microciclo_id == micro_id,
+        SessaoTreino.id.in_(ids),
+        SessaoTreino.e_jogo.is_(False),
+        SessaoTreino.ativa.is_(True),
+    ).all() if ids else []
+    sessoes_por_id = {sessao.id: sessao for sessao in sessoes}
+    if len(sessoes_por_id) != len(set(ids)):
+        return JSONResponse({"sucesso": False, "erro": "Um dos treinos já não está disponível."}, status_code=404)
+
+    atualizacoes = []
+    for entrada in entradas:
+        sessao = sessoes_por_id[int(entrada["sessao_id"])]
+        try:
+            volume_bruto = entrada.get("volume_minutos")
+            rpe_bruto = entrada.get("intensidade_rpe")
+            volume = None if volume_bruto in (None, "") else int(volume_bruto)
+            rpe = None if rpe_bruto in (None, "") else float(rpe_bruto)
+            if volume is not None and not 1 <= volume <= 600:
+                raise ValueError
+            if rpe is not None and not 0 <= rpe <= 10:
+                raise ValueError
+        except (TypeError, ValueError):
+            return JSONResponse({
+                "sucesso": False,
+                "erro": "O volume deve estar entre 1 e 600 minutos e o RPE entre 0 e 10.",
+            }, status_code=400)
+
+        minutos_atribuidos = calcular_balanco_minutos(sessao)["atribuidos"]
+        if volume is not None and minutos_atribuidos > volume:
+            nome_treino = (
+                f"Treino {sessao.numero_treino}"
+                if sessao.numero_treino is not None
+                else "Este treino"
+            )
+            return JSONResponse({
+                "sucesso": False,
+                "erro": (
+                    f"{nome_treino} "
+                    f"já tem {minutos_atribuidos} minutos distribuídos. "
+                    "Aumenta o volume ou reduz os conteúdos."
+                ),
+            }, status_code=400)
+        atualizacoes.append((sessao, volume, rpe))
+
+    for sessao, volume, rpe in atualizacoes:
+        sessao.volume_minutos = volume
+        sessao.intensidade_rpe = rpe
+        sessao.alterada_manual = True
+        sessao.sincronizada = False
+    db.commit()
+
+    sessoes_ativas = db.query(SessaoTreino).filter(
+        SessaoTreino.microciclo_id == micro_id,
+        SessaoTreino.ativa.is_(True),
+    ).order_by(SessaoTreino.data, SessaoTreino.id).all()
+    return JSONResponse({
+        "sucesso": True,
+        "mensagem": "Cargas guardadas.",
+        **_resumo_carga_microciclo(sessoes_ativas),
+        "sessoes": [_dados_conteudos_sessao(sessao) for sessao in sessoes if not sessao.e_jogo],
+    })
+
+
 @router.post("/microciclos/{micro_id}/sessoes/{sessao_id}/conteudos")
 async def adicionar_conteudo_sessao(
     micro_id: int,
@@ -1833,7 +1956,7 @@ async def adicionar_conteudo_sessao(
         SessaoTreino.ativa.is_(True),
     ).first()
     if not sessao:
-        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+        return _erro_acao_microciclo(request, micro_id, "O treino já não está disponível.", 404)
 
     descricao = descricao.strip()
     try:
@@ -1841,21 +1964,111 @@ async def adicionar_conteudo_sessao(
         if categoria not in CATEGORIAS_POR_CODIGO or not descricao or not 1 <= minutos_int <= 600:
             raise ValueError
     except (TypeError, ValueError):
-        set_flash(request, "Indica uma categoria, conteúdo e duração entre 1 e 600 minutos.", "error")
-        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+        return _erro_acao_microciclo(
+            request, micro_id, "Indica uma categoria, conteúdo e duração entre 1 e 600 minutos."
+        )
+
+    balanco_minutos = calcular_balanco_minutos(sessao)
+    if balanco_minutos["limite"] is not None and balanco_minutos["atribuidos"] + minutos_int > balanco_minutos["limite"]:
+        return _erro_acao_microciclo(
+            request,
+            micro_id,
+            f"Este treino só tem {balanco_minutos['disponiveis']} minutos disponíveis.",
+        )
 
     ordem = len(sessao.conteudos) + 1
-    sessao.conteudos.append(ConteudoSessaoTreino(
+    conteudo = ConteudoSessaoTreino(
         categoria=categoria,
         descricao=descricao,
         minutos=minutos_int,
         ordem=ordem,
-    ))
+    )
+    sessao.conteudos.append(conteudo)
     atualizar_minutos_por_componente(sessao)
     sessao.alterada_manual = True
     sessao.sincronizada = False
     db.commit()
+    db.refresh(conteudo)
+    if _pedido_assincrono(request):
+        return JSONResponse({
+            "sucesso": True,
+            "mensagem": "Conteúdo adicionado.",
+            "conteudo": {
+                "id": conteudo.id,
+                "categoria": conteudo.categoria,
+                "descricao": conteudo.descricao,
+                "minutos": conteudo.minutos,
+            },
+            **_dados_conteudos_sessao(sessao),
+        })
     set_flash(request, "Conteúdo adicionado ao treino.")
+    return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+
+
+@router.post("/microciclos/{micro_id}/sessoes/{sessao_id}/conteudos/{conteudo_id}/editar")
+async def editar_conteudo_sessao(
+    micro_id: int,
+    sessao_id: int,
+    conteudo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    categoria: str = Form(...),
+    descricao: str = Form(...),
+    minutos: str = Form(...),
+):
+    equipa_id = _obter_equipa_id_por_microciclo(db, micro_id)
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    sessao = db.query(SessaoTreino).filter(
+        SessaoTreino.id == sessao_id,
+        SessaoTreino.microciclo_id == micro_id,
+        SessaoTreino.e_jogo.is_(False),
+        SessaoTreino.ativa.is_(True),
+    ).first()
+    conteudo = db.query(ConteudoSessaoTreino).filter(
+        ConteudoSessaoTreino.id == conteudo_id,
+        ConteudoSessaoTreino.sessao_id == sessao_id,
+    ).first()
+    if not sessao or not conteudo:
+        return _erro_acao_microciclo(request, micro_id, "O conteúdo já não está disponível.", 404)
+
+    descricao = descricao.strip()
+    try:
+        minutos_int = int(minutos)
+        if categoria not in CATEGORIAS_POR_CODIGO or not descricao or not 1 <= minutos_int <= 600:
+            raise ValueError
+    except (TypeError, ValueError):
+        return _erro_acao_microciclo(
+            request, micro_id, "Indica uma categoria, conteúdo e duração entre 1 e 600 minutos."
+        )
+
+    balanco_sem_conteudo = calcular_balanco_minutos(sessao, ignorar_conteudo_id=conteudo.id)
+    if balanco_sem_conteudo["limite"] is not None and balanco_sem_conteudo["atribuidos"] + minutos_int > balanco_sem_conteudo["limite"]:
+        disponiveis = max(0, balanco_sem_conteudo["limite"] - balanco_sem_conteudo["atribuidos"])
+        return _erro_acao_microciclo(
+            request, micro_id, f"Este conteúdo pode ocupar no máximo {disponiveis} minutos."
+        )
+
+    conteudo.categoria = categoria
+    conteudo.descricao = descricao
+    conteudo.minutos = minutos_int
+    atualizar_minutos_por_componente(sessao)
+    sessao.alterada_manual = True
+    sessao.sincronizada = False
+    db.commit()
+    if _pedido_assincrono(request):
+        return JSONResponse({
+            "sucesso": True,
+            "mensagem": "Conteúdo atualizado.",
+            "conteudo": {
+                "id": conteudo.id,
+                "categoria": conteudo.categoria,
+                "descricao": conteudo.descricao,
+                "minutos": conteudo.minutos,
+            },
+            **_dados_conteudos_sessao(sessao),
+        })
+    set_flash(request, "Conteúdo atualizado.")
     return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
 
 
@@ -1881,7 +2094,7 @@ async def eliminar_conteudo_sessao(
         ConteudoSessaoTreino.sessao_id == sessao_id,
     ).first()
     if not sessao or not conteudo:
-        return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
+        return _erro_acao_microciclo(request, micro_id, "O conteúdo já não está disponível.", 404)
 
     # Remover pela relação mantém a coleção em memória sincronizada antes do recálculo.
     sessao.conteudos.remove(conteudo)
@@ -1890,6 +2103,13 @@ async def eliminar_conteudo_sessao(
     sessao.alterada_manual = True
     sessao.sincronizada = False
     db.commit()
+    if _pedido_assincrono(request):
+        return JSONResponse({
+            "sucesso": True,
+            "mensagem": "Conteúdo removido.",
+            "conteudo_id": conteudo_id,
+            **_dados_conteudos_sessao(sessao),
+        })
     set_flash(request, "Conteúdo removido do treino.")
     return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
 
@@ -2017,6 +2237,8 @@ async def guardar_reflexao_microciclo(
     microciclo.reflexao = reflexao or None
 
     db.commit()
+    if _pedido_assincrono(request):
+        return JSONResponse({"sucesso": True, "mensagem": "Reflexão guardada."})
     set_flash(request, "Reflexão guardada.")
     return RedirectResponse(
         url=f"/planeamento/microciclos/{micro_id}",

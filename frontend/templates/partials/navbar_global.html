@@ -52,7 +52,7 @@
           <div>
             <div class="flex items-center justify-between gap-2 px-2 pb-1"><span class="ds-dropdown-label">{{ 'Mudar de equipa' if equipa_contexto_id else 'Abrir equipa' }}</span><a href="/equipas" class="ds-dropdown-all">Ver todas</a></div>
             <div class="ds-team-switcher">
-              {% for item in nav.equipas|default([]) %}<a href="/equipas/{{ item.id }}" class="{% if item.id == equipa_contexto_id %}is-current{% endif %}"><span class="ds-team-dot"></span><span class="truncate">{{ item.nome }}</span></a>{% else %}<p>Sem equipas disponíveis.</p>{% endfor %}
+              {% for item in nav.equipas|default([]) %}<a href="/equipas/{{ item.id }}/resumo" class="{% if item.id == equipa_contexto_id %}is-current{% endif %}"><span class="ds-team-dot"></span><span class="truncate">{{ item.nome }}</span></a>{% else %}<p>Sem equipas disponíveis.</p>{% endfor %}
             </div>
           </div>
           {% if equipa_contexto_id %}
@@ -65,7 +65,7 @@
 
       {% if equipa_contexto_id %}
       <div class="ds-team-direct-nav" aria-label="Área da equipa">
-        <a href="/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-resumo {% if p == '/equipas/' ~ equipa_contexto_id %}is-active{% endif %}">Resumo</a>
+        <a href="/equipas/{{ equipa_contexto_id }}/resumo" class="ds-header-trigger ds-team-direct-link ds-nav-order-resumo {% if p in ['/equipas/' ~ equipa_contexto_id, '/equipas/' ~ equipa_contexto_id ~ '/resumo'] %}is-active{% endif %}">Resumo</a>
         <a href="/fisico/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-fisico {% if p.startswith('/fisico') %}is-active{% endif %}">Físico</a>
         <a href="/jogos/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-jogos {% if p.startswith('/jogos') %}is-active{% endif %}">Jogos</a>
         <a href="/assiduidade/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-assiduidade {% if p.startswith('/assiduidade') %}is-active{% endif %}">Assiduidade</a>

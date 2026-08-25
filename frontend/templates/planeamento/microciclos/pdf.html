@@ -48,11 +48,10 @@
         .chart-label { color: #64748b; font-size: 6px; height: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .chart-empty { color: #94a3b8; font-size: 8px; padding: 28px 0; text-align: center; }
         .balance { display: grid; grid-template-columns: 1.25fr .75fr; gap: 9px; }
-        .component-grid { display: grid; grid-template-columns: repeat(8, 1fr); border: 1px solid #d9e1eb; border-radius: 7px; overflow: hidden; }
-        .component { border-right: 1px solid #e5eaf0; padding: 5px; text-align: center; }
-        .component:last-child { border-right: 0; }
-        .component small { color: #64748b; display: block; font-size: 6px; font-weight: 700; }
-        .component strong { color: #172033; display: block; font-size: 10px; margin-top: 2px; }
+        .component-table { border: 1px solid #d9e1eb; table-layout: fixed; width: 100%; }
+        .component-table th { border-right: 1px solid #e5eaf0; padding: 4px 2px 2px; text-align: center; }
+        .component-table td { border: 0; border-right: 1px solid #e5eaf0; color: #172033; font-size: 9px; font-weight: 800; line-height: 1.15; padding: 2px 2px 5px; text-align: center; white-space: nowrap; }
+        .component-table th:last-child, .component-table td:last-child { border-right: 0; }
         .attendance { border: 1px solid #d9e1eb; border-radius: 7px; padding: 6px 8px; }
         .attendance strong { color: var(--pdf-primary-dark); font-size: 15px; }
         .attendance span { color: #64748b; display: block; font-size: 7px; margin-top: 2px; }
@@ -131,11 +130,10 @@
     <section class="section balance">
         <div>
             <div class="section-title">Minutos por componente</div>
-            <div class="component-grid">
-                {% for sigla, minutos in [('TIO', balanco.componentes.TIO), ('TID', balanco.componentes.TID), ('TaIO', balanco.componentes.TaIO), ('TaID', balanco.componentes.TaID), ('TCO', balanco.componentes.TCO), ('TCD', balanco.componentes.TCD), ('FÍS', balanco.componentes['FÍS']), ('PSI', balanco.componentes.PSI)] %}
-                <div class="component"><small>{{ sigla }}</small><strong>{{ minutos }}</strong></div>
-                {% endfor %}
-            </div>
+            <table class="component-table">
+                <thead><tr>{% for sigla, minutos in [('TIO', balanco.componentes.TIO), ('TID', balanco.componentes.TID), ('TaIO', balanco.componentes.TaIO), ('TaID', balanco.componentes.TaID), ('TCO', balanco.componentes.TCO), ('TCD', balanco.componentes.TCD), ('FÍS', balanco.componentes['FÍS']), ('PSI', balanco.componentes.PSI)] %}<th>{{ sigla }}</th>{% endfor %}</tr></thead>
+                <tbody><tr>{% for sigla, minutos in [('TIO', balanco.componentes.TIO), ('TID', balanco.componentes.TID), ('TaIO', balanco.componentes.TaIO), ('TaID', balanco.componentes.TaID), ('TCO', balanco.componentes.TCO), ('TCD', balanco.componentes.TCD), ('FÍS', balanco.componentes['FÍS']), ('PSI', balanco.componentes.PSI)] %}<td>{{ minutos }} min</td>{% endfor %}</tr></tbody>
+            </table>
         </div>
         <div>
             <div class="section-title">Presenças</div>

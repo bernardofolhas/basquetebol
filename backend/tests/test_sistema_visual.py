@@ -119,8 +119,33 @@ def test_microciclo_adiciona_conteudos_individualmente_em_cada_celula():
     ).read_text(encoding="utf-8")
 
     assert "Gerir conteúdos" not in conteudo
-    assert "adicionar-conteudo-{{ treino.sessao_id }}-{{ categoria.codigo }}" in conteudo
+    assert 'id="conteudo-dialog"' in conteudo
+    assert "abrirConteudoDialog({{ treino.sessao_id }}" in conteudo
+    assert "data-editar-conteudo" in conteudo
+    assert "data-minutos-balanco" in conteudo
     assert "Use o sinal + de cada célula" in conteudo
+
+
+def test_microciclo_guarda_cargas_e_reflexao_sem_navegar():
+    conteudo = (
+        TEMPLATES_DIR / "planeamento" / "microciclos" / "detalhe.html"
+    ).read_text(encoding="utf-8")
+
+    assert 'id="guardar-cargas"' in conteudo
+    assert "event.preventDefault();" in conteudo
+    assert "X-Requested-With" in conteudo
+    assert 'id="reflexao-form"' in conteudo
+
+
+def test_equipa_abre_explicitamente_no_resumo_e_base_usa_logo_como_icone():
+    dashboard = (TEMPLATES_DIR / "dashboard_treinador.html").read_text(encoding="utf-8")
+    base = (TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
+
+    assert '/equipas/{{ item.equipa.id }}/resumo' in dashboard
+    assert '<link rel="icon" href="{{ identidade.logo_principal }}">' in base
+    assert "scrollbar-gutter:auto" in (
+        TEMPLATES_DIR.parent / "static" / "css" / "design-system.css"
+    ).read_text(encoding="utf-8")
 
 
 def test_login_mantem_recuperacao_e_melhora_utilizacao():

@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from auth import verificar_acesso_equipa, verificar_perfil
@@ -25,6 +25,26 @@ from services.remocao_sessoes_service import eliminar_sessoes_treino
 
 
 router = APIRouter(prefix="/agenda")
+
+
+def _pedido_assincrono(request: Request) -> bool:
+    return request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+
+def _resposta_assincrona(
+    request: Request,
+    *,
+    sucesso: bool,
+    mensagem: str,
+    destino: str,
+    status_code: int = 200,
+):
+    if not _pedido_assincrono(request):
+        return None
+    return JSONResponse(
+        {"sucesso": sucesso, "mensagem" if sucesso else "erro": mensagem, "destino": destino},
+        status_code=status_code,
+    )
 
 
 def _datas_recorrencia(inicio: date, fim: date | None, frequencia: str, intervalo: int) -> list[date]:
@@ -468,14 +488,24 @@ async def criar_atividade_agenda(
         db.commit()
     except ValueError as erro:
         db.rollback()
+        resposta = _resposta_assincrona(
+            request,
+            sucesso=False,
+            mensagem=str(erro),
+            destino=_retorno_seguro(retorno),
+            status_code=400,
+        )
+        if resposta:
+            return resposta
         set_flash(request, str(erro), "error")
         return RedirectResponse(url=retorno or "/calendario", status_code=303)
 
     if conflitos:
-        set_flash(request, f"Atividade criada com {len(conflitos)} conflito(s) de agenda. Revê o detalhe.", "error")
+        mensagem = f"Atividade criada com {len(conflitos)} conflito(s) de agenda. Revê o detalhe."
     else:
         sufixo = f" ({len(datas)} ocorrências)" if len(datas) > 1 else ""
-        set_flash(request, f"{metadados_tipo_agenda(evento.tipo)['label']} criado com sucesso{sufixo}.")
+        mensagem = f"{metadados_tipo_agenda(evento.tipo)['label']} criado com sucesso{sufixo}."
+
     if (
         evento.tipo == TipoEventoPlaneamentoClubeEnum.jogo
         and evento.equipa_id
@@ -491,6 +521,15 @@ async def criar_atividade_agenda(
                 destino,
             )
             db.commit()
+    resposta = _resposta_assincrona(
+        request,
+        sucesso=True,
+        mensagem=mensagem,
+        destino=destino,
+    )
+    if resposta:
+        return resposta
+    set_flash(request, mensagem, "error" if conflitos else "success")
     return RedirectResponse(url=destino, status_code=303)
 
 
@@ -520,6 +559,15 @@ async def editar_atividade_agenda(
 ):
     evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
     if not evento:
+        resposta = _resposta_assincrona(
+            request,
+            sucesso=False,
+            mensagem="A atividade já não está disponível.",
+            destino=_retorno_seguro(retorno),
+            status_code=404,
+        )
+        if resposta:
+            return resposta
         return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
     try:
         tipo_valido = TipoEventoPlaneamentoClubeEnum(tipo)
@@ -604,19 +652,33 @@ async def editar_atividade_agenda(
         db.commit()
     except ValueError as erro:
         db.rollback()
+        resposta = _resposta_assincrona(
+            request,
+            sucesso=False,
+            mensagem=str(erro),
+            destino=_retorno_seguro(retorno),
+            status_code=400,
+        )
+        if resposta:
+            return resposta
         set_flash(request, str(erro), "error")
         return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
 
     if conflitos:
-        set_flash(request, f"Atividade atualizada com {len(conflitos)} conflito(s) de agenda.", "error")
+        mensagem = f"Atividade atualizada com {len(conflitos)} conflito(s) de agenda."
     else:
-        set_flash(request, "Atividade atualizada.")
-    return RedirectResponse(url=_url_contexto(
+        mensagem = "Atividade atualizada."
+    destino = _url_contexto(
         macrociclo_id=evento.macrociclo_id,
         mesociclo_id=evento.mesociclo_id,
         microciclo_id=evento.microciclo_id,
         retorno=retorno,
-    ), status_code=303)
+    )
+    resposta = _resposta_assincrona(request, sucesso=True, mensagem=mensagem, destino=destino)
+    if resposta:
+        return resposta
+    set_flash(request, mensagem, "error" if conflitos else "success")
+    return RedirectResponse(url=destino, status_code=303)
 
 
 @router.post("/atividades/{evento_id}/apagar")
@@ -627,6 +689,15 @@ async def apagar_atividade_agenda(
 ):
     evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
     if not evento:
+        resposta = _resposta_assincrona(
+            request,
+            sucesso=False,
+            mensagem="A atividade já não está disponível.",
+            destino=_retorno_seguro(retorno),
+            status_code=404,
+        )
+        if resposta:
+            return resposta
         return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
     _verificar_acesso(utilizador, evento.equipa_id, db, evento.aplica_a_todas_equipas)
     alvos = [evento]
@@ -647,8 +718,13 @@ async def apagar_atividade_agenda(
         else:
             db.delete(alvo)
     db.commit()
-    set_flash(request, f"{len(alvos)} atividade(s) removida(s) do calendário.")
-    return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
+    mensagem = f"{len(alvos)} atividade(s) removida(s) do calendário."
+    destino = _retorno_seguro(retorno)
+    resposta = _resposta_assincrona(request, sucesso=True, mensagem=mensagem, destino=destino)
+    if resposta:
+        return resposta
+    set_flash(request, mensagem)
+    return RedirectResponse(url=destino, status_code=303)
 
 
 @router.post("/atividades/{evento_id}/duplicar")
@@ -662,6 +738,15 @@ async def duplicar_atividade_agenda(
 ):
     evento = db.query(EventoPlaneamentoClube).filter(EventoPlaneamentoClube.id == evento_id).first()
     if not evento:
+        resposta = _resposta_assincrona(
+            request,
+            sucesso=False,
+            mensagem="A atividade já não está disponível.",
+            destino=_retorno_seguro(retorno),
+            status_code=404,
+        )
+        if resposta:
+            return resposta
         return RedirectResponse(url=_retorno_seguro(retorno), status_code=303)
     _verificar_acesso(utilizador, evento.equipa_id, db, evento.aplica_a_todas_equipas)
     copia = EventoPlaneamentoClube(
@@ -689,10 +774,14 @@ async def duplicar_atividade_agenda(
     microciclo = db.query(Microciclo).filter(Microciclo.id == copia.microciclo_id).first() if copia.microciclo_id else None
     _criar_sessao_se_necessario(db, copia, microciclo, copia.tipo.value, copia.equipa_id)
     db.commit()
-    set_flash(request, "Atividade duplicada.")
-    return RedirectResponse(url=_url_contexto(
+    destino = _url_contexto(
         macrociclo_id=copia.macrociclo_id,
         mesociclo_id=copia.mesociclo_id,
         microciclo_id=copia.microciclo_id,
         retorno=retorno,
-    ), status_code=303)
+    )
+    resposta = _resposta_assincrona(request, sucesso=True, mensagem="Atividade duplicada.", destino=destino)
+    if resposta:
+        return resposta
+    set_flash(request, "Atividade duplicada.")
+    return RedirectResponse(url=destino, status_code=303)

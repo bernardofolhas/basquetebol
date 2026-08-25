@@ -16,7 +16,7 @@
   <section class="grid gap-4 lg:grid-cols-3">
     <div class="ds-card p-5">
       <h2 class="font-bold">Equipas <span class="text-sm text-slate-400">{{ equipas_resultado|length }}</span></h2>
-      <div class="mt-3 space-y-2">{% for item in equipas_resultado %}<a href="/equipas/{{ item.id }}" class="ds-result-link"><strong>{{ item.nome }}</strong><span>{{ item.escalao.value }} · {{ item.genero.value }}</span></a>{% else %}<p class="text-sm text-slate-400">Sem resultados.</p>{% endfor %}</div>
+      <div class="mt-3 space-y-2">{% for item in equipas_resultado %}<a href="/equipas/{{ item.id }}/resumo" class="ds-result-link"><strong>{{ item.nome }}</strong><span>{{ item.escalao.value }} · {{ item.genero.value }}</span></a>{% else %}<p class="text-sm text-slate-400">Sem resultados.</p>{% endfor %}</div>
     </div>
     <div class="ds-card p-5">
       <h2 class="font-bold">Atletas <span class="text-sm text-slate-400">{{ jogadores_resultado|length }}</span></h2>
