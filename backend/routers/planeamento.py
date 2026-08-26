@@ -29,7 +29,13 @@ from horarios import hora_eh_anterior, hora_valida, normalizar_hora
 from database import get_db
 from paths import TEMPLATES_DIR
 from services.planeamento_integrado_service import obter_dashboard_planeamento_equipa
-from services.mapa_conteudos_service import AREAS_MAPA, construir_mapa_conteudos, construir_semanas
+from services.mapa_conteudos_service import (
+    AREAS_MAPA,
+    construir_mapa_conteudos,
+    construir_semanas,
+    obter_sugestoes_conteudos_microciclo,
+    sincronizar_prioridades_com_microciclos,
+)
 from services.pdf_service import renderizar_pdf
 from services.sincronizacao_ui import preparar_sessoes_para_ui, sessao_corresponde_filtro
 
@@ -1783,6 +1789,9 @@ async def criar_microciclo(
     db.add(microciclo)
     db.flush()
     renumerar_microciclos(db, meso_id)
+    anual = microciclo.mesociclo.macrociclo.planeamento_anual_equipa
+    if anual:
+        sincronizar_prioridades_com_microciclos(db, anual)
     eventos_integrados = _integrar_eventos_planeados_no_microciclo(db, microciclo)
     db.commit()
     mensagem = "Microciclo criado com sucesso."
@@ -1845,6 +1854,9 @@ async def editar_microciclo(
     microciclo.obj_fisicos = obj_fisicos or None
     microciclo.obj_psicologicos = obj_psicologicos or None
     renumerar_microciclos(db, microciclo.mesociclo_id)
+    anual = microciclo.mesociclo.macrociclo.planeamento_anual_equipa
+    if anual:
+        sincronizar_prioridades_com_microciclos(db, anual)
     db.commit()
     set_flash(request, "Microciclo atualizado.")
     return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
@@ -1859,9 +1871,12 @@ async def eliminar_microciclo(micro_id: int, request: Request, db: Session = Dep
     microciclo = db.query(Microciclo).filter(Microciclo.id == micro_id).first()
     if microciclo:
         meso_id = microciclo.mesociclo_id
+        anual = microciclo.mesociclo.macrociclo.planeamento_anual_equipa
         db.delete(microciclo)
         db.flush()
         renumerar_microciclos(db, meso_id)
+        if anual:
+            sincronizar_prioridades_com_microciclos(db, anual)
         renumerar_treinos_equipa(db, equipa_id)
         db.commit()
         set_flash(request, "Microciclo eliminado.")
@@ -1903,6 +1918,8 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
     sessoes_ativas = [sessao for sessao in sessoes if sessao.ativa]
     calendario_semanal = _construir_calendario_microciclo(sessoes_ativas)
     balanco, dados_graficos = _calcular_balanco_microciclo(sessoes_ativas)
+    sugestoes_conteudos = obter_sugestoes_conteudos_microciclo(db, microciclo)
+    db.commit()
 
     filtros_sessoes = [
         {"valor": "todas", "label": "Todas", "total": len(sessoes)},
@@ -1964,6 +1981,7 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
             macrociclo=microciclo.mesociclo.macrociclo,
             mesociclo=microciclo.mesociclo,
         ),
+        "sugestoes_conteudos": sugestoes_conteudos,
         "agenda_contexto": _contexto_agenda(
             equipa_id=equipa_id,
             data_inicio=microciclo.data_inicio,

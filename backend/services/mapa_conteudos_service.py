@@ -171,10 +171,11 @@ def _indice_semana(data_evento: date, semanas: list[dict]) -> int | None:
 
 def _segmentos_ciclos(semanas: list[dict], ciclos: list, prefixo: str) -> list[dict]:
     valores = []
-    sequencia = {ciclo.id: indice for indice, ciclo in enumerate(ciclos, start=1)}
     for semana in semanas:
         ciclo = next((item for item in ciclos if item.data_inicio <= semana["fim"] and item.data_fim >= semana["inicio"]), None)
-        valores.append((ciclo.id, f"{prefixo} {sequencia[ciclo.id]}") if ciclo else (None, ""))
+        # Usa a numeração cronológica guardada no ciclo para manter o mapa
+        # atualizado mesmo quando são criados ou reorganizados períodos.
+        valores.append((ciclo.id, f"{prefixo} {ciclo.numero}") if ciclo else (None, ""))
 
     segmentos = []
     for identificador, label in valores:
@@ -183,6 +184,97 @@ def _segmentos_ciclos(semanas: list[dict], ciclos: list, prefixo: str) -> list[d
         else:
             segmentos.append({"id": identificador, "label": label, "span": 1})
     return segmentos
+
+
+def _microciclos_do_planeamento(db: Session, planeamento: PlaneamentoAnualEquipa) -> list[Microciclo]:
+    """Devolve os microciclos atuais do anual, ordenados cronologicamente."""
+    macros = db.query(Macrociclo).filter(
+        Macrociclo.planeamento_anual_equipa_id == planeamento.id,
+    ).order_by(Macrociclo.data_inicio, Macrociclo.data_fim, Macrociclo.id).all()
+    macro_ids = [item.id for item in macros]
+    if not macro_ids:
+        return []
+    mesos = db.query(Mesociclo).filter(Mesociclo.macrociclo_id.in_(macro_ids)).order_by(
+        Mesociclo.data_inicio, Mesociclo.data_fim, Mesociclo.id,
+    ).all()
+    meso_ids = [item.id for item in mesos]
+    if not meso_ids:
+        return []
+    return db.query(Microciclo).filter(Microciclo.mesociclo_id.in_(meso_ids)).order_by(
+        Microciclo.data_inicio, Microciclo.data_fim, Microciclo.id,
+    ).all()
+
+
+def sincronizar_prioridades_com_microciclos(db: Session, planeamento: PlaneamentoAnualEquipa) -> bool:
+    """Religa prioridades às semanas dos microciclos atualmente existentes.
+
+    A semana é a fonte de verdade. Uma prioridade definida antes de existir o
+    microciclo é ligada automaticamente quando a estrutura é criada ou muda.
+    """
+    micros = _microciclos_do_planeamento(db, planeamento)
+    micro_por_semana = {}
+    for semana in construir_semanas(planeamento.data_inicio, planeamento.data_fim):
+        micro = next(
+            (item for item in micros if item.data_inicio <= semana["fim"] and item.data_fim >= semana["inicio"]),
+            None,
+        )
+        micro_por_semana[semana["inicio"]] = micro.id if micro else None
+
+    alterou = False
+    for prioridade in db.query(PrioridadeConteudoMapaAnual).filter(
+        PrioridadeConteudoMapaAnual.planeamento_anual_id == planeamento.id,
+    ).all():
+        micro_id = micro_por_semana.get(prioridade.semana_inicio)
+        if prioridade.microciclo_id != micro_id:
+            prioridade.microciclo_id = micro_id
+            alterou = True
+    return alterou
+
+
+def obter_sugestoes_conteudos_microciclo(db: Session, microciclo: Microciclo) -> dict:
+    """Prepara sugestões sucintas do mapa anual para a semana do microciclo."""
+    anual = microciclo.mesociclo.macrociclo.planeamento_anual_equipa
+    if not anual:
+        return {"planeamento": None, "itens": []}
+
+    sincronizar_prioridades_com_microciclos(db, anual)
+    semanas = {item["inicio"] for item in construir_semanas(microciclo.data_inicio, microciclo.data_fim)}
+    ocultos = {
+        conteudo_id for (conteudo_id,) in db.query(ConteudoMapaAnualOculto.conteudo_id).filter(
+            ConteudoMapaAnualOculto.planeamento_anual_id == anual.id,
+        ).all()
+    }
+    prioridades = db.query(PrioridadeConteudoMapaAnual).join(ConteudoMapaAnual).filter(
+        PrioridadeConteudoMapaAnual.planeamento_anual_id == anual.id,
+        PrioridadeConteudoMapaAnual.semana_inicio.in_(semanas),
+        ConteudoMapaAnual.ativo.is_(True),
+    ).order_by(
+        PrioridadeConteudoMapaAnual.prioridade,
+        ConteudoMapaAnual.ordem_area,
+        ConteudoMapaAnual.ordem_subarea,
+        ConteudoMapaAnual.ordem,
+        ConteudoMapaAnual.nome,
+    ).all()
+
+    itens_por_conteudo = {}
+    for prioridade in prioridades:
+        conteudo = prioridade.conteudo
+        if conteudo.id in ocultos:
+            continue
+        existente = itens_por_conteudo.get(conteudo.id)
+        if not existente or prioridade.prioridade < existente["prioridade"]:
+            itens_por_conteudo[conteudo.id] = {
+                "nome": conteudo.nome,
+                "area": conteudo.area,
+                "subarea": conteudo.subarea,
+                "prioridade": prioridade.prioridade,
+            }
+
+    itens = sorted(
+        itens_por_conteudo.values(),
+        key=lambda item: (item["prioridade"], item["area"], item["subarea"] or "", item["nome"]),
+    )
+    return {"planeamento": anual, "itens": itens}
 
 
 def _agrupar_catalogo(conteudos: list[ConteudoMapaAnual]) -> list[dict]:
@@ -252,14 +344,14 @@ def construir_mapa_conteudos(db: Session, planeamento: PlaneamentoAnualEquipa) -
 
     macros = db.query(Macrociclo).filter(
         Macrociclo.planeamento_anual_equipa_id == planeamento.id,
-    ).order_by(Macrociclo.data_inicio, Macrociclo.numero, Macrociclo.id).all()
+    ).order_by(Macrociclo.data_inicio, Macrociclo.data_fim, Macrociclo.id).all()
     macro_ids = [item.id for item in macros]
     mesos = db.query(Mesociclo).filter(Mesociclo.macrociclo_id.in_(macro_ids)).order_by(
-        Mesociclo.data_inicio, Mesociclo.numero, Mesociclo.id,
+        Mesociclo.data_inicio, Mesociclo.data_fim, Mesociclo.id,
     ).all() if macro_ids else []
     meso_ids = [item.id for item in mesos]
     micros = db.query(Microciclo).filter(Microciclo.mesociclo_id.in_(meso_ids)).order_by(
-        Microciclo.data_inicio, Microciclo.numero, Microciclo.id,
+        Microciclo.data_inicio, Microciclo.data_fim, Microciclo.id,
     ).all() if meso_ids else []
 
     micro_por_semana = {}
@@ -267,6 +359,7 @@ def construir_mapa_conteudos(db: Session, planeamento: PlaneamentoAnualEquipa) -
         micro = next((item for item in micros if item.data_inicio <= semana["fim"] and item.data_fim >= semana["inicio"]), None)
         micro_por_semana[semana["chave"]] = micro.id if micro else None
 
+    sincronizar_prioridades_com_microciclos(db, planeamento)
     prioridades_guardadas = db.query(PrioridadeConteudoMapaAnual).filter(
         PrioridadeConteudoMapaAnual.planeamento_anual_id == planeamento.id,
     ).all()

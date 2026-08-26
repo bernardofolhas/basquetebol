@@ -21,7 +21,7 @@ from models.planeamento import (
 )
 from models.treinador import Treinador
 from models.utilizador import PerfilEnum, Utilizador
-from services.mapa_conteudos_service import construir_semanas
+from services.mapa_conteudos_service import construir_mapa_conteudos, construir_semanas
 from testsupport import TestClient
 
 
@@ -176,6 +176,23 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         assert prioridade.prioridade == 1
         assert prioridade.microciclo_id == micro.id
         assert 'data-value="1"' in cliente.get(f"/planeamento/anuais/{anual.id}").text
+        pagina_micro = cliente.get(f"/planeamento/microciclos/{micro.id}")
+        assert pagina_micro.status_code == 200
+        assert "Prioridades do mapa anual de conteúdos" in pagina_micro.text
+        assert "Passe + receção" in pagina_micro.text
+
+        # Uma alteração de datas não pode deixar uma prioridade ligada a um
+        # microciclo antigo. A semana volta a ser ligada assim que coincide.
+        micro.data_inicio = date(2026, 10, 5)
+        micro.data_fim = date(2026, 10, 11)
+        db.commit()
+        construir_mapa_conteudos(db, anual)
+        assert prioridade.microciclo_id is None
+        micro.data_inicio = date(2026, 9, 7)
+        micro.data_fim = date(2026, 9, 13)
+        construir_mapa_conteudos(db, anual)
+        assert prioridade.microciclo_id == micro.id
+        db.commit()
 
         payload["alteracoes"][0]["prioridade"] = 2
         atualizada = cliente.post(f"/planeamento/anuais/{anual.id}/mapa-conteudos/prioridades", json=payload)
