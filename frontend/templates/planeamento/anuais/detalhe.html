@@ -3,12 +3,14 @@
 {% from "partials/agenda_modal.html" import agenda_modal, agenda_legenda %}
 
 {% block titulo %}{{ planeamento.titulo }} - {{ equipa.nome }}{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/mapa-conteudos.css?v=20260826-1">{% endblock %}
 {% block conteudo %}
 {{ equipa_contexto(equipa, planeamento.titulo, planeamento.epoca ~ " · " ~ (planeamento.data_inicio|data_pt) ~ " a " ~ (planeamento.data_fim|data_pt), "planeamento", "/planeamento/equipas/" ~ equipa.id ~ "/anuais", "Planeamentos anuais") }}
 
 <nav class="ds-workspace-tabs" data-workspace-tabs="anual" data-workspace-default="calendario" aria-label="Áreas do planeamento anual">
     <div class="ds-workspace-tabs-list" role="tablist">
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="calendario">Calendário</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="mapa-conteudos">Mapa de conteúdos</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="macrociclos">Macrociclos <span class="text-xs opacity-60">{{ macrociclos|length }}</span></button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="objetivos">Objetivos</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="estado">Estado</button>
@@ -48,6 +50,86 @@
                 {% endfor %}
             </div>
         </div>
+
+        <section id="anual-mapa-conteudos" data-workspace-panel="anual:mapa-conteudos" role="tabpanel" class="mapa-conteudos-shell" data-mapa-conteudos data-save-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/prioridades">
+            <header class="mapa-conteudos-toolbar">
+                <div>
+                    <p class="mapa-conteudos-kicker">Visão anual</p>
+                    <h2>Mapa de conteúdos</h2>
+                    <p>Define a prioridade de cada conteúdo ao longo das semanas da época.</p>
+                </div>
+                <div class="mapa-conteudos-actions">
+                    <div class="mapa-conteudos-legend" aria-label="Legenda de prioridades">
+                        <span><b class="priority-swatch priority-swatch-1">1</b> Prioridade máxima</span>
+                        <span><b class="priority-swatch priority-swatch-2">2</b> Prioridade secundária</span>
+                    </div>
+                    <span class="mapa-save-status" data-mapa-save-status role="status" aria-live="polite">Sem alterações</span>
+                    <button type="button" class="mapa-save-button" data-mapa-save disabled>Guardar prioridades</button>
+                </div>
+            </header>
+
+            <p class="mapa-mobile-hint">Desliza horizontalmente para consultar toda a época. Toca numa célula para alternar entre vazio, 1 e 2.</p>
+            <div class="mapa-conteudos-viewport" tabindex="0" aria-label="Grelha anual de prioridades de conteúdos">
+                <table class="mapa-conteudos-table">
+                    <thead>
+                        <tr class="mapa-month-row">
+                            <th colspan="3" class="mapa-label-global">Mês</th>
+                            {% for mes in mapa_conteudos.meses %}<th colspan="{{ mes.span }}" class="mapa-month">{{ mes.label }}</th>{% endfor %}
+                        </tr>
+                        <tr class="mapa-week-row">
+                            <th class="mapa-sticky mapa-area-heading">Área</th>
+                            <th class="mapa-sticky mapa-subarea-heading">Subárea</th>
+                            <th class="mapa-sticky mapa-content-heading">Conteúdo</th>
+                            {% for semana in mapa_conteudos.semanas %}
+                            <th class="mapa-week" title="{{ semana.inicio|data_pt }} a {{ semana.fim|data_pt }}">
+                                <span>S{{ semana.numero }}</span><small>{{ semana.inicio_dia }}–{{ semana.fim_dia }}</small>
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="mapa-context-row mapa-competition-row">
+                            <th colspan="3" class="mapa-label-global">Competição</th>
+                            {% for semana in mapa_conteudos.semanas %}
+                            <td>{% for jogo in mapa_conteudos.jogos_por_semana.get(loop.index0, []) %}{% if jogo.competicao %}<span title="{{ jogo.competicao }}">{{ jogo.competicao }}</span>{% endif %}{% endfor %}</td>
+                            {% endfor %}
+                        </tr>
+                        <tr class="mapa-context-row mapa-game-row">
+                            <th colspan="3" class="mapa-label-global">Jogo</th>
+                            {% for semana in mapa_conteudos.semanas %}
+                            <td>{% for jogo in mapa_conteudos.jogos_por_semana.get(loop.index0, []) %}<a href="/jogos/{{ jogo.id }}" class="mapa-game {% if jogo.em_casa %}is-home{% else %}is-away{% endif %}" title="{{ 'Casa' if jogo.em_casa else 'Fora' }} · {{ jogo.adversario }}"><b>{{ jogo.casa_fora }}</b>{{ jogo.adversario }}</a>{% endfor %}</td>
+                            {% endfor %}
+                        </tr>
+                        {% for label, segmentos, classe in [('Macrociclo', mapa_conteudos.segmentos_macro, 'macro'), ('Mesociclo', mapa_conteudos.segmentos_meso, 'meso'), ('Microciclo', mapa_conteudos.segmentos_micro, 'micro')] %}
+                        <tr class="mapa-context-row mapa-cycle-row mapa-cycle-{{ classe }}">
+                            <th colspan="3" class="mapa-label-global">{{ label }}</th>
+                            {% for segmento in segmentos %}<td colspan="{{ segmento.span }}" class="{% if segmento.label %}has-cycle{% endif %}">{{ segmento.label }}</td>{% endfor %}
+                        </tr>
+                        {% endfor %}
+
+                        {% for area in mapa_conteudos.areas %}
+                        {% set classe_area = 'mapa-area-' ~ loop.index %}
+                        {% for subarea in area.subareas %}
+                        {% set primeira_subarea = loop.first %}
+                        {% for conteudo in subarea.conteudos %}
+                        <tr class="mapa-content-row {{ classe_area }}">
+                            {% if primeira_subarea and loop.first %}<th rowspan="{{ area.total_linhas }}" class="mapa-sticky mapa-area-cell">{{ area.nome }}</th>{% endif %}
+                            {% if loop.first %}<th rowspan="{{ subarea.total_linhas }}" class="mapa-sticky mapa-subarea-cell">{{ subarea.nome or 'Conteúdos' }}</th>{% endif %}
+                            <th class="mapa-sticky mapa-content-cell">{{ conteudo.nome }}</th>
+                            {% for semana in mapa_conteudos.semanas %}
+                            {% set valor = mapa_conteudos.prioridades.get(conteudo.id, {}).get(semana.chave) %}
+                            <td class="mapa-priority-cell">
+                                <button type="button" class="mapa-priority-button{% if valor %} priority-{{ valor }}{% endif %}" data-priority-cell data-content-id="{{ conteudo.id }}" data-week="{{ semana.chave }}" data-value="{{ valor or '' }}" aria-label="{{ conteudo.nome }}, semana {{ semana.numero }}: {{ ('prioridade ' ~ valor) if valor else 'sem prioridade' }}">{{ valor or '' }}</button>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                        {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
         {% for macro in macrociclos %}
         <a href="/planeamento/macrociclos/{{ macro.id }}" data-workspace-panel="anual:macrociclos" role="tabpanel" class="mb-4 block rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:border-orange-200">
             <div class="flex items-center justify-between gap-4"><div><p class="text-xs font-semibold uppercase tracking-wider text-orange-600">Macrociclo {{ macro.numero }}</p><h2 class="mt-2 font-semibold text-gray-900">{{ macro.data_inicio|data_pt }} a {{ macro.data_fim|data_pt }}</h2><p class="mt-2 text-sm text-gray-500">{{ macro.mesociclos|length }} mesociclo(s)</p></div><span class="text-orange-500">Abrir →</span></div>
@@ -64,3 +146,4 @@
 </div>
 {{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, [], request.session.get('_csrf', '')) }}
 {% endblock %}
+{% block scripts_extra %}<script src="/static/js/mapa-conteudos.js?v=20260826-1" defer></script>{% endblock %}

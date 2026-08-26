@@ -1,7 +1,19 @@
 # Importações necessárias do SQLAlchemy e Python
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Float, Boolean
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship, backref
 from database import Base
 
@@ -48,6 +60,85 @@ class PlaneamentoAnualEquipa(Base):
         back_populates="planeamento_anual_equipa",
         cascade="all, delete",
     )
+    prioridades_conteudos = relationship(
+        "PrioridadeConteudoMapaAnual",
+        back_populates="planeamento_anual",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class ConteudoMapaAnual(Base):
+    """Conteudo configuravel usado nas linhas do mapa anual."""
+
+    __tablename__ = "conteudos_mapa_anual"
+    __table_args__ = (
+        UniqueConstraint("clube_id", "codigo", name="uq_conteudo_mapa_clube_codigo"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    codigo = Column(String(100), nullable=False)
+    area = Column(String(80), nullable=False)
+    subarea = Column(String(100), nullable=True)
+    nome = Column(String(180), nullable=False)
+    ordem_area = Column(Integer, nullable=False, default=0)
+    ordem_subarea = Column(Integer, nullable=False, default=0)
+    ordem = Column(Integer, nullable=False, default=0)
+    ativo = Column(Boolean, nullable=False, default=True, server_default="true")
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    prioridades = relationship(
+        "PrioridadeConteudoMapaAnual",
+        back_populates="conteudo",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class PrioridadeConteudoMapaAnual(Base):
+    """Prioridade de um conteudo numa semana do planeamento anual."""
+
+    __tablename__ = "prioridades_conteudos_mapa_anual"
+    __table_args__ = (
+        UniqueConstraint(
+            "planeamento_anual_id",
+            "conteudo_id",
+            "semana_inicio",
+            name="uq_prioridade_mapa_anual_semana",
+        ),
+        CheckConstraint("prioridade IN (1, 2)", name="ck_prioridade_mapa_anual_valor"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    planeamento_anual_id = Column(
+        Integer,
+        ForeignKey("planeamentos_anuais_equipa.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    conteudo_id = Column(
+        Integer,
+        ForeignKey("conteudos_mapa_anual.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    microciclo_id = Column(
+        Integer,
+        ForeignKey("microciclos.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    semana_inicio = Column(Date, nullable=False, index=True)
+    prioridade = Column(Integer, nullable=False)
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+    atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    planeamento_anual = relationship("PlaneamentoAnualEquipa", back_populates="prioridades_conteudos")
+    conteudo = relationship("ConteudoMapaAnual", back_populates="prioridades")
+    microciclo = relationship("Microciclo")
 
 
 # ─────────────────────────────────────────

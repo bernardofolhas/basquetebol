@@ -28,6 +28,7 @@ from horarios import hora_eh_anterior, hora_valida, normalizar_hora
 from database import get_db
 from paths import TEMPLATES_DIR
 from services.planeamento_integrado_service import obter_dashboard_planeamento_equipa
+from services.mapa_conteudos_service import construir_mapa_conteudos, construir_semanas
 from services.pdf_service import renderizar_pdf
 from services.sincronizacao_ui import preparar_sessoes_para_ui, sessao_corresponde_filtro
 
@@ -38,6 +39,8 @@ from models.planeamento import (
     Mesociclo,
     Microciclo,
     PlaneamentoAnualEquipa,
+    ConteudoMapaAnual,
+    PrioridadeConteudoMapaAnual,
     SessaoTreino,
 )
 from models.planeamento_clube import EventoPlaneamentoClube, PlaneamentoClubeAnual, TipoEventoPlaneamentoClubeEnum
@@ -643,12 +646,15 @@ def detalhe_anual_equipa(
         planeamento.data_inicio,
         planeamento.data_fim,
     )
+    mapa_conteudos = construir_mapa_conteudos(db, planeamento)
+    db.commit()
     return templates.TemplateResponse(request, "planeamento/anuais/detalhe.html", {
         "utilizador": utilizador,
         "planeamento": planeamento,
         "equipa": planeamento.equipa,
         "macrociclos": macrociclos,
         "dashboard_planeamento": dashboard_planeamento,
+        "mapa_conteudos": mapa_conteudos,
         "objetivos_por_categoria": objetivos_por_categoria(planeamento),
         "agenda_contexto": _contexto_agenda(
             equipa_id=planeamento.equipa_id,
@@ -658,6 +664,108 @@ def detalhe_anual_equipa(
         ),
         "agenda_tipos": tipos_agenda_formulario(),
         "espacos_agenda": db.query(EspacoTreino).filter(EspacoTreino.ativo.is_(True)).order_by(EspacoTreino.nome).all(),
+    })
+
+
+@router.post("/anuais/{anual_id}/mapa-conteudos/prioridades")
+async def guardar_prioridades_mapa_conteudos(
+    anual_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Guarda, numa única operação, as células alteradas no mapa anual."""
+    _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_anual(db, anual_id), db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.id == anual_id,
+    ).first()
+    if not planeamento:
+        return JSONResponse({"sucesso": False, "erro": "O planeamento anual já não existe."}, status_code=404)
+
+    try:
+        payload = await request.json()
+    except ValueError:
+        return JSONResponse({"sucesso": False, "erro": "Os dados enviados não são válidos."}, status_code=400)
+
+    alteracoes = payload.get("alteracoes", []) if isinstance(payload, dict) else None
+    if not isinstance(alteracoes, list):
+        return JSONResponse({"sucesso": False, "erro": "As alterações enviadas não são válidas."}, status_code=422)
+    if len(alteracoes) > 500:
+        return JSONResponse({"sucesso": False, "erro": "Guarda até 500 alterações de cada vez."}, status_code=422)
+
+    semanas_validas = {item["inicio"] for item in construir_semanas(planeamento.data_inicio, planeamento.data_fim)}
+    normalizadas = {}
+    try:
+        for item in alteracoes:
+            if not isinstance(item, dict):
+                raise ValueError
+            conteudo_id = int(item.get("conteudo_id"))
+            semana_inicio = date.fromisoformat(str(item.get("semana_inicio", "")))
+            prioridade = item.get("prioridade")
+            if prioridade is not None:
+                prioridade = int(prioridade)
+            if semana_inicio not in semanas_validas or prioridade not in (None, 1, 2):
+                raise ValueError
+            normalizadas[(conteudo_id, semana_inicio)] = prioridade
+    except (TypeError, ValueError):
+        return JSONResponse({
+            "sucesso": False,
+            "erro": "Cada célula deve indicar uma semana válida e prioridade vazia, 1 ou 2.",
+        }, status_code=422)
+
+    conteudo_ids = {chave[0] for chave in normalizadas}
+    conteudos_validos = {
+        item.id for item in db.query(ConteudoMapaAnual).filter(
+            ConteudoMapaAnual.id.in_(conteudo_ids),
+            ConteudoMapaAnual.clube_id == planeamento.clube_id,
+            ConteudoMapaAnual.ativo.is_(True),
+        ).all()
+    } if conteudo_ids else set()
+    if conteudos_validos != conteudo_ids:
+        return JSONResponse({
+            "sucesso": False,
+            "erro": "Foi indicado um conteúdo que não pertence a este clube.",
+        }, status_code=422)
+
+    existentes = {
+        (item.conteudo_id, item.semana_inicio): item
+        for item in db.query(PrioridadeConteudoMapaAnual).filter(
+            PrioridadeConteudoMapaAnual.planeamento_anual_id == planeamento.id,
+            PrioridadeConteudoMapaAnual.conteudo_id.in_(conteudo_ids),
+        ).all()
+    } if conteudo_ids else {}
+    mapa = construir_mapa_conteudos(db, planeamento)
+    criadas = atualizadas = removidas = 0
+
+    for (conteudo_id, semana_inicio), prioridade in normalizadas.items():
+        existente = existentes.get((conteudo_id, semana_inicio))
+        if prioridade is None:
+            if existente:
+                db.delete(existente)
+                removidas += 1
+            continue
+        if existente:
+            if existente.prioridade != prioridade:
+                existente.prioridade = prioridade
+                atualizadas += 1
+            continue
+        db.add(PrioridadeConteudoMapaAnual(
+            clube_id=planeamento.clube_id,
+            planeamento_anual_id=planeamento.id,
+            conteudo_id=conteudo_id,
+            microciclo_id=mapa["micro_por_semana"].get(semana_inicio.isoformat()),
+            semana_inicio=semana_inicio,
+            prioridade=prioridade,
+        ))
+        criadas += 1
+
+    db.commit()
+    return JSONResponse({
+        "sucesso": True,
+        "mensagem": "Prioridades guardadas.",
+        "criadas": criadas,
+        "atualizadas": atualizadas,
+        "removidas": removidas,
     })
 
 

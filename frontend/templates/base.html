@@ -18,6 +18,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23334155'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial' font-size='28' font-weight='700' fill='white'%3EB%3C/text%3E%3C/svg%3E">
   {% endif %}
   <link rel="stylesheet" href="/static/css/design-system.css?v=20260825-5">
+  {% block estilos_extra %}{% endblock %}
   <style>:root{--clube-primary:{{ '#334155' if modo_plataforma else identidade.cor_principal|default('#f97316') }};--clube-secondary:{{ '#0f172a' if modo_plataforma else identidade.cor_secundaria|default('#1f2937') }};--clube-accent:{{ '#64748b' if modo_plataforma else identidade.cor_destaque|default('#0ea5e9') }};--clube-primary-light:{{ '#f1f5f9' if modo_plataforma else identidade.cor_principal_clara|default('#fff7ed') }};--clube-primary-dark:{{ '#1e293b' if modo_plataforma else identidade.cor_principal_escura|default('#c2410c') }};--clube-primary-hover:{{ '#475569' if modo_plataforma else identidade.cor_principal_hover|default('#ea580c') }};--clube-primary-surface:{{ '#f8fafc' if modo_plataforma else identidade.cor_principal_superficie|default('#fff7ed') }};--clube-primary-border:{{ '#cbd5e1' if modo_plataforma else identidade.cor_borda_marca|default('#fed7aa') }};--clube-on-primary:{{ '#fff' if modo_plataforma else identidade.texto_sobre_principal|default('#fff') }};--clube-on-secondary:{{ '#fff' if modo_plataforma else identidade.texto_sobre_secundaria|default('#fff') }};--clube-on-accent:{{ '#fff' if modo_plataforma else identidade.texto_sobre_destaque|default('#111827') }};--clube-header-text:{{ '#fff' if modo_plataforma else identidade.texto_cabecalho|default(identidade.cor_secundaria)|default('#fff') }}}</style>
   <meta name="csrf-token" content="{{ request.session.get('_csrf', '') }}">
   <script>
@@ -128,5 +129,6 @@
       if(event.persisted) window.location.reload();
     });
   </script>
+  {% block scripts_extra %}{% endblock %}
 </body>
 </html>
