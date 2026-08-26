@@ -1,0 +1,92 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Mapa anual de conteúdos - {{ equipa.nome }}</title>
+    {{ estilo_pdf() }}
+    <style>
+        * { box-sizing: border-box; }
+        @page { size: A3 landscape; margin: 6mm 7mm; }
+        body { margin: 0; color: #172033; font-family: Arial, sans-serif; font-size: {{ tamanho_fonte }}pt; }
+        .pdf-brand-header { margin-bottom: 4px; padding-bottom: 4px; }
+        .pdf-brand-logo { width: 31px; height: 31px; }
+        .pdf-brand-title { font-size: 13px; }
+        .pdf-brand-name { font-size: 8px; }
+        .summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 4px; }
+        .summary p { margin: 0; color: #526174; font-size: 5.2pt; }
+        .legend { display: flex; gap: 8px; white-space: nowrap; }
+        .legend span { display: inline-flex; align-items: center; gap: 3px; }
+        .legend b { display: inline-block; width: 4mm; height: 4mm; border-radius: 1mm; color: #fff; font-size: 5pt; line-height: 4mm; text-align: center; }
+        .legend .p1 { background: var(--pdf-primary); }
+        .legend .p2 { background: var(--pdf-accent); color: #172033; }
+        table { width: 100%; border: .35mm solid #263247; border-collapse: collapse; table-layout: fixed; page-break-inside: avoid; }
+        col.area { width: 15mm; }
+        col.subarea { width: 23mm; }
+        col.content { width: 49mm; }
+        th, td { overflow: hidden; border: .18mm solid #aeb9c7; padding: .45mm; vertical-align: middle; }
+        thead th { text-align: center; }
+        .month-row th { height: 5.5mm; background: var(--pdf-secondary); color: var(--pdf-on-secondary); font-size: 5.5pt; font-weight: 800; }
+        .week-row th { height: 7mm; background: #edf2f7; color: #263247; font-size: 4.6pt; }
+        .week-row small { display: block; margin-top: .4mm; color: #68768a; font-size: 3.8pt; }
+        .global-label { background: #334155 !important; color: #fff !important; text-align: left !important; font-weight: 800; }
+        .context-row th, .context-row td { height: 5mm; }
+        .context-row td { padding: .25mm; background: #fff; text-align: center; font-size: 3.6pt; }
+        .context-row span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .game { border-radius: .7mm; padding: .35mm; color: #fff; font-weight: 800; }
+        .game.home { background: #087a55; }
+        .game.away { background: #d33a45; }
+        .cycle-row th, .cycle-row td { height: 4.5mm; }
+        .cycle-row td { background: #eef3f8; color: #334155; text-align: center; font-size: 4.2pt; font-weight: 800; }
+        .cycle-row.macro td.has-cycle { background: #dcebf5; }
+        .cycle-row.meso td.has-cycle { background: #deefdc; }
+        .cycle-row.micro td.has-cycle { background: #ffe4cf; }
+        .content-row th, .content-row td { height: {{ altura_linha }}mm; }
+        .area-cell { color: #fff; font-size: 4.4pt; font-weight: 800; line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+        .subarea-cell { color: #263247; font-weight: 800; }
+        .content-cell { background: #fff; color: #354258; font-weight: 700; line-height: 1.05; }
+        .area-1 .area-cell { background: #c89208; }
+        .area-1 .subarea-cell { background: #fff3c9; }
+        .area-2 .area-cell { background: #b57906; }
+        .area-2 .subarea-cell { background: #fff0c2; }
+        .area-3 .area-cell { background: #3d7c35; }
+        .area-3 .subarea-cell { background: #e4f1df; }
+        .area-4 .area-cell { background: #285f48; }
+        .area-4 .subarea-cell { background: #dcece4; }
+        .priority { background: #fff; padding: .25mm; text-align: center; font-size: 5pt; font-weight: 900; }
+        .priority.p1 { background: var(--pdf-primary); color: var(--pdf-on-primary); }
+        .priority.p2 { background: var(--pdf-accent); color: #172033; }
+        .pdf-brand-footer { margin-top: 4px; padding-top: 3px; font-size: 5pt; }
+    </style>
+</head>
+<body>
+    {{ cabecalho_pdf('Mapa anual de conteúdos', equipa.nome ~ ' · ' ~ planeamento.epoca ~ ' · ' ~ (planeamento.data_inicio|data_pt) ~ ' a ' ~ (planeamento.data_fim|data_pt), mapa_conteudos.total_conteudos ~ ' conteúdos · ' ~ mapa_conteudos.semanas|length ~ ' semanas') }}
+    <div class="summary">
+        <p>Leitura: cada coluna representa uma semana da época; jogos e ciclos servem de enquadramento às prioridades técnicas e táticas.</p>
+        <div class="legend"><span><b class="p1">1</b> Prioridade máxima</span><span><b class="p2">2</b> Prioridade secundária</span></div>
+    </div>
+    <table>
+        <colgroup><col class="area"><col class="subarea"><col class="content">{% for semana in mapa_conteudos.semanas %}<col>{% endfor %}</colgroup>
+        <thead>
+            <tr class="month-row"><th colspan="3" class="global-label">Mês</th>{% for mes in mapa_conteudos.meses %}<th colspan="{{ mes.span }}">{{ mes.label }}</th>{% endfor %}</tr>
+            <tr class="week-row"><th>Área</th><th>Subárea</th><th>Conteúdo</th>{% for semana in mapa_conteudos.semanas %}<th>S{{ semana.numero }}<small>{{ semana.inicio_dia }}-{{ semana.fim_dia }}</small></th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+            <tr class="context-row"><th colspan="3" class="global-label">Competição</th>{% for semana in mapa_conteudos.semanas %}<td>{% for jogo in mapa_conteudos.jogos_por_semana.get(loop.index0, []) %}{% if jogo.competicao %}<span>{{ jogo.competicao }}</span>{% endif %}{% endfor %}</td>{% endfor %}</tr>
+            <tr class="context-row"><th colspan="3" class="global-label">Jogo</th>{% for semana in mapa_conteudos.semanas %}<td>{% for jogo in mapa_conteudos.jogos_por_semana.get(loop.index0, []) %}<span class="game {% if jogo.em_casa %}home{% else %}away{% endif %}">{{ jogo.casa_fora }} {{ jogo.adversario }}</span>{% endfor %}</td>{% endfor %}</tr>
+            {% for label, segmentos, classe in [('Macrociclo', mapa_conteudos.segmentos_macro, 'macro'), ('Mesociclo', mapa_conteudos.segmentos_meso, 'meso'), ('Microciclo', mapa_conteudos.segmentos_micro, 'micro')] %}
+            <tr class="cycle-row {{ classe }}"><th colspan="3" class="global-label">{{ label }}</th>{% for segmento in segmentos %}<td colspan="{{ segmento.span }}" class="{% if segmento.label %}has-cycle{% endif %}">{{ segmento.label }}</td>{% endfor %}</tr>
+            {% endfor %}
+            {% for area in mapa_conteudos.areas %}{% set classe_area = 'area-' ~ loop.index %}{% for subarea in area.subareas %}{% set primeira_subarea = loop.first %}{% for conteudo in subarea.conteudos %}
+            <tr class="content-row {{ classe_area }}">
+                {% if primeira_subarea and loop.first %}<th rowspan="{{ area.total_linhas }}" class="area-cell">{{ area.nome }}</th>{% endif %}
+                {% if loop.first %}<th rowspan="{{ subarea.total_linhas }}" class="subarea-cell">{{ subarea.nome or 'Conteúdos' }}</th>{% endif %}
+                <th class="content-cell">{{ conteudo.nome }}</th>
+                {% for semana in mapa_conteudos.semanas %}{% set valor = mapa_conteudos.prioridades.get(conteudo.id, {}).get(semana.chave) %}<td class="priority{% if valor %} p{{ valor }}{% endif %}">{{ valor or '' }}</td>{% endfor %}
+            </tr>
+            {% endfor %}{% endfor %}{% endfor %}
+        </tbody>
+    </table>
+    {{ rodape_pdf(nome_treinador ~ ' · ' ~ identidade.nome_curto|default(identidade.nome_oficial)) }}
+</body>
+</html>

@@ -66,6 +66,18 @@ class PlaneamentoAnualEquipa(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    conteudos_personalizados = relationship(
+        "ConteudoMapaAnual",
+        back_populates="planeamento_anual",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    conteudos_ocultos = relationship(
+        "ConteudoMapaAnualOculto",
+        back_populates="planeamento_anual",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class ConteudoMapaAnual(Base):
@@ -78,6 +90,12 @@ class ConteudoMapaAnual(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    planeamento_anual_id = Column(
+        Integer,
+        ForeignKey("planeamentos_anuais_equipa.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     codigo = Column(String(100), nullable=False)
     area = Column(String(80), nullable=False)
     subarea = Column(String(100), nullable=True)
@@ -95,6 +113,45 @@ class ConteudoMapaAnual(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    planeamento_anual = relationship("PlaneamentoAnualEquipa", back_populates="conteudos_personalizados")
+    ocultacoes = relationship(
+        "ConteudoMapaAnualOculto",
+        back_populates="conteudo",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class ConteudoMapaAnualOculto(Base):
+    """Oculta uma linha do catalogo apenas num planeamento anual."""
+
+    __tablename__ = "conteudos_mapa_anual_ocultos"
+    __table_args__ = (
+        UniqueConstraint(
+            "planeamento_anual_id",
+            "conteudo_id",
+            name="uq_conteudo_mapa_oculto_planeamento",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    planeamento_anual_id = Column(
+        Integer,
+        ForeignKey("planeamentos_anuais_equipa.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    conteudo_id = Column(
+        Integer,
+        ForeignKey("conteudos_mapa_anual.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    criado_em = Column(DateTime, default=datetime.now, nullable=False)
+
+    planeamento_anual = relationship("PlaneamentoAnualEquipa", back_populates="conteudos_ocultos")
+    conteudo = relationship("ConteudoMapaAnual", back_populates="ocultacoes")
 
 
 class PrioridadeConteudoMapaAnual(Base):

@@ -3,11 +3,13 @@ from __future__ import annotations
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from models.jogo import Jogo
 from models.planeamento import (
     ConteudoMapaAnual,
+    ConteudoMapaAnualOculto,
     Macrociclo,
     Mesociclo,
     Microciclo,
@@ -19,6 +21,13 @@ from models.planeamento import (
 MESES_PT = (
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+)
+
+AREAS_MAPA = (
+    ("Técnica Ofensiva", 10),
+    ("Técnica Defensiva", 20),
+    ("Tática Ofensiva", 30),
+    ("Tática Defensiva", 40),
 )
 
 
@@ -202,10 +211,22 @@ def construir_mapa_conteudos(db: Session, planeamento: PlaneamentoAnualEquipa) -
     garantir_catalogo_padrao(db, planeamento.clube_id)
     semanas = construir_semanas(planeamento.data_inicio, planeamento.data_fim)
 
-    conteudos = db.query(ConteudoMapaAnual).filter(
+    conteudos_ocultos = {
+        conteudo_id for (conteudo_id,) in db.query(ConteudoMapaAnualOculto.conteudo_id).filter(
+            ConteudoMapaAnualOculto.planeamento_anual_id == planeamento.id,
+        ).all()
+    }
+    consulta_conteudos = db.query(ConteudoMapaAnual).filter(
         ConteudoMapaAnual.clube_id == planeamento.clube_id,
         ConteudoMapaAnual.ativo.is_(True),
-    ).order_by(
+        or_(
+            ConteudoMapaAnual.planeamento_anual_id.is_(None),
+            ConteudoMapaAnual.planeamento_anual_id == planeamento.id,
+        ),
+    )
+    if conteudos_ocultos:
+        consulta_conteudos = consulta_conteudos.filter(ConteudoMapaAnual.id.notin_(conteudos_ocultos))
+    conteudos = consulta_conteudos.order_by(
         ConteudoMapaAnual.ordem_area,
         ConteudoMapaAnual.ordem_subarea,
         ConteudoMapaAnual.ordem,
@@ -264,4 +285,6 @@ def construir_mapa_conteudos(db: Session, planeamento: PlaneamentoAnualEquipa) -
         "micro_por_semana": micro_por_semana,
         "prioridades": dict(matriz),
         "total_conteudos": len(conteudos),
+        "conteudo_ids": {item.id for item in conteudos},
+        "areas_disponiveis": [nome for nome, _ in AREAS_MAPA],
     }

@@ -3,7 +3,7 @@
 {% from "partials/agenda_modal.html" import agenda_modal, agenda_legenda %}
 
 {% block titulo %}{{ planeamento.titulo }} - {{ equipa.nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/mapa-conteudos.css?v=20260826-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/mapa-conteudos.css?v=20260826-2">{% endblock %}
 {% block conteudo %}
 {{ equipa_contexto(equipa, planeamento.titulo, planeamento.epoca ~ " · " ~ (planeamento.data_inicio|data_pt) ~ " a " ~ (planeamento.data_fim|data_pt), "planeamento", "/planeamento/equipas/" ~ equipa.id ~ "/anuais", "Planeamentos anuais") }}
 
@@ -51,7 +51,7 @@
             </div>
         </div>
 
-        <section id="anual-mapa-conteudos" data-workspace-panel="anual:mapa-conteudos" role="tabpanel" class="mapa-conteudos-shell" data-mapa-conteudos data-save-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/prioridades">
+        <section id="anual-mapa-conteudos" data-workspace-panel="anual:mapa-conteudos" role="tabpanel" class="mapa-conteudos-shell" data-mapa-conteudos data-save-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/prioridades" data-create-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/conteudos">
             <header class="mapa-conteudos-toolbar">
                 <div>
                     <p class="mapa-conteudos-kicker">Visão anual</p>
@@ -59,6 +59,8 @@
                     <p>Define a prioridade de cada conteúdo ao longo das semanas da época.</p>
                 </div>
                 <div class="mapa-conteudos-actions">
+                    <a href="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/pdf" class="mapa-secondary-button">Exportar A3</a>
+                    <button type="button" class="mapa-secondary-button" data-mapa-add>+ Conteúdo</button>
                     <div class="mapa-conteudos-legend" aria-label="Legenda de prioridades">
                         <span><b class="priority-swatch priority-swatch-1">1</b> Prioridade máxima</span>
                         <span><b class="priority-swatch priority-swatch-2">2</b> Prioridade secundária</span>
@@ -115,7 +117,7 @@
                         <tr class="mapa-content-row {{ classe_area }}">
                             {% if primeira_subarea and loop.first %}<th rowspan="{{ area.total_linhas }}" class="mapa-sticky mapa-area-cell">{{ area.nome }}</th>{% endif %}
                             {% if loop.first %}<th rowspan="{{ subarea.total_linhas }}" class="mapa-sticky mapa-subarea-cell">{{ subarea.nome or 'Conteúdos' }}</th>{% endif %}
-                            <th class="mapa-sticky mapa-content-cell">{{ conteudo.nome }}</th>
+                            <th class="mapa-sticky mapa-content-cell"><span>{{ conteudo.nome }}</span><button type="button" class="mapa-delete-content" data-delete-content data-content-name="{{ conteudo.nome|e }}" data-delete-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/conteudos/{{ conteudo.id }}/eliminar" aria-label="Eliminar {{ conteudo.nome }}" title="Eliminar conteúdo">×</button></th>
                             {% for semana in mapa_conteudos.semanas %}
                             {% set valor = mapa_conteudos.prioridades.get(conteudo.id, {}).get(semana.chave) %}
                             <td class="mapa-priority-cell">
@@ -129,6 +131,19 @@
                     </tbody>
                 </table>
             </div>
+            <dialog class="mapa-content-dialog" data-content-dialog>
+                <form method="dialog" class="mapa-content-form" data-content-form>
+                    <header>
+                        <div><p class="mapa-conteudos-kicker">Nova linha</p><h3>Acrescentar conteúdo</h3></div>
+                        <button type="button" class="mapa-dialog-close" data-content-cancel aria-label="Fechar">×</button>
+                    </header>
+                    <label>Área<select name="area" required>{% for area in mapa_conteudos.areas_disponiveis %}<option value="{{ area }}">{{ area }}</option>{% endfor %}</select></label>
+                    <label>Subárea <span>(opcional)</span><input name="subarea" maxlength="100" placeholder="Ex.: Coletiva ofensiva"></label>
+                    <label>Conteúdo<input name="nome" maxlength="180" required placeholder="Ex.: Transição ofensiva"></label>
+                    <p class="mapa-dialog-status" data-content-status role="status" aria-live="polite"></p>
+                    <footer><button type="button" class="mapa-secondary-button" data-content-cancel>Cancelar</button><button type="submit" class="mapa-save-button">Acrescentar</button></footer>
+                </form>
+            </dialog>
         </section>
         {% for macro in macrociclos %}
         <a href="/planeamento/macrociclos/{{ macro.id }}" data-workspace-panel="anual:macrociclos" role="tabpanel" class="mb-4 block rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:border-orange-200">
@@ -146,4 +161,4 @@
 </div>
 {{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, [], request.session.get('_csrf', '')) }}
 {% endblock %}
-{% block scripts_extra %}<script src="/static/js/mapa-conteudos.js?v=20260826-1" defer></script>{% endblock %}
+{% block scripts_extra %}<script src="/static/js/mapa-conteudos.js?v=20260826-2" defer></script>{% endblock %}

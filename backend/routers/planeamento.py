@@ -11,6 +11,7 @@ import json
 from datetime import date, timedelta
 from io import BytesIO
 from urllib.parse import urlencode
+from uuid import uuid4
 
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
@@ -28,7 +29,7 @@ from horarios import hora_eh_anterior, hora_valida, normalizar_hora
 from database import get_db
 from paths import TEMPLATES_DIR
 from services.planeamento_integrado_service import obter_dashboard_planeamento_equipa
-from services.mapa_conteudos_service import construir_mapa_conteudos, construir_semanas
+from services.mapa_conteudos_service import AREAS_MAPA, construir_mapa_conteudos, construir_semanas
 from services.pdf_service import renderizar_pdf
 from services.sincronizacao_ui import preparar_sessoes_para_ui, sessao_corresponde_filtro
 
@@ -40,6 +41,7 @@ from models.planeamento import (
     Microciclo,
     PlaneamentoAnualEquipa,
     ConteudoMapaAnual,
+    ConteudoMapaAnualOculto,
     PrioridadeConteudoMapaAnual,
     SessaoTreino,
 )
@@ -714,13 +716,8 @@ async def guardar_prioridades_mapa_conteudos(
         }, status_code=422)
 
     conteudo_ids = {chave[0] for chave in normalizadas}
-    conteudos_validos = {
-        item.id for item in db.query(ConteudoMapaAnual).filter(
-            ConteudoMapaAnual.id.in_(conteudo_ids),
-            ConteudoMapaAnual.clube_id == planeamento.clube_id,
-            ConteudoMapaAnual.ativo.is_(True),
-        ).all()
-    } if conteudo_ids else set()
+    mapa = construir_mapa_conteudos(db, planeamento)
+    conteudos_validos = mapa["conteudo_ids"].intersection(conteudo_ids)
     if conteudos_validos != conteudo_ids:
         return JSONResponse({
             "sucesso": False,
@@ -734,7 +731,6 @@ async def guardar_prioridades_mapa_conteudos(
             PrioridadeConteudoMapaAnual.conteudo_id.in_(conteudo_ids),
         ).all()
     } if conteudo_ids else {}
-    mapa = construir_mapa_conteudos(db, planeamento)
     criadas = atualizadas = removidas = 0
 
     for (conteudo_id, semana_inicio), prioridade in normalizadas.items():
@@ -767,6 +763,168 @@ async def guardar_prioridades_mapa_conteudos(
         "atualizadas": atualizadas,
         "removidas": removidas,
     })
+
+
+@router.post("/anuais/{anual_id}/mapa-conteudos/conteudos")
+async def criar_conteudo_mapa_anual(
+    anual_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Acrescenta uma linha apenas ao mapa anual que está a ser editado."""
+    _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_anual(db, anual_id), db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.id == anual_id,
+    ).first()
+    if not planeamento:
+        return JSONResponse({"sucesso": False, "erro": "O planeamento anual já não existe."}, status_code=404)
+
+    try:
+        payload = await request.json()
+    except ValueError:
+        return JSONResponse({"sucesso": False, "erro": "Os dados enviados não são válidos."}, status_code=400)
+
+    nome = str(payload.get("nome", "")).strip() if isinstance(payload, dict) else ""
+    area = str(payload.get("area", "")).strip() if isinstance(payload, dict) else ""
+    subarea = str(payload.get("subarea", "")).strip() if isinstance(payload, dict) else ""
+    areas_ordem = dict(AREAS_MAPA)
+    if area not in areas_ordem:
+        return JSONResponse({"sucesso": False, "erro": "Seleciona uma área válida."}, status_code=422)
+    if not nome or len(nome) > 180:
+        return JSONResponse({"sucesso": False, "erro": "Indica um conteúdo com até 180 caracteres."}, status_code=422)
+    if len(subarea) > 100:
+        return JSONResponse({"sucesso": False, "erro": "A subárea pode ter até 100 caracteres."}, status_code=422)
+
+    existentes_area = db.query(ConteudoMapaAnual).filter(
+        ConteudoMapaAnual.clube_id == planeamento.clube_id,
+        ConteudoMapaAnual.area == area,
+        ConteudoMapaAnual.ativo.is_(True),
+    ).all()
+    visiveis = construir_mapa_conteudos(db, planeamento)["conteudo_ids"]
+    if any(item.id in visiveis and item.nome.casefold() == nome.casefold() for item in existentes_area):
+        return JSONResponse({"sucesso": False, "erro": "Esse conteúdo já existe neste mapa."}, status_code=409)
+
+    subarea_normalizada = subarea or None
+    if subarea_normalizada:
+        subarea_existente = next(
+            (item for item in existentes_area if (item.subarea or "").casefold() == subarea_normalizada.casefold()),
+            None,
+        )
+        if subarea_existente:
+            subarea_normalizada = subarea_existente.subarea
+            ordem_subarea = subarea_existente.ordem_subarea
+        else:
+            ordem_subarea = max((item.ordem_subarea for item in existentes_area), default=0) + 10
+    else:
+        ordem_subarea = 0
+
+    ordem = max(
+        (
+            item.ordem for item in existentes_area
+            if (item.subarea or "").casefold() == (subarea_normalizada or "").casefold()
+        ),
+        default=0,
+    ) + 10
+    conteudo = ConteudoMapaAnual(
+        clube_id=planeamento.clube_id,
+        planeamento_anual_id=planeamento.id,
+        codigo=f"personalizado-{planeamento.id}-{uuid4().hex[:12]}",
+        area=area,
+        subarea=subarea_normalizada,
+        nome=nome,
+        ordem_area=areas_ordem[area],
+        ordem_subarea=ordem_subarea,
+        ordem=ordem,
+        ativo=True,
+    )
+    db.add(conteudo)
+    db.commit()
+    db.refresh(conteudo)
+    return JSONResponse({
+        "sucesso": True,
+        "mensagem": "Conteúdo acrescentado.",
+        "conteudo_id": conteudo.id,
+    })
+
+
+@router.post("/anuais/{anual_id}/mapa-conteudos/conteudos/{conteudo_id}/eliminar")
+def eliminar_conteudo_mapa_anual(
+    anual_id: int,
+    conteudo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Remove uma linha deste mapa sem alterar os mapas das outras equipas."""
+    _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_anual(db, anual_id), db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.id == anual_id,
+    ).first()
+    if not planeamento:
+        return JSONResponse({"sucesso": False, "erro": "O planeamento anual já não existe."}, status_code=404)
+
+    mapa = construir_mapa_conteudos(db, planeamento)
+    if conteudo_id not in mapa["conteudo_ids"]:
+        return JSONResponse({"sucesso": False, "erro": "O conteúdo já não está disponível neste mapa."}, status_code=404)
+    conteudo = db.query(ConteudoMapaAnual).filter(
+        ConteudoMapaAnual.id == conteudo_id,
+        ConteudoMapaAnual.clube_id == planeamento.clube_id,
+    ).first()
+    if not conteudo:
+        return JSONResponse({"sucesso": False, "erro": "O conteúdo já não existe."}, status_code=404)
+
+    db.query(PrioridadeConteudoMapaAnual).filter(
+        PrioridadeConteudoMapaAnual.planeamento_anual_id == planeamento.id,
+        PrioridadeConteudoMapaAnual.conteudo_id == conteudo.id,
+    ).delete(synchronize_session=False)
+    if conteudo.planeamento_anual_id == planeamento.id:
+        db.delete(conteudo)
+    else:
+        db.add(ConteudoMapaAnualOculto(
+            clube_id=planeamento.clube_id,
+            planeamento_anual_id=planeamento.id,
+            conteudo_id=conteudo.id,
+        ))
+    db.commit()
+    return JSONResponse({"sucesso": True, "mensagem": "Conteúdo eliminado deste mapa."})
+
+
+@router.get("/anuais/{anual_id}/mapa-conteudos/pdf")
+def exportar_mapa_conteudos_anual_pdf(
+    anual_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Exporta a grelha anual completa numa única folha A3 horizontal."""
+    _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_anual(db, anual_id), db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.id == anual_id,
+    ).first()
+    if not planeamento:
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    mapa = construir_mapa_conteudos(db, planeamento)
+    db.commit()
+    total_linhas = max(mapa["total_conteudos"], 1)
+    altura_linha = max(2.4, min(5.5, 215 / total_linhas))
+    tamanho_fonte = max(3.0, min(5.5, altura_linha))
+    nome_treinador = utilizador.treinador.nome if getattr(utilizador, "treinador", None) else utilizador.nome
+    pdf_bytes = renderizar_pdf(request, "planeamento/anuais/mapa_conteudos_pdf.html", {
+        "planeamento": planeamento,
+        "equipa": planeamento.equipa,
+        "mapa_conteudos": mapa,
+        "nome_treinador": nome_treinador,
+        "altura_linha": round(altura_linha, 2),
+        "tamanho_fonte": round(tamanho_fonte, 2),
+    })
+    nome = f"mapa-conteudos-{planeamento.equipa_id}-{planeamento.epoca.replace('/', '-')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nome}"'},
+    )
 
 
 @router.get("/anuais/{anual_id}/editar", response_class=HTMLResponse)

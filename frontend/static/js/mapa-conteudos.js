@@ -6,6 +6,27 @@
         var estado = mapa.querySelector("[data-mapa-save-status]");
         var alteracoes = new Map();
         var aGuardar = false;
+        var chaveMensagem = "mapa-conteudos:mensagem:" + window.location.pathname;
+
+        function csrfToken() {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            return meta ? meta.content : "";
+        }
+
+        async function enviarJson(url, dados) {
+            var resposta = await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": csrfToken(),
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: JSON.stringify(dados || {})
+            });
+            var payload = await resposta.json();
+            if (!resposta.ok || !payload.sucesso) throw new Error(payload.erro || "Não foi possível concluir a operação.");
+            return payload;
+        }
 
         function atualizarEstado(mensagem, classe) {
             estado.textContent = mensagem;
@@ -20,6 +41,15 @@
                 atualizarEstado("Sem alterações", "");
             }
         }
+
+        try {
+            var mensagemGuardada = window.sessionStorage.getItem(chaveMensagem);
+            if (mensagemGuardada) {
+                window.sessionStorage.removeItem(chaveMensagem);
+                atualizarEstado(mensagemGuardada, "is-success");
+                window.setTimeout(atualizarBotao, 2200);
+            }
+        } catch (erro) {}
 
         mapa.querySelectorAll("[data-priority-cell]").forEach(function (celula) {
             celula.dataset.original = celula.dataset.value || "";
@@ -51,16 +81,7 @@
             botaoGuardar.disabled = true;
             atualizarEstado("A guardar...", "is-pending");
             try {
-                var resposta = await fetch(mapa.dataset.saveUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({ alteracoes: Array.from(alteracoes.values()) })
-                });
-                var dados = await resposta.json();
-                if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || "Não foi possível guardar as prioridades.");
+                await enviarJson(mapa.dataset.saveUrl, { alteracoes: Array.from(alteracoes.values()) });
                 mapa.querySelectorAll("[data-priority-cell].is-pending").forEach(function (celula) {
                     celula.dataset.original = celula.dataset.value || "";
                     celula.classList.remove("is-pending");
@@ -74,6 +95,73 @@
                 aGuardar = false;
                 botaoGuardar.disabled = !alteracoes.size;
             }
+        });
+
+        var dialogo = mapa.querySelector("[data-content-dialog]");
+        var formulario = mapa.querySelector("[data-content-form]");
+        var estadoDialogo = mapa.querySelector("[data-content-status]");
+        var botaoAdicionar = mapa.querySelector("[data-mapa-add]");
+
+        function podeAlterarEstrutura() {
+            if (!alteracoes.size) return true;
+            atualizarEstado("Guarda primeiro as prioridades pendentes.", "is-error");
+            return false;
+        }
+
+        function fecharDialogo() {
+            if (dialogo && dialogo.open) dialogo.close();
+        }
+
+        if (botaoAdicionar && dialogo && formulario) {
+            botaoAdicionar.addEventListener("click", function () {
+                if (!podeAlterarEstrutura()) return;
+                estadoDialogo.textContent = "";
+                formulario.reset();
+                dialogo.showModal();
+                window.setTimeout(function () { formulario.elements.area.focus(); }, 0);
+            });
+            mapa.querySelectorAll("[data-content-cancel]").forEach(function (botao) {
+                botao.addEventListener("click", fecharDialogo);
+            });
+            dialogo.addEventListener("click", function (event) {
+                if (event.target === dialogo) fecharDialogo();
+            });
+            formulario.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                var botao = formulario.querySelector('[type="submit"]');
+                estadoDialogo.textContent = "A acrescentar...";
+                botao.disabled = true;
+                try {
+                    var dadosFormulario = new FormData(formulario);
+                    var resultado = await enviarJson(mapa.dataset.createUrl, {
+                        area: dadosFormulario.get("area"),
+                        subarea: dadosFormulario.get("subarea"),
+                        nome: dadosFormulario.get("nome")
+                    });
+                    window.sessionStorage.setItem(chaveMensagem, resultado.mensagem);
+                    window.location.reload();
+                } catch (erro) {
+                    estadoDialogo.textContent = erro.message;
+                    botao.disabled = false;
+                }
+            });
+        }
+
+        mapa.querySelectorAll("[data-delete-content]").forEach(function (botao) {
+            botao.addEventListener("click", async function () {
+                if (!podeAlterarEstrutura()) return;
+                if (!window.confirm('Eliminar "' + botao.dataset.contentName + '" deste mapa?')) return;
+                botao.disabled = true;
+                atualizarEstado("A eliminar conteúdo...", "is-pending");
+                try {
+                    var resultado = await enviarJson(botao.dataset.deleteUrl, {});
+                    window.sessionStorage.setItem(chaveMensagem, resultado.mensagem);
+                    window.location.reload();
+                } catch (erro) {
+                    botao.disabled = false;
+                    atualizarEstado(erro.message, "is-error");
+                }
+            });
         });
 
         window.addEventListener("beforeunload", function (event) {

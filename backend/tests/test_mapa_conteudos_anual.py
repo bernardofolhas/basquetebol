@@ -1,5 +1,8 @@
 from datetime import date
+from io import BytesIO
 from uuid import uuid4
+
+from pypdf import PdfReader
 
 from auth import encriptar_password
 from database import SessionLocal
@@ -9,6 +12,7 @@ from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.jogo import Jogo
 from models.planeamento import (
     ConteudoMapaAnual,
+    ConteudoMapaAnualOculto,
     Macrociclo,
     Mesociclo,
     Microciclo,
@@ -148,6 +152,8 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         assert "Macro 1" in pagina.text
         assert "Meso 1" in pagina.text
         assert "Micro 1" in pagina.text
+        assert "+ Conteúdo" in pagina.text
+        assert "Exportar A3" in pagina.text
 
         db.expire_all()
         conteudo = db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
@@ -189,14 +195,72 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
             PrioridadeConteudoMapaAnual.planeamento_anual_id == anual.id,
         ).count() == 0
 
+        criado = cliente.post(f"/planeamento/anuais/{anual.id}/mapa-conteudos/conteudos", json={
+            "area": "Tática Ofensiva",
+            "subarea": "Coletiva ofensiva",
+            "nome": "Ataque contra zona",
+        })
+        assert criado.status_code == 200
+        conteudo_personalizado_id = criado.json()["conteudo_id"]
+        db.expire_all()
+        conteudo_personalizado = db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
+            ConteudoMapaAnual.id == conteudo_personalizado_id,
+        ).one()
+        assert conteudo_personalizado.planeamento_anual_id == anual.id
+        assert "Ataque contra zona" in cliente.get(f"/planeamento/anuais/{anual.id}").text
+
+        pdf = cliente.get(f"/planeamento/anuais/{anual.id}/mapa-conteudos/pdf")
+        assert pdf.status_code == 200
+        assert pdf.headers["content-type"].startswith("application/pdf")
+        leitor = PdfReader(BytesIO(pdf.content))
+        assert len(leitor.pages) == 1
+        pagina_pdf = leitor.pages[0]
+        assert float(pagina_pdf.mediabox.width) > float(pagina_pdf.mediabox.height)
+        assert 1180 < float(pagina_pdf.mediabox.width) < 1200
+
+        eliminada_personalizada = cliente.post(
+            f"/planeamento/anuais/{anual.id}/mapa-conteudos/conteudos/{conteudo_personalizado_id}/eliminar",
+            json={},
+        )
+        assert eliminada_personalizada.status_code == 200
+        assert "Ataque contra zona" not in cliente.get(f"/planeamento/anuais/{anual.id}").text
+
+        eliminado_catalogo = cliente.post(
+            f"/planeamento/anuais/{anual.id}/mapa-conteudos/conteudos/{conteudo.id}/eliminar",
+            json={},
+        )
+        assert eliminado_catalogo.status_code == 200
+        db.expire_all()
+        assert db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
+            ConteudoMapaAnual.id == conteudo.id,
+            ConteudoMapaAnual.ativo.is_(True),
+        ).count() == 1
+        assert db.query(ConteudoMapaAnualOculto).execution_options(ignorar_clube=True).filter(
+            ConteudoMapaAnualOculto.planeamento_anual_id == anual.id,
+            ConteudoMapaAnualOculto.conteudo_id == conteudo.id,
+        ).count() == 1
+        assert "Passe + receção" not in cliente.get(f"/planeamento/anuais/{anual.id}").text
+
         bloqueada = cliente.get(f"/planeamento/anuais/{anual_sem_acesso.id}", follow_redirects=False)
         assert bloqueada.status_code in (302, 303)
+        bloqueada_criacao = cliente.post(
+            f"/planeamento/anuais/{anual_sem_acesso.id}/mapa-conteudos/conteudos",
+            json={"area": "Técnica Ofensiva", "nome": "Sem acesso"},
+            follow_redirects=False,
+        )
+        assert bloqueada_criacao.status_code in (302, 303)
+        bloqueada_pdf = cliente.get(
+            f"/planeamento/anuais/{anual_sem_acesso.id}/mapa-conteudos/pdf",
+            follow_redirects=False,
+        )
+        assert bloqueada_pdf.status_code in (302, 303)
     finally:
         db.rollback()
         treinador.equipas.clear()
         db.commit()
         for modelo in (
             PrioridadeConteudoMapaAnual,
+            ConteudoMapaAnualOculto,
             ConteudoMapaAnual,
             Jogo,
             Microciclo,
