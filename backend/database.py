@@ -692,6 +692,41 @@ def actualizar_estrutura_planeamento_equipa() -> None:
         db.close()
 
 
+def actualizar_estrutura_mapa_conteudos() -> None:
+    """Adiciona a personalização por plano em instalações sem Alembic automático."""
+    inspector = inspect(engine)
+    if not inspector.has_table("conteudos_mapa_anual"):
+        return
+    colunas = {coluna["name"] for coluna in inspector.get_columns("conteudos_mapa_anual")}
+    if "planeamento_anual_id" in colunas:
+        return
+
+    with engine.begin() as ligacao:
+        if engine.dialect.name == "postgresql":
+            ligacao.execute(text(
+                "ALTER TABLE conteudos_mapa_anual "
+                "ADD COLUMN IF NOT EXISTS planeamento_anual_id INTEGER NULL"
+            ))
+            ligacao.execute(text(
+                "DO $$ BEGIN "
+                "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = "
+                "'fk_conteudo_mapa_planeamento_anual') THEN "
+                "ALTER TABLE conteudos_mapa_anual ADD CONSTRAINT "
+                "fk_conteudo_mapa_planeamento_anual FOREIGN KEY (planeamento_anual_id) "
+                "REFERENCES planeamentos_anuais_equipa(id) ON DELETE CASCADE; "
+                "END IF; END $$"
+            ))
+            ligacao.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_conteudos_mapa_anual_planeamento_anual_id "
+                "ON conteudos_mapa_anual (planeamento_anual_id)"
+            ))
+        else:
+            ligacao.execute(text(
+                "ALTER TABLE conteudos_mapa_anual ADD COLUMN planeamento_anual_id INTEGER NULL"
+            ))
+    logger.info("Personalização por planeamento adicionada ao mapa anual de conteúdos.")
+
+
 def actualizar_estrutura_assiduidade() -> None:
     """Atualiza instalações antigas com o estado detalhado de assiduidade."""
     inspector = inspect(engine)

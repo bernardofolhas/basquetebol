@@ -47,6 +47,7 @@ from database import (
     actualizar_estrutura_perfis,
     actualizar_estrutura_planeamento_clube,
     actualizar_estrutura_planeamento_equipa,
+    actualizar_estrutura_mapa_conteudos,
     actualizar_estrutura_recuperacao_password,
     actualizar_estrutura_objetivos_planeamento,
     actualizar_estrutura_playbook,
@@ -113,6 +114,7 @@ try:
     actualizar_estrutura_objetivos_planeamento()
     actualizar_estrutura_playbook()
     actualizar_estrutura_planeamento_equipa()
+    actualizar_estrutura_mapa_conteudos()
     actualizar_estrutura_assiduidade()
     actualizar_estrutura_jogadores()
     with SessionLocal() as db:
