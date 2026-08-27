@@ -24,7 +24,8 @@
         tr:nth-child(even) td { background: #fafafa; }
         .type-badge { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 8px; font-weight: bold; }
         .type-badge.train { background: #dcfce7; color: #166534; }
-        .type-badge.game { background: #fee2e2; color: #991b1b; }
+        .type-badge.jogo-casa { background: #dcfce7; color: #166534; }
+        .type-badge.jogo-fora { background: #dbeafe; color: #1d4ed8; }
         .empty { padding: 12px; border: 1px dashed #d1d5db; border-radius: 8px; color: #6b7280; }
         .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 8px; color: #9ca3af; display: flex; justify-content: space-between; }
     </style>
@@ -72,7 +73,7 @@
                 <td>{{ item.intervalo_horario }}</td>
                 <td>{{ item.sessao.local or "Local por definir" }}</td>
                 <td>
-                    <span class="type-badge {% if item.sessao.e_jogo %}game{% else %}train{% endif %}">
+                    <span class="type-badge {% if item.sessao.e_jogo %}{{ item.classe_jogo }}{% else %}train{% endif %}">
                         {{ item.tipo_label }}
                     </span>
                 </td>

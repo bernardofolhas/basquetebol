@@ -11,6 +11,7 @@ from models.planeamento_clube import (
     TipoEventoPlaneamentoClubeEnum,
 )
 from services.planeamento_integrado_service import (
+    _item_jogo,
     obter_dashboard_planeamento_anual,
     obter_dashboard_planeamento_equipa,
 )
@@ -21,6 +22,26 @@ TITULO_ATIVIDADE_TESTE = "Atividade Planeamento Integrado Pytest"
 TITULO_EVENTO_CLUBE_TESTE = "Evento Clube Planeamento Integrado Pytest"
 TITULO_EVENTO_TREINO_TESTE = "Treino Global Planeamento Integrado Pytest"
 ADVERSARIO_JOGO_TESTE = "Adversario Planeamento Integrado Pytest"
+
+
+def test_itens_de_jogo_distinguem_casa_e_fora():
+    equipa = Equipa(nome="Equipa de teste", escalao=EscalaoEnum.sub16, genero=GeneroEnum.feminino)
+    jogo_casa = Jogo(
+        data=date(2031, 8, 1), adversario="Casa", em_casa=True, equipa=equipa,
+    )
+    jogo_fora = Jogo(
+        data=date(2031, 8, 2), adversario="Fora", em_casa=False, equipa=equipa,
+    )
+
+    item_casa = _item_jogo(jogo_casa)
+    item_fora = _item_jogo(jogo_fora)
+
+    assert item_casa["classe_jogo"] == "jogo-casa"
+    assert item_casa["jogo_localidade"] == "Casa"
+    assert "emerald" in item_casa["card_classes"]
+    assert item_fora["classe_jogo"] == "jogo-fora"
+    assert item_fora["jogo_localidade"] == "Fora"
+    assert "blue" in item_fora["card_classes"]
 
 
 def _limpar_contexto_teste():

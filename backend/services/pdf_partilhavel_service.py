@@ -46,6 +46,7 @@ def _sanitizar_item(item: dict, descricoes_publicas: dict[str, str]) -> dict:
         "titulo": titulo,
         "tipo": item.get("badge") or item.get("categoria", "Evento").title(),
         "categoria": item.get("categoria", "outro"),
+        "classe_jogo": item.get("classe_jogo", ""),
         "local": item.get("local") or "Local por definir",
         "equipa_nome": item.get("equipa_nome") or "Clube",
         "descricao_publica": descricao,

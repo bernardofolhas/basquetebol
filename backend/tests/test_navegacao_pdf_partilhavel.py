@@ -60,6 +60,17 @@ def test_pdf_partilhavel_remove_reflexao_e_observacoes_internas():
     assert "REFLEXAO_PRIVADA" not in str(publico)
 
 
+def test_pdf_partilhavel_mantem_apenas_a_cor_semantica_do_jogo():
+    item = {
+        "id": "jogo-44", "data": date(2026, 8, 1), "hora_inicio": "18:00",
+        "hora_fim": None, "horario": "18:00", "titulo": "vs Adversário",
+        "badge": "Jogo · Fora", "categoria": "jogo", "classe_jogo": "jogo-fora",
+        "local": "Pavilhão", "equipa_nome": "Sub-18", "detalhe": "Competição",
+    }
+    publico = _sanitizar_item(item, {})
+    assert publico["classe_jogo"] == "jogo-fora"
+
+
 def test_pdf_partilhavel_usa_apenas_descricao_publica_de_evento():
     item = {
         "id": "evento-9", "data": date(2026, 8, 1), "hora_inicio": None,
@@ -155,3 +166,18 @@ def test_microciclo_partilhavel_usa_modelo_semanal_legivel():
     assert "summary-item" not in modelo
     assert "Sem atividade" not in modelo
     assert "Documento para partilha" not in modelo
+
+
+def test_calendarios_pdf_distinguem_jogos_em_casa_e_fora():
+    from paths import TEMPLATES_DIR
+
+    modelos = [
+        TEMPLATES_DIR / "calendario_pdf.html",
+        TEMPLATES_DIR / "calendario_partilhavel_pdf.html",
+        TEMPLATES_DIR / "mesociclo_partilhavel_pdf.html",
+        TEMPLATES_DIR / "planeamento" / "microciclos" / "partilhavel_pdf.html",
+    ]
+    for modelo in modelos:
+        conteudo = modelo.read_text(encoding="utf-8")
+        assert "jogo-casa" in conteudo
+        assert "jogo-fora" in conteudo

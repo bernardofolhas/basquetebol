@@ -368,11 +368,14 @@ def _construir_calendario_microciclo(sessoes: list[SessaoTreino]) -> list[dict]:
     """Converte as sessões do microciclo num quadro semanal simples."""
     calendario = []
     for sessao in _ordenar_sessoes_microciclo(sessoes):
+        evento = getattr(sessao, "evento_planeamento_clube", None)
+        jogo = getattr(evento, "jogo", None) if evento else None
         calendario.append({
             "sessao": sessao,
             "dia_semana": _obter_nome_dia_semana(sessao.data),
             "intervalo_horario": _formatar_intervalo_sessao(sessao),
             "tipo_label": _obter_tipo_legivel_sessao(sessao),
+            "classe_jogo": "jogo-casa" if jogo and jogo.em_casa else ("jogo-fora" if jogo else ""),
             "link": f"/treino/sessoes/{sessao.id}",
         })
     return calendario
@@ -1568,14 +1571,17 @@ def detalhe_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_
     cal_start = mesociclo.data_inicio - timedelta(days=mesociclo.data_inicio.weekday())
     cal_end = mesociclo.data_fim + timedelta(days=6 - mesociclo.data_fim.weekday())
 
+    jogos_por_data = {jogo.data: jogo for jogo in jogos_periodo}
     eventos_por_dia: dict[date, list] = {}
     for micro in microciclos:
         for sessao in micro.sessoes:
             if not sessao.ativa:
                 continue
+            jogo_sessao = jogos_por_data.get(sessao.data) if sessao.e_jogo else None
             eventos_por_dia.setdefault(sessao.data, []).append({
                 "tipo": "jogo" if sessao.e_jogo else "treino",
                 "label": f"T{sessao.numero_treino}" if sessao.numero_treino else ("🏀" if sessao.e_jogo else "Treino"),
+                "em_casa": jogo_sessao.em_casa if jogo_sessao else None,
                 "micro_numero": micro.numero,
                 "id": sessao.id,
                 "link": f"/treino/sessoes/{sessao.id}",
@@ -1584,6 +1590,7 @@ def detalhe_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_
         eventos_por_dia.setdefault(jogo.data, []).append({
             "tipo": "jogo_ext",
             "label": f"🏀 {jogo.adversario}",
+            "em_casa": jogo.em_casa,
             "jogo_id": jogo.id,
             "link": f"/jogos/{jogo.id}",
         })

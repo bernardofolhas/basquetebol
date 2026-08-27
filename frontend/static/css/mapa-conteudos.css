@@ -71,7 +71,7 @@
 .mapa-game + .mapa-game { margin-top: .12rem; }
 .mapa-game b { margin-right: .15rem; }
 .mapa-game.is-home { background: #087a55; }
-.mapa-game.is-away { background: #d33a45; }
+.mapa-game.is-away { background: #2563eb; }
 .mapa-cycle-row td { height: 1.7rem; background: #eef3f8; color: #334155; font-size: .62rem; font-weight: 800; text-align: center; }
 .mapa-cycle-row td.has-cycle { border-right: 2px solid #8390a2; }
 .mapa-cycle-macro td.has-cycle { background: #dcebf5; }

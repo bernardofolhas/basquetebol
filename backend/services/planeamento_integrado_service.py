@@ -173,7 +173,34 @@ def _criar_item_base(
         "plano_treino_link": None,
         "agenda_id": None,
         "agenda_editavel": False,
+        "classe_jogo": "",
+        "jogo_localidade": None,
     }
+
+
+def _aplicar_estilo_localizacao_jogo(item: dict, em_casa: bool) -> dict:
+    """Distingue jogos em casa e fora em todos os calendários partilhados."""
+    if em_casa:
+        item.update({
+            "badge": "Jogo · Casa",
+            "pill_classes": "bg-emerald-100 text-emerald-800",
+            "dot_classes": "bg-emerald-500",
+            "card_classes": "border-emerald-200 bg-emerald-50",
+            "classe_jogo": "jogo-casa",
+            "jogo_localidade": "Casa",
+            "em_casa": True,
+        })
+    else:
+        item.update({
+            "badge": "Jogo · Fora",
+            "pill_classes": "bg-blue-100 text-blue-800",
+            "dot_classes": "bg-blue-500",
+            "card_classes": "border-blue-200 bg-blue-50",
+            "classe_jogo": "jogo-fora",
+            "jogo_localidade": "Fora",
+            "em_casa": False,
+        })
+    return item
 
 
 def _item_sessao(sessao: SessaoTreino) -> dict | None:
@@ -242,6 +269,8 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
             "agenda_data_fim": evento_agenda.data_fim or "",
             "agenda_recorrencia": evento_agenda.recorrencia_frequencia or "unica",
         })
+        if sessao.e_jogo and evento_agenda.jogo:
+            _aplicar_estilo_localizacao_jogo(item, evento_agenda.jogo.em_casa)
     return item
 
 
@@ -277,7 +306,7 @@ def apresentar_treinos_por_perfil(itens: list[dict], perfil: str | None) -> list
 def _item_jogo(jogo: Jogo) -> dict:
     titulo = f"vs {jogo.adversario}" if jogo.adversario else "Jogo oficial"
     detalhe = jogo.competicao or ("Casa" if jogo.em_casa else "Fora")
-    return _criar_item_base(
+    item = _criar_item_base(
         item_id=f"jogo-{jogo.id}",
         categoria="jogo",
         subtipo="jogo_oficial",
@@ -292,6 +321,7 @@ def _item_jogo(jogo: Jogo) -> dict:
         detalhe=detalhe,
         link=f"/jogos/{jogo.id}",
     )
+    return _aplicar_estilo_localizacao_jogo(item, jogo.em_casa)
 
 
 def _item_atividade(atividade: Atividade) -> dict:
@@ -368,6 +398,8 @@ def _item_evento(evento: EventoPlaneamentoClube, equipa_id: int | None = None) -
         "agenda_recorrencia": evento.recorrencia_frequencia or "unica",
         "plano_treino_link": link if evento.tipo in TIPOS_EVENTO_TREINO and equipa_para_plano else None,
     })
+    if categoria == "jogo" and evento.jogo:
+        _aplicar_estilo_localizacao_jogo(item, evento.jogo.em_casa)
     return item
 
 
@@ -585,10 +617,18 @@ def _construir_itens_integrados(
         if sessao.e_jogo and getattr(sessao, "evento_planeamento_clube", None) and sessao.evento_planeamento_clube.jogo_id
     }
     datas_jogo_representadas = {sessao.data for sessao in sessoes if sessao.e_jogo}
+    jogos_por_equipa_data = defaultdict(list)
+    for jogo in jogos:
+        jogos_por_equipa_data[(jogo.equipa_id, jogo.data)].append(jogo)
 
     for sessao in sessoes:
         item = _item_sessao(sessao)
         if item:
+            if sessao.e_jogo and not item["classe_jogo"]:
+                equipa = _obter_equipa_sessao(sessao)
+                candidatos = jogos_por_equipa_data.get((equipa.id, sessao.data), []) if equipa else []
+                if len(candidatos) == 1:
+                    _aplicar_estilo_localizacao_jogo(item, candidatos[0].em_casa)
             itens.append(item)
 
     for jogo in jogos:
