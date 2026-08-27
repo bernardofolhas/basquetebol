@@ -180,6 +180,37 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         pagina_com_transicao = cliente.get(f"/planeamento/anuais/{anual.id}")
         assert f'href="/planeamento/mesociclos/{meso_2.id}"' in pagina_com_transicao.text
 
+        # Ciclos legados podem ter ficado associados à equipa e à época sem
+        # a chave direta do planeamento anual. Também têm de aparecer no mapa.
+        macro_legado = Macrociclo(
+            clube_id=clube.id,
+            equipa_id=equipa.id,
+            numero=2,
+            data_inicio=date(2026, 11, 1),
+            data_fim=date(2026, 11, 30),
+        )
+        db.add(macro_legado)
+        db.flush()
+        meso_legado = Mesociclo(
+            clube_id=clube.id,
+            macrociclo_id=macro_legado.id,
+            numero=2,
+            data_inicio=date(2026, 11, 1),
+            data_fim=date(2026, 11, 30),
+        )
+        db.add(meso_legado)
+        db.commit()
+
+        mapa_com_legado = construir_mapa_conteudos(db, anual)
+        assert any(
+            ciclo["id"] == meso_legado.id
+            for segmento in mapa_com_legado["segmentos_meso"]
+            for ciclo in segmento["ciclos"]
+        )
+        pagina_com_legado = cliente.get(f"/planeamento/anuais/{anual.id}")
+        assert f'href="/planeamento/mesociclos/{meso_legado.id}"' in pagina_com_legado.text
+        assert "mapa-content-line" in pagina_com_legado.text
+
         db.expire_all()
         conteudo = db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
             ConteudoMapaAnual.clube_id == clube.id,

@@ -82,7 +82,8 @@
 .mapa-cycle-link:focus-visible { outline: 2px solid #f97316; outline-offset: .12rem; border-radius: .2rem; }
 
 .mapa-content-row th { text-align: left; vertical-align: middle; }
-.mapa-content-actions { display: inline-flex; gap: .1rem; margin-right: .2rem; vertical-align: middle; }
+.mapa-content-line { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: .25rem; }
+.mapa-content-actions { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .1rem; white-space: nowrap; }
 .mapa-edit-content, .mapa-delete-content { border: 0; border-radius: .25rem; background: transparent; color: inherit; cursor: pointer; font: inherit; line-height: 1; opacity: .55; padding: .1rem .2rem; }
 .mapa-edit-content:hover, .mapa-edit-content:focus-visible { background: #e0f2fe; color: #0369a1; opacity: 1; }
 .mapa-delete-content:hover, .mapa-delete-content:focus-visible { background: #fee2e2; color: #b91c1c; opacity: 1; }
@@ -90,7 +91,7 @@
 .mapa-area-cell { color: #fff; font-size: .7rem; font-weight: 800; letter-spacing: .02em; text-align: center !important; writing-mode: vertical-rl; transform: rotate(180deg); }
 .mapa-subarea-cell { color: #2f3b4f; font-size: .64rem; font-weight: 800; }
 .mapa-content-cell { position: sticky; background: #fff; color: #354258; font-size: .64rem; font-weight: 650; }
-.mapa-content-name { overflow-wrap: anywhere; }
+.mapa-content-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mapa-content-row:hover .mapa-content-actions, .mapa-content-actions:focus-within { opacity: 1; }
 .mapa-content-actions { opacity: .45; vertical-align: middle; }
 .mapa-area-1 .mapa-area-cell { background: #c89208; }

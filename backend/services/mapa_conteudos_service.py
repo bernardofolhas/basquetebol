@@ -201,11 +201,18 @@ def _segmentos_ciclos(semanas: list[dict], ciclos: list, prefixo: str) -> list[d
     return segmentos
 
 
+def _macrociclos_do_planeamento(db: Session, planeamento: PlaneamentoAnualEquipa) -> list[Macrociclo]:
+    """Inclui ciclos da equipa no período, mesmo quando a ligação anual é legada."""
+    return db.query(Macrociclo).filter(
+        Macrociclo.equipa_id == planeamento.equipa_id,
+        Macrociclo.data_inicio <= planeamento.data_fim,
+        Macrociclo.data_fim >= planeamento.data_inicio,
+    ).order_by(Macrociclo.data_inicio, Macrociclo.data_fim, Macrociclo.id).all()
+
+
 def _microciclos_do_planeamento(db: Session, planeamento: PlaneamentoAnualEquipa) -> list[Microciclo]:
     """Devolve os microciclos atuais do anual, ordenados cronologicamente."""
-    macros = db.query(Macrociclo).filter(
-        Macrociclo.planeamento_anual_equipa_id == planeamento.id,
-    ).order_by(Macrociclo.data_inicio, Macrociclo.data_fim, Macrociclo.id).all()
+    macros = _macrociclos_do_planeamento(db, planeamento)
     macro_ids = [item.id for item in macros]
     if not macro_ids:
         return []
@@ -357,9 +364,7 @@ def construir_mapa_conteudos(db: Session, planeamento: PlaneamentoAnualEquipa) -
                 "em_casa": jogo.em_casa,
             })
 
-    macros = db.query(Macrociclo).filter(
-        Macrociclo.planeamento_anual_equipa_id == planeamento.id,
-    ).order_by(Macrociclo.data_inicio, Macrociclo.data_fim, Macrociclo.id).all()
+    macros = _macrociclos_do_planeamento(db, planeamento)
     macro_ids = [item.id for item in macros]
     mesos = db.query(Mesociclo).filter(Mesociclo.macrociclo_id.in_(macro_ids)).order_by(
         Mesociclo.data_inicio, Mesociclo.data_fim, Mesociclo.id,
