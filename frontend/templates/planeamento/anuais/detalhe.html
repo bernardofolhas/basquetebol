@@ -105,7 +105,13 @@
                         {% for label, segmentos, classe in [('Macrociclo', mapa_conteudos.segmentos_macro, 'macro'), ('Mesociclo', mapa_conteudos.segmentos_meso, 'meso'), ('Microciclo', mapa_conteudos.segmentos_micro, 'micro')] %}
                         <tr class="mapa-context-row mapa-cycle-row mapa-cycle-{{ classe }}">
                             <th colspan="3" class="mapa-label-global">{{ label }}</th>
-                            {% for segmento in segmentos %}<td colspan="{{ segmento.span }}" class="{% if segmento.label %}has-cycle{% endif %}">{{ segmento.label }}</td>{% endfor %}
+                            {% for segmento in segmentos %}
+                            <td colspan="{{ segmento.span }}" class="{% if segmento.label %}has-cycle{% endif %}">
+                                {% if segmento.id %}
+                                <a href="{% if classe == 'macro' %}/planeamento/macrociclos/{{ segmento.id }}{% elif classe == 'meso' %}/planeamento/mesociclos/{{ segmento.id }}{% else %}/planeamento/microciclos/{{ segmento.id }}{% endif %}" class="mapa-cycle-link" title="Abrir {{ segmento.label }}">{{ segmento.label }}</a>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
                         </tr>
                         {% endfor %}
 

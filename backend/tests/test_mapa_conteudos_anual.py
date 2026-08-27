@@ -152,6 +152,10 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         assert "Macro 1" in pagina.text
         assert "Meso 1" in pagina.text
         assert "Micro 1" in pagina.text
+        assert f'href="/planeamento/macrociclos/{macro.id}"' in pagina.text
+        assert f'href="/planeamento/mesociclos/{meso.id}"' in pagina.text
+        assert f'href="/planeamento/microciclos/{micro.id}"' in pagina.text
+        assert f'href="/jogos/{jogo.id}"' in pagina.text
         assert "+ Conteúdo" in pagina.text
         assert "Exportar A3" in pagina.text
 

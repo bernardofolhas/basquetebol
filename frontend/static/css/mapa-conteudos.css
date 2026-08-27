@@ -77,6 +77,9 @@
 .mapa-cycle-macro td.has-cycle { background: #dcebf5; }
 .mapa-cycle-meso td.has-cycle { background: #deefdc; }
 .mapa-cycle-micro td.has-cycle { background: #ffe4cf; }
+.mapa-cycle-link { display: block; color: inherit; text-decoration: none; }
+.mapa-cycle-link:hover { text-decoration: underline; text-underline-offset: .14rem; }
+.mapa-cycle-link:focus-visible { outline: 2px solid #f97316; outline-offset: .12rem; border-radius: .2rem; }
 
 .mapa-content-row th { text-align: left; vertical-align: middle; }
 .mapa-area-cell { color: #fff; font-size: .7rem; font-weight: 800; letter-spacing: .02em; text-align: center !important; writing-mode: vertical-rl; transform: rotate(180deg); }
