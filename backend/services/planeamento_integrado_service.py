@@ -268,6 +268,7 @@ def _item_sessao(sessao: SessaoTreino) -> dict | None:
             "agenda_serie_id": evento_agenda.serie_id or "",
             "agenda_data_fim": evento_agenda.data_fim or "",
             "agenda_recorrencia": evento_agenda.recorrencia_frequencia or "unica",
+            "agenda_recorrencia_intervalo": evento_agenda.recorrencia_intervalo or 1,
         })
         if sessao.e_jogo and evento_agenda.jogo:
             _aplicar_estilo_localizacao_jogo(item, evento_agenda.jogo.em_casa)
@@ -396,6 +397,7 @@ def _item_evento(evento: EventoPlaneamentoClube, equipa_id: int | None = None) -
         "agenda_serie_id": evento.serie_id or "",
         "agenda_data_fim": evento.data_fim or "",
         "agenda_recorrencia": evento.recorrencia_frequencia or "unica",
+        "agenda_recorrencia_intervalo": evento.recorrencia_intervalo or 1,
         "plano_treino_link": link if evento.tipo in TIPOS_EVENTO_TREINO and equipa_para_plano else None,
     })
     if categoria == "jogo" and evento.jogo:

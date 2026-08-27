@@ -2,7 +2,10 @@ from datetime import date
 from pathlib import Path
 
 from database import SessionLocal
+from models.equipa import Equipa
+from models.planeamento import Macrociclo
 from models.planeamento_clube import EventoPlaneamentoClube, TipoEventoPlaneamentoClubeEnum
+from models.utilizador import Utilizador
 from services.agenda_service import (
     TIPOS_AGENDA,
     intervalo_sobreposto,
@@ -68,6 +71,85 @@ def test_mesociclo_envia_os_dados_da_serie_para_o_editor_de_agenda():
     assert "data-agenda-serie-id" in modelo
     assert "data-agenda-recorrencia" in modelo
     assert "campo('agenda-escopo').value = 'serie'" in script
+
+
+def test_macrociclo_envia_os_dados_da_serie_para_o_editor_de_agenda():
+    raiz = Path(__file__).resolve().parents[2]
+    modelo = (raiz / "frontend" / "templates" / "planeamento" / "macrociclos" / "detalhe.html").read_text(encoding="utf-8")
+    script = (raiz / "frontend" / "static" / "js" / "agenda.js").read_text(encoding="utf-8")
+
+    assert "data-agenda-data-fim" in modelo
+    assert "data-agenda-serie-id" in modelo
+    assert "data-agenda-recorrencia" in modelo
+    assert "data-agenda-recorrencia-intervalo" in modelo
+    assert "elemento.dataset.agendaRecorrenciaIntervalo || '1'" in script
+
+
+def test_macrociclo_cria_treinos_semanais_ate_a_data_final(client_admin):
+    db = SessionLocal()
+    macro = None
+    try:
+        administrador = db.query(Utilizador).execution_options(ignorar_clube=True).filter(
+            Utilizador.username == "admin"
+        ).first()
+        equipa = db.query(Equipa).execution_options(ignorar_clube=True).filter(
+            Equipa.clube_id == administrador.clube_id
+        ).order_by(Equipa.id).first()
+        assert equipa is not None
+        macro = Macrociclo(
+            clube_id=equipa.clube_id,
+            equipa_id=equipa.id,
+            numero=997,
+            data_inicio=date(2097, 1, 1),
+            data_fim=date(2097, 3, 31),
+        )
+        db.add(macro)
+        db.commit()
+        macro_id = macro.id
+
+        resposta = client_admin.post(
+            "/agenda/atividades",
+            data={
+                "tipo": "treino_equipa",
+                "titulo": "Treino recorrente do macrociclo",
+                "data_evento": "2097-01-01",
+                "data_fim": "2097-01-22",
+                "recorrencia": "semanal",
+                "recorrencia_intervalo": "1",
+                "equipa_id": str(equipa.id),
+                "macrociclo_id": str(macro_id),
+                "mesociclo_id": "",
+                "microciclo_id": "",
+                "retorno": f"/planeamento/macrociclos/{macro_id}",
+            },
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            follow_redirects=False,
+        )
+
+        assert resposta.status_code == 200
+        assert resposta.json()["sucesso"] is True
+        db.expire_all()
+        eventos = db.query(EventoPlaneamentoClube).execution_options(ignorar_clube=True).filter(
+            EventoPlaneamentoClube.macrociclo_id == macro_id,
+            EventoPlaneamentoClube.titulo == "Treino recorrente do macrociclo",
+        ).order_by(EventoPlaneamentoClube.data).all()
+        assert [evento.data for evento in eventos] == [
+            date(2097, 1, 1),
+            date(2097, 1, 8),
+            date(2097, 1, 15),
+            date(2097, 1, 22),
+        ]
+        assert len({evento.serie_id for evento in eventos}) == 1
+        assert eventos[0].serie_id
+    finally:
+        if macro is not None:
+            for evento in db.query(EventoPlaneamentoClube).execution_options(ignorar_clube=True).filter(
+                EventoPlaneamentoClube.macrociclo_id == macro.id
+            ).all():
+                db.delete(evento)
+            db.delete(macro)
+            db.commit()
+        db.close()
 
 
 def test_link_do_plano_de_treino_tem_prioridade_sobre_o_clique_no_dia_do_calendario():

@@ -103,6 +103,7 @@
         campo('agenda-data').value = elemento.dataset.agendaData || '';
         campo('agenda-data-fim').value = elemento.dataset.agendaDataFim || '';
         campo('agenda-recorrencia').value = elemento.dataset.agendaRecorrencia || 'unica';
+        campo('agenda-intervalo').value = elemento.dataset.agendaRecorrenciaIntervalo || '1';
         if (elemento.dataset.agendaSerieId) campo('agenda-escopo').value = 'serie';
         campo('agenda-hora-inicio').value = elemento.dataset.agendaHoraInicio || '';
         campo('agenda-hora-fim').value = elemento.dataset.agendaHoraFim || '';
