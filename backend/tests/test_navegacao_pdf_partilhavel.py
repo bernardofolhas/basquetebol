@@ -160,6 +160,8 @@ def test_microciclo_partilhavel_usa_modelo_semanal_legivel():
     ).read_text(encoding="utf-8")
 
     assert 'template="planeamento/microciclos/partilhavel_pdf.html"' in rota
+    assert 'titulo=f"Semana {micro.numero}"' in rota
+    assert 'titulo_documento": titulo or agenda["meses_intervalo"]' in rota
     assert "font-size:18pt" in modelo
     assert "height:{{ altura_semana }}mm" in modelo
     assert '<table class="calendar"' in modelo

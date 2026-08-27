@@ -44,7 +44,7 @@ def _responder(request, db, utilizador, *, titulo, data_inicio, data_fim, nome, 
         nome_treinador = equipa.treinadores[0].nome
     pdf = renderizar_pdf(request, template, {
         "utilizador": utilizador,
-        "titulo_documento": titulo,
+        "titulo_documento": titulo or agenda["meses_intervalo"],
         "equipa_documento": equipa,
         "agenda": agenda,
         "nome_treinador": nome_treinador or utilizador.nome,
@@ -141,7 +141,7 @@ def meso_partilhavel(meso_id: int, request: Request, db: Session = Depends(get_d
     verificar_ou_negar_equipa(utilizador, equipa.id, db)
     return _responder(
         request, db, utilizador,
-        titulo=f"Mesociclo {meso.numero} · calendário",
+        titulo=None,
         data_inicio=meso.data_inicio,
         data_fim=meso.data_fim,
         nome=f"Mesociclo {meso.numero}",
@@ -159,7 +159,7 @@ def micro_partilhavel(micro_id: int, request: Request, db: Session = Depends(get
     verificar_ou_negar_equipa(utilizador, equipa.id, db)
     return _responder(
         request, db, utilizador,
-        titulo=f"Microciclo {micro.numero} - Agenda semanal",
+        titulo=f"Semana {micro.numero}",
         data_inicio=micro.data_inicio,
         data_fim=micro.data_fim,
         nome=f"Microciclo {micro.numero}",
