@@ -139,6 +139,34 @@ def test_pdf_partilhavel_de_jogos_usa_lista_propria(client_admin):
     assert "Documento para partilha" not in texto
 
 
+def test_calendario_anual_de_jogos_gera_grelha_a3(client_admin):
+    from database import SessionLocal
+    from models.equipa import Equipa
+    from models.utilizador import Utilizador
+
+    db = SessionLocal()
+    try:
+        admin = db.query(Utilizador).filter(Utilizador.username == "admin").first()
+        equipa = db.query(Equipa).filter(Equipa.clube_id == admin.clube_id).first()
+        assert equipa is not None
+        equipa_id = equipa.id
+    finally:
+        db.close()
+
+    response = client_admin.get(f"/jogos/equipas/{equipa_id}/pdf")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    leitor = PdfReader(BytesIO(response.content))
+    assert len(leitor.pages) >= 1
+    pagina = leitor.pages[0]
+    assert float(pagina.mediabox.width) > 1100
+    texto = pagina.extract_text() or ""
+    assert "Época" in texto
+    assert "AGOSTO" in texto
+    assert "JUNHO" in texto
+
+
 def test_calendario_partilhavel_de_mesociclo_mantem_apenas_dias_do_intervalo(monkeypatch):
     import services.pdf_partilhavel_service as servico
 

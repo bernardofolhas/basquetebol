@@ -1,21 +1,165 @@
-{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+{% from "partials/pdf_branding.html" import estilo_pdf with context %}
 <!DOCTYPE html>
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <title>Calendário - {{ equipa.nome }}</title>
-    <style>
-        * { box-sizing: border-box; } @page { size: A4 portrait; margin: 12mm; }
-        body { margin: 0; font-family: Arial, sans-serif; color: #172033; font-size: 10px; }
-        .header { background: #e25a1c; color: white; padding: 13px 15px; display: flex; justify-content: space-between; } h1 { margin: 0; font-size: 20px; } .sub { margin-top: 4px; color: #ffedd5; } .right { text-align: right; font-size: 8px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 12px; } th { background: #7c2d12; color: white; padding: 6px; text-align: left; } td { border: 1px solid #cbd5e1; padding: 6px; vertical-align: top; } tr:nth-child(even) td { background: #fff7ed; } thead { display: table-header-group; } tr { page-break-inside: avoid; }
-        .home { color: #15803d; font-weight: bold; } .away { color: #1d4ed8; font-weight: bold; } .footer { border-top: 1px solid #cbd5e1; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; color: #64748b; font-size: 8px; }
-    </style>
+    <title>Calendário de jogos - {{ equipa.nome }}</title>
     {{ estilo_pdf() }}
+    <style>
+        @page { size: A3 landscape; margin: 6mm; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: #172033; font-family: Arial, sans-serif; }
+        .epoca { break-after: page; page-break-after: always; }
+        .epoca:last-child { break-after: auto; page-break-after: auto; }
+        .cabecalho {
+            align-items: center;
+            background: var(--pdf-primary);
+            color: var(--pdf-on-primary);
+            display: flex;
+            height: 14mm;
+            justify-content: space-between;
+            padding: 2mm 4mm;
+        }
+        .clube { align-items: center; display: flex; gap: 3mm; min-width: 0; }
+        .logo { height: 10mm; object-fit: contain; width: 10mm; }
+        .clube-nome { font-size: 14pt; font-weight: 800; line-height: 1; }
+        .epoca-nome { font-size: 13pt; font-weight: 800; white-space: nowrap; }
+        .contexto {
+            align-items: center;
+            background: #f8fafc;
+            border: 0.25mm solid #cbd5e1;
+            border-top: 0;
+            display: flex;
+            font-size: 7pt;
+            justify-content: space-between;
+            min-height: 8mm;
+            padding: 1.2mm 2.5mm;
+        }
+        .equipa { color: #0f172a; font-size: 9pt; font-weight: 800; }
+        .legenda { align-items: center; display: flex; gap: 4mm; }
+        .legenda-item { align-items: center; display: flex; gap: 1mm; white-space: nowrap; }
+        .amostra { border-radius: 1mm; display: inline-block; height: 3mm; width: 5mm; }
+        .amostra.casa { background: var(--pdf-primary-light); border: 0.25mm solid var(--pdf-primary); }
+        .amostra.fora { background: #e0e7ff; border: 0.25mm solid #4f46e5; }
+        table.calendario { border-collapse: collapse; table-layout: fixed; width: 100%; }
+        .calendario th {
+            background: var(--pdf-secondary);
+            border: 0.2mm solid #475569;
+            color: var(--pdf-on-secondary);
+            font-size: 6.3pt;
+            font-weight: 800;
+            height: 6.5mm;
+            padding: 1mm;
+            text-align: center;
+            text-transform: uppercase;
+        }
+        .calendario td {
+            border: 0.2mm solid #94a3b8;
+            height: 7.45mm;
+            overflow: hidden;
+            padding: 0;
+            vertical-align: top;
+        }
+        .calendario td.fim-semana { background: #f1f5f9; }
+        .calendario td.invalido { background: #e2e8f0; }
+        .dia { display: flex; height: 7.2mm; min-width: 0; }
+        .numero-dia {
+            align-items: center;
+            border-right: 0.2mm solid #cbd5e1;
+            color: #475569;
+            display: flex;
+            flex: 0 0 4.4mm;
+            font-size: 5.4pt;
+            font-weight: 800;
+            justify-content: center;
+        }
+        .jogos-dia { flex: 1; min-width: 0; overflow: hidden; }
+        .jogo {
+            border-left: 0.7mm solid transparent;
+            height: 7.2mm;
+            line-height: 1.08;
+            overflow: hidden;
+            padding: 0.65mm 0.8mm;
+        }
+        .jogo.casa { background: var(--pdf-primary-light); border-left-color: var(--pdf-primary); }
+        .jogo.fora { background: #e0e7ff; border-left-color: #4f46e5; }
+        .jogos-dia.multiplos .jogo { height: 3.6mm; padding-bottom: 0.25mm; padding-top: 0.25mm; }
+        .jogo-linha {
+            color: #0f172a;
+            font-size: 5.2pt;
+            font-weight: 800;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .jogo-numero { color: var(--pdf-primary-dark); margin-right: 0.8mm; }
+        .jogo.fora .jogo-numero { color: #3730a3; }
+        .jogo-meta {
+            color: #475569;
+            font-size: 4.2pt;
+            margin-top: 0.35mm;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .rodape {
+            align-items: center;
+            color: #64748b;
+            display: flex;
+            font-size: 5pt;
+            height: 4mm;
+            justify-content: space-between;
+            padding-top: 1mm;
+        }
+    </style>
 </head>
 <body>
-    {{ cabecalho_pdf('Calendário de jogos', equipa.nome ~ ' · ' ~ (jogos | length) ~ ' jogo(s)', 'Jogos · ' ~ data_exportacao) }}
-    {% if linhas_jogos %}<table><thead><tr><th style="width:12%">Data</th><th style="width:9%">Hora</th><th style="width:19%">Visitada</th><th style="width:19%">Visitante</th><th style="width:16%">Competição</th><th style="width:16%">Local</th><th>Resultado</th></tr></thead><tbody>{% for linha in linhas_jogos %}{% set jogo = linha.jogo %}<tr><td>{{ jogo.data|data_pt }}</td><td>{{ jogo.hora or 'Por definir' }}</td><td><strong>{{ linha.visitada }}</strong></td><td><strong>{{ linha.visitante }}</strong></td><td>{{ jogo.competicao or '—' }}</td><td>{{ jogo.local or 'Por definir' }}</td><td>{% if jogo.pontos_nos is not none and jogo.pontos_adversario is not none %}{{ jogo.pontos_nos }}-{{ jogo.pontos_adversario }}{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Não existem jogos marcados.</p>{% endif %}
-    {{ rodape_pdf(equipa.nome ~ ' · Calendário de jogos') }}
+{% for pagina in epocas_calendario %}
+<section class="epoca">
+    <header class="cabecalho">
+        <div class="clube">
+            {% if identidade.logo_principal %}<img class="logo" src="{{ identidade.logo_principal }}" alt="Logótipo">{% endif %}
+            <div class="clube-nome">{{ identidade.nome_oficial|default('Clube de Basquetebol') }}</div>
+        </div>
+        <div class="epoca-nome">Época {{ pagina.epoca }}</div>
+    </header>
+    <div class="contexto">
+        <div><span class="equipa">{{ equipa.nome }}</span> · {{ pagina.jogos|length }} jogo(s)</div>
+        <div class="legenda">
+            <span class="legenda-item"><i class="amostra casa"></i> Jogo em casa</span>
+            <span class="legenda-item"><i class="amostra fora"></i> Jogo fora</span>
+            <span>J = número cronológico do jogo</span>
+        </div>
+    </div>
+    <table class="calendario">
+        <thead><tr>{% for mes in pagina.meses %}<th>{{ mes.nome }}<br>{{ mes.ano }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for indice_dia in range(31) %}
+        <tr>
+            {% for mes in pagina.meses %}
+            {% set dia = mes.dias[indice_dia] %}
+            <td class="{% if not dia.valido %}invalido{% elif dia.fim_semana %}fim-semana{% endif %}">
+                {% if dia.valido %}
+                <div class="dia">
+                    <span class="numero-dia">{{ dia.numero }}</span>
+                    <div class="jogos-dia {% if dia.jogos|length > 1 %}multiplos{% endif %}">
+                        {% for entrada in dia.jogos %}{% set jogo = entrada.jogo %}
+                        <div class="jogo {{ 'casa' if jogo.em_casa else 'fora' }}">
+                            <div class="jogo-linha"><span class="jogo-numero">J{{ entrada.numero }}</span>{{ jogo.adversario }}</div>
+                            {% if dia.jogos|length == 1 %}<div class="jogo-meta">{{ 'Casa' if jogo.em_casa else 'Fora' }} · {{ jogo.hora or 'Hora por definir' }}{% if jogo.competicao %} · {{ jogo.competicao }}{% endif %}{% if jogo.local %} · {{ jogo.local }}{% endif %}</div>{% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <footer class="rodape"><span>{{ identidade.nome_curto|default(identidade.nome_oficial)|default('Clube') }} · {{ equipa.nome }}</span><span>Exportado em {{ data_exportacao|data_pt }}</span></footer>
+</section>
+{% endfor %}
 </body>
 </html>

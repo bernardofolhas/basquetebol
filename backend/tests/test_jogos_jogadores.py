@@ -7,7 +7,12 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from main import app
 from models.jogo import Jogo
 from routers.jogos import _mensagem_novo_jogo
-from services.jogos_service import formatar_confronto, preparar_linhas_calendario_jogos, separar_visitada_visitante
+from services.jogos_service import (
+    formatar_confronto,
+    preparar_epocas_calendario_jogos,
+    preparar_linhas_calendario_jogos,
+    separar_visitada_visitante,
+)
 from testsupport import TestClient
 
 
@@ -59,6 +64,34 @@ def test_linhas_de_calendario_separam_visitada_e_visitante():
     linha = preparar_linhas_calendario_jogos([jogo], "SL Benfica")[0]
     assert linha["visitada"] == "Clube Visitante"
     assert linha["visitante"] == "SL Benfica"
+
+
+def test_calendario_anual_distribui_jogos_pelos_meses_sem_colunas_por_equipa():
+    jogos = [
+        Jogo(id=101, data=date(2026, 9, 5), hora="18:30", adversario="Clube A", em_casa=True),
+        Jogo(id=102, data=date(2027, 1, 9), hora="16:00", adversario="Clube B", em_casa=False),
+    ]
+
+    epocas = preparar_epocas_calendario_jogos(jogos)
+
+    assert [epoca["epoca"] for epoca in epocas] == ["2026/2027"]
+    assert len(epocas[0]["meses"]) == 11
+    setembro = next(mes for mes in epocas[0]["meses"] if mes["nome"] == "Setembro")
+    janeiro = next(mes for mes in epocas[0]["meses"] if mes["nome"] == "Janeiro")
+    assert setembro["dias"][4]["jogos"][0]["numero"] == 1
+    assert setembro["dias"][4]["jogos"][0]["jogo"].adversario == "Clube A"
+    assert janeiro["dias"][8]["jogos"][0]["numero"] == 2
+
+
+def test_template_calendario_anual_de_jogos_e_a3_com_um_bloco_por_mes():
+    raiz = Path(__file__).resolve().parents[2]
+    modelo = (raiz / "frontend" / "templates" / "jogos" / "calendario_pdf.html").read_text(encoding="utf-8")
+
+    assert "size: A3 landscape" in modelo
+    assert '<table class="calendario">' in modelo
+    assert "for mes in pagina.meses" in modelo
+    assert "Jogo em casa" in modelo
+    assert "Jogo fora" in modelo
 
 
 def _fazer_login(client: TestClient, perfil: str):

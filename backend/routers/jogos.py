@@ -14,8 +14,12 @@ from models.jogador import Jogador
 from models.jogo import Convocado, Jogo, PlanoJogo
 from paths import TEMPLATES_DIR
 from services.notificacoes_service import criar_notificacoes_para_equipa
-from services.pdf_service import renderizar_pdf
-from services.jogos_service import formatar_confronto, preparar_linhas_calendario_jogos
+from services.pdf_service import content_disposition_pdf, renderizar_pdf
+from services.jogos_service import (
+    formatar_confronto,
+    preparar_epocas_calendario_jogos,
+    preparar_linhas_calendario_jogos,
+)
 
 router = APIRouter(prefix="/jogos")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -97,16 +101,26 @@ def exportar_pdf_calendario_equipa(
         return RedirectResponse(url="/equipas")
     jogos = db.query(Jogo).filter(Jogo.equipa_id == equipa_id).order_by(Jogo.data, Jogo.hora).all()
     nome_clube = _nome_clube_pedido(request, equipa)
+    identidade = getattr(request.state, "identidade_clube", {}) or {}
+    epocas_calendario = preparar_epocas_calendario_jogos(
+        jogos,
+        identidade.get("epoca_predefinida"),
+    )
     pdf_bytes = renderizar_pdf(request, "jogos/calendario_pdf.html", {
         "utilizador": utilizador,
         "equipa": equipa,
         "jogos": jogos,
         "confrontos": _confrontos(jogos, nome_clube),
         "linhas_jogos": preparar_linhas_calendario_jogos(jogos, nome_clube),
+        "epocas_calendario": epocas_calendario,
         "hoje": date.today(),
     })
-    nome = f"calendario_{equipa.nome}_{equipa.id}.pdf".replace(" ", "_")
-    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nome}"})
+    epoca_nome = epocas_calendario[-1]["epoca"].replace("/", "-")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": content_disposition_pdf(f"Calendário de jogos {epoca_nome}")},
+    )
 
 
 @router.post("/equipas/{equipa_id}/novo")
