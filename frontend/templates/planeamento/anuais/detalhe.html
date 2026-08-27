@@ -123,7 +123,7 @@
                         <tr class="mapa-content-row {{ classe_area }}">
                             {% if primeira_subarea and loop.first %}<th rowspan="{{ area.total_linhas }}" class="mapa-sticky mapa-area-cell">{{ area.nome }}</th>{% endif %}
                             {% if loop.first %}<th rowspan="{{ subarea.total_linhas }}" class="mapa-sticky mapa-subarea-cell">{{ subarea.nome or 'Conteúdos' }}</th>{% endif %}
-                            <th class="mapa-sticky mapa-content-cell"><span>{{ conteudo.nome }}</span><span class="mapa-content-actions"><button type="button" class="mapa-edit-content" data-edit-content data-content-id="{{ conteudo.id }}" data-content-name="{{ conteudo.nome|e }}" data-content-area="{{ conteudo.area|e }}" data-content-subarea="{{ conteudo.subarea or ''|e }}" data-edit-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/conteudos/{{ conteudo.id }}/editar" aria-label="Editar {{ conteudo.nome }}" title="Editar conteúdo">✎</button><button type="button" class="mapa-delete-content" data-delete-content data-content-name="{{ conteudo.nome|e }}" data-delete-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/conteudos/{{ conteudo.id }}/eliminar" aria-label="Eliminar {{ conteudo.nome }}" title="Eliminar conteúdo">×</button></span></th>
+                            <th class="mapa-sticky mapa-content-cell"><span class="mapa-content-actions"><button type="button" class="mapa-edit-content" data-edit-content data-content-id="{{ conteudo.id }}" data-content-name="{{ conteudo.nome|e }}" data-content-area="{{ conteudo.area|e }}" data-content-subarea="{{ (conteudo.subarea or '')|e }}" data-edit-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/conteudos/{{ conteudo.id }}/editar" aria-label="Editar {{ conteudo.nome }}" title="Editar conteúdo">✎</button><button type="button" class="mapa-delete-content" data-delete-content data-content-name="{{ conteudo.nome|e }}" data-delete-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/conteudos/{{ conteudo.id }}/eliminar" aria-label="Eliminar {{ conteudo.nome }}" title="Eliminar conteúdo">×</button></span><span class="mapa-content-name">{{ conteudo.nome }}</span></th>
                             {% for semana in mapa_conteudos.semanas %}
                             {% set valor = mapa_conteudos.prioridades.get(conteudo.id, {}).get(semana.chave) %}
                             <td class="mapa-priority-cell">
@@ -167,4 +167,4 @@
 </div>
 {{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, [], request.session.get('_csrf', '')) }}
 {% endblock %}
-{% block scripts_extra %}<script src="/static/js/mapa-conteudos.js?v=20260826-2" defer></script>{% endblock %}
+{% block scripts_extra %}<script src="/static/js/mapa-conteudos.js?v=20260827-1" defer></script>{% endblock %}
