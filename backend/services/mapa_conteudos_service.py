@@ -172,17 +172,32 @@ def _indice_semana(data_evento: date, semanas: list[dict]) -> int | None:
 def _segmentos_ciclos(semanas: list[dict], ciclos: list, prefixo: str) -> list[dict]:
     valores = []
     for semana in semanas:
-        ciclo = next((item for item in ciclos if item.data_inicio <= semana["fim"] and item.data_fim >= semana["inicio"]), None)
-        # Usa a numeração cronológica guardada no ciclo para manter o mapa
-        # atualizado mesmo quando são criados ou reorganizados períodos.
-        valores.append((ciclo.id, f"{prefixo} {ciclo.numero}") if ciclo else (None, ""))
+        # Pode haver ciclos em transição na mesma semana. O mapa tem de
+        # mostrar todos, em vez de escolher apenas o primeiro e ocultar os
+        # restantes (por exemplo, o Meso 2 quando o Meso 1 termina nessa semana).
+        ciclos_na_semana = [
+            item for item in ciclos
+            if item.data_inicio <= semana["fim"] and item.data_fim >= semana["inicio"]
+        ]
+        valores.append({
+            "ids": tuple(item.id for item in ciclos_na_semana),
+            "ciclos": [
+                {"id": item.id, "label": f"{prefixo} {item.numero}"}
+                for item in ciclos_na_semana
+            ],
+        })
 
     segmentos = []
-    for identificador, label in valores:
-        if segmentos and segmentos[-1]["id"] == identificador:
+    for valor in valores:
+        if segmentos and segmentos[-1]["ids"] == valor["ids"]:
             segmentos[-1]["span"] += 1
         else:
-            segmentos.append({"id": identificador, "label": label, "span": 1})
+            segmentos.append({
+                "ids": valor["ids"],
+                "ciclos": valor["ciclos"],
+                "label": " · ".join(item["label"] for item in valor["ciclos"]),
+                "span": 1,
+            })
     return segmentos
 
 

@@ -106,10 +106,10 @@
                         <tr class="mapa-context-row mapa-cycle-row mapa-cycle-{{ classe }}">
                             <th colspan="3" class="mapa-label-global">{{ label }}</th>
                             {% for segmento in segmentos %}
-                            <td colspan="{{ segmento.span }}" class="{% if segmento.label %}has-cycle{% endif %}">
-                                {% if segmento.id %}
-                                <a href="{% if classe == 'macro' %}/planeamento/macrociclos/{{ segmento.id }}{% elif classe == 'meso' %}/planeamento/mesociclos/{{ segmento.id }}{% else %}/planeamento/microciclos/{{ segmento.id }}{% endif %}" class="mapa-cycle-link" title="Abrir {{ segmento.label }}">{{ segmento.label }}</a>
-                                {% endif %}
+                            <td colspan="{{ segmento.span }}" class="{% if segmento.ciclos %}has-cycle{% endif %}">
+                                {% for ciclo in segmento.ciclos %}
+                                <a href="{% if classe == 'macro' %}/planeamento/macrociclos/{{ ciclo.id }}{% elif classe == 'meso' %}/planeamento/mesociclos/{{ ciclo.id }}{% else %}/planeamento/microciclos/{{ ciclo.id }}{% endif %}" class="mapa-cycle-link" title="Abrir {{ ciclo.label }}">{{ ciclo.label }}</a>{% if not loop.last %}<span class="mapa-cycle-separator"> · </span>{% endif %}
+                                {% endfor %}
                             </td>
                             {% endfor %}
                         </tr>

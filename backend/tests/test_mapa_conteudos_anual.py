@@ -159,6 +159,26 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         assert "+ Conteúdo" in pagina.text
         assert "Exportar A3" in pagina.text
 
+        # Mesos que se cruzam numa semana de transição têm de ficar ambos
+        # visíveis no mapa, e não apenas o primeiro encontrado.
+        meso_2 = Mesociclo(
+            clube_id=clube.id,
+            macrociclo_id=macro.id,
+            numero=2,
+            data_inicio=date(2026, 9, 28),
+            data_fim=date(2026, 10, 31),
+        )
+        db.add(meso_2)
+        db.commit()
+        mapa_com_transicao = construir_mapa_conteudos(db, anual)
+        segmento_transicao = next(
+            segmento for segmento in mapa_com_transicao["segmentos_meso"]
+            if {ciclo["id"] for ciclo in segmento["ciclos"]} == {meso.id, meso_2.id}
+        )
+        assert segmento_transicao["label"] == "Meso 1 · Meso 2"
+        pagina_com_transicao = cliente.get(f"/planeamento/anuais/{anual.id}")
+        assert f'href="/planeamento/mesociclos/{meso_2.id}"' in pagina_com_transicao.text
+
         db.expire_all()
         conteudo = db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
             ConteudoMapaAnual.clube_id == clube.id,
