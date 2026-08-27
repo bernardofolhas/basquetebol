@@ -63,6 +63,7 @@ from services.agenda_service import metadados_tipo_agenda, tipos_agenda_formular
 from services.historico_planeamento_service import registar_historico_planeamento
 from services.planeamento_integrado_service import obter_dashboard_planeamento_anual
 from services.numeracao_planeamento_service import (
+    proximo_numero_microciclo,
     renumerar_macrociclos,
     renumerar_mesociclos,
     renumerar_microciclos,
@@ -900,9 +901,8 @@ def _criar_microciclo_automatico(
     data_fim: date,
 ) -> Microciclo:
     """Cria um microciclo semanal automático dentro do mesociclo indicado."""
-    total_microciclos = db.query(Microciclo).filter(Microciclo.mesociclo_id == mesociclo.id).count()
     microciclo = Microciclo(
-        numero=total_microciclos + 1,
+        numero=proximo_numero_microciclo(db, mesociclo.id),
         data_inicio=data_inicio,
         data_fim=data_fim,
         tipo="automatico_planeamento_global",

@@ -317,7 +317,7 @@ class Microciclo(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    # Número automático dentro do mesociclo
+    # Número automático contínuo dentro do planeamento anual da equipa
     numero = Column(Integer, nullable=False)
 
     data_inicio = Column(Date, nullable=False)

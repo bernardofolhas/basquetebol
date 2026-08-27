@@ -28,11 +28,56 @@ def renumerar_mesociclos(db: Session, macrociclo_id: int) -> None:
     _renumerar(ciclos)
 
 
-def renumerar_microciclos(db: Session, mesociclo_id: int) -> None:
-    ciclos = db.query(Microciclo).filter(
-        Microciclo.mesociclo_id == mesociclo_id,
-    ).order_by(Microciclo.data_inicio, Microciclo.data_fim, Microciclo.id).all()
+def renumerar_microciclos_planeamento(
+    db: Session,
+    equipa_id: int,
+    planeamento_anual_equipa_id: int | None,
+) -> None:
+    """Numera os micros continuamente em todo o planeamento anual da equipa."""
+    consulta = db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+    )
+    if planeamento_anual_equipa_id is None:
+        consulta = consulta.filter(Macrociclo.planeamento_anual_equipa_id.is_(None))
+    else:
+        consulta = consulta.filter(
+            Macrociclo.planeamento_anual_equipa_id == planeamento_anual_equipa_id,
+        )
+    ciclos = consulta.order_by(
+        Microciclo.data_inicio,
+        Microciclo.data_fim,
+        Microciclo.id,
+    ).all()
     _renumerar(ciclos)
+
+
+def renumerar_microciclos(db: Session, mesociclo_id: int) -> None:
+    """Renumerar a partir de um meso mantém a sequência do plano anual inteiro."""
+    escopo = db.query(
+        Macrociclo.equipa_id,
+        Macrociclo.planeamento_anual_equipa_id,
+    ).join(Mesociclo).filter(Mesociclo.id == mesociclo_id).first()
+    if not escopo:
+        return
+    renumerar_microciclos_planeamento(db, escopo[0], escopo[1])
+
+
+def proximo_numero_microciclo(db: Session, mesociclo_id: int) -> int:
+    """Devolve o número seguinte no plano anual, sem reiniciar em cada meso."""
+    escopo = db.query(
+        Macrociclo.equipa_id,
+        Macrociclo.planeamento_anual_equipa_id,
+    ).join(Mesociclo).filter(Mesociclo.id == mesociclo_id).first()
+    if not escopo:
+        return 1
+    consulta = db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == escopo[0],
+    )
+    if escopo[1] is None:
+        consulta = consulta.filter(Macrociclo.planeamento_anual_equipa_id.is_(None))
+    else:
+        consulta = consulta.filter(Macrociclo.planeamento_anual_equipa_id == escopo[1])
+    return consulta.count() + 1
 
 
 def renumerar_treinos_equipa(db: Session, equipa_id: int) -> None:
@@ -88,12 +133,22 @@ def renumerar_todos_os_ciclos(db: Session) -> None:
     for grupo in grupos_meso.values():
         _renumerar(grupo)
 
-    microciclos = db.query(Microciclo).execution_options(ignorar_clube=True).order_by(
-        Microciclo.mesociclo_id, Microciclo.data_inicio, Microciclo.data_fim, Microciclo.id,
+    microciclos = db.query(Microciclo).execution_options(ignorar_clube=True).join(
+        Mesociclo,
+    ).join(Macrociclo).order_by(
+        Macrociclo.equipa_id,
+        Macrociclo.planeamento_anual_equipa_id,
+        Microciclo.data_inicio,
+        Microciclo.data_fim,
+        Microciclo.id,
     ).all()
-    grupos_micro: dict[int, list[Microciclo]] = {}
+    grupos_micro: dict[tuple[int, int | None], list[Microciclo]] = {}
     for micro in microciclos:
-        grupos_micro.setdefault(micro.mesociclo_id, []).append(micro)
+        macro = micro.mesociclo.macrociclo
+        grupos_micro.setdefault(
+            (macro.equipa_id, macro.planeamento_anual_equipa_id),
+            [],
+        ).append(micro)
     for grupo in grupos_micro.values():
         _renumerar(grupo)
 

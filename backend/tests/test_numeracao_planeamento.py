@@ -16,6 +16,7 @@ from routers.planeamento_clube import (
 )
 from services.remocao_sessoes_service import eliminar_sessoes_treino, limpar_sessoes_geradas_orfas
 from services.numeracao_planeamento_service import (
+    proximo_numero_microciclo,
     renumerar_macrociclos,
     renumerar_mesociclos,
     renumerar_microciclos,
@@ -51,9 +52,11 @@ def test_ciclos_sao_renumerados_pela_data_de_inicio():
 
         micro_tardio = Microciclo(clube_id=clube.id, mesociclo_id=meso_cedo.id, numero=1, data_inicio=date(2026, 1, 8), data_fim=date(2026, 1, 14))
         micro_cedo = Microciclo(clube_id=clube.id, mesociclo_id=meso_cedo.id, numero=9, data_inicio=date(2026, 1, 1), data_fim=date(2026, 1, 7))
-        db.add_all([micro_tardio, micro_cedo])
+        micro_meso_seguinte = Microciclo(clube_id=clube.id, mesociclo_id=meso_tardio.id, numero=1, data_inicio=date(2026, 3, 1), data_fim=date(2026, 3, 7))
+        db.add_all([micro_tardio, micro_cedo, micro_meso_seguinte])
         db.flush()
         renumerar_microciclos(db, meso_cedo.id)
+        assert proximo_numero_microciclo(db, meso_tardio.id) == 4
         sessao_tardia = SessaoTreino(
             clube_id=clube.id, microciclo_id=micro_cedo.id, data=date(2026, 1, 5),
             hora_inicio="20:00", numero_treino=9, e_jogo=False, ativa=True,
@@ -84,7 +87,7 @@ def test_ciclos_sao_renumerados_pela_data_de_inicio():
 
         assert (macro_cedo.numero, macro_tardio.numero) == (1, 2)
         assert (meso_cedo.numero, meso_tardio.numero) == (1, 2)
-        assert (micro_cedo.numero, micro_tardio.numero) == (1, 2)
+        assert (micro_cedo.numero, micro_tardio.numero, micro_meso_seguinte.numero) == (1, 2, 3)
         assert (sessao_cedo.numero_treino, sessao_tardia.numero_treino, sessao_sem_dados.numero_treino) == (1, 2, 3)
         assert (treino_fisico.numero_treino, treino_fisico_sem_dados.numero_treino) == (1, 2)
 

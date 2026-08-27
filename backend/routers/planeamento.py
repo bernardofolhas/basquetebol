@@ -62,9 +62,11 @@ from models.jogo import Jogo
 from services.agenda_service import tipos_agenda_formulario
 from services.planeamento_objetivos_service import contexto_objetivos_superiores, objetivos_por_categoria
 from services.numeracao_planeamento_service import (
+    proximo_numero_microciclo,
     renumerar_macrociclos,
     renumerar_mesociclos,
     renumerar_microciclos,
+    renumerar_microciclos_planeamento,
     renumerar_treinos_equipa,
 )
 from services.conteudos_sessao_service import (
@@ -1467,6 +1469,7 @@ async def eliminar_macrociclo(macro_id: int, request: Request, db: Session = Dep
         db.delete(macrociclo)
         db.flush()
         renumerar_macrociclos(db, equipa_id, anual_id)
+        renumerar_microciclos_planeamento(db, equipa_id, anual_id)
         renumerar_treinos_equipa(db, equipa_id)
         db.commit()
         set_flash(request, "Macrociclo eliminado.")
@@ -1608,7 +1611,7 @@ def detalhe_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_
         semanas_calendario.append(semana)
         cur += timedelta(days=7)
 
-    proximo_numero_micro = len(microciclos) + 1
+    proximo_numero_micro = proximo_numero_microciclo(db, meso_id)
     dashboard_planeamento = obter_dashboard_planeamento_equipa(
         db,
         equipa_id,
@@ -1787,9 +1790,11 @@ async def eliminar_mesociclo(meso_id: int, request: Request, db: Session = Depen
     mesociclo = db.query(Mesociclo).filter(Mesociclo.id == meso_id).first()
     if mesociclo:
         macro_id = mesociclo.macrociclo_id
+        anual_id = mesociclo.macrociclo.planeamento_anual_equipa_id
         db.delete(mesociclo)
         db.flush()
         renumerar_mesociclos(db, macro_id)
+        renumerar_microciclos_planeamento(db, equipa_id, anual_id)
         renumerar_treinos_equipa(db, equipa_id)
         db.commit()
         set_flash(request, "Mesociclo eliminado.")
@@ -1884,12 +1889,8 @@ async def criar_microciclo(
 ):
     _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_mesociclo(db, meso_id), db)
 
-    total_micros = db.query(Microciclo).filter(
-        Microciclo.mesociclo_id == meso_id
-    ).count()
-
     microciclo = Microciclo(
-        numero=total_micros + 1,
+        numero=proximo_numero_microciclo(db, meso_id),
         data_inicio=date.fromisoformat(data_inicio),
         data_fim=date.fromisoformat(data_fim),
         tipo=tipo or None,
