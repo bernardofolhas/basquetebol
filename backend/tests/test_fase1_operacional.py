@@ -3,6 +3,7 @@ from datetime import date
 from database import SessionLocal
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
+from models.utilizador import Utilizador
 from services.planeamento_integrado_service import _item_sessao
 from services.sessao_workflow import (
     estado_sessao_visual,
@@ -122,7 +123,8 @@ def test_calendario_unificado_responde_em_html_e_pdf(client_admin):
 def test_plantel_da_equipa_e_lista_operacional_responsiva(client_admin):
     db = SessionLocal()
     try:
-        equipa = db.query(Equipa).first()
+        administrador = db.query(Utilizador).filter(Utilizador.username == "admin").first()
+        equipa = db.query(Equipa).filter(Equipa.clube_id == administrador.clube_id).first() if administrador else None
         if not equipa:
             return
         resposta = client_admin.get(f"/equipas/{equipa.id}/plantel")
@@ -131,5 +133,12 @@ def test_plantel_da_equipa_e_lista_operacional_responsiva(client_admin):
         assert 'id="selecionar-plantel"' in resposta.text
         assert f'name="equipa_id" value="{equipa.id}"' in resposta.text
         assert "ds-roster-list" in resposta.text
+        assert f'/equipas/{equipa.id}/plantel/pdf' in resposta.text
+
+        pdf = client_admin.get(f"/equipas/{equipa.id}/plantel/pdf")
+        assert pdf.status_code == 200
+        assert pdf.headers["content-type"] == "application/pdf"
+        assert "Plantel" in pdf.headers["content-disposition"]
+        assert pdf.content.startswith(b"%PDF")
     finally:
         db.close()

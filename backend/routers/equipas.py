@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
@@ -24,6 +24,9 @@ from models.planeamento import Macrociclo
 from models.planeamento_clube import EventoPlaneamentoClube
 from models.playbook import Playbook
 from paths import TEMPLATES_DIR
+from services.desenho_service import imagem_estatica_data_uri
+from services.fotografia_jogador_service import caminho_fotografia
+from services.pdf_service import content_disposition_pdf, renderizar_pdf
 from services.planeamento_integrado_service import obter_dashboard_planeamento_equipa
 from services.planeamento_semanal_administrativo_service import obter_previsao_equipa
 
@@ -46,6 +49,15 @@ def _ordenar_treinadores(treinadores):
     return sorted(
         treinadores,
         key=lambda treinador: ((treinador.nome or "").lower(), treinador.id),
+    )
+
+
+def _calcular_idade(data_nascimento: date | None, hoje: date | None = None) -> int | None:
+    if not data_nascimento:
+        return None
+    referencia = hoje or date.today()
+    return referencia.year - data_nascimento.year - (
+        (referencia.month, referencia.day) < (data_nascimento.month, data_nascimento.day)
     )
 
 
@@ -231,6 +243,56 @@ def plantel_equipa(
         "utilizador": utilizador,
         "equipa": equipa,
     })
+
+
+@router.get("/{equipa_id}/plantel/pdf")
+def exportar_pdf_plantel(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+
+    equipa = _carregar_equipa_detalhe(equipa_id, db)
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    atletas = []
+    idades = []
+    for jogador in equipa.jogadores:
+        if not jogador.ativo:
+            continue
+        idade = _calcular_idade(jogador.data_nascimento)
+        if idade is not None:
+            idades.append(idade)
+        registos = sorted(
+            jogador.registos_antropometricos or [],
+            key=lambda item: item.data,
+            reverse=True,
+        )
+        caminho_foto = caminho_fotografia(jogador.fotografia)
+        atletas.append({
+            "jogador": jogador,
+            "idade": idade,
+            "altura": registos[0].altura if registos else None,
+            "fotografia": imagem_estatica_data_uri(caminho_foto, "image/jpeg") if caminho_foto else None,
+        })
+
+    nome_treinador = equipa.treinadores[0].nome if equipa.treinadores else utilizador.nome
+    pdf = renderizar_pdf(request, "equipas/plantel_pdf.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "atletas": atletas,
+        "media_idades": round(sum(idades) / len(idades), 1) if idades else None,
+        "idades_registadas": len(idades),
+        "nome_treinador": nome_treinador,
+    })
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": content_disposition_pdf(f"Plantel {equipa.nome}")},
+    )
 
 
 @router.get("/{equipa_id}/editar", response_class=HTMLResponse)
