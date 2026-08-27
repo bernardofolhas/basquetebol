@@ -896,6 +896,117 @@ def eliminar_conteudo_mapa_anual(
     return JSONResponse({"sucesso": True, "mensagem": "Conteúdo eliminado deste mapa."})
 
 
+@router.post("/anuais/{anual_id}/mapa-conteudos/conteudos/{conteudo_id}/editar")
+async def editar_conteudo_mapa_anual(
+    anual_id: int,
+    conteudo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Edita uma linha sem alterar conteúdos partilhados por outras equipas."""
+    _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_anual(db, anual_id), db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.id == anual_id,
+    ).first()
+    if not planeamento:
+        return JSONResponse({"sucesso": False, "erro": "O planeamento anual já não existe."}, status_code=404)
+
+    try:
+        payload = await request.json()
+    except ValueError:
+        return JSONResponse({"sucesso": False, "erro": "Os dados enviados não são válidos."}, status_code=400)
+
+    nome = str(payload.get("nome", "")).strip() if isinstance(payload, dict) else ""
+    area = str(payload.get("area", "")).strip() if isinstance(payload, dict) else ""
+    subarea = str(payload.get("subarea", "")).strip() if isinstance(payload, dict) else ""
+    areas_ordem = dict(AREAS_MAPA)
+    if area not in areas_ordem:
+        return JSONResponse({"sucesso": False, "erro": "Seleciona uma área válida."}, status_code=422)
+    if not nome or len(nome) > 180:
+        return JSONResponse({"sucesso": False, "erro": "Indica um conteúdo com até 180 caracteres."}, status_code=422)
+    if len(subarea) > 100:
+        return JSONResponse({"sucesso": False, "erro": "A subárea pode ter até 100 caracteres."}, status_code=422)
+
+    mapa = construir_mapa_conteudos(db, planeamento)
+    if conteudo_id not in mapa["conteudo_ids"]:
+        return JSONResponse({"sucesso": False, "erro": "O conteúdo já não está disponível neste mapa."}, status_code=404)
+    conteudo = db.query(ConteudoMapaAnual).filter(
+        ConteudoMapaAnual.id == conteudo_id,
+        ConteudoMapaAnual.clube_id == planeamento.clube_id,
+    ).first()
+    if not conteudo:
+        return JSONResponse({"sucesso": False, "erro": "O conteúdo já não existe."}, status_code=404)
+
+    conteudos_visiveis = db.query(ConteudoMapaAnual).filter(
+        ConteudoMapaAnual.id.in_(mapa["conteudo_ids"]),
+    ).all()
+    if any(item.id != conteudo.id and item.nome.casefold() == nome.casefold() for item in conteudos_visiveis):
+        return JSONResponse({"sucesso": False, "erro": "Esse conteúdo já existe neste mapa."}, status_code=409)
+
+    subarea_normalizada = subarea or None
+    existentes_area = db.query(ConteudoMapaAnual).filter(
+        ConteudoMapaAnual.clube_id == planeamento.clube_id,
+        ConteudoMapaAnual.area == area,
+        ConteudoMapaAnual.ativo.is_(True),
+    ).all()
+    mesma_subarea = (conteudo.subarea or "").casefold() == (subarea_normalizada or "").casefold()
+    if mesma_subarea:
+        ordem_subarea = conteudo.ordem_subarea
+    elif subarea_normalizada:
+        subarea_existente = next(
+            (item for item in existentes_area if (item.subarea or "").casefold() == subarea_normalizada.casefold()),
+            None,
+        )
+        ordem_subarea = subarea_existente.ordem_subarea if subarea_existente else max(
+            (item.ordem_subarea for item in existentes_area), default=0,
+        ) + 10
+    else:
+        ordem_subarea = 0
+    mesma_posicao = conteudo.area == area and mesma_subarea
+    ordem = conteudo.ordem if mesma_posicao else max(
+        (item.ordem for item in existentes_area if (item.subarea or "").casefold() == (subarea_normalizada or "").casefold()),
+        default=0,
+    ) + 10
+
+    if conteudo.planeamento_anual_id == planeamento.id:
+        conteudo.area = area
+        conteudo.subarea = subarea_normalizada
+        conteudo.nome = nome
+        conteudo.ordem_area = areas_ordem[area]
+        conteudo.ordem_subarea = ordem_subarea
+        conteudo.ordem = ordem
+    else:
+        # O catálogo do clube é partilhado. Criamos uma cópia só neste anual
+        # e transferimos as prioridades, para nunca alterar outro planeamento.
+        novo_conteudo = ConteudoMapaAnual(
+            clube_id=planeamento.clube_id,
+            planeamento_anual_id=planeamento.id,
+            codigo=f"personalizado-{planeamento.id}-{uuid4().hex[:12]}",
+            area=area,
+            subarea=subarea_normalizada,
+            nome=nome,
+            ordem_area=areas_ordem[area],
+            ordem_subarea=ordem_subarea,
+            ordem=ordem,
+            ativo=True,
+        )
+        db.add(novo_conteudo)
+        db.flush()
+        db.query(PrioridadeConteudoMapaAnual).filter(
+            PrioridadeConteudoMapaAnual.planeamento_anual_id == planeamento.id,
+            PrioridadeConteudoMapaAnual.conteudo_id == conteudo.id,
+        ).update({"conteudo_id": novo_conteudo.id}, synchronize_session=False)
+        db.add(ConteudoMapaAnualOculto(
+            clube_id=planeamento.clube_id,
+            planeamento_anual_id=planeamento.id,
+            conteudo_id=conteudo.id,
+        ))
+
+    db.commit()
+    return JSONResponse({"sucesso": True, "mensagem": "Conteúdo atualizado."})
+
+
 @router.get("/anuais/{anual_id}/mapa-conteudos/pdf")
 def exportar_mapa_conteudos_anual_pdf(
     anual_id: int,

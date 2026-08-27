@@ -101,6 +101,10 @@
         var formulario = mapa.querySelector("[data-content-form]");
         var estadoDialogo = mapa.querySelector("[data-content-status]");
         var botaoAdicionar = mapa.querySelector("[data-mapa-add]");
+        var tituloDialogo = mapa.querySelector("[data-content-dialog-title]");
+        var kickerDialogo = mapa.querySelector("[data-content-dialog-kicker]");
+        var botaoSubmeter = mapa.querySelector("[data-content-submit]");
+        var urlEdicao = null;
 
         function podeAlterarEstrutura() {
             if (!alteracoes.size) return true;
@@ -112,13 +116,41 @@
             if (dialogo && dialogo.open) dialogo.close();
         }
 
+        function prepararDialogoCriacao() {
+            urlEdicao = null;
+            estadoDialogo.textContent = "";
+            formulario.reset();
+            kickerDialogo.textContent = "Nova linha";
+            tituloDialogo.textContent = "Acrescentar conteúdo";
+            botaoSubmeter.textContent = "Acrescentar";
+        }
+
+        function prepararDialogoEdicao(botao) {
+            urlEdicao = botao.dataset.editUrl;
+            estadoDialogo.textContent = "";
+            formulario.reset();
+            formulario.elements.area.value = botao.dataset.contentArea || "";
+            formulario.elements.subarea.value = botao.dataset.contentSubarea || "";
+            formulario.elements.nome.value = botao.dataset.contentName || "";
+            kickerDialogo.textContent = "Conteúdo existente";
+            tituloDialogo.textContent = "Editar conteúdo";
+            botaoSubmeter.textContent = "Guardar alterações";
+        }
+
         if (botaoAdicionar && dialogo && formulario) {
             botaoAdicionar.addEventListener("click", function () {
                 if (!podeAlterarEstrutura()) return;
-                estadoDialogo.textContent = "";
-                formulario.reset();
+                prepararDialogoCriacao();
                 dialogo.showModal();
                 window.setTimeout(function () { formulario.elements.area.focus(); }, 0);
+            });
+            mapa.querySelectorAll("[data-edit-content]").forEach(function (botao) {
+                botao.addEventListener("click", function () {
+                    if (!podeAlterarEstrutura()) return;
+                    prepararDialogoEdicao(botao);
+                    dialogo.showModal();
+                    window.setTimeout(function () { formulario.elements.nome.focus(); }, 0);
+                });
             });
             mapa.querySelectorAll("[data-content-cancel]").forEach(function (botao) {
                 botao.addEventListener("click", fecharDialogo);
@@ -129,11 +161,11 @@
             formulario.addEventListener("submit", async function (event) {
                 event.preventDefault();
                 var botao = formulario.querySelector('[type="submit"]');
-                estadoDialogo.textContent = "A acrescentar...";
+                estadoDialogo.textContent = urlEdicao ? "A guardar..." : "A acrescentar...";
                 botao.disabled = true;
                 try {
                     var dadosFormulario = new FormData(formulario);
-                    var resultado = await enviarJson(mapa.dataset.createUrl, {
+                    var resultado = await enviarJson(urlEdicao || mapa.dataset.createUrl, {
                         area: dadosFormulario.get("area"),
                         subarea: dadosFormulario.get("subarea"),
                         nome: dadosFormulario.get("nome")

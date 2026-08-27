@@ -123,7 +123,7 @@
                         <tr class="mapa-content-row {{ classe_area }}">
                             {% if primeira_subarea and loop.first %}<th rowspan="{{ area.total_linhas }}" class="mapa-sticky mapa-area-cell">{{ area.nome }}</th>{% endif %}
                             {% if loop.first %}<th rowspan="{{ subarea.total_linhas }}" class="mapa-sticky mapa-subarea-cell">{{ subarea.nome or 'Conteúdos' }}</th>{% endif %}
-                            <th class="mapa-sticky mapa-content-cell"><span>{{ conteudo.nome }}</span><button type="button" class="mapa-delete-content" data-delete-content data-content-name="{{ conteudo.nome|e }}" data-delete-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/conteudos/{{ conteudo.id }}/eliminar" aria-label="Eliminar {{ conteudo.nome }}" title="Eliminar conteúdo">×</button></th>
+                            <th class="mapa-sticky mapa-content-cell"><span>{{ conteudo.nome }}</span><span class="mapa-content-actions"><button type="button" class="mapa-edit-content" data-edit-content data-content-id="{{ conteudo.id }}" data-content-name="{{ conteudo.nome|e }}" data-content-area="{{ conteudo.area|e }}" data-content-subarea="{{ conteudo.subarea or ''|e }}" data-edit-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/conteudos/{{ conteudo.id }}/editar" aria-label="Editar {{ conteudo.nome }}" title="Editar conteúdo">✎</button><button type="button" class="mapa-delete-content" data-delete-content data-content-name="{{ conteudo.nome|e }}" data-delete-url="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/conteudos/{{ conteudo.id }}/eliminar" aria-label="Eliminar {{ conteudo.nome }}" title="Eliminar conteúdo">×</button></span></th>
                             {% for semana in mapa_conteudos.semanas %}
                             {% set valor = mapa_conteudos.prioridades.get(conteudo.id, {}).get(semana.chave) %}
                             <td class="mapa-priority-cell">
@@ -140,14 +140,14 @@
             <dialog class="mapa-content-dialog" data-content-dialog>
                 <form method="dialog" class="mapa-content-form" data-content-form>
                     <header>
-                        <div><p class="mapa-conteudos-kicker">Nova linha</p><h3>Acrescentar conteúdo</h3></div>
+                        <div><p class="mapa-conteudos-kicker" data-content-dialog-kicker>Nova linha</p><h3 data-content-dialog-title>Acrescentar conteúdo</h3></div>
                         <button type="button" class="mapa-dialog-close" data-content-cancel aria-label="Fechar">×</button>
                     </header>
                     <label>Área<select name="area" required>{% for area in mapa_conteudos.areas_disponiveis %}<option value="{{ area }}">{{ area }}</option>{% endfor %}</select></label>
                     <label>Subárea <span>(opcional)</span><input name="subarea" maxlength="100" placeholder="Ex.: Coletiva ofensiva"></label>
                     <label>Conteúdo<input name="nome" maxlength="180" required placeholder="Ex.: Transição ofensiva"></label>
                     <p class="mapa-dialog-status" data-content-status role="status" aria-live="polite"></p>
-                    <footer><button type="button" class="mapa-secondary-button" data-content-cancel>Cancelar</button><button type="submit" class="mapa-save-button">Acrescentar</button></footer>
+                    <footer><button type="button" class="mapa-secondary-button" data-content-cancel>Cancelar</button><button type="submit" class="mapa-save-button" data-content-submit>Acrescentar</button></footer>
                 </form>
             </dialog>
         </section>

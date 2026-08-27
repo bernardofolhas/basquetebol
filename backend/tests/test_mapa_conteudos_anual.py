@@ -230,6 +230,37 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         assert conteudo_personalizado.planeamento_anual_id == anual.id
         assert "Ataque contra zona" in cliente.get(f"/planeamento/anuais/{anual.id}").text
 
+        atualizada_personalizada = cliente.post(
+            f"/planeamento/anuais/{anual.id}/mapa-conteudos/conteudos/{conteudo_personalizado_id}/editar",
+            json={
+                "area": "Tática Ofensiva",
+                "subarea": "Coletiva ofensiva",
+                "nome": "Ataque contra zona 2-3",
+            },
+        )
+        assert atualizada_personalizada.status_code == 200
+        assert "Ataque contra zona 2-3" in cliente.get(f"/planeamento/anuais/{anual.id}").text
+
+        conteudo_partilhado = db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
+            ConteudoMapaAnual.clube_id == clube.id,
+            ConteudoMapaAnual.codigo == "tecnica-ofensiva-enquadramento",
+        ).one()
+        atualizada_partilhada = cliente.post(
+            f"/planeamento/anuais/{anual.id}/mapa-conteudos/conteudos/{conteudo_partilhado.id}/editar",
+            json={
+                "area": "Técnica Ofensiva",
+                "subarea": "",
+                "nome": "Enquadramento ofensivo",
+            },
+        )
+        assert atualizada_partilhada.status_code == 200
+        db.expire_all()
+        assert db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
+            ConteudoMapaAnual.id == conteudo_partilhado.id,
+            ConteudoMapaAnual.nome == "Enquadramento",
+        ).count() == 1
+        assert "Enquadramento ofensivo" in cliente.get(f"/planeamento/anuais/{anual.id}").text
+
         pdf = cliente.get(f"/planeamento/anuais/{anual.id}/mapa-conteudos/pdf")
         assert pdf.status_code == 200
         assert pdf.headers["content-type"].startswith("application/pdf")
