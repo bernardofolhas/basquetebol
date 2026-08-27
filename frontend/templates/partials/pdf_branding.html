@@ -37,6 +37,25 @@
         margin-top: 10px;
         padding-top: 5px;
     }
+    {% if pdf_filtros is defined and not pdf_filtros.observacoes %}
+    .pdf-observacoes, .observacoes, .reflexao, .reflexao-box, [class*="observacao"], [class*="reflexao"] { display: none !important; }
+    {% endif %}
+    {% if pdf_filtros is defined and not pdf_filtros.indicadores %}
+    .pdf-indicadores, .summary, .resumo, .stats, .stats-grid, .charts, [class*="indicador"], [class*="grafico"], [class*="chart"], [class*="stat-"] { display: none !important; }
+    {% endif %}
+    {% if pdf_filtros is defined and not pdf_filtros.imagens %}
+    .pdf-imagem, [class*="desenho"], [class*="tactical"], [class*="court"], [class*="foto"] { display: none !important; }
+    img:not(.pdf-brand-logo):not(.logo) { display: none !important; }
+    {% endif %}
+    {% if pdf_filtros is defined and 'treino' not in pdf_filtros.tipos %}
+    .treino, .fisico, [data-pdf-tipo="treino"] { display: none !important; }
+    {% endif %}
+    {% if pdf_filtros is defined and 'jogo' not in pdf_filtros.tipos %}
+    .jogo, .jogo-casa, .jogo-fora, [data-pdf-tipo="jogo"] { display: none !important; }
+    {% endif %}
+    {% if pdf_filtros is defined and 'atividade' not in pdf_filtros.tipos %}
+    .atividade, [data-pdf-tipo="atividade"] { display: none !important; }
+    {% endif %}
 </style>
 {% endmacro %}
 

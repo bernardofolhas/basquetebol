@@ -11,6 +11,7 @@ from template_config import Jinja2Templates
 from paths import STATIC_DIR, TEMPLATES_DIR
 from services.desenho_service import imagem_estatica_data_uri
 from services.identidade_clube_service import CORES_PADRAO, caminho_ficheiro_logo
+from services.pdf_filtros_service import obter_filtros_pdf
 
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -62,6 +63,7 @@ def preparar_contexto_pdf(request, contexto: dict | None = None, identidade: dic
     resultado.setdefault("data_exportacao", date.today())
     if "nome_treinador" in resultado:
         resultado["nome_treinador"] = nome_curto_pessoa(resultado["nome_treinador"])
+    resultado["pdf_filtros"] = obter_filtros_pdf(request)
     resultado["request"] = request
     return resultado
 

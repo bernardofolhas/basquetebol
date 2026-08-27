@@ -126,8 +126,8 @@
     <div class="contexto">
         <div><span class="equipa">{{ equipa.nome }}</span> · {{ pagina.jogos|length }} jogo(s)</div>
         <div class="legenda">
-            <span class="legenda-item"><i class="amostra casa"></i> Jogo em casa</span>
-            <span class="legenda-item"><i class="amostra fora"></i> Jogo fora</span>
+            {% if pdf_filtros.casa %}<span class="legenda-item"><i class="amostra casa"></i> Jogo em casa</span>{% endif %}
+            {% if pdf_filtros.fora %}<span class="legenda-item"><i class="amostra fora"></i> Jogo fora</span>{% endif %}
             <span>J = número cronológico do jogo</span>
         </div>
     </div>

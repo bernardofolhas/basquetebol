@@ -16,6 +16,7 @@ from paths import TEMPLATES_DIR
 from services.agenda_service import tipos_agenda_formulario
 from services.planeamento_integrado_service import apresentar_treinos_por_perfil, obter_dashboard_planeamento_intervalo
 from services.pdf_service import renderizar_pdf
+from services.pdf_filtros_service import filtrar_itens_agenda, obter_filtros_pdf
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -164,6 +165,25 @@ def exportar_pdf_calendario_global(
 ):
     """Exporta a agenda operacional integrada numa tabela A4 legível."""
     contexto = _obter_contexto_calendario(request, db, utilizador)
+    filtros = obter_filtros_pdf(request)
+    contexto["itens"] = filtrar_itens_agenda(contexto["itens"], filtros)
+    contexto["itens_administrativos"] = [
+        item for item in contexto["itens"] if item["categoria"] not in {"treino", "jogo"}
+    ]
+    itens_por_data: dict[date, list] = {}
+    for item in contexto["itens"]:
+        itens_por_data.setdefault(item["data"], []).append(item)
+    contexto["itens_por_data"] = itens_por_data
+    for mes in contexto["meses_calendario"]:
+        for semana in mes["semanas"]:
+            for dia in semana:
+                dia["itens"] = itens_por_data.get(dia["data"], [])
+    contexto["estatisticas"] = {
+        "total": len(contexto["itens"]),
+        "treinos": sum(item["categoria"] in {"treino", "fisico"} for item in contexto["itens"]),
+        "jogos": sum(item["categoria"] == "jogo" for item in contexto["itens"]),
+        "atividades": sum(item["categoria"] not in {"treino", "fisico", "jogo"} for item in contexto["itens"]),
+    }
     pdf_bytes = renderizar_pdf(request, "calendario_pdf.html", contexto)
     return Response(
         content=pdf_bytes,

@@ -1,0 +1,30 @@
+<dialog id="pdf-configurador" class="pdf-configurador" aria-labelledby="pdf-configurador-titulo">
+  <form method="dialog" class="pdf-configurador-card">
+    <div class="pdf-configurador-topo">
+      <div><span class="pdf-configurador-kicker">EXPORTAÇÃO</span><h2 id="pdf-configurador-titulo">Personalizar PDF</h2><p>Escolhe apenas a informação que queres incluir.</p></div>
+      <button type="button" class="pdf-configurador-fechar" data-pdf-fechar aria-label="Fechar">&times;</button>
+    </div>
+    <fieldset data-pdf-grupo="calendario" hidden>
+      <legend>Conteúdo do calendário</legend>
+      <label><input type="checkbox" name="pdf_tipo" value="treino" checked><span><b>Treinos</b><small>Treinos normais e físicos</small></span></label>
+      <label><input type="checkbox" name="pdf_tipo" value="jogo" checked><span><b>Jogos</b><small>Jogos em casa e fora</small></span></label>
+      <label><input type="checkbox" name="pdf_tipo" value="atividade" checked><span><b>Atividades</b><small>Eventos e restantes tarefas</small></span></label>
+    </fieldset>
+    <fieldset data-pdf-grupo="jogos" hidden>
+      <legend>Jogos a incluir</legend>
+      <div class="pdf-configurador-linha">
+        <label><input type="checkbox" name="pdf_casa" checked><span><b>Em casa</b><small>Equipa visitada</small></span></label>
+        <label><input type="checkbox" name="pdf_fora" checked><span><b>Fora</b><small>Equipa visitante</small></span></label>
+      </div>
+      <label class="pdf-configurador-campo"><span>Competição (opcional)</span><input type="text" name="pdf_competicao" placeholder="Ex.: Amigável"><small>Deixa vazio para incluir todas.</small></label>
+    </fieldset>
+    <fieldset data-pdf-grupo="opcoes">
+      <legend>Detalhe do documento</legend>
+      <label><input type="checkbox" name="pdf_observacoes" checked><span><b>Observações e reflexão</b><small>Notas e texto de análise</small></span></label>
+      <label><input type="checkbox" name="pdf_indicadores" checked><span><b>Indicadores e gráficos</b><small>Resumos, totais e balanços</small></span></label>
+      <label><input type="checkbox" name="pdf_imagens" checked><span><b>Imagens e anexos</b><small>Fotografias e desenhos táticos</small></span></label>
+    </fieldset>
+    <p class="pdf-configurador-erro" data-pdf-erro hidden>Seleciona pelo menos uma opção de conteúdo.</p>
+    <div class="pdf-configurador-acoes"><button type="button" class="ds-button ds-button-secondary" data-pdf-fechar>Cancelar</button><button type="button" class="ds-button ds-button-primary" data-pdf-exportar>Exportar PDF</button></div>
+  </form>
+</dialog>

@@ -15,6 +15,7 @@ from models.jogo import Convocado, Jogo, PlanoJogo
 from paths import TEMPLATES_DIR
 from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.pdf_service import content_disposition_pdf, renderizar_pdf
+from services.pdf_filtros_service import filtrar_jogos, obter_filtros_pdf
 from services.jogos_service import (
     formatar_confronto,
     preparar_epocas_calendario_jogos,
@@ -100,6 +101,7 @@ def exportar_pdf_calendario_equipa(
     if not equipa:
         return RedirectResponse(url="/equipas")
     jogos = db.query(Jogo).filter(Jogo.equipa_id == equipa_id).order_by(Jogo.data, Jogo.hora).all()
+    jogos = filtrar_jogos(jogos, obter_filtros_pdf(request))
     nome_clube = _nome_clube_pedido(request, equipa)
     identidade = getattr(request.state, "identidade_clube", {}) or {}
     epocas_calendario = preparar_epocas_calendario_jogos(

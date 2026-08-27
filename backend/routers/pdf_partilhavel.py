@@ -12,6 +12,7 @@ from models.planeamento import Macrociclo, Mesociclo, Microciclo
 from models.planeamento_clube import PlaneamentoClubeAnual, PlanoSemanalClube
 from services.pdf_partilhavel_service import preparar_calendario_intervalo_partilhavel
 from services.pdf_service import content_disposition_pdf, renderizar_pdf
+from services.pdf_filtros_service import filtrar_itens_agenda, filtrar_jogos, obter_filtros_pdf
 from services.jogos_service import formatar_confronto, preparar_linhas_calendario_jogos
 
 
@@ -30,15 +31,17 @@ def _responder(request, db, utilizador, *, titulo, data_inicio, data_fim, nome, 
     agenda = preparar_calendario_intervalo_partilhavel(
         db, data_inicio, data_fim, equipa_ids=equipa_ids or []
     )
+    filtros = obter_filtros_pdf(request)
+    agenda["itens"] = filtrar_itens_agenda(agenda["itens"], filtros)
     if categorias:
         agenda["itens"] = [item for item in agenda["itens"] if item.get("categoria") in categorias]
-        itens_por_data = {}
-        for item in agenda["itens"]:
-            itens_por_data.setdefault(item["data"], []).append(item)
-        for semana in agenda["semanas_intervalo"]:
-            for dia in semana:
-                if dia:
-                    dia["itens"] = itens_por_data.get(dia["data"], [])
+    itens_por_data = {}
+    for item in agenda["itens"]:
+        itens_por_data.setdefault(item["data"], []).append(item)
+    for semana in agenda["semanas_intervalo"]:
+        for dia in semana:
+            if dia:
+                dia["itens"] = itens_por_data.get(dia["data"], [])
     nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
     if not nome_treinador and equipa and equipa.treinadores:
         nome_treinador = equipa.treinadores[0].nome
@@ -84,6 +87,7 @@ def jogos_partilhaveis(equipa_id: int, request: Request, inicio: date | None = N
     if fim:
         consulta = consulta.filter(Jogo.data <= fim)
     jogos = consulta.order_by(Jogo.data, Jogo.hora, Jogo.id).all()
+    jogos = filtrar_jogos(jogos, obter_filtros_pdf(request))
     data_inicio = inicio or (jogos[0].data if jogos else None)
     data_fim = fim or (jogos[-1].data if jogos else None)
     nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
