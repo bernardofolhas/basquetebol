@@ -1,6 +1,9 @@
 """Helpers comuns para exportações PDF com a identidade do clube."""
 
 from datetime import date
+import re
+import unicodedata
+from urllib.parse import quote
 
 import weasyprint
 from template_config import Jinja2Templates
@@ -11,6 +14,21 @@ from services.identidade_clube_service import CORES_PADRAO, caminho_ficheiro_log
 
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def content_disposition_pdf(nome: str) -> str:
+    """Cria um nome de download legivel, seguro e compativel com acentos."""
+    nome_limpo = re.sub(r'[\r\n"\\/]+', " ", (nome or "Documento").strip())
+    nome_limpo = re.sub(r"\s+", " ", nome_limpo)
+    if not nome_limpo.lower().endswith(".pdf"):
+        nome_limpo += ".pdf"
+
+    nome_ascii = (
+        unicodedata.normalize("NFKD", nome_limpo)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    ) or "Documento.pdf"
+    return f"attachment; filename=\"{nome_ascii}\"; filename*=UTF-8''{quote(nome_limpo)}"
 
 
 def nome_curto_pessoa(nome: str | None) -> str:

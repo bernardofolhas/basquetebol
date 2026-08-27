@@ -36,7 +36,7 @@ from services.mapa_conteudos_service import (
     obter_sugestoes_conteudos_microciclo,
     sincronizar_prioridades_com_microciclos,
 )
-from services.pdf_service import renderizar_pdf
+from services.pdf_service import content_disposition_pdf, renderizar_pdf
 from services.sincronizacao_ui import preparar_sessoes_para_ui, sessao_corresponde_filtro
 
 # Importamos os modelos que vamos precisar
@@ -1385,11 +1385,10 @@ def exportar_pdf_macrociclo(
         "objetivos_por_categoria": objetivos_por_categoria(macrociclo),
         "hoje": date.today(),
     })
-    nome = f"macrociclo_{macrociclo.numero}_{macrociclo.equipa.nome}_{macrociclo.data_inicio}.pdf".replace(" ", "_")
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={nome}"},
+        headers={"Content-Disposition": content_disposition_pdf(f"Macrociclo {macrociclo.numero}")},
     )
 
 
@@ -1719,12 +1718,10 @@ def exportar_pdf_mesociclo(meso_id: int, request: Request, db: Session = Depends
         "hoje": date.today(),
     })
 
-    nome = f"mesociclo_{mesociclo.numero}_{equipa.nome}_{mesociclo.data_inicio}.pdf"
-    nome_safe = nome.replace(" ", "_")
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={nome_safe}"},
+        headers={"Content-Disposition": content_disposition_pdf(f"Mesociclo {mesociclo.numero}")},
     )
 
 
@@ -2544,11 +2541,10 @@ def exportar_pdf_calendario_microciclo(
         "hoje": date.today(),
     })
 
-    nome = f"calendario_microciclo_{microciclo.numero}_{equipa.nome}.pdf".replace(" ", "_")
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={nome}"},
+        headers={"Content-Disposition": content_disposition_pdf(f"Microciclo {microciclo.numero}")},
     )
 
 
@@ -2607,11 +2603,10 @@ def exportar_pdf_microciclo(
         "hoje": date.today(),
     })
 
-    nome = f"microciclo_{microciclo.numero}_{equipa.nome}_{microciclo.data_inicio}.pdf".replace(" ", "_")
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={nome}"},
+        headers={"Content-Disposition": content_disposition_pdf(f"Microciclo {microciclo.numero}")},
     )
 
 # ─────────────────────────────────────────

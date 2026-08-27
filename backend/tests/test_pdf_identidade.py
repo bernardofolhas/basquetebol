@@ -40,3 +40,11 @@ def test_contexto_pdf_abrevia_nome_do_treinador_no_rodape():
     assert contexto["nome_treinador"] == "Bernardo Folhas"
     assert pdf_service.nome_curto_pessoa("Bernardo Folhas") == "Bernardo Folhas"
     assert pdf_service.nome_curto_pessoa("Bernardo") == "Bernardo"
+
+
+def test_content_disposition_pdf_usa_nome_simples_e_preserva_acentos():
+    cabecalho = pdf_service.content_disposition_pdf("Treino físico 2")
+
+    assert 'filename="Treino fisico 2.pdf"' in cabecalho
+    assert "filename*=UTF-8''Treino%20f%C3%ADsico%202.pdf" in cabecalho
+    assert pdf_service.content_disposition_pdf("Microciclo 1").endswith("Microciclo%201.pdf")

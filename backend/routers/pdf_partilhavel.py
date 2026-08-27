@@ -11,7 +11,7 @@ from models.jogo import Jogo
 from models.planeamento import Macrociclo, Mesociclo, Microciclo
 from models.planeamento_clube import PlaneamentoClubeAnual, PlanoSemanalClube
 from services.pdf_partilhavel_service import preparar_calendario_intervalo_partilhavel
-from services.pdf_service import renderizar_pdf
+from services.pdf_service import content_disposition_pdf, renderizar_pdf
 from services.jogos_service import formatar_confronto, preparar_linhas_calendario_jogos
 
 
@@ -50,7 +50,7 @@ def _responder(request, db, utilizador, *, titulo, data_inicio, data_fim, nome, 
         "nome_treinador": nome_treinador or utilizador.nome,
         "hoje": date.today(),
     })
-    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nome}"})
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": content_disposition_pdf(nome)})
 
 
 @router.get("/calendario/pdf")
@@ -129,7 +129,7 @@ def macro_partilhavel(macro_id: int, request: Request, db: Session = Depends(get
     if not macro:
         return RedirectResponse("/equipas", status_code=303)
     verificar_ou_negar_equipa(utilizador, macro.equipa_id, db)
-    return _responder(request, db, utilizador, titulo=f"Macrociclo {macro.numero} · calendário", data_inicio=macro.data_inicio, data_fim=macro.data_fim, nome=f"macrociclo_{macro.id}_partilhavel.pdf", equipa=macro.equipa, equipa_ids=[macro.equipa_id])
+    return _responder(request, db, utilizador, titulo=f"Macrociclo {macro.numero} · calendário", data_inicio=macro.data_inicio, data_fim=macro.data_fim, nome=f"Macrociclo {macro.numero}", equipa=macro.equipa, equipa_ids=[macro.equipa_id])
 
 
 @router.get("/mesociclos/{meso_id}/pdf")
@@ -144,7 +144,7 @@ def meso_partilhavel(meso_id: int, request: Request, db: Session = Depends(get_d
         titulo=f"Mesociclo {meso.numero} · calendário",
         data_inicio=meso.data_inicio,
         data_fim=meso.data_fim,
-        nome=f"mesociclo_{meso.id}_partilhavel.pdf",
+        nome=f"Mesociclo {meso.numero}",
         equipa=equipa,
         equipa_ids=[equipa.id],
     )
@@ -162,7 +162,7 @@ def micro_partilhavel(micro_id: int, request: Request, db: Session = Depends(get
         titulo=f"Microciclo {micro.numero} - Agenda semanal",
         data_inicio=micro.data_inicio,
         data_fim=micro.data_fim,
-        nome=f"microciclo_{micro.id}_partilhavel.pdf",
+        nome=f"Microciclo {micro.numero}",
         equipa=equipa,
         equipa_ids=[equipa.id],
         template="planeamento/microciclos/partilhavel_pdf.html",

@@ -49,7 +49,7 @@ from services.importacao_plano_treino_service import (
     validar_ficheiro,
 )
 from services.numeracao_planeamento_service import renumerar_treinos_equipa
-from services.pdf_service import renderizar_pdf
+from services.pdf_service import content_disposition_pdf, renderizar_pdf
 from services.planeamento_semanal_administrativo_service import obter_previsao_equipa, validar_local_sessao
 from services.remocao_sessoes_service import eliminar_sessoes_treino
 from services.sessao_workflow import (
@@ -1547,9 +1547,10 @@ def exportar_pdf_plano(sessao_id: int, request: Request, db: Session = Depends(g
     contexto_pdf["modo_pdf"] = True
     pdf = renderizar_pdf(request, "treino/plano_print.html", contexto_pdf)
 
-    nome = f"plano_treino_{equipa.nome}_{sessao.data}.pdf"
+    tipo_treino = "Treino físico" if (getattr(sessao, "tipo_treino", None) or "normal") == "fisico" else "Treino"
+    nome = f"{tipo_treino} {sessao.numero_treino}" if sessao.numero_treino is not None else tipo_treino
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={nome}"}
+        headers={"Content-Disposition": content_disposition_pdf(nome)}
     )
