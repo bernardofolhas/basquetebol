@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% set identidade = request.state.identidade_clube|default({}, true) %}
     <title>Acesso — Plataforma de Basquetebol</title>
-    {% if identidade.logo_principal %}<link rel="icon" href="{{ identidade.logo_principal }}"><link rel="apple-touch-icon" href="{{ identidade.logo_principal }}">{% else %}<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23334155'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial' font-size='28' font-weight='700' fill='white'%3EB%3C/text%3E%3C/svg%3E">{% endif %}
+    <link rel="icon" href="/static/img/favicon-plataforma.svg">
+    <link rel="apple-touch-icon" href="/static/img/favicon-plataforma.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

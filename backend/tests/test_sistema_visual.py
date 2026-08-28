@@ -143,6 +143,7 @@ def test_equipa_abre_explicitamente_no_resumo_e_base_usa_logo_como_icone():
 
     assert '/equipas/{{ item.equipa.id }}/resumo' in dashboard
     assert '<link rel="icon" href="{{ identidade.logo_principal }}">' in base
+    assert '/static/img/favicon-plataforma.svg' in base
     assert "scrollbar-gutter:auto" in (
         TEMPLATES_DIR.parent / "static" / "css" / "design-system.css"
     ).read_text(encoding="utf-8")
@@ -155,3 +156,5 @@ def test_login_mantem_recuperacao_e_melhora_utilizacao():
     assert 'href="/recuperar-password"' in conteudo
     assert 'id="mostrar-password"' in conteudo
     assert 'autocomplete="current-password"' in conteudo
+    assert '/static/img/favicon-plataforma.svg' in conteudo
+    assert 'identidade.logo_principal' not in conteudo
