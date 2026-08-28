@@ -90,7 +90,7 @@
           </div>
           {% elif nav.equipas|default([]) %}
           <p class="ds-dropdown-title">Planeamento das equipas</p>
-          <div class="ds-team-switcher p-2">{% for item in nav.equipas %}<a href="/planeamento/equipas/{{ item.id }}/anuais"><span class="ds-team-dot"></span><span class="truncate">{{ item.nome }}</span></a>{% endfor %}</div>
+          <div class="ds-team-switcher p-2">{% for item in nav.equipas %}<a href="/equipas/{{ item.id }}/resumo"><span class="ds-team-dot"></span><span class="truncate">{{ item.nome }}</span></a>{% endfor %}</div>
           {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
           <div class="ds-dropdown-section">
