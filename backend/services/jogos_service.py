@@ -17,6 +17,7 @@ MESES_EPOCA = (
     (5, "Maio"),
     (6, "Junho"),
 )
+DIAS_SEMANA_ABREVIADOS = ("2ª", "3ª", "4ª", "5ª", "6ª", "S", "D")
 
 
 def formatar_confronto(nome_clube: str | None, adversario: str | None, em_casa: bool) -> str:
@@ -100,6 +101,7 @@ def preparar_epocas_calendario_jogos(
                 dias.append({
                     "valido": True,
                     "numero": numero_dia,
+                    "dia_semana": DIAS_SEMANA_ABREVIADOS[data_dia.weekday()],
                     "jogos": jogos_por_data.get(data_dia, []),
                     "fim_semana": data_dia.weekday() >= 5,
                 })

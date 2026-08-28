@@ -63,12 +63,22 @@
         .calendario td.fim-semana { background: #f1f5f9; }
         .calendario td.invalido { background: #e2e8f0; }
         .dia { display: flex; height: 7.2mm; min-width: 0; }
+        .dia-semana {
+            align-items: center;
+            border-right: 0.2mm solid #cbd5e1;
+            color: #64748b;
+            display: flex;
+            flex: 0 0 3.4mm;
+            font-size: 4.1pt;
+            font-weight: 800;
+            justify-content: center;
+        }
         .numero-dia {
             align-items: center;
             border-right: 0.2mm solid #cbd5e1;
             color: #475569;
             display: flex;
-            flex: 0 0 4.4mm;
+            flex: 0 0 3.8mm;
             font-size: 5.4pt;
             font-weight: 800;
             justify-content: center;
@@ -141,6 +151,7 @@
             <td class="{% if not dia.valido %}invalido{% elif dia.fim_semana %}fim-semana{% endif %}">
                 {% if dia.valido %}
                 <div class="dia">
+                    <span class="dia-semana">{{ dia.dia_semana }}</span>
                     <span class="numero-dia">{{ dia.numero }}</span>
                     <div class="jogos-dia {% if dia.jogos|length > 1 %}multiplos{% endif %}">
                         {% for entrada in dia.jogos %}{% set jogo = entrada.jogo %}
