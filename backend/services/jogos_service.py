@@ -101,7 +101,6 @@ def preparar_epocas_calendario_jogos(
                 dias.append({
                     "valido": True,
                     "numero": numero_dia,
-                    "dia_semana": DIAS_SEMANA_ABREVIADOS[data_dia.weekday()],
                     "jogos": jogos_por_data.get(data_dia, []),
                     "fim_semana": data_dia.weekday() >= 5,
                 })
@@ -112,5 +111,10 @@ def preparar_epocas_calendario_jogos(
             "epoca": f"{ano_inicio}/{ano_inicio + 1}",
             "meses": meses,
             "jogos": jogos_epoca,
+            # A coluna fixa à esquerda usa agosto como referência da semana.
+            "dias_semana_referencia": [
+                DIAS_SEMANA_ABREVIADOS[date(ano_inicio, 8, numero_dia).weekday()]
+                for numero_dia in range(1, 32)
+            ],
         })
     return epocas

@@ -80,7 +80,7 @@ def test_calendario_anual_distribui_jogos_pelos_meses_sem_colunas_por_equipa():
     janeiro = next(mes for mes in epocas[0]["meses"] if mes["nome"] == "Janeiro")
     assert setembro["dias"][4]["jogos"][0]["numero"] == 1
     assert setembro["dias"][4]["jogos"][0]["jogo"].adversario == "Clube A"
-    assert setembro["dias"][4]["dia_semana"] == "S"
+    assert epocas[0]["dias_semana_referencia"][0] == "S"
     assert janeiro["dias"][8]["jogos"][0]["numero"] == 2
 
 
@@ -91,7 +91,7 @@ def test_template_calendario_anual_de_jogos_e_a3_com_um_bloco_por_mes():
     assert "size: A3 landscape" in modelo
     assert '<table class="calendario">' in modelo
     assert "for mes in pagina.meses" in modelo
-    assert 'class="dia-semana"' in modelo
+    assert 'pagina.dias_semana_referencia[indice_dia]' in modelo
     assert "Jogo em casa" in modelo
     assert "Jogo fora" in modelo
 
