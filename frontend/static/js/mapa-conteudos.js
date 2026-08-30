@@ -214,8 +214,7 @@
                 atualizarEstado("A eliminar conteúdo...", "is-pending");
                 try {
                     var resultado = await enviarJson(botao.dataset.deleteUrl, {});
-                    window.sessionStorage.setItem(chaveMensagem, resultado.mensagem);
-                    window.location.reload();
+                    await atualizarMapaSemRecarregar(resultado.mensagem);
                 } catch (erro) {
                     botao.disabled = false;
                     atualizarEstado(erro.message, "is-error");
