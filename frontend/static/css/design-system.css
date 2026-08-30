@@ -165,7 +165,9 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
 
 /* Compatibility layer for legacy action controls while pages move to ds-button. */
 #conteudo-principal :is(a, button, input[type="submit"])[class*="bg-orange-"],
-#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-slate-900"] {
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-slate-900"],
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-gray-900"],
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-[var(--clube-primary"] {
     display:inline-flex;
     min-height:2.45rem;
     align-items:center;
@@ -182,7 +184,9 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
     transition:background-color .16s,border-color .16s,color .16s,box-shadow .16s,transform .16s;
 }
 #conteudo-principal :is(a, button, input[type="submit"])[class*="bg-orange-"]:hover,
-#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-slate-900"]:hover {
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-slate-900"]:hover,
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-gray-900"]:hover,
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-[var(--clube-primary"]:hover {
     background:var(--clube-primary-hover) !important;
     transform:translateY(-1px);
     box-shadow:0 5px 12px rgb(15 23 42 / .10);
@@ -241,6 +245,12 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
 #conteudo-principal :is(a, button, input[type="submit"]):focus-visible {
     outline:3px solid color-mix(in srgb,var(--clube-accent) 35%,transparent);
     outline-offset:2px;
+}
+/* Keep the final action of each form visually separate from its fields. */
+#conteudo-principal form > :is(.flex.justify-end, .flex.flex-wrap.justify-end, .flex.flex-col-reverse):last-child {
+    margin-top:1rem;
+    padding-top:1rem;
+    border-top:1px solid var(--border-subtle);
 }
 
 .ds-nav-active {

@@ -91,10 +91,10 @@
 
         <div class="mt-6 flex flex-wrap justify-end gap-2">
             <label id="agenda-escopo-wrap" class="mr-auto hidden text-sm text-slate-600">Aplicar a <select id="agenda-escopo" name="escopo_recorrencia" class="ml-1 rounded-lg border border-slate-200 px-2 py-1"><option value="ocorrencia">esta ocorrência</option><option value="futuro">esta e seguintes</option><option value="serie">toda a série</option></select></label>
-            <button type="button" id="agenda-apagar" onclick="apagarAgenda()" class="hidden rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Apagar</button>
-            <button type="button" id="agenda-duplicar" onclick="duplicarAgenda()" class="hidden rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Duplicar</button>
-            <button type="button" onclick="document.getElementById('agenda-modal').close()" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600">Cancelar</button>
-            <button id="agenda-submit" type="submit" class="ds-primary rounded-xl px-4 py-2 text-sm font-semibold">Criar atividade</button>
+            <button type="button" id="agenda-apagar" onclick="apagarAgenda()" class="ds-button ds-button-danger hidden">Apagar</button>
+            <button type="button" id="agenda-duplicar" onclick="duplicarAgenda()" class="ds-button ds-button-secondary hidden">Duplicar</button>
+            <button type="button" onclick="document.getElementById('agenda-modal').close()" class="ds-button ds-button-secondary">Cancelar</button>
+            <button id="agenda-submit" type="submit" class="ds-button ds-button-primary">Criar atividade</button>
         </div>
     </form>
 </dialog>

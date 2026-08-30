@@ -38,6 +38,6 @@
         </div>
         <label class="mt-4 block text-sm font-medium text-gray-700">Reflexão anual<textarea name="reflexao" rows="3" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5">{{ planeamento.reflexao if planeamento and planeamento.reflexao else '' }}</textarea></label>
     </section>
-    <div class="flex gap-3"><button class="rounded-xl bg-orange-500 px-5 py-2.5 font-medium text-white hover:bg-orange-600">{{ "Guardar alterações" if planeamento else "Criar planeamento anual" }}</button><a href="{{ '/planeamento/anuais/' ~ planeamento.id if planeamento else '/planeamento/equipas/' ~ equipa.id ~ '/anuais' }}" class="rounded-xl bg-gray-100 px-5 py-2.5 font-medium text-gray-700">Cancelar</a></div>
+    <div class="flex gap-3"><button class="ds-button ds-button-primary">{{ "Guardar alterações" if planeamento else "Criar planeamento anual" }}</button><a href="{{ '/planeamento/anuais/' ~ planeamento.id if planeamento else '/planeamento/equipas/' ~ equipa.id ~ '/anuais' }}" class="ds-button ds-button-secondary">Cancelar</a></div>
 </form>
 {% endblock %}
