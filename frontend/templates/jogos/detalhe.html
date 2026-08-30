@@ -36,6 +36,7 @@
     <div class="ds-workspace-tabs-list" role="tablist">
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resultado">Resultado</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="convocatoria">Convocatória</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="scouting">Scouting</button>
     </div>
 </nav>
 
@@ -150,6 +151,13 @@
             <button type="submit" class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100">Copiar convocatória</button>
         </form>
         {% endif %}
+    </div>
+
+    <div data-workspace-panel="jogo:scouting" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100" hidden>
+        <p class="ds-kicker">Preparação do jogo</p>
+        <h2 class="mt-1 text-xl font-extrabold text-slate-900">Scouting do adversário</h2>
+        <p class="mt-2 max-w-2xl text-sm text-slate-600">Reúne identidade, atletas-chave, ações, respostas, prioridades e a revisão pós-jogo no mesmo dossier.</p>
+        <div class="mt-5 flex flex-wrap gap-3"><a href="/scouting/jogos/{{ jogo.id }}" class="ds-button-primary">Abrir scouting</a><a href="/jogos/{{ jogo.id }}/plano" class="ds-button-secondary">Abrir plano de jogo</a></div>
     </div>
 
 </div>

@@ -44,6 +44,13 @@ class Jogo(Base):
         cascade="all, delete-orphan",
         single_parent=True,
     )
+    scouting = relationship(
+        "RelatorioScouting",
+        back_populates="jogo",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )
 
 
 class Convocado(Base):

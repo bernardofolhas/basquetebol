@@ -1,10 +1,12 @@
 """Contexto comum da navegação, sem lógica de apresentação nos templates."""
 
 from collections import OrderedDict
+from datetime import date
 
 from models.equipa import Equipa
 from models.utilizador import PerfilEnum
 from models.notificacao import Notificacao
+from models.jogo import Jogo
 from services.dashboard_service import obter_painel_operacional
 from services.notificacoes_service import obter_notificacoes_utilizador
 
@@ -125,6 +127,10 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
     return {
         "dashboard_url": "/dashboard",
         "equipas": [{"id": equipa.id, "nome": equipa.nome} for equipa in equipas],
+        "jogos_proximos": db.query(Jogo).filter(
+            Jogo.equipa_id.in_([equipa.id for equipa in equipas]),
+            Jogo.data >= date.today(),
+        ).order_by(Jogo.data, Jogo.hora).limit(6).all() if equipas else [],
         "pendencias": _agrupar_pendencias(tarefas),
         "total_pendencias": len(tarefas),
         "total_urgentes": sum(1 for tarefa in tarefas if tarefa.get("urgente")),

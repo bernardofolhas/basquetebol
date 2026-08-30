@@ -67,7 +67,22 @@
       <div class="ds-team-direct-nav" aria-label="Área da equipa">
         <a href="/equipas/{{ equipa_contexto_id }}/resumo" class="ds-header-trigger ds-team-direct-link ds-nav-order-resumo {% if p in ['/equipas/' ~ equipa_contexto_id, '/equipas/' ~ equipa_contexto_id ~ '/resumo'] %}is-active{% endif %}">Resumo</a>
         <a href="/fisico/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-fisico {% if p.startswith('/fisico') %}is-active{% endif %}">Físico</a>
-        <a href="/jogos/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-jogos {% if p.startswith('/jogos') %}is-active{% endif %}">Jogos</a>
+        <details class="ds-menu ds-primary-menu ds-team-direct-link ds-nav-order-jogos">
+          <summary class="ds-header-trigger {% if p.startswith('/jogos') or p.startswith('/scouting') %}is-active{% endif %}">Jogos <span class="ds-menu-chevron">⌄</span></summary>
+          <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
+            <p class="ds-dropdown-title">Jogos · {{ equipa_contexto_nome }}</p>
+            {{ menu_link('/jogos/equipas/' ~ equipa_contexto_id, 'Calendário de jogos', 'Jogos, resultados e convocatórias', p.startswith('/jogos/equipas/' ~ equipa_contexto_id)) }}
+            {% for jogo_nav in nav.jogos_proximos|default([]) if jogo_nav.equipa_id == equipa_contexto_id %}
+            <div class="ds-dropdown-section">
+              <p class="ds-dropdown-label px-2 pb-1">{{ jogo_nav.data|data_pt }} · {{ jogo_nav.adversario }}</p>
+              <div class="ds-menu-grid">
+                {{ menu_link('/jogos/' ~ jogo_nav.id ~ '/plano', 'Plano de jogo', 'Preparação e 5 inicial') }}
+                {{ menu_link('/scouting/jogos/' ~ jogo_nav.id, 'Scouting', 'Adversário e resposta') }}
+              </div>
+            </div>
+            {% else %}<p class="px-2 py-3 text-sm text-slate-500">Sem próximos jogos. O calendário mantém os planos dos jogos já registados.</p>{% endfor %}
+          </div>
+        </details>
         <a href="/assiduidade/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-assiduidade {% if p.startswith('/assiduidade') %}is-active{% endif %}">Assiduidade</a>
         <a href="/equipas/{{ equipa_contexto_id }}/plantel" class="ds-header-trigger ds-team-direct-link ds-nav-order-plantel {% if p.endswith('/plantel') %}is-active{% endif %}">Plantel</a>
         <a href="/playbook/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-playbook {% if p.startswith('/playbook') %}is-active{% endif %}">Playbook</a>

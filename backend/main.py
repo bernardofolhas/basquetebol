@@ -27,6 +27,7 @@ import models.planeamento
 import models.planeamento_clube
 import models.playbook
 import models.recuperacao_password
+import models.scouting
 import models.treinador
 import models.treino
 import models.utilizador
@@ -80,6 +81,7 @@ from routers import jogos
 from routers import notificacoes
 from routers import identidade
 from routers import secretaria
+from routers import scouting
 from routers import superadmin
 from routers import planeamento
 from routers import planeamento_clube
@@ -178,6 +180,7 @@ app.include_router(pdf_partilhavel.router)
 app.include_router(assiduidade.router)
 app.include_router(treino.router)
 app.include_router(jogos.router)
+app.include_router(scouting.router)
 app.include_router(notificacoes.router)
 app.include_router(identidade.router)
 app.include_router(secretaria.router)
