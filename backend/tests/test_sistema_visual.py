@@ -36,6 +36,15 @@ def test_sistema_visual_tem_componentes_e_estados_comuns():
         assert componente in conteudo
 
 
+def test_acoes_legadas_herdam_o_sistema_visual_do_clube():
+    conteudo = CSS.read_text(encoding="utf-8")
+
+    assert "Compatibility layer for legacy action controls" in conteudo
+    assert 'background:var(--clube-primary) !important;' in conteudo
+    assert '#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-red-"]' in conteudo
+    assert "outline:3px solid color-mix" in conteudo
+
+
 def test_base_preserva_navegacao_acessivel_e_responsiva():
     conteudo = (TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
 

@@ -163,6 +163,86 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
 .ds-button-quiet:hover { background:var(--surface-muted);color:var(--text-main);box-shadow:none; }
 .ds-button-sm { min-height:2.25rem;padding:.5rem .75rem;font-size:.78rem; }
 
+/* Compatibility layer for legacy action controls while pages move to ds-button. */
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-orange-"],
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-slate-900"] {
+    display:inline-flex;
+    min-height:2.45rem;
+    align-items:center;
+    justify-content:center;
+    border:1px solid transparent;
+    border-radius:var(--radius-control);
+    background:var(--clube-primary) !important;
+    color:var(--clube-on-primary) !important;
+    padding:.58rem .85rem;
+    font-size:.78rem;
+    font-weight:750;
+    line-height:1;
+    box-shadow:0 1px 2px color-mix(in srgb,var(--clube-primary) 30%,transparent);
+    transition:background-color .16s,border-color .16s,color .16s,box-shadow .16s,transform .16s;
+}
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-orange-"]:hover,
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-slate-900"]:hover {
+    background:var(--clube-primary-hover) !important;
+    transform:translateY(-1px);
+    box-shadow:0 5px 12px rgb(15 23 42 / .10);
+}
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-blue-"] {
+    display:inline-flex;
+    min-height:2.45rem;
+    align-items:center;
+    justify-content:center;
+    border:1px solid var(--border-strong);
+    border-radius:var(--radius-control);
+    background:var(--surface-card) !important;
+    color:#435268 !important;
+    padding:.58rem .85rem;
+    font-size:.78rem;
+    font-weight:750;
+    line-height:1;
+    transition:background-color .16s,border-color .16s,color .16s,box-shadow .16s,transform .16s;
+}
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-blue-"]:hover {
+    border-color:var(--clube-primary-border);
+    background:var(--clube-primary-surface) !important;
+    color:var(--clube-primary-dark) !important;
+}
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-red-"] {
+    display:inline-flex;
+    min-height:2.45rem;
+    align-items:center;
+    justify-content:center;
+    border:1px solid #fecaca;
+    border-radius:var(--radius-control);
+    background:#fff !important;
+    color:#b42318 !important;
+    padding:.58rem .85rem;
+    font-size:.78rem;
+    font-weight:750;
+    line-height:1;
+    transition:background-color .16s,border-color .16s,color .16s,box-shadow .16s,transform .16s;
+}
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-red-"]:hover {
+    border-color:#fca5a5;
+    background:#fff1f2 !important;
+    color:#991b1b !important;
+}
+#conteudo-principal :is(a, button, input[type="submit"])[class*="bg-white"][class*="border-"] {
+    display:inline-flex;
+    min-height:2.45rem;
+    align-items:center;
+    justify-content:center;
+    border-radius:var(--radius-control);
+    padding:.58rem .85rem;
+    font-size:.78rem;
+    font-weight:750;
+    line-height:1;
+}
+#conteudo-principal :is(a, button, input[type="submit"]):focus-visible {
+    outline:3px solid color-mix(in srgb,var(--clube-accent) 35%,transparent);
+    outline-offset:2px;
+}
+
 .ds-nav-active {
     background: var(--clube-primary);
     color: var(--clube-on-primary);
