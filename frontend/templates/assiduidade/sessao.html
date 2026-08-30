@@ -36,8 +36,8 @@
     </div>
 
     <div class="bg-white rounded-xl shadow-sm p-4 text-center border border-gray-100">
-        <p class="text-3xl font-bold text-red-500">{{ resumo_assiduidade.por_estado.ausente + resumo_assiduidade.por_estado.justificada + resumo_assiduidade.por_estado.lesionada + resumo_assiduidade.por_estado.dispensada }}</p>
-        <p class="text-xs text-gray-500 mt-1">Ausências / dispensas</p>
+        <p class="text-3xl font-bold text-red-500">{{ resumo_assiduidade.por_estado.ausente + resumo_assiduidade.por_estado.justificada + resumo_assiduidade.por_estado.lesionada }}</p>
+        <p class="text-xs text-gray-500 mt-1">Faltas</p>
     </div>
 
     <!-- Presentes -->
@@ -65,8 +65,8 @@
             <p class="mt-1 text-xs text-gray-500">{{ resumo_assiduidade.registados }} de {{ total_jogadores }} {{ termo_jogador(equipa, plural=True, capitalizar=False) }} com estado definido.</p>
         </div>
         <div class="flex flex-wrap gap-2">
-            <button type="button" data-marcar-todos="presente" class="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100">Todos presentes</button>
-            <button type="button" data-marcar-todos="por_registar" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100">Limpar estados</button>
+            <button type="button" data-marcar-todos="presente" class="ds-button ds-button-secondary ds-button-sm">Todos presentes</button>
+            <button type="button" data-marcar-todos="por_registar" class="ds-button ds-button-secondary ds-button-sm">Limpar estados</button>
         </div>
     </div>
 
@@ -140,13 +140,16 @@
 
 {% endblock %}
 
+{% block scripts_extra %}
 <script>
 document.querySelectorAll('[data-marcar-todos]').forEach(function (button) {
     button.addEventListener('click', function () {
         var estado = button.dataset.marcarTodos;
         document.querySelectorAll('select[name^="estado_"]').forEach(function (select) {
             select.value = estado;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
         });
     });
 });
 </script>
+{% endblock %}

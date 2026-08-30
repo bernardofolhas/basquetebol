@@ -1012,6 +1012,111 @@ async def editar_conteudo_mapa_anual(
     return JSONResponse({"sucesso": True, "mensagem": "Conteúdo atualizado."})
 
 
+@router.post("/anuais/{anual_id}/mapa-conteudos/conteudos/{conteudo_id}/mover")
+async def mover_conteudo_mapa_anual(
+    anual_id: int,
+    conteudo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Move uma linha inteira do mapa, conservando as prioridades semanais."""
+    _verificar_acesso_planeamento(utilizador, _obter_equipa_id_por_anual(db, anual_id), db)
+    planeamento = db.query(PlaneamentoAnualEquipa).filter(
+        PlaneamentoAnualEquipa.id == anual_id,
+    ).first()
+    if not planeamento:
+        return JSONResponse({"sucesso": False, "erro": "O planeamento anual já não existe."}, status_code=404)
+
+    try:
+        payload = await request.json()
+    except ValueError:
+        return JSONResponse({"sucesso": False, "erro": "Os dados enviados não são válidos."}, status_code=400)
+
+    area = str(payload.get("area", "")).strip() if isinstance(payload, dict) else ""
+    subarea = str(payload.get("subarea", "")).strip() if isinstance(payload, dict) else ""
+    areas_ordem = dict(AREAS_MAPA)
+    if area not in areas_ordem:
+        return JSONResponse({"sucesso": False, "erro": "Seleciona um grupo válido para o conteúdo."}, status_code=422)
+    if len(subarea) > 100:
+        return JSONResponse({"sucesso": False, "erro": "A subárea pode ter até 100 caracteres."}, status_code=422)
+
+    mapa = construir_mapa_conteudos(db, planeamento)
+    if conteudo_id not in mapa["conteudo_ids"]:
+        return JSONResponse({"sucesso": False, "erro": "O conteúdo já não está disponível neste mapa."}, status_code=404)
+    conteudo = db.query(ConteudoMapaAnual).filter(
+        ConteudoMapaAnual.id == conteudo_id,
+        ConteudoMapaAnual.clube_id == planeamento.clube_id,
+    ).first()
+    if not conteudo:
+        return JSONResponse({"sucesso": False, "erro": "O conteúdo já não existe."}, status_code=404)
+
+    subarea_normalizada = subarea or None
+    if conteudo.area == area and (conteudo.subarea or "") == (subarea_normalizada or ""):
+        return JSONResponse({"sucesso": True, "mensagem": "O conteúdo já pertence a este grupo."})
+
+    conteudos_visiveis = db.query(ConteudoMapaAnual).filter(
+        ConteudoMapaAnual.id.in_(mapa["conteudo_ids"]),
+    ).all()
+    conteudos_destino = [
+        item for item in conteudos_visiveis
+        if item.id != conteudo.id
+        and item.area == area
+        and (item.subarea or "") == (subarea_normalizada or "")
+    ]
+    if subarea_normalizada:
+        subarea_existente = next(
+            (
+                item for item in conteudos_visiveis
+                if item.area == area and (item.subarea or "").casefold() == subarea_normalizada.casefold()
+            ),
+            None,
+        )
+        ordem_subarea = subarea_existente.ordem_subarea if subarea_existente else max(
+            (item.ordem_subarea for item in conteudos_visiveis if item.area == area),
+            default=0,
+        ) + 10
+    else:
+        ordem_subarea = 0
+    ordem = max((item.ordem for item in conteudos_destino), default=0) + 10
+
+    if conteudo.planeamento_anual_id == planeamento.id:
+        conteudo.area = area
+        conteudo.subarea = subarea_normalizada
+        conteudo.ordem_area = areas_ordem[area]
+        conteudo.ordem_subarea = ordem_subarea
+        conteudo.ordem = ordem
+    else:
+        # O catálogo de base é partilhado pelo clube. A movimentação cria uma
+        # cópia local para este planeamento e mantém toda a linha semanal.
+        novo_conteudo = ConteudoMapaAnual(
+            clube_id=planeamento.clube_id,
+            planeamento_anual_id=planeamento.id,
+            codigo=f"personalizado-{planeamento.id}-{uuid4().hex[:12]}",
+            area=area,
+            subarea=subarea_normalizada,
+            nome=conteudo.nome,
+            ordem_area=areas_ordem[area],
+            ordem_subarea=ordem_subarea,
+            ordem=ordem,
+            ativo=True,
+        )
+        db.add(novo_conteudo)
+        db.flush()
+        db.query(PrioridadeConteudoMapaAnual).filter(
+            PrioridadeConteudoMapaAnual.planeamento_anual_id == planeamento.id,
+            PrioridadeConteudoMapaAnual.conteudo_id == conteudo.id,
+        ).update({"conteudo_id": novo_conteudo.id}, synchronize_session=False)
+        db.add(ConteudoMapaAnualOculto(
+            clube_id=planeamento.clube_id,
+            planeamento_anual_id=planeamento.id,
+            conteudo_id=conteudo.id,
+        ))
+
+    db.commit()
+    return JSONResponse({"sucesso": True, "mensagem": "Conteúdo movido com as respetivas prioridades."})
+
+
 @router.get("/anuais/{anual_id}/mapa-conteudos/pdf")
 def exportar_mapa_conteudos_anual_pdf(
     anual_id: int,

@@ -55,11 +55,15 @@ def calcular_resumo_assiduidade(registos: list[RegistoAssiduidade]) -> dict:
     ]
     contagem = Counter(estados)
     total = len(estados)
+    # Uma dispensa não é uma falta nem uma presença esperada: a atleta ficou
+    # formalmente dispensada daquela sessão e não deve reduzir a percentagem.
+    total_elegivel = total - contagem["dispensada"]
     total_presentes = sum(contagem[estado] for estado in ESTADOS_PRESENTES)
     return {
         "total": total,
+        "total_elegivel": total_elegivel,
         "presentes": total_presentes,
-        "percentagem": round((total_presentes / total) * 100, 1) if total else 0,
+        "percentagem": round((total_presentes / total_elegivel) * 100, 1) if total_elegivel else 0,
         "por_estado": {estado: contagem[estado] for estado in ESTADOS_ASSIDUIDADE},
     }
 

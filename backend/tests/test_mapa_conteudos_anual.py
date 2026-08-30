@@ -157,6 +157,8 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         assert f'href="/planeamento/microciclos/{micro.id}"' in pagina.text
         assert f'href="/jogos/{jogo.id}"' in pagina.text
         assert "data-edit-content" in pagina.text
+        assert "data-content-row" in pagina.text
+        assert "data-move-url" in pagina.text
         assert "+ Conteúdo" in pagina.text
         assert "Exportar A3" in pagina.text
 
@@ -292,6 +294,19 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         )
         assert atualizada_personalizada.status_code == 200
         assert "Ataque contra zona 2-3" in cliente.get(f"/planeamento/anuais/{anual.id}").text
+
+        movida_personalizada = cliente.post(
+            f"/planeamento/anuais/{anual.id}/mapa-conteudos/conteudos/{conteudo_personalizado_id}/mover",
+            json={"area": "Técnica Ofensiva", "subarea": "Fundamentos"},
+        )
+        assert movida_personalizada.status_code == 200
+        assert movida_personalizada.json()["sucesso"] is True
+        db.expire_all()
+        conteudo_movido = db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
+            ConteudoMapaAnual.id == conteudo_personalizado_id,
+        ).one()
+        assert conteudo_movido.area == "Técnica Ofensiva"
+        assert conteudo_movido.subarea == "Fundamentos"
 
         conteudo_partilhado = db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
             ConteudoMapaAnual.clube_id == clube.id,

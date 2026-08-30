@@ -113,6 +113,19 @@ def test_calcula_estados_detalhados_sem_perder_compatibilidade_booleana():
     assert resumo["percentagem"] == 66.7
 
 
+def test_dispensa_nao_e_falta_nem_reduz_a_percentagem_de_presencas():
+    resumo = calcular_resumo_assiduidade([
+        RegistoAssiduidade(presente=True, estado="presente"),
+        RegistoAssiduidade(presente=False, estado="dispensada"),
+        RegistoAssiduidade(presente=False, estado="ausente"),
+    ])
+
+    assert resumo["total"] == 3
+    assert resumo["total_elegivel"] == 2
+    assert resumo["por_estado"]["dispensada"] == 1
+    assert resumo["percentagem"] == 50.0
+
+
 def test_relatorio_assiduidade_e_ficha_evolucao_respondem_com_pdf(client_admin):
     db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id = _criar_contexto()
     try:
