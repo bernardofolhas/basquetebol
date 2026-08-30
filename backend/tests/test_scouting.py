@@ -37,6 +37,16 @@ def test_scouting_e_plano_de_jogo_estao_acessiveis_no_fluxo_de_jogos():
     assert 'Abrir scouting' in detalhe_jogo
 
 
+def test_variantes_de_botao_isoladas_mantem_estrutura_visual():
+    estilos = (ROOT / "frontend" / "static" / "css" / "design-system.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert ".ds-button-primary:not(.ds-button)" in estilos
+    assert ".ds-button-secondary:not(.ds-button)" in estilos
+    assert "Variantes usadas isoladamente" in estilos
+
+
 def test_templates_de_scouting_renderizam_no_ambiente_jinja():
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     for nome in (
