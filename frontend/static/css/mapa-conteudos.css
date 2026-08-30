@@ -82,12 +82,12 @@
 .mapa-cycle-link:focus-visible { outline: 2px solid #f97316; outline-offset: .12rem; border-radius: .2rem; }
 
 .mapa-content-row th { text-align: left; vertical-align: middle; }
-.mapa-content-row[draggable="true"] { cursor: grab; }
-.mapa-content-row[draggable="true"]:active { cursor: grabbing; }
 .mapa-content-row.is-dragging { opacity: .42; }
 .mapa-content-row.is-drop-target > .mapa-content-cell,
-.mapa-content-row.is-drop-target > .mapa-priority-cell { background: var(--clube-primary-surface); }
-.mapa-content-row.is-drop-target > .mapa-content-cell { box-shadow: inset 3px 0 0 var(--clube-primary), 5px 0 8px rgb(15 23 42 / .06); }
+.mapa-content-row.is-drop-target > .mapa-priority-cell,
+.mapa-content-row .is-drop-target { background: var(--clube-primary-surface); }
+.mapa-content-row.is-drop-target > .mapa-content-cell,
+.mapa-content-row .is-drop-target { box-shadow: inset 3px 0 0 var(--clube-primary), 5px 0 8px rgb(15 23 42 / .06); }
 .mapa-content-line { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: .25rem; }
 .mapa-content-actions { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .1rem; white-space: nowrap; }
 .mapa-edit-content, .mapa-delete-content { border: 0; border-radius: .25rem; background: transparent; color: inherit; cursor: pointer; font: inherit; line-height: 1; opacity: .55; padding: .1rem .2rem; }
@@ -98,7 +98,9 @@
 .mapa-subarea-cell { color: #2f3b4f; font-size: .64rem; font-weight: 800; }
 .mapa-content-cell { position: sticky; background: #fff; color: #354258; font-size: .64rem; font-weight: 650; }
 .mapa-content-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mapa-content-row[draggable="true"] .mapa-content-name::before { content: "⋮⋮"; margin-right: .28rem; color: #a1adbb; font-size: .7rem; letter-spacing: -.14rem; }
+.mapa-drag-handle { display:inline-grid; width:1rem; flex:0 0 1rem; place-items:center; cursor:grab; color:#a1adbb; font-size:.88rem; line-height:1; user-select:none; }
+.mapa-drag-handle:active { cursor:grabbing; }
+.mapa-drag-handle:hover { color:var(--clube-primary); }
 .mapa-content-row:hover .mapa-content-actions, .mapa-content-actions:focus-within { opacity: 1; }
 .mapa-content-actions { opacity: .45; vertical-align: middle; }
 .mapa-area-1 .mapa-area-cell { background: #c89208; }

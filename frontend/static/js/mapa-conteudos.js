@@ -197,43 +197,50 @@
         });
 
         var linhaArrastada = null;
-        mapa.querySelectorAll("[data-content-row]").forEach(function (linha) {
-            linha.addEventListener("dragstart", function (event) {
+        mapa.querySelectorAll(".mapa-drag-handle").forEach(function (pega) {
+            pega.addEventListener("dragstart", function (event) {
                 if (!podeAlterarEstrutura()) {
                     event.preventDefault();
                     return;
                 }
+                var linha = pega.closest("[data-content-row]");
+                if (!linha) return;
                 linhaArrastada = linha;
                 linha.classList.add("is-dragging");
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", linha.dataset.contentId);
             });
-            linha.addEventListener("dragend", function () {
-                linha.classList.remove("is-dragging");
+            pega.addEventListener("dragend", function () {
+                var linha = pega.closest("[data-content-row]");
+                if (linha) linha.classList.remove("is-dragging");
                 mapa.querySelectorAll(".is-drop-target").forEach(function (alvo) {
                     alvo.classList.remove("is-drop-target");
                 });
                 linhaArrastada = null;
             });
-            linha.addEventListener("dragover", function (event) {
-                if (!linhaArrastada || linhaArrastada === linha) return;
+        });
+
+        function registarAlvoDeArrasto(alvo) {
+            alvo.addEventListener("dragover", function (event) {
+                if (!linhaArrastada || alvo.closest("[data-content-row]") === linhaArrastada) return;
                 event.preventDefault();
                 event.dataTransfer.dropEffect = "move";
-                linha.classList.add("is-drop-target");
+                alvo.classList.add("is-drop-target");
             });
-            linha.addEventListener("dragleave", function (event) {
-                if (!linha.contains(event.relatedTarget)) linha.classList.remove("is-drop-target");
+            alvo.addEventListener("dragleave", function (event) {
+                if (!alvo.contains(event.relatedTarget)) alvo.classList.remove("is-drop-target");
             });
-            linha.addEventListener("drop", async function (event) {
+            alvo.addEventListener("drop", async function (event) {
                 event.preventDefault();
-                linha.classList.remove("is-drop-target");
+                alvo.classList.remove("is-drop-target");
                 var origem = linhaArrastada;
-                if (!origem || origem === linha || !podeAlterarEstrutura()) return;
+                var destino = alvo.dataset.targetArea ? alvo : alvo.closest("[data-content-row]");
+                if (!origem || !destino || origem === destino || !podeAlterarEstrutura()) return;
                 atualizarEstado("A mover conteúdo...", "is-pending");
                 try {
                     var resultado = await enviarJson(origem.dataset.moveUrl, {
-                        area: linha.dataset.contentArea,
-                        subarea: linha.dataset.contentSubarea || ""
+                        area: destino.dataset.targetArea || destino.dataset.contentArea,
+                        subarea: destino.dataset.targetSubarea || destino.dataset.contentSubarea || ""
                     });
                     window.sessionStorage.setItem(chaveMensagem, resultado.mensagem);
                     window.location.reload();
@@ -241,7 +248,8 @@
                     atualizarEstado(erro.message, "is-error");
                 }
             });
-        });
+        }
+        mapa.querySelectorAll("[data-content-dropzone], [data-content-row]").forEach(registarAlvoDeArrasto);
 
         window.addEventListener("beforeunload", function (event) {
             if (!alteracoes.size) return;
