@@ -1691,6 +1691,32 @@ def detalhe_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_
 
     jogos_nao_importados = [j for j in jogos_periodo if j.data not in sessao_datas_jogo]
 
+    # A lista dos microciclos deve refletir todos os jogos efetivamente
+    # marcados no calendário, mesmo que ainda não tenham sido importados como
+    # sessão. Uma sessão de jogo sem registo de jogo associado mantém-se visível.
+    jogos_por_micro: dict[int, list[dict]] = {}
+    for micro in microciclos:
+        jogos_do_micro = [
+            {
+                "data": jogo.data,
+                "local": jogo.local,
+                "link": f"/jogos/{jogo.id}",
+            }
+            for jogo in jogos_periodo
+            if micro.data_inicio <= jogo.data <= micro.data_fim
+        ]
+        datas_com_jogo = {jogo["data"] for jogo in jogos_do_micro}
+        jogos_do_micro.extend(
+            {
+                "data": sessao.data,
+                "local": sessao.local,
+                "link": f"/treino/sessoes/{sessao.id}",
+            }
+            for sessao in micro.sessoes
+            if sessao.ativa and sessao.e_jogo and sessao.data not in datas_com_jogo
+        )
+        jogos_por_micro[micro.id] = jogos_do_micro
+
     # Dados para gráfico Chart.js (volume e RPE por microciclo)
     chart_labels = []
     chart_volume = []
@@ -1761,6 +1787,7 @@ def detalhe_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_
         "proximo_numero_micro": proximo_numero_micro,
         "jogos_periodo": jogos_periodo,
         "jogos_nao_importados": jogos_nao_importados,
+        "jogos_por_micro": jogos_por_micro,
         "semanas_calendario": semanas_calendario,
         "chart_labels": json.dumps(chart_labels),
         "chart_volume": json.dumps(chart_volume),

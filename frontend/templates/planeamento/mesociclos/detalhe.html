@@ -369,7 +369,7 @@
     <div class="space-y-3 mb-6">
         {% for micro in microciclos %}
         {% set sessoes_ativas = micro.sessoes | selectattr('ativa') | list %}
-        {% set jogos_micro = sessoes_ativas | selectattr('e_jogo') | list %}
+        {% set jogos_micro = jogos_por_micro.get(micro.id, []) %}
         {% set treinos_micro = sessoes_ativas | rejectattr('e_jogo') | list %}
         <div class="border border-gray-100 rounded-xl p-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -402,7 +402,7 @@
                 {% for s in jogos_micro %}
                 <span class="inline-flex items-center gap-1 bg-red-50 border border-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">
                     🏀 {{ s.data }}{% if s.local %} · {{ s.local }}{% endif %}
-                    <a href="/treino/sessoes/{{ s.id }}" class="ml-1 text-red-400 hover:text-red-600">Ver</a>
+                    <a href="{{ s.link }}" class="ml-1 text-red-400 hover:text-red-600">Ver</a>
                 </span>
                 {% endfor %}
             </div>
