@@ -60,6 +60,35 @@
             }
         }
 
+        function eliminarLinhaDoMapa(linha) {
+            if (!linha) return;
+            var proximaLinha = linha.nextElementSibling;
+            var area = linha.dataset.contentArea || "";
+            var subarea = linha.dataset.contentSubarea || "";
+            var cabecalhoArea = linha.querySelector(".mapa-area-cell");
+            var cabecalhoSubarea = linha.querySelector(".mapa-subarea-cell");
+
+            // Se a linha eliminada inicia um grupo, o cabeçalho acompanha a
+            // primeira linha seguinte do mesmo grupo para manter a tabela alinhada.
+            if (cabecalhoArea && cabecalhoArea.rowSpan > 1 && proximaLinha
+                && proximaLinha.dataset.contentArea === area) {
+                cabecalhoArea.rowSpan -= 1;
+                proximaLinha.insertBefore(cabecalhoArea, proximaLinha.firstChild);
+            }
+            if (cabecalhoSubarea && cabecalhoSubarea.rowSpan > 1 && proximaLinha
+                && proximaLinha.dataset.contentArea === area
+                && (proximaLinha.dataset.contentSubarea || "") === subarea) {
+                cabecalhoSubarea.rowSpan -= 1;
+                var cabecalhoAreaSeguinte = proximaLinha.querySelector(".mapa-area-cell");
+                if (cabecalhoAreaSeguinte) {
+                    cabecalhoAreaSeguinte.insertAdjacentElement("afterend", cabecalhoSubarea);
+                } else {
+                    proximaLinha.insertBefore(cabecalhoSubarea, proximaLinha.firstChild);
+                }
+            }
+            linha.remove();
+        }
+
         function atualizarBotao() {
             botaoGuardar.disabled = !alteracoes.size || aGuardar;
             if (!aGuardar && alteracoes.size) {
@@ -214,7 +243,8 @@
                 atualizarEstado("A eliminar conteúdo...", "is-pending");
                 try {
                     var resultado = await enviarJson(botao.dataset.deleteUrl, {});
-                    await atualizarMapaSemRecarregar(resultado.mensagem);
+                    eliminarLinhaDoMapa(botao.closest("[data-content-row]"));
+                    atualizarEstado(resultado.mensagem, "is-success");
                 } catch (erro) {
                     botao.disabled = false;
                     atualizarEstado(erro.message, "is-error");
