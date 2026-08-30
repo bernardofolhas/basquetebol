@@ -295,9 +295,24 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         assert atualizada_personalizada.status_code == 200
         assert "Ataque contra zona 2-3" in cliente.get(f"/planeamento/anuais/{anual.id}").text
 
+        destino_para_ordenacao = cliente.post(
+            f"/planeamento/anuais/{anual.id}/mapa-conteudos/conteudos",
+            json={
+                "area": "Técnica Ofensiva",
+                "subarea": "Fundamentos",
+                "nome": "Conteúdo de destino",
+            },
+        )
+        assert destino_para_ordenacao.status_code == 200
+        conteudo_destino_id = destino_para_ordenacao.json()["conteudo_id"]
+
         movida_personalizada = cliente.post(
             f"/planeamento/anuais/{anual.id}/mapa-conteudos/conteudos/{conteudo_personalizado_id}/mover",
-            json={"area": "Técnica Ofensiva", "subarea": "Fundamentos"},
+            json={
+                "area": "Técnica Ofensiva",
+                "subarea": "Fundamentos",
+                "antes_de_conteudo_id": conteudo_destino_id,
+            },
         )
         assert movida_personalizada.status_code == 200
         assert movida_personalizada.json()["sucesso"] is True
@@ -307,6 +322,10 @@ def test_mapa_anual_carrega_contexto_e_guarda_prioridades_com_isolamento():
         ).one()
         assert conteudo_movido.area == "Técnica Ofensiva"
         assert conteudo_movido.subarea == "Fundamentos"
+        conteudo_destino = db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
+            ConteudoMapaAnual.id == conteudo_destino_id,
+        ).one()
+        assert conteudo_movido.ordem < conteudo_destino.ordem
 
         conteudo_partilhado = db.query(ConteudoMapaAnual).execution_options(ignorar_clube=True).filter(
             ConteudoMapaAnual.clube_id == clube.id,

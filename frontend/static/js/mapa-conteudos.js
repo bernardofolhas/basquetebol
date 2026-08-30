@@ -33,6 +33,33 @@
             estado.className = "mapa-save-status" + (classe ? " " + classe : "");
         }
 
+        async function atualizarMapaSemRecarregar(mensagem) {
+            var quadroAtual = mapa.querySelector(".mapa-conteudos-viewport");
+            var scrollTop = quadroAtual ? quadroAtual.scrollTop : 0;
+            var scrollLeft = quadroAtual ? quadroAtual.scrollLeft : 0;
+            var resposta = await fetch(window.location.href, {
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                cache: "no-store"
+            });
+            if (!resposta.ok) throw new Error("Não foi possível atualizar o mapa de conteúdos.");
+            var paginaAtualizada = new DOMParser().parseFromString(await resposta.text(), "text/html");
+            var mapaAtualizado = paginaAtualizada.querySelector("[data-mapa-conteudos]");
+            if (!mapaAtualizado) throw new Error("Não foi possível atualizar o mapa de conteúdos.");
+
+            mapa.replaceWith(mapaAtualizado);
+            var quadroAtualizado = mapaAtualizado.querySelector(".mapa-conteudos-viewport");
+            if (quadroAtualizado) {
+                quadroAtualizado.scrollTop = scrollTop;
+                quadroAtualizado.scrollLeft = scrollLeft;
+            }
+            iniciarMapa(mapaAtualizado);
+            var estadoAtualizado = mapaAtualizado.querySelector("[data-mapa-save-status]");
+            if (estadoAtualizado && mensagem) {
+                estadoAtualizado.textContent = mensagem;
+                estadoAtualizado.className = "mapa-save-status is-success";
+            }
+        }
+
         function atualizarBotao() {
             botaoGuardar.disabled = !alteracoes.size || aGuardar;
             if (!aGuardar && alteracoes.size) {
@@ -232,6 +259,7 @@
             });
             alvo.addEventListener("drop", async function (event) {
                 event.preventDefault();
+                event.stopPropagation();
                 alvo.classList.remove("is-drop-target");
                 var origem = linhaArrastada;
                 var destino = alvo.dataset.targetArea ? alvo : alvo.closest("[data-content-row]");
@@ -240,10 +268,12 @@
                 try {
                     var resultado = await enviarJson(origem.dataset.moveUrl, {
                         area: destino.dataset.targetArea || destino.dataset.contentArea,
-                        subarea: destino.dataset.targetSubarea || destino.dataset.contentSubarea || ""
+                        subarea: destino.dataset.targetSubarea || destino.dataset.contentSubarea || "",
+                        antes_de_conteudo_id: destino.closest("[data-content-row]")
+                            ? Number(destino.closest("[data-content-row]").dataset.contentId)
+                            : null
                     });
-                    window.sessionStorage.setItem(chaveMensagem, resultado.mensagem);
-                    window.location.reload();
+                    await atualizarMapaSemRecarregar(resultado.mensagem);
                 } catch (erro) {
                     atualizarEstado(erro.message, "is-error");
                 }

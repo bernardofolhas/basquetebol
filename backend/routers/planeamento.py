@@ -1035,6 +1035,10 @@ async def mover_conteudo_mapa_anual(
 
     area = str(payload.get("area", "")).strip() if isinstance(payload, dict) else ""
     subarea = str(payload.get("subarea", "")).strip() if isinstance(payload, dict) else ""
+    try:
+        antes_de_conteudo_id = int(payload.get("antes_de_conteudo_id") or 0) or None
+    except (TypeError, ValueError):
+        return JSONResponse({"sucesso": False, "erro": "O destino do conteúdo não é válido."}, status_code=422)
     areas_ordem = dict(AREAS_MAPA)
     if area not in areas_ordem:
         return JSONResponse({"sucesso": False, "erro": "Seleciona um grupo válido para o conteúdo."}, status_code=422)
@@ -1052,7 +1056,8 @@ async def mover_conteudo_mapa_anual(
         return JSONResponse({"sucesso": False, "erro": "O conteúdo já não existe."}, status_code=404)
 
     subarea_normalizada = subarea or None
-    if conteudo.area == area and (conteudo.subarea or "") == (subarea_normalizada or ""):
+    mesmo_grupo = conteudo.area == area and (conteudo.subarea or "") == (subarea_normalizada or "")
+    if mesmo_grupo and not antes_de_conteudo_id:
         return JSONResponse({"sucesso": True, "mensagem": "O conteúdo já pertence a este grupo."})
 
     conteudos_visiveis = db.query(ConteudoMapaAnual).filter(
@@ -1064,6 +1069,11 @@ async def mover_conteudo_mapa_anual(
         and item.area == area
         and (item.subarea or "") == (subarea_normalizada or "")
     ]
+    conteudo_antes = None
+    if antes_de_conteudo_id:
+        conteudo_antes = next((item for item in conteudos_destino if item.id == antes_de_conteudo_id), None)
+        if not conteudo_antes:
+            return JSONResponse({"sucesso": False, "erro": "O conteúdo de destino já não está disponível."}, status_code=422)
     if subarea_normalizada:
         subarea_existente = next(
             (
@@ -1086,6 +1096,7 @@ async def mover_conteudo_mapa_anual(
         conteudo.ordem_area = areas_ordem[area]
         conteudo.ordem_subarea = ordem_subarea
         conteudo.ordem = ordem
+        conteudo_movido = conteudo
     else:
         # O catálogo de base é partilhado pelo clube. A movimentação cria uma
         # cópia local para este planeamento e mantém toda a linha semanal.
@@ -1112,9 +1123,28 @@ async def mover_conteudo_mapa_anual(
             planeamento_anual_id=planeamento.id,
             conteudo_id=conteudo.id,
         ))
+        conteudo_movido = novo_conteudo
+
+    # Reordena o grupo de destino de forma determinística. Isto permite largar
+    # uma linha sobre outra e mantê-la imediatamente antes desse conteúdo.
+    conteudos_ordenados = sorted(conteudos_destino, key=lambda item: (item.ordem, item.id))
+    if conteudo_antes:
+        indice_destino = next(
+            indice for indice, item in enumerate(conteudos_ordenados)
+            if item.id == conteudo_antes.id
+        )
+    else:
+        indice_destino = len(conteudos_ordenados)
+    conteudos_ordenados.insert(indice_destino, conteudo_movido)
+    for indice, item in enumerate(conteudos_ordenados, start=1):
+        item.ordem = indice * 10
 
     db.commit()
-    return JSONResponse({"sucesso": True, "mensagem": "Conteúdo movido com as respetivas prioridades."})
+    return JSONResponse({
+        "sucesso": True,
+        "mensagem": "Conteúdo movido com as respetivas prioridades.",
+        "conteudo_id": conteudo_movido.id,
+    })
 
 
 @router.get("/anuais/{anual_id}/mapa-conteudos/pdf")
