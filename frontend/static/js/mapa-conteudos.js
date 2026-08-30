@@ -107,7 +107,7 @@
             }
         } catch (erro) {}
 
-        mapa.querySelectorAll("[data-priority-cell]").forEach(function (celula) {
+        function registarCelulaPrioridade(celula) {
             celula.dataset.original = celula.dataset.value || "";
             celula.addEventListener("click", function () {
                 var atual = celula.dataset.value || "";
@@ -129,7 +129,8 @@
                 });
                 atualizarBotao();
             });
-        });
+        }
+        mapa.querySelectorAll("[data-priority-cell]").forEach(registarCelulaPrioridade);
 
         botaoGuardar.addEventListener("click", async function () {
             if (!alteracoes.size || aGuardar) return;
@@ -193,6 +194,102 @@
             botaoSubmeter.textContent = "Guardar alterações";
         }
 
+        function registarBotaoEdicao(botao) {
+            botao.addEventListener("click", function () {
+                if (!podeAlterarEstrutura()) return;
+                prepararDialogoEdicao(botao);
+                dialogo.showModal();
+                window.setTimeout(function () { formulario.elements.nome.focus(); }, 0);
+            });
+        }
+
+        function criarCabecalhoGrupo(classe, texto, area, subarea) {
+            var cabecalho = document.createElement("th");
+            cabecalho.className = "mapa-sticky " + classe;
+            cabecalho.rowSpan = 1;
+            cabecalho.textContent = texto;
+            cabecalho.dataset.contentDropzone = "";
+            cabecalho.dataset.targetArea = area;
+            cabecalho.dataset.targetSubarea = subarea;
+            return cabecalho;
+        }
+
+        function inserirConteudoNoMapa(resultado, dados) {
+            var area = String(dados.area || "");
+            var subarea = String(dados.subarea || "");
+            var linhas = Array.from(mapa.querySelectorAll("[data-content-row]"));
+            var linhasArea = linhas.filter(function (linha) { return linha.dataset.contentArea === area; });
+            var linhasGrupo = linhasArea.filter(function (linha) {
+                return (linha.dataset.contentSubarea || "") === subarea;
+            });
+            var referencia = linhasGrupo[linhasGrupo.length - 1]
+                || linhasArea[linhasArea.length - 1]
+                || linhas[linhas.length - 1];
+            if (!referencia) throw new Error("Não foi possível apresentar o conteúdo acrescentado.");
+
+            var linha = referencia.cloneNode(true);
+            linha.querySelectorAll(".mapa-area-cell, .mapa-subarea-cell").forEach(function (cabecalho) {
+                cabecalho.remove();
+            });
+            linha.dataset.contentId = resultado.conteudo_id;
+            linha.dataset.contentArea = area;
+            linha.dataset.contentSubarea = subarea;
+            linha.dataset.moveUrl = mapa.dataset.createUrl + "/" + resultado.conteudo_id + "/mover";
+
+            var celulaConteudo = linha.querySelector(".mapa-content-cell");
+            if (!celulaConteudo) throw new Error("Não foi possível apresentar o conteúdo acrescentado.");
+            celulaConteudo.dataset.targetArea = area;
+            celulaConteudo.dataset.targetSubarea = subarea;
+            var nome = String(dados.nome || "");
+            celulaConteudo.querySelector(".mapa-content-name").textContent = nome;
+            var pega = celulaConteudo.querySelector(".mapa-drag-handle");
+            pega.title = "Arrastar linha para outro grupo";
+            pega.setAttribute("aria-label", "Arrastar " + nome);
+            var editar = celulaConteudo.querySelector("[data-edit-content]");
+            editar.dataset.contentId = resultado.conteudo_id;
+            editar.dataset.contentName = nome;
+            editar.dataset.contentArea = area;
+            editar.dataset.contentSubarea = subarea;
+            editar.dataset.editUrl = mapa.dataset.createUrl + "/" + resultado.conteudo_id + "/editar";
+            editar.setAttribute("aria-label", "Editar " + nome);
+            var eliminar = celulaConteudo.querySelector("[data-delete-content]");
+            eliminar.dataset.contentName = nome;
+            eliminar.dataset.deleteUrl = mapa.dataset.createUrl + "/" + resultado.conteudo_id + "/eliminar";
+            eliminar.setAttribute("aria-label", "Eliminar " + nome);
+            linha.querySelectorAll("[data-priority-cell]").forEach(function (celula) {
+                celula.dataset.contentId = resultado.conteudo_id;
+                celula.dataset.value = "";
+                celula.dataset.original = "";
+                celula.textContent = "";
+                celula.classList.remove("priority-1", "priority-2", "is-pending");
+                celula.setAttribute("aria-label", nome + ", semana " + celula.dataset.week + ": sem prioridade");
+            });
+
+            if (linhasArea.length) {
+                var cabecalhoAreaExistente = linhasArea.map(function (item) {
+                    return item.querySelector(".mapa-area-cell");
+                }).find(Boolean);
+                if (cabecalhoAreaExistente) cabecalhoAreaExistente.rowSpan += 1;
+            } else {
+                celulaConteudo.insertAdjacentElement("beforebegin", criarCabecalhoGrupo("mapa-area-cell", area, area, ""));
+            }
+            if (linhasGrupo.length) {
+                var cabecalhoSubareaExistente = linhasGrupo[0].querySelector(".mapa-subarea-cell");
+                if (cabecalhoSubareaExistente) cabecalhoSubareaExistente.rowSpan += 1;
+            } else {
+                celulaConteudo.insertAdjacentElement("beforebegin", criarCabecalhoGrupo(
+                    "mapa-subarea-cell", subarea || "Conteúdos", area, subarea
+                ));
+            }
+            referencia.insertAdjacentElement("afterend", linha);
+
+            linha.querySelectorAll("[data-priority-cell]").forEach(registarCelulaPrioridade);
+            registarBotaoEdicao(editar);
+            registarBotaoEliminacao(eliminar);
+            registarPegaArrasto(pega);
+            registarAlvoDeArrasto(celulaConteudo);
+        }
+
         if (botaoAdicionar && dialogo && formulario) {
             botaoAdicionar.addEventListener("click", function () {
                 if (!podeAlterarEstrutura()) return;
@@ -200,14 +297,7 @@
                 dialogo.showModal();
                 window.setTimeout(function () { formulario.elements.area.focus(); }, 0);
             });
-            mapa.querySelectorAll("[data-edit-content]").forEach(function (botao) {
-                botao.addEventListener("click", function () {
-                    if (!podeAlterarEstrutura()) return;
-                    prepararDialogoEdicao(botao);
-                    dialogo.showModal();
-                    window.setTimeout(function () { formulario.elements.nome.focus(); }, 0);
-                });
-            });
+            mapa.querySelectorAll("[data-edit-content]").forEach(registarBotaoEdicao);
             mapa.querySelectorAll("[data-content-cancel]").forEach(function (botao) {
                 botao.addEventListener("click", fecharDialogo);
             });
@@ -226,8 +316,18 @@
                         subarea: dadosFormulario.get("subarea"),
                         nome: dadosFormulario.get("nome")
                     });
-                    window.sessionStorage.setItem(chaveMensagem, resultado.mensagem);
-                    window.location.reload();
+                    if (urlEdicao) {
+                        window.sessionStorage.setItem(chaveMensagem, resultado.mensagem);
+                        window.location.reload();
+                        return;
+                    }
+                    inserirConteudoNoMapa(resultado, {
+                        area: dadosFormulario.get("area"),
+                        subarea: dadosFormulario.get("subarea"),
+                        nome: dadosFormulario.get("nome")
+                    });
+                    fecharDialogo();
+                    atualizarEstado(resultado.mensagem, "is-success");
                 } catch (erro) {
                     estadoDialogo.textContent = erro.message;
                     botao.disabled = false;
@@ -235,7 +335,7 @@
             });
         }
 
-        mapa.querySelectorAll("[data-delete-content]").forEach(function (botao) {
+        function registarBotaoEliminacao(botao) {
             botao.addEventListener("click", async function () {
                 if (!podeAlterarEstrutura()) return;
                 if (!window.confirm('Eliminar "' + botao.dataset.contentName + '" deste mapa?')) return;
@@ -250,10 +350,11 @@
                     atualizarEstado(erro.message, "is-error");
                 }
             });
-        });
+        }
+        mapa.querySelectorAll("[data-delete-content]").forEach(registarBotaoEliminacao);
 
         var linhaArrastada = null;
-        mapa.querySelectorAll(".mapa-drag-handle").forEach(function (pega) {
+        function registarPegaArrasto(pega) {
             pega.addEventListener("dragstart", function (event) {
                 if (!podeAlterarEstrutura()) {
                     event.preventDefault();
@@ -274,7 +375,8 @@
                 });
                 linhaArrastada = null;
             });
-        });
+        }
+        mapa.querySelectorAll(".mapa-drag-handle").forEach(registarPegaArrasto);
 
         function registarAlvoDeArrasto(alvo) {
             alvo.addEventListener("dragover", function (event) {
