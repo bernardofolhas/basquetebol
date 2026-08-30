@@ -3,7 +3,7 @@
 {% from "partials/agenda_modal.html" import agenda_modal, agenda_legenda %}
 
 {% block titulo %}{{ planeamento.titulo }} - {{ equipa.nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/mapa-conteudos.css?v=20260830-drag">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/mapa-conteudos.css?v=20260830-fullscreen">{% endblock %}
 {% block conteudo %}
 {{ equipa_contexto(equipa, planeamento.titulo, planeamento.epoca ~ " · " ~ (planeamento.data_inicio|data_pt) ~ " a " ~ (planeamento.data_fim|data_pt), "planeamento", "/planeamento/equipas/" ~ equipa.id ~ "/anuais", "Planeamentos anuais") }}
 
@@ -59,6 +59,7 @@
                     <p>Define prioridades por semana e arrasta uma linha para a mover para outro grupo.</p>
                 </div>
                 <div class="mapa-conteudos-actions">
+                    <button type="button" class="mapa-secondary-button" data-mapa-fullscreen aria-pressed="false">Ecrã completo</button>
                     <a href="/planeamento/anuais/{{ planeamento.id }}/mapa-conteudos/pdf" class="mapa-secondary-button">Exportar A3</a>
                     <button type="button" class="mapa-secondary-button" data-mapa-add>+ Conteúdo</button>
                     <div class="mapa-conteudos-legend" aria-label="Legenda de prioridades">
@@ -167,4 +168,4 @@
 </div>
 {{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, [], request.session.get('_csrf', '')) }}
 {% endblock %}
-{% block scripts_extra %}<script src="/static/js/mapa-conteudos.js?v=20260830-instant-add" defer></script>{% endblock %}
+{% block scripts_extra %}<script src="/static/js/mapa-conteudos.js?v=20260830-fullscreen" defer></script>{% endblock %}

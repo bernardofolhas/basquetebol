@@ -7,6 +7,7 @@
         var alteracoes = new Map();
         var aGuardar = false;
         var chaveMensagem = "mapa-conteudos:mensagem:" + window.location.pathname;
+        var botaoEcraCompleto = mapa.querySelector("[data-mapa-fullscreen]");
 
         function csrfToken() {
             var meta = document.querySelector('meta[name="csrf-token"]');
@@ -31,6 +32,30 @@
         function atualizarEstado(mensagem, classe) {
             estado.textContent = mensagem;
             estado.className = "mapa-save-status" + (classe ? " " + classe : "");
+        }
+
+        function atualizarBotaoEcraCompleto() {
+            if (!botaoEcraCompleto) return;
+            var emEcraCompleto = document.fullscreenElement === mapa;
+            botaoEcraCompleto.textContent = emEcraCompleto ? "Sair do ecrã completo" : "Ecrã completo";
+            botaoEcraCompleto.setAttribute("aria-pressed", String(emEcraCompleto));
+        }
+
+        if (botaoEcraCompleto) {
+            if (!document.fullscreenEnabled) {
+                botaoEcraCompleto.hidden = true;
+            } else {
+                botaoEcraCompleto.addEventListener("click", async function () {
+                    try {
+                        if (document.fullscreenElement === mapa) await document.exitFullscreen();
+                        else await mapa.requestFullscreen();
+                    } catch (erro) {
+                        atualizarEstado("Não foi possível abrir o ecrã completo.", "is-error");
+                    }
+                });
+                document.addEventListener("fullscreenchange", atualizarBotaoEcraCompleto);
+                atualizarBotaoEcraCompleto();
+            }
         }
 
         async function atualizarMapaSemRecarregar(mensagem) {
