@@ -2567,6 +2567,84 @@ async def adicionar_conteudo_sessao(
     return RedirectResponse(url=f"/planeamento/microciclos/{micro_id}", status_code=303)
 
 
+@router.post("/microciclos/{micro_id}/sessoes/{sessao_id}/conteudos/{conteudo_id}/copiar")
+async def copiar_conteudo_sessao(
+    micro_id: int,
+    sessao_id: int,
+    conteudo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Copia um conteúdo para outra célula da visão semanal do microciclo."""
+    equipa_id = _obter_equipa_id_por_microciclo(db, micro_id)
+    _verificar_acesso_planeamento(utilizador, equipa_id, db)
+    try:
+        payload = await request.json()
+        sessao_destino_id = int(payload.get("sessao_destino_id"))
+        categoria_destino = str(payload.get("categoria_destino", "")).strip()
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return _erro_acao_microciclo(request, micro_id, "O destino do conteúdo não é válido.")
+
+    sessao_origem = db.query(SessaoTreino).filter(
+        SessaoTreino.id == sessao_id,
+        SessaoTreino.microciclo_id == micro_id,
+        SessaoTreino.e_jogo.is_(False),
+        SessaoTreino.ativa.is_(True),
+    ).first()
+    conteudo_origem = db.query(ConteudoSessaoTreino).filter(
+        ConteudoSessaoTreino.id == conteudo_id,
+        ConteudoSessaoTreino.sessao_id == sessao_id,
+    ).first()
+    sessao_destino = db.query(SessaoTreino).filter(
+        SessaoTreino.id == sessao_destino_id,
+        SessaoTreino.microciclo_id == micro_id,
+        SessaoTreino.e_jogo.is_(False),
+        SessaoTreino.ativa.is_(True),
+    ).first()
+    if not sessao_origem or not conteudo_origem or not sessao_destino:
+        return _erro_acao_microciclo(request, micro_id, "O conteúdo ou o treino de destino já não está disponível.", 404)
+    if categoria_destino not in CATEGORIAS_POR_CODIGO:
+        return _erro_acao_microciclo(request, micro_id, "Seleciona uma categoria válida para o conteúdo.")
+    if sessao_destino.id == sessao_origem.id and categoria_destino == conteudo_origem.categoria:
+        return _erro_acao_microciclo(request, micro_id, "Escolhe outra célula para copiar o conteúdo.")
+
+    balanco_minutos = calcular_balanco_minutos(sessao_destino)
+    if (
+        balanco_minutos["limite"] is not None
+        and balanco_minutos["atribuidos"] + conteudo_origem.minutos > balanco_minutos["limite"]
+    ):
+        return _erro_acao_microciclo(
+            request,
+            micro_id,
+            f"Este treino só tem {balanco_minutos['disponiveis']} minutos disponíveis.",
+        )
+
+    copia = ConteudoSessaoTreino(
+        categoria=categoria_destino,
+        descricao=conteudo_origem.descricao,
+        minutos=conteudo_origem.minutos,
+        ordem=len(sessao_destino.conteudos) + 1,
+    )
+    sessao_destino.conteudos.append(copia)
+    atualizar_minutos_por_componente(sessao_destino)
+    sessao_destino.alterada_manual = True
+    sessao_destino.sincronizada = False
+    db.commit()
+    db.refresh(copia)
+    return JSONResponse({
+        "sucesso": True,
+        "mensagem": "Conteúdo copiado.",
+        "conteudo": {
+            "id": copia.id,
+            "categoria": copia.categoria,
+            "descricao": copia.descricao,
+            "minutos": copia.minutos,
+        },
+        **_dados_conteudos_sessao(sessao_destino),
+    })
+
+
 @router.post("/microciclos/{micro_id}/sessoes/{sessao_id}/conteudos/{conteudo_id}/editar")
 async def editar_conteudo_sessao(
     micro_id: int,

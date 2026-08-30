@@ -232,7 +232,8 @@
                         {% if conteudos %}
                         <div data-conteudo-lista class="space-y-1.5">
                             {% for conteudo in conteudos %}
-                            <div data-conteudo-id="{{ conteudo.id }}" class="flex items-start gap-1 rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700">
+                            <div data-conteudo-id="{{ conteudo.id }}" data-conteudo-sessao-id="{{ treino.sessao_id }}" class="flex items-start gap-1 rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700">
+                                <span data-conteudo-drag-handle draggable="true" class="shrink-0 cursor-grab select-none text-slate-400 active:cursor-grabbing" title="Arrastar para copiar" aria-label="Arrastar {{ conteudo.descricao }} para copiar">⠿</span>
                                 <span class="min-w-0 flex-1 break-words">{{ conteudo.descricao }} <span class="font-semibold text-slate-500">· {{ conteudo.minutos }} min</span></span>
                                 <button type="button" data-editar-conteudo onclick='abrirConteudoDialog({{ treino.sessao_id }}, {{ categoria.codigo|tojson }}, {{ treino.titulo_treino|tojson }}, {{ categoria.sigla|tojson }}, {{ categoria.label|tojson }}, {{ conteudo.id }}, {{ conteudo.descricao|tojson }}, {{ conteudo.minutos }})' class="shrink-0 rounded px-1 text-slate-400 hover:bg-white hover:text-orange-700" title="Editar conteúdo" aria-label="Editar {{ conteudo.descricao }}">✎</button>
                                 <button type="button" onclick="eliminarConteudo({{ treino.sessao_id }}, {{ conteudo.id }})" class="shrink-0 rounded px-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Remover conteúdo" aria-label="Remover {{ conteudo.descricao }}">×</button>
@@ -579,7 +580,7 @@ function htmlConteudo(sessaoId, conteudo) {
     const titulo = botaoAdicionar?.getAttribute('aria-label')?.replace(/^Adicionar conteúdo de .+ ao /, '') || 'Treino';
     const categoriaTitulo = celula?.closest('tr')?.querySelector('th span:nth-child(2)')?.textContent?.trim() || categoria;
     const sigla = celula?.closest('tr')?.querySelector('th span:first-child')?.textContent?.trim() || categoria;
-    return `<div data-conteudo-id="${conteudo.id}" class="flex items-start gap-1 rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700"><span class="min-w-0 flex-1 break-words">${escaparHtml(conteudo.descricao)} <span class="font-semibold text-slate-500">· ${conteudo.minutos} min</span></span><button type="button" data-editar-conteudo class="shrink-0 rounded px-1 text-slate-400 hover:bg-white hover:text-orange-700" title="Editar conteúdo" aria-label="Editar ${escaparHtml(conteudo.descricao)}">✎</button><button type="button" data-eliminar-conteudo class="shrink-0 rounded px-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Remover conteúdo" aria-label="Remover ${escaparHtml(conteudo.descricao)}">×</button><span hidden data-conteudo-meta data-treino="${escaparHtml(titulo)}" data-sigla="${escaparHtml(sigla)}" data-label="${escaparHtml(categoriaTitulo)}" data-categoria="${categoria}" data-descricao="${escaparHtml(conteudo.descricao)}" data-minutos="${conteudo.minutos}" data-sessao-id="${sessaoId}"></span></div>`;
+    return `<div data-conteudo-id="${conteudo.id}" data-conteudo-sessao-id="${sessaoId}" class="flex items-start gap-1 rounded-md border border-orange-100 bg-orange-50 px-2 py-1.5 text-[11px] text-slate-700"><span data-conteudo-drag-handle draggable="true" class="shrink-0 cursor-grab select-none text-slate-400 active:cursor-grabbing" title="Arrastar para copiar" aria-label="Arrastar ${escaparHtml(conteudo.descricao)} para copiar">⠿</span><span class="min-w-0 flex-1 break-words">${escaparHtml(conteudo.descricao)} <span class="font-semibold text-slate-500">· ${conteudo.minutos} min</span></span><button type="button" data-editar-conteudo class="shrink-0 rounded px-1 text-slate-400 hover:bg-white hover:text-orange-700" title="Editar conteúdo" aria-label="Editar ${escaparHtml(conteudo.descricao)}">✎</button><button type="button" data-eliminar-conteudo class="shrink-0 rounded px-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Remover conteúdo" aria-label="Remover ${escaparHtml(conteudo.descricao)}">×</button><span hidden data-conteudo-meta data-treino="${escaparHtml(titulo)}" data-sigla="${escaparHtml(sigla)}" data-label="${escaparHtml(categoriaTitulo)}" data-categoria="${categoria}" data-descricao="${escaparHtml(conteudo.descricao)}" data-minutos="${conteudo.minutos}" data-sessao-id="${sessaoId}"></span></div>`;
 }
 
 function ligarAcoesConteudo(elemento) {
@@ -587,7 +588,75 @@ function ligarAcoesConteudo(elemento) {
     if (!meta) return;
     elemento.querySelector('[data-editar-conteudo]').addEventListener('click', () => abrirConteudoDialog(Number(meta.dataset.sessaoId), meta.dataset.categoria, meta.dataset.treino, meta.dataset.sigla, meta.dataset.label, Number(elemento.dataset.conteudoId), meta.dataset.descricao, Number(meta.dataset.minutos)));
     elemento.querySelector('[data-eliminar-conteudo]').addEventListener('click', () => eliminarConteudo(Number(meta.dataset.sessaoId), Number(elemento.dataset.conteudoId)));
+    ligarArrastoConteudo(elemento);
 }
+
+let conteudoArrastado = null;
+
+function ligarArrastoConteudo(elemento) {
+    const pega = elemento.querySelector('[data-conteudo-drag-handle]');
+    if (!pega || pega.dataset.arrastoLigado) return;
+    pega.dataset.arrastoLigado = 'true';
+    pega.addEventListener('dragstart', evento => {
+        conteudoArrastado = elemento;
+        elemento.classList.add('opacity-50');
+        evento.dataTransfer.effectAllowed = 'copy';
+        evento.dataTransfer.setData('text/plain', elemento.dataset.conteudoId);
+    });
+    pega.addEventListener('dragend', () => {
+        elemento.classList.remove('opacity-50');
+        document.querySelectorAll('[data-conteudo-celula].ring-1').forEach(celula => {
+            celula.classList.remove('ring-1', 'ring-inset', 'ring-orange-300', 'bg-orange-50');
+        });
+        conteudoArrastado = null;
+    });
+}
+
+async function copiarConteudoParaCelula(celula) {
+    const origem = conteudoArrastado;
+    if (!origem) return;
+    const [sessaoDestinoId, categoriaDestino] = celula.dataset.conteudoCelula.split(':');
+    if (Number(sessaoDestinoId) === Number(origem.dataset.conteudoSessaoId)
+        && categoriaDestino === origem.querySelector('[data-conteudo-meta]')?.dataset.categoria) return;
+    const resposta = await fetch(
+        `/planeamento/microciclos/${_MICROCICLO_ID}/sessoes/${origem.dataset.conteudoSessaoId}/conteudos/${origem.dataset.conteudoId}/copiar`,
+        {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({sessao_destino_id: Number(sessaoDestinoId), categoria_destino: categoriaDestino}),
+        }
+    );
+    const dados = await resposta.json();
+    if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível copiar o conteúdo.');
+    celula.querySelector('[data-conteudo-vazio]')?.remove();
+    const lista = celula.querySelector('[data-conteudo-lista]');
+    lista.insertAdjacentHTML('beforeend', htmlConteudo(Number(sessaoDestinoId), dados.conteudo));
+    ligarAcoesConteudo(lista.lastElementChild);
+    atualizarBalancoMinutos(dados);
+    atualizarComponentes(dados.componentes);
+}
+
+document.querySelectorAll('[data-conteudo-id]').forEach(ligarArrastoConteudo);
+document.querySelectorAll('[data-conteudo-celula]').forEach(celula => {
+    celula.addEventListener('dragover', evento => {
+        if (!conteudoArrastado) return;
+        evento.preventDefault();
+        evento.dataTransfer.dropEffect = 'copy';
+        celula.classList.add('ring-1', 'ring-inset', 'ring-orange-300', 'bg-orange-50');
+    });
+    celula.addEventListener('dragleave', evento => {
+        if (!celula.contains(evento.relatedTarget)) celula.classList.remove('ring-1', 'ring-inset', 'ring-orange-300', 'bg-orange-50');
+    });
+    celula.addEventListener('drop', async evento => {
+        evento.preventDefault();
+        celula.classList.remove('ring-1', 'ring-inset', 'ring-orange-300', 'bg-orange-50');
+        try {
+            await copiarConteudoParaCelula(celula);
+        } catch (erro) {
+            window.alert(erro.message);
+        }
+    });
+});
 
 conteudoForm.addEventListener('submit', async event => {
     event.preventDefault();
