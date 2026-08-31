@@ -99,7 +99,7 @@
                     <p class="font-medium text-gray-800 text-sm">{{ jogo.equipa.nome }} vs {{ jogo.adversario }}</p>
                     <p class="text-xs text-gray-400">{{ jogo.data|data_pt }}{% if jogo.hora %} — {{ jogo.hora }}{% endif %}</p>
                 </div>
-                <span class="{% if jogo.em_casa %}bg-green-100 text-green-700{% else %}bg-blue-100 text-blue-700{% endif %} text-xs px-2 py-0.5 rounded-full">
+                <span class="{% if jogo.em_casa %}bg-rose-100 text-rose-700{% else %}bg-blue-100 text-blue-700{% endif %} text-xs px-2 py-0.5 rounded-full">
                     {% if jogo.em_casa %}Casa{% else %}Fora{% endif %}
                 </span>
             </div>

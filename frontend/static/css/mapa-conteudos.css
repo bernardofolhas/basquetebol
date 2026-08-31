@@ -74,7 +74,7 @@
 .mapa-game { display: block; overflow: hidden; border-radius: .25rem; padding: .18rem .12rem; color: #fff; font-size: .56rem; font-weight: 800; line-height: 1.1; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
 .mapa-game + .mapa-game { margin-top: .12rem; }
 .mapa-game b { margin-right: .15rem; }
-.mapa-game.is-home { background: #087a55; }
+.mapa-game.is-home { background: #be123c; }
 .mapa-game.is-away { background: #2563eb; }
 .mapa-cycle-row td { height: 1.7rem; background: #eef3f8; color: #334155; font-size: .62rem; font-weight: 800; text-align: center; }
 .mapa-cycle-row td.has-cycle { border-right: 2px solid #8390a2; }

@@ -183,9 +183,9 @@ def _aplicar_estilo_localizacao_jogo(item: dict, em_casa: bool) -> dict:
     if em_casa:
         item.update({
             "badge": "Jogo · Casa",
-            "pill_classes": "bg-emerald-100 text-emerald-800",
-            "dot_classes": "bg-emerald-500",
-            "card_classes": "border-emerald-200 bg-emerald-50",
+            "pill_classes": "bg-rose-100 text-rose-800",
+            "dot_classes": "bg-rose-500",
+            "card_classes": "border-rose-200 bg-rose-50",
             "classe_jogo": "jogo-casa",
             "jogo_localidade": "Casa",
             "em_casa": True,

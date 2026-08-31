@@ -38,7 +38,7 @@ def test_itens_de_jogo_distinguem_casa_e_fora():
 
     assert item_casa["classe_jogo"] == "jogo-casa"
     assert item_casa["jogo_localidade"] == "Casa"
-    assert "emerald" in item_casa["card_classes"]
+    assert "rose" in item_casa["card_classes"]
     assert item_fora["classe_jogo"] == "jogo-fora"
     assert item_fora["jogo_localidade"] == "Fora"
     assert "blue" in item_fora["card_classes"]
