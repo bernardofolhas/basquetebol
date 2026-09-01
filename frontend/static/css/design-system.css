@@ -819,6 +819,15 @@ table tbody tr:hover { background:#fafbfd; }
 .pdf-configurador-campo input { width:100%;min-height:2.5rem;padding:.55rem .7rem;font-size:.78rem; }
 .pdf-configurador-erro { margin:0;border-radius:.5rem;background:#fff1f2;padding:.55rem .7rem;color:#b4232f;font-size:.72rem;font-weight:700; }
 .pdf-configurador-acoes { display:flex;justify-content:flex-end;gap:.5rem;border-top:1px solid var(--border-soft);padding-top:1rem; }
+
+/* O staff consulta e exporta o planeamento, mas as ações técnicas ficam na
+   equipa responsável pelo planeamento. A validação no servidor mantém esta
+   regra mesmo para URLs introduzidos manualmente. */
+.perfil-staff a[href*="/planeamento/"][href$="/editar"],
+.perfil-staff a[href*="/planeamento/"][href*="/novo"],
+.perfil-staff form[action^="/planeamento/"],
+.perfil-staff form[action^="/treino/"],
+.perfil-staff [data-action="adicionar-atividade"] { display:none !important; }
 @media (max-width:640px) {
     .pdf-configurador { width:calc(100vw - 1rem);max-height:calc(100vh - 1rem); }
     .pdf-configurador-card { gap:.8rem;padding:1rem; }

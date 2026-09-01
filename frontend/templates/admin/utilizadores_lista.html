@@ -26,6 +26,7 @@
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Perfil</th>
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Treinador</th>
+        <th class="text-left px-4 py-3 font-semibold text-gray-600">Equipas de staff</th>
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Estado</th>
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Ações</th>
         </tr>
@@ -47,6 +48,9 @@
                     {% else %}
                         —
                     {% endif %}
+                </td>
+                <td class="px-4 py-3 text-gray-600">
+                    {% if u.perfil.value == 'staff' %}{{ u.equipas_staff | map(attribute='nome') | join(', ') or 'Sem equipas atribuídas' }}{% else %}—{% endif %}
                 </td>
                 <td class="px-4 py-3">
                     {% if u.ativo %}

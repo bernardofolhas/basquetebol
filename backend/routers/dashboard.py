@@ -30,7 +30,7 @@ def dashboard(
     """Renderiza o dashboard adequado ao perfil do utilizador autenticado."""
     if utilizador.perfil.value == "superadministrador" and not getattr(request.state, "clube_atual", None):
         return RedirectResponse(url="/superadmin/clubes", status_code=303)
-    if utilizador.perfil.value == "treinador":
+    if utilizador.perfil.value in {"treinador", "staff"}:
         contexto = get_dashboard_treinador(db, utilizador)
         return templates.TemplateResponse(request, "dashboard_treinador.html", contexto)
 

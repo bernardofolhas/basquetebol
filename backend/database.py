@@ -142,6 +142,74 @@ def actualizar_estrutura_perfis() -> None:
         if not existe:
             ligacao.execute(text("ALTER TYPE perfilenum ADD VALUE 'secretaria'"))
             logger.info("Perfil 'secretaria' adicionado ao enum da base de dados.")
+        existe_staff = ligacao.execute(text(
+            "SELECT 1 FROM pg_enum "
+            "WHERE enumtypid = 'perfilenum'::regtype AND enumlabel = 'staff'"
+        )).first()
+        if not existe_staff:
+            ligacao.execute(text("ALTER TYPE perfilenum ADD VALUE 'staff'"))
+            logger.info("Perfil 'staff' adicionado ao enum da base de dados.")
+
+
+def actualizar_estrutura_staff() -> None:
+    """Cria os vínculos de staff e converte a conta Staff23 sem alterar credenciais."""
+    inspector = inspect(engine)
+    if not inspector.has_table("utilizadores") or not inspector.has_table("equipas"):
+        return
+
+    with engine.begin() as ligacao:
+        ligacao.execute(text(
+            "CREATE TABLE IF NOT EXISTS utilizador_staff_equipa ("
+            "utilizador_id INTEGER NOT NULL REFERENCES utilizadores(id) ON DELETE CASCADE, "
+            "equipa_id INTEGER NOT NULL REFERENCES equipas(id) ON DELETE CASCADE, "
+            "PRIMARY KEY (utilizador_id, equipa_id)"
+            ")"
+        ))
+
+    # Esta migração é intencionalmente idempotente. Se a conta já tiver
+    # equipas, respeita-as; caso venha de uma conta de treinador, herda as
+    # equipas desse treinador. Sem essa associação, fica ligada às equipas do
+    # próprio clube, podendo o administrador restringi-las depois no formulário.
+    with engine.begin() as ligacao:
+        staff23 = ligacao.execute(text(
+            "SELECT id, clube_id, treinador_id FROM utilizadores "
+            "WHERE lower(username) = 'staff23'"
+        )).mappings().all()
+        for conta in staff23:
+            ligacao.execute(text(
+                "UPDATE utilizadores SET perfil = 'staff' WHERE id = :utilizador_id"
+            ), {"utilizador_id": conta["id"]})
+            tem_equipas = ligacao.execute(text(
+                "SELECT 1 FROM utilizador_staff_equipa WHERE utilizador_id = :utilizador_id LIMIT 1"
+            ), {"utilizador_id": conta["id"]}).first()
+            if tem_equipas:
+                continue
+            if conta["treinador_id"]:
+                ligacao.execute(text(
+                    "INSERT INTO utilizador_staff_equipa (utilizador_id, equipa_id) "
+                    "SELECT :utilizador_id, equipa_id FROM treinador_equipa "
+                    "WHERE treinador_id = :treinador_id ON CONFLICT DO NOTHING"
+                ), {"utilizador_id": conta["id"], "treinador_id": conta["treinador_id"]})
+            else:
+                # Staff23 é uma conta criada para o escalão Sub-23. Se essa
+                # equipa existir, a associação é específica; em instalações
+                # sem esse nome, mantém-se uma associação funcional ao clube.
+                equipas_sub23 = ligacao.execute(text(
+                    "SELECT id FROM equipas WHERE clube_id = :clube_id "
+                    "AND lower(replace(nome, '-', '')) LIKE '%sub23%'"
+                ), {"clube_id": conta["clube_id"]}).mappings().all()
+                if equipas_sub23:
+                    for equipa in equipas_sub23:
+                        ligacao.execute(text(
+                            "INSERT INTO utilizador_staff_equipa (utilizador_id, equipa_id) "
+                            "VALUES (:utilizador_id, :equipa_id) ON CONFLICT DO NOTHING"
+                        ), {"utilizador_id": conta["id"], "equipa_id": equipa["id"]})
+                else:
+                    ligacao.execute(text(
+                        "INSERT INTO utilizador_staff_equipa (utilizador_id, equipa_id) "
+                        "SELECT :utilizador_id, id FROM equipas WHERE clube_id = :clube_id "
+                        "ON CONFLICT DO NOTHING"
+                    ), {"utilizador_id": conta["id"], "clube_id": conta["clube_id"]})
 
 
 def actualizar_estrutura_recuperacao_password() -> None:

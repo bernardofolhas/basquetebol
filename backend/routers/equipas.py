@@ -97,6 +97,8 @@ def listar_equipas(
     from auth import verificar_perfil
     if verificar_perfil(utilizador, ["administrador", "coordenador"]):
         equipas = db.query(Equipa).options(joinedload(Equipa.jogadores)).all()
+    elif getattr(utilizador.perfil, "value", utilizador.perfil) == "staff":
+        equipas = list(utilizador.equipas_staff or [])
     else:
         if utilizador.treinador_id:
             from models.treinador import Treinador
@@ -300,7 +302,7 @@ def form_editar_equipa(
     equipa_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     verificar_ou_negar_equipa(utilizador, equipa_id, db)
 
@@ -321,7 +323,7 @@ async def editar_equipa(
     equipa_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_operacao_desportiva),
     nome: str = Form(...),
     escalao: str = Form(...),
     genero: str = Form(...),

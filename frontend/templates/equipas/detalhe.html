@@ -12,7 +12,7 @@
     "/equipas",
     "Voltar às equipas"
 ) %}
-    {% if utilizador.perfil.value in ['administrador', 'coordenador', 'superadministrador'] %}
+    {% if utilizador.perfil.value in ['administrador', 'coordenador', 'staff', 'superadministrador'] %}
     <a href="/equipas/{{ equipa.id }}/editar" class="rounded-full bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-blue-50 hover:text-blue-700">Editar equipa</a>
     {% endif %}
     {% if utilizador.perfil.value in ['administrador', 'coordenador'] %}

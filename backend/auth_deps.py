@@ -52,7 +52,7 @@ def exigir_qualquer_perfil(request: Request, db: Session = Depends(get_db)):
         raise NaoAutenticado()
     perfis = _perfis_com_superadmin_em_apoio(
         request,
-        ["administrador", "coordenador", "treinador", "secretaria"],
+        ["administrador", "coordenador", "treinador", "secretaria", "staff"],
     )
     if not verificar_perfil(utilizador, perfis):
         raise NaoAutenticado()
@@ -84,10 +84,24 @@ def exigir_operacao_desportiva(request: Request, db: Session = Depends(get_db)):
         raise NaoAutenticado()
     perfis = _perfis_com_superadmin_em_apoio(
         request,
-        ["administrador", "coordenador", "treinador"],
+        ["administrador", "coordenador", "treinador", "staff"],
     )
     if not verificar_perfil(utilizador, perfis):
         raise SemPermissao("/dashboard")
+    return utilizador
+
+
+def exigir_scouting(request: Request, db: Session = Depends(get_db)):
+    """Scouting é reservado à equipa técnica com responsabilidade técnica."""
+    utilizador = obter_utilizador_atual(request, db)
+    if not utilizador:
+        raise NaoAutenticado()
+    perfis = _perfis_com_superadmin_em_apoio(
+        request,
+        ["administrador", "coordenador", "treinador"],
+    )
+    if not verificar_perfil(utilizador, perfis):
+        raise SemPermissao("/dashboard", status_code=403)
     return utilizador
 
 

@@ -30,6 +30,14 @@ def _obter_jogo(db: Session, jogo_id: int):
     return db.query(Jogo).filter(Jogo.id == jogo_id).first()
 
 
+def _verificar_acesso_plano_jogo(utilizador, jogo: Jogo, db: Session) -> None:
+    """O staff pode gerir jogos, mas não o respetivo plano técnico."""
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    if utilizador.perfil.value == "staff":
+        from auth_deps import SemPermissao
+        raise SemPermissao(f"/jogos/{jogo.id}", status_code=403)
+
+
 def _atualizar_campos_jogo(jogo: Jogo, data: str, hora: str, local: str,
                             adversario: str, competicao: str, em_casa: str, observacoes: str) -> None:
     jogo.data = date.fromisoformat(data)
@@ -367,7 +375,7 @@ def pagina_plano_jogo(
     jogo = _obter_jogo(db, jogo_id)
     if not jogo:
         return RedirectResponse(url="/equipas")
-    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db)
 
     jogadores = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).order_by(Jogador.nome).all()
     plano = db.query(PlanoJogo).filter(PlanoJogo.jogo_id == jogo_id).first()
@@ -390,7 +398,7 @@ async def guardar_plano_jogo(
     jogo = _obter_jogo(db, jogo_id)
     if not jogo:
         return RedirectResponse(url="/equipas")
-    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db)
 
     dados = await request.form()
 
@@ -468,7 +476,7 @@ def imprimir_plano_jogo(
     jogo = _obter_jogo(db, jogo_id)
     if not jogo:
         return RedirectResponse(url="/equipas")
-    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db)
 
     jogadores = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).all()
     jogadores_dict = {j.id: j for j in jogadores}
@@ -492,7 +500,7 @@ def exportar_pdf_plano_jogo(
     jogo = _obter_jogo(db, jogo_id)
     if not jogo:
         return RedirectResponse(url="/equipas")
-    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db)
     jogadores = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).all()
     jogadores_dict = {j.id: j for j in jogadores}
     pdf_bytes = renderizar_pdf(request, "jogos/plano_jogo_print.html", {

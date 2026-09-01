@@ -1,5 +1,5 @@
 
-from sqlalchemy import Column, Integer, String, Boolean, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Enum, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from database import Base
 import enum
@@ -11,6 +11,18 @@ class PerfilEnum(str, enum.Enum):
     coordenador = "coordenador"
     treinador = "treinador"
     secretaria = "secretaria"
+    staff = "staff"
+
+
+# As contas de staff pertencem a uma ou mais equipas sem precisarem de ser
+# registadas como treinadores. Isto limita o acesso ao contexto de trabalho
+# que lhes foi atribuído pelo administrador do clube.
+utilizador_staff_equipa = Table(
+    "utilizador_staff_equipa",
+    Base.metadata,
+    Column("utilizador_id", Integer, ForeignKey("utilizadores.id", ondelete="CASCADE"), primary_key=True),
+    Column("equipa_id", Integer, ForeignKey("equipas.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Utilizador(Base):
@@ -33,3 +45,4 @@ class Utilizador(Base):
     # Relação ORM para aceder ao treinador associado
     treinador = relationship("Treinador", backref="utilizadores")
     clube = relationship("Clube", foreign_keys=[clube_id], backref="utilizadores")
+    equipas_staff = relationship("Equipa", secondary=utilizador_staff_equipa, backref="utilizadores_staff")

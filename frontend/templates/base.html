@@ -27,7 +27,7 @@
     document.addEventListener("htmx:configRequest",function(evt){evt.detail.headers["X-CSRF-Token"]=document.querySelector("meta[name='csrf-token']").content});
   </script>
 </head>
-<body class="min-h-screen bg-slate-100 {% if modo_plataforma %}modo-plataforma{% endif %}">
+<body class="min-h-screen bg-slate-100 perfil-{{ utilizador.perfil.value }} {% if modo_plataforma %}modo-plataforma{% endif %}">
   <a href="#conteudo-principal" class="ds-skip-link">Saltar para o conteúdo</a>
   {% set perfil = utilizador.perfil.value %}
   {% set p = request.url.path %}

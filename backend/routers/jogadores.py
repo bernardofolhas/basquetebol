@@ -41,6 +41,8 @@ def _equipas_para_utilizador(utilizador, db: Session) -> list:
     """Devolve as equipas acessíveis pelo utilizador atual."""
     if verificar_perfil(utilizador, ["administrador", "coordenador"]):
         return db.query(Equipa).all()
+    if utilizador.perfil == PerfilEnum.staff:
+        return list(utilizador.equipas_staff or [])
     if utilizador.treinador_id:
         from models.treinador import Treinador
         treinador = db.query(Treinador).options(
@@ -56,7 +58,7 @@ def _verificar_acesso_jogador(utilizador, jogador: Jogador, db: Session) -> None
         return
     if jogador.equipa_id:
         verificar_ou_negar_equipa(utilizador, jogador.equipa_id, db)
-    elif verificar_perfil(utilizador, ["treinador"]):
+    elif verificar_perfil(utilizador, ["treinador", "staff"]):
         raise AcessoNegado("/jogadores")
 
 
@@ -205,7 +207,7 @@ async def criar_jogador(
 async def eliminar_jogadores_selecionados(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     form = await request.form()
     equipa_id_form = str(form.get("equipa_id", "")).strip()
@@ -217,6 +219,8 @@ async def eliminar_jogadores_selecionados(
     if equipa_id:
         query = query.filter(Jogador.equipa_id == equipa_id)
     jogadores = query.all() if ids else []
+    for jogador in jogadores:
+        _verificar_acesso_jogador(utilizador, jogador, db)
     retorno = f"/equipas/{equipa_id}/plantel" if equipa_id else "/jogadores"
     if not jogadores or str(len(jogadores)) != str(form.get("confirmar_total", "")):
         set_flash(request, "A confirmação não corresponde ao número de jogadores selecionados.", "error")
@@ -233,7 +237,7 @@ async def eliminar_jogadores_selecionados(
 async def eliminar_todos_jogadores(
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     form = await request.form()
     equipa_id_form = str(form.get("equipa_id", "")).strip()
@@ -244,6 +248,8 @@ async def eliminar_todos_jogadores(
     if equipa_id:
         query = query.filter(Jogador.equipa_id == equipa_id)
     jogadores = query.all()
+    for jogador in jogadores:
+        _verificar_acesso_jogador(utilizador, jogador, db)
     retorno = f"/equipas/{equipa_id}/plantel" if equipa_id else "/jogadores"
     if not jogadores or str(len(jogadores)) != str(form.get("confirmar_total", "")):
         set_flash(request, "Confirma o número total de jogadores antes de eliminar.", "error")
@@ -484,10 +490,11 @@ def apagar_jogador(
     jogador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     jogador = db.query(Jogador).filter(Jogador.id == jogador_id).first()
     if jogador:
+        _verificar_acesso_jogador(utilizador, jogador, db)
         nome = jogador.nome
         fotografia = _apagar_jogador_com_dependencias(db, jogador)
         db.commit()

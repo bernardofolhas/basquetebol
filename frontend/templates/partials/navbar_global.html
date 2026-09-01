@@ -22,7 +22,7 @@
   </a>
 
   <div id="header-navigation" class="ds-header-navigation" aria-label="Navegação principal">
-    {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
+    {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
     <form action="/pesquisa" method="get" class="ds-mobile-search xl:hidden">
       <label><span class="sr-only">Pesquisar</span><input name="q" minlength="2" placeholder="Pesquisar no clube"></label>
     </form>
@@ -42,7 +42,7 @@
         </div>
       </details>
       {% else %}
-      {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
+      {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
       <details class="ds-menu ds-primary-menu ds-nav-order-equipa">
         <summary class="ds-header-trigger {% if not equipa_contexto_id and p.startswith('/equipas') %}is-active{% endif %}">
           <span>Equipa</span><span class="ds-menu-chevron">⌄</span>
@@ -76,8 +76,8 @@
             <div class="ds-dropdown-section">
               <p class="ds-dropdown-label px-2 pb-1">{{ jogo_nav.data|data_pt }} · {{ jogo_nav.adversario }}</p>
               <div class="ds-menu-grid">
-                {{ menu_link('/jogos/' ~ jogo_nav.id ~ '/plano', 'Plano de jogo', 'Preparação e 5 inicial') }}
-                {{ menu_link('/scouting/jogos/' ~ jogo_nav.id, 'Scouting', 'Adversário e resposta') }}
+                {% if perfil != 'staff' %}{{ menu_link('/jogos/' ~ jogo_nav.id ~ '/plano', 'Plano de jogo', 'Preparação e 5 inicial') }}{% endif %}
+                {% if perfil != 'staff' %}{{ menu_link('/scouting/jogos/' ~ jogo_nav.id, 'Scouting', 'Adversário e resposta') }}{% endif %}
               </div>
             </div>
             {% else %}<p class="px-2 py-3 text-sm text-slate-500">Sem próximos jogos. O calendário mantém os planos dos jogos já registados.</p>{% endfor %}
@@ -126,7 +126,7 @@
         <summary class="ds-header-trigger {% if p.startswith('/calendario') or p.startswith('/planeamento-clube/espacos') or p.startswith('/biblioteca') or p.startswith('/dashboard/clube') %}is-active{% endif %}">Operação <span class="ds-menu-chevron">⌄</span></summary>
         <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
           <p class="ds-dropdown-title">Trabalho diário</p>
-          {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
+          {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
           {{ menu_link('/calendario', 'Calendário operacional', 'Treinos, jogos e atividades', p.startswith('/calendario')) }}
           {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
@@ -146,11 +146,11 @@
           {{ menu_link('/planeamento-clube/semanal', 'Horários previstos', 'Consulta semanal') }}
           {{ menu_link('/planeamento-clube/espacos', 'Espaços e slots', 'Consulta de espaços') }}
           {% endif %}
-          {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}{{ menu_link('/biblioteca', 'Biblioteca de exercícios', 'Pesquisar e reutilizar') }}{% endif %}
+          {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}{{ menu_link('/biblioteca', 'Biblioteca de exercícios', 'Pesquisar e reutilizar') }}{% endif %}
         </div>
       </details>
 
-      {% if perfil in ['administrador', 'coordenador', 'secretaria', 'superadministrador'] %}
+      {% if perfil in ['administrador', 'coordenador', 'secretaria', 'staff', 'superadministrador'] %}
       <details class="ds-menu ds-primary-menu ds-nav-order-gestao">
         <summary class="ds-header-trigger {% if p.startswith('/jogadores') or p.startswith('/treinadores') or p.startswith('/secretaria') or p.startswith('/admin') or p.startswith('/administracao') %}is-active{% endif %}">Gestão <span class="ds-menu-chevron">⌄</span></summary>
         <div class="ds-dropdown ds-navigation-dropdown right-0 w-80">
@@ -181,7 +181,7 @@
 
   <span class="ml-auto"></span>
 
-  {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
+  {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
   <details class="ds-menu relative hidden md:block">
     <summary class="ds-icon-button" aria-label="Pesquisar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></summary>
     <div class="ds-dropdown right-0 w-80 p-3"><form action="/pesquisa" method="get"><label class="block"><span class="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Pesquisar no clube</span><input name="q" minlength="2" autofocus placeholder="Equipa, atleta, treinador..." class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"></label></form></div>

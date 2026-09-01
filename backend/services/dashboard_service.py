@@ -337,7 +337,9 @@ def get_dashboard_treinador(db, utilizador):
     hoje, limite = _obter_intervalo_alertas()
 
     equipas = []
-    if utilizador.treinador_id:
+    if getattr(utilizador.perfil, "value", utilizador.perfil) == "staff":
+        equipas = list(getattr(utilizador, "equipas_staff", []) or [])
+    elif utilizador.treinador_id:
         treinador = db.query(Treinador).filter(
             Treinador.id == utilizador.treinador_id
         ).first()

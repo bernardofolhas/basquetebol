@@ -40,10 +40,12 @@ from middleware_clube import ClubeContextoMiddleware
 from middleware_navegacao import NavegacaoGlobalMiddleware
 from middleware_retorno_criacao import RetornoAposCriacaoMiddleware
 from middleware_cache import PaginasDinamicasSemCacheMiddleware
+from middleware_staff import StaffPermissionsMiddleware
 from database import (
     Base,
     actualizar_estrutura_assiduidade,
     actualizar_estrutura_campos_desenho,
+    actualizar_estrutura_staff,
     actualizar_estrutura_jogadores,
     actualizar_estrutura_perfis,
     actualizar_estrutura_planeamento_clube,
@@ -110,6 +112,7 @@ try:
     validar_ligacao_base_dados()
     Base.metadata.create_all(bind=engine)
     actualizar_estrutura_perfis()
+    actualizar_estrutura_staff()
     actualizar_estrutura_planeamento_clube()
     actualizar_estrutura_recuperacao_password()
     actualizar_estrutura_campos_desenho()
@@ -140,6 +143,7 @@ app.add_middleware(IdentidadeClubeMiddleware)
 app.add_middleware(NavegacaoGlobalMiddleware)
 app.add_middleware(FlashMiddleware)
 app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(StaffPermissionsMiddleware)
 app.add_middleware(ClubeContextoMiddleware)
 app.add_middleware(RetornoAposCriacaoMiddleware)
 app.add_middleware(PaginasDinamicasSemCacheMiddleware)
