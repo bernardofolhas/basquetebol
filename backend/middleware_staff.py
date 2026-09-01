@@ -10,7 +10,13 @@ from database import SessionLocal
 
 
 class StaffPermissionsMiddleware(BaseHTTPMiddleware):
-    """Impede alterações técnicas fora do âmbito atribuído ao staff."""
+    """Mantém planeamento, scouting e jogos em consulta para o staff."""
+
+    _metodos_leitura = {"GET", "HEAD", "OPTIONS"}
+    _areas_consulta = ("/planeamento", "/planeamento-clube", "/treino", "/agenda", "/scouting", "/jogos")
+    _paginas_de_edicao = re.compile(
+        r"/(?:novo|editar|eliminar|apagar|duplicar|importar|publicar|cancelar)(?:/|$)"
+    )
 
     async def dispatch(self, request, call_next):
         caminho = request.url.path
@@ -23,13 +29,10 @@ class StaffPermissionsMiddleware(BaseHTTPMiddleware):
             if not utilizador or utilizador.perfil.value != "staff":
                 return await call_next(request)
 
-            bloqueado = (
-                caminho.startswith("/scouting")
-                or bool(re.match(r"^/jogos/\d+/plano(?:/|$)", caminho))
-                or (
-                    request.method not in {"GET", "HEAD", "OPTIONS"}
-                    and caminho.startswith(("/planeamento", "/treino", "/agenda"))
-                )
+            area_em_consulta = caminho.startswith(self._areas_consulta)
+            bloqueado = area_em_consulta and (
+                request.method not in self._metodos_leitura
+                or bool(self._paginas_de_edicao.search(caminho))
             )
             if not bloqueado:
                 return await call_next(request)

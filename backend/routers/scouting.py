@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
-from auth_deps import exigir_scouting, verificar_ou_negar_equipa
+from auth_deps import exigir_operacao_desportiva, verificar_ou_negar_equipa
 from database import get_db
 from flash import set_flash
 from models.jogo import Jogo
@@ -66,7 +66,7 @@ def pagina_scouting(
     jogo_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_scouting),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     jogo, relatorio = _jogo_e_relatorio(db, jogo_id, utilizador)
     if not jogo:
@@ -85,7 +85,7 @@ async def guardar_scouting(
     relatorio_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_scouting),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     relatorio = _obter_relatorio(db, relatorio_id, utilizador)
     if not relatorio:
@@ -111,7 +111,7 @@ def publicar_scouting(
     relatorio_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_scouting),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     relatorio = _obter_relatorio(db, relatorio_id, utilizador)
     if not relatorio:
@@ -131,7 +131,7 @@ def adicionar_jogador_adversario(
     numero: str = Form(""),
     posicao: str = Form(""),
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_scouting),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     relatorio = _obter_relatorio(db, relatorio_id, utilizador)
     if not relatorio:
@@ -154,7 +154,7 @@ async def guardar_jogador_adversario(
     jogador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_scouting),
+    utilizador=Depends(exigir_operacao_desportiva),
 ):
     jogador = db.query(ScoutingJogadorAdversario).filter(ScoutingJogadorAdversario.id == jogador_id).first()
     if not jogador or not _obter_relatorio(db, jogador.relatorio_id, utilizador):
@@ -171,7 +171,7 @@ async def guardar_jogador_adversario(
 
 
 @router.post("/jogadores/{jogador_id}/eliminar")
-def eliminar_jogador_adversario(jogador_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+def eliminar_jogador_adversario(jogador_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_operacao_desportiva)):
     jogador = db.query(ScoutingJogadorAdversario).filter(ScoutingJogadorAdversario.id == jogador_id).first()
     if not jogador or not _obter_relatorio(db, jogador.relatorio_id, utilizador):
         return RedirectResponse(url="/equipas", status_code=303)
@@ -183,7 +183,7 @@ def eliminar_jogador_adversario(jogador_id: int, request: Request, db: Session =
 
 
 @router.post("/{relatorio_id}/acoes/nova")
-def adicionar_acao(relatorio_id: int, request: Request, nome: str = Form(""), categoria: str = Form("Ataque"), db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+def adicionar_acao(relatorio_id: int, request: Request, nome: str = Form(""), categoria: str = Form("Ataque"), db: Session = Depends(get_db), utilizador=Depends(exigir_operacao_desportiva)):
     relatorio = _obter_relatorio(db, relatorio_id, utilizador)
     if not relatorio:
         return RedirectResponse(url="/equipas", status_code=303)
@@ -197,7 +197,7 @@ def adicionar_acao(relatorio_id: int, request: Request, nome: str = Form(""), ca
 
 
 @router.post("/acoes/{acao_id}/guardar")
-async def guardar_acao(acao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+async def guardar_acao(acao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_operacao_desportiva)):
     acao = db.query(ScoutingAcao).filter(ScoutingAcao.id == acao_id).first()
     if not acao or not _obter_relatorio(db, acao.relatorio_id, utilizador):
         return RedirectResponse(url="/equipas", status_code=303)
@@ -214,7 +214,7 @@ async def guardar_acao(acao_id: int, request: Request, db: Session = Depends(get
 
 
 @router.post("/acoes/{acao_id}/eliminar")
-def eliminar_acao(acao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+def eliminar_acao(acao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_operacao_desportiva)):
     acao = db.query(ScoutingAcao).filter(ScoutingAcao.id == acao_id).first()
     if not acao or not _obter_relatorio(db, acao.relatorio_id, utilizador):
         return RedirectResponse(url="/equipas", status_code=303)
@@ -226,7 +226,7 @@ def eliminar_acao(acao_id: int, request: Request, db: Session = Depends(get_db),
 
 
 @router.get("/{relatorio_id}/pdf/{formato}")
-def exportar_pdf_scouting(relatorio_id: int, formato: str, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+def exportar_pdf_scouting(relatorio_id: int, formato: str, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_operacao_desportiva)):
     relatorio = _obter_relatorio(db, relatorio_id, utilizador)
     if not relatorio:
         return RedirectResponse(url="/equipas", status_code=303)

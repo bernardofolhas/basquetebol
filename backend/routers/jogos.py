@@ -30,10 +30,12 @@ def _obter_jogo(db: Session, jogo_id: int):
     return db.query(Jogo).filter(Jogo.id == jogo_id).first()
 
 
-def _verificar_acesso_plano_jogo(utilizador, jogo: Jogo, db: Session) -> None:
-    """O staff pode gerir jogos, mas não o respetivo plano técnico."""
+def _verificar_acesso_plano_jogo(
+    utilizador, jogo: Jogo, db: Session, permitir_consulta_staff: bool = True
+) -> None:
+    """O staff consulta o plano, mas não pode alterar o respetivo conteúdo."""
     verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
-    if utilizador.perfil.value == "staff":
+    if utilizador.perfil.value == "staff" and not permitir_consulta_staff:
         from auth_deps import SemPermissao
         raise SemPermissao(f"/jogos/{jogo.id}", status_code=403)
 
@@ -398,7 +400,7 @@ async def guardar_plano_jogo(
     jogo = _obter_jogo(db, jogo_id)
     if not jogo:
         return RedirectResponse(url="/equipas")
-    _verificar_acesso_plano_jogo(utilizador, jogo, db)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
 
     dados = await request.form()
 

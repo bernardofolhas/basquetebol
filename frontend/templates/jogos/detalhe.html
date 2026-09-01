@@ -19,7 +19,7 @@
     <span class="{% if jogo.em_casa %}bg-rose-100 text-rose-700{% else %}bg-blue-100 text-blue-700{% endif %} px-4 py-2 rounded-full text-sm font-medium">
         {% if jogo.em_casa %}Casa{% else %}Fora{% endif %}
     </span>
-    <a href="/jogos/{{ jogo.id }}/editar"
+    {% if utilizador.perfil.value != 'staff' %}<a href="/jogos/{{ jogo.id }}/editar"
        class="bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">
         ✏️ Editar Jogo
     </a>
@@ -30,6 +30,7 @@
             🗑️ Eliminar Jogo
         </button>
     </form>
+    {% endif %}
 {% endcall %}
 
 <nav class="ds-workspace-tabs" data-workspace-tabs="jogo" data-workspace-default="resultado" aria-label="Áreas do jogo">
@@ -60,7 +61,7 @@
         <p class="text-gray-400 text-sm mb-4">Resultado ainda não registado.</p>
         {% endif %}
 
-        <form method="POST" action="/jogos/{{ jogo.id }}/resultado">
+        {% if utilizador.perfil.value != 'staff' %}<form method="POST" action="/jogos/{{ jogo.id }}/resultado">
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">Os nossos pontos</label>
@@ -82,12 +83,13 @@
                 Guardar resultado
             </button>
         </form>
+        {% endif %}
     </div>
 
     <!-- Convocatória -->
     <div data-workspace-panel="jogo:convocatoria" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <h2 class="font-semibold text-gray-700 mb-4">Convocatória</h2>
-        <form method="POST" action="/jogos/{{ jogo.id }}/convocatoria">
+        {% if utilizador.perfil.value != 'staff' %}<form method="POST" action="/jogos/{{ jogo.id }}/convocatoria">
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">Hora de encontro</label>
@@ -150,6 +152,7 @@
             </select>
             <button type="submit" class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100">Copiar convocatória</button>
         </form>
+        {% endif %}
         {% endif %}
     </div>
 
