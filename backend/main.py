@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 import models.atividade
+import models.avaliacao
 import models.auditoria
 import models.clube
 import models.atribuicao_espaco_semanal
@@ -68,6 +69,7 @@ from services.numeracao_planeamento_service import renumerar_todos_os_ciclos
 from services.volume_sessao_service import sincronizar_volumes_automaticos
 from routers import admin
 from routers import agenda
+from routers import avaliacoes
 from routers import assiduidade
 from routers import atividades
 from routers import auth_web
@@ -171,6 +173,7 @@ except Exception:
 
 app.include_router(biblioteca.router)
 app.include_router(agenda.router)
+app.include_router(avaliacoes.router)
 app.include_router(espacos_agenda.router)
 app.include_router(exportacoes.router)
 app.include_router(equipas.router)

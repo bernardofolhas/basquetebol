@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% block titulo %}Registar Avaliações - {{ equipa.nome }}{% endblock %}
+{% block conteudo %}
+
+{% call equipa_contexto(
+    equipa,
+    "Registar Avaliações",
+    ("Treino " ~ (sessao.numero_treino or '') ~ " · " ~ (sessao.data|data_pt)) if sessao else "Avaliação múltipla da equipa",
+    "fisico",
+    "/analise/equipas/" ~ equipa.id,
+    "Voltar à análise"
+) %}
+    <a href="/analise/equipas/{{ equipa.id }}" class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Ver análise</a>
+{% endcall %}
+
+<style>
+  .ds-eval-shell{max-width:1180px;margin:0 auto}
+  .ds-eval-step{display:flex;align-items:center;gap:.7rem;color:#94a3b8;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em}
+  .ds-eval-step::before{display:grid;width:1.8rem;height:1.8rem;place-items:center;border-radius:999px;background:#e2e8f0;color:#64748b;content:attr(data-step)}
+  .ds-eval-step.is-active{color:var(--clube-primary-dark)}.ds-eval-step.is-active::before{background:var(--clube-primary);color:var(--clube-on-primary)}
+  .ds-eval-card{border:1px solid #e2e8f0;border-radius:24px;background:#fff;box-shadow:0 10px 32px rgba(15,23,42,.045)}
+  .ds-eval-input{width:100%;min-height:44px;border:1px solid #cbd5e1;border-radius:13px;background:#fff;padding:.65rem .8rem;color:#0f172a;outline:none}
+  .ds-eval-input:focus{border-color:var(--clube-primary);box-shadow:0 0 0 3px var(--clube-primary-soft)}
+  .ds-eval-choice{display:flex;align-items:center;gap:.75rem;border:1px solid #e2e8f0;border-radius:15px;padding:.72rem .8rem;transition:.15s ease;cursor:pointer}
+  .ds-eval-choice[hidden]{display:none!important}
+  .ds-eval-choice:has(input:checked){border-color:var(--clube-primary);background:var(--clube-primary-surface);box-shadow:0 0 0 1px var(--clube-primary-soft)}
+  .ds-eval-choice input{width:1.05rem;height:1.05rem;accent-color:var(--clube-primary)}
+  .ds-eval-primary{display:inline-flex;min-height:44px;align-items:center;justify-content:center;border-radius:13px;background:var(--clube-primary);padding:.7rem 1.2rem;color:var(--clube-on-primary);font-size:.875rem;font-weight:800;transition:.15s ease}
+  .ds-eval-primary:hover{filter:brightness(.92)}.ds-eval-primary:disabled{cursor:not-allowed;opacity:.55}
+  .ds-eval-dialog{width:min(92vw,580px);border:0;border-radius:26px;padding:0;box-shadow:0 24px 70px rgba(15,23,42,.3)}.ds-eval-dialog::backdrop{background:rgba(15,23,42,.5)}
+  .ds-eval-matrix-player{overflow:hidden;border:1px solid #e2e8f0;border-radius:20px;background:#fff}
+  .ds-eval-value-row{display:grid;grid-template-columns:minmax(170px,1fr) minmax(120px,180px);align-items:center;gap:1rem;border-top:1px solid #f1f5f9;padding:.8rem 1rem}
+  .ds-eval-value-row:first-child{border-top:0}
+  #eval-success{position:fixed;right:1rem;bottom:1rem;z-index:80;max-width:360px;border-radius:16px;background:#064e3b;padding:.85rem 1rem;color:#fff;font-size:.875rem;font-weight:700;box-shadow:0 18px 45px rgba(15,23,42,.3)}
+  @media(max-width:640px){.ds-eval-shell{margin:0 -.15rem}.ds-eval-card{border-radius:19px}.ds-eval-value-row{grid-template-columns:1fr;padding:.75rem}.ds-eval-value-row .ds-eval-input{font-size:16px}.ds-eval-choice{min-height:50px}.ds-eval-footer{position:sticky;bottom:.5rem;z-index:10;border:1px solid #e2e8f0;border-radius:17px;background:rgba(255,255,255,.94);padding:.6rem;box-shadow:0 12px 35px rgba(15,23,42,.16);backdrop-filter:blur(10px)}}
+</style>
+
+<div class="ds-eval-shell">
+  <div class="mb-5 flex items-center gap-5 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+    <span class="ds-eval-step is-active" data-step-indicator="1" data-step="1">Escolher</span>
+    <span class="h-px flex-1 bg-slate-200"></span>
+    <span class="ds-eval-step" data-step-indicator="2" data-step="2">Avaliar</span>
+  </div>
+
+  <section id="eval-step-1" class="space-y-5">
+    <div class="ds-eval-card p-5 sm:p-6">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div><p class="text-xs font-black uppercase tracking-[.16em] text-[var(--clube-primary-dark)]">Momento de avaliação</p><h2 class="mt-1 text-xl font-black text-slate-900">Quem e o que vais avaliar?</h2><p class="mt-1 text-sm text-slate-500">Escolhe os atletas e apenas os parâmetros necessários para esta observação.</p></div>
+        <label class="w-full sm:w-52"><span class="mb-1 block text-xs font-bold text-slate-500">Data da avaliação</span><input id="evaluation-date" type="date" value="{{ data_avaliacao|data_iso }}" class="ds-eval-input" {% if sessao %}readonly{% endif %}></label>
+      </div>
+      {% if sessao %}<div class="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">Associada ao treino {{ sessao.numero_treino or '' }}, {{ sessao.data|data_pt }}{% if sessao.local %}, em {{ sessao.local }}{% endif %}.</div>{% endif %}
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-2">
+      <section class="ds-eval-card p-5 sm:p-6">
+        <div class="flex items-center justify-between gap-3"><div><p class="text-xs font-black uppercase tracking-[.14em] text-slate-400">Atletas</p><h2 class="mt-1 font-black text-slate-900">Selecionar plantel</h2></div><button type="button" data-select-all="players" class="text-xs font-bold text-[var(--clube-primary-dark)]">Selecionar todos</button></div>
+        <input type="search" data-filter="players" placeholder="Pesquisar atleta" class="ds-eval-input mt-4">
+        <div id="player-options" class="mt-3 max-h-[410px] space-y-2 overflow-y-auto pr-1">
+        {% for jogador in jogadores %}
+          <label class="ds-eval-choice" data-option="players" data-search="{{ jogador.nome|lower }}">
+            <input type="checkbox" value="{{ jogador.id }}" data-player-name="{{ jogador.nome }}" data-player-number="{{ jogador.numero_camisola or '' }}" {% if jogador.id in jogadores_selecionados %}checked{% endif %}>
+            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-black text-slate-600">{{ jogador.numero_camisola or jogador.nome[:1] }}</span>
+            <span class="min-w-0"><strong class="block truncate text-sm text-slate-800">{{ jogador.nome }}</strong><small class="text-slate-400">{{ jogador.posicao or equipa.nome }}</small></span>
+          </label>
+        {% else %}<p class="py-8 text-center text-sm text-slate-500">Esta equipa ainda não tem atletas ativos.</p>{% endfor %}
+        </div>
+      </section>
+
+      <section class="ds-eval-card p-5 sm:p-6">
+        <div class="flex items-center justify-between gap-3"><div><p class="text-xs font-black uppercase tracking-[.14em] text-slate-400">Parâmetros</p><h2 class="mt-1 font-black text-slate-900">Selecionar critérios</h2></div><button type="button" data-select-all="parameters" class="text-xs font-bold text-[var(--clube-primary-dark)]">Selecionar todos</button></div>
+        <div class="mt-3 flex gap-2"><input type="search" data-filter="parameters" placeholder="Pesquisar parâmetro" class="ds-eval-input"> <button type="button" onclick="document.getElementById('dialog-quick-parameter').showModal()" class="shrink-0 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-600 hover:bg-slate-50" aria-label="Adicionar parâmetro">+ Novo</button></div>
+        <div id="parameter-options" class="mt-3 max-h-[410px] space-y-4 overflow-y-auto pr-1">
+        {% for categoria, label in categorias.items() %}
+          <div data-category-group="{{ categoria }}">
+            <p class="mb-2 text-xs font-black uppercase tracking-[.12em] text-[var(--clube-primary-dark)]">{{ label }}</p>
+            <div class="space-y-2" data-category-list="{{ categoria }}">
+            {% for parametro in parametros_por_categoria[categoria] %}
+              <label class="ds-eval-choice" data-option="parameters" data-search="{{ parametro.nome|lower }} {{ label|lower }}">
+                <input type="checkbox" value="{{ parametro.id }}" data-parameter-name="{{ parametro.nome }}" data-category="{{ parametro.categoria }}" data-min="{{ parametro.valor_minimo }}" data-max="{{ parametro.valor_maximo }}" data-unit="{{ parametro.unidade or '' }}" {% if parametro.id in parametros_selecionados %}checked{% endif %}>
+                <span class="min-w-0 flex-1"><strong class="block truncate text-sm text-slate-800">{{ parametro.nome }}</strong><small class="text-slate-400">{% if parametro.categoria == 'fisica' %}{{ parametro.valor_minimo|int }}-{{ parametro.valor_maximo|int }} {{ parametro.unidade or '' }}{% else %}Escala 0-5{% endif %}</small></span>
+              </label>
+            {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <div class="ds-eval-footer flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+      <p id="selection-summary" class="text-sm font-semibold text-slate-500">Seleciona pelo menos um atleta e um parâmetro.</p>
+      <button id="continue-evaluation" type="button" class="ds-eval-primary">Continuar para avaliação</button>
+    </div>
+  </section>
+
+  <section id="eval-step-2" hidden>
+    <form id="evaluation-form" method="POST" action="/analise/equipas/{{ equipa.id }}/registar">
+      <input type="hidden" name="data" id="form-date">
+      {% if sessao %}<input type="hidden" name="sessao_id" value="{{ sessao.id }}">{% endif %}
+      <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="text-xl font-black text-slate-900">Preencher avaliações</h2><p class="text-sm text-slate-500">Os campos podem ficar vazios quando um parâmetro não foi observado.</p></div><button id="back-to-selection" type="button" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Alterar seleção</button></div>
+      <div id="evaluation-matrix" class="space-y-4"></div>
+      <div class="ds-eval-footer mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p class="text-sm text-slate-500">Guarda todos os atletas e critérios numa única ação.</p><button id="save-evaluation" class="ds-eval-primary">Guardar avaliações</button></div>
+    </form>
+  </section>
+</div>
+
+<dialog id="dialog-quick-parameter" class="ds-eval-dialog">
+  <form id="quick-parameter-form" method="POST" action="/analise/equipas/{{ equipa.id }}/parametros" class="p-6 sm:p-7">
+    <div class="flex items-start justify-between gap-4"><div><p class="text-xs font-black uppercase tracking-[.16em] text-[var(--clube-primary-dark)]">Novo critério</p><h2 class="mt-1 text-xl font-black text-slate-900">Adicionar à avaliação</h2></div><button type="button" onclick="this.closest('dialog').close()" class="rounded-full p-2 text-slate-400 hover:bg-slate-100" aria-label="Fechar">X</button></div>
+    <div class="mt-5 grid gap-4 sm:grid-cols-2">
+      <label class="sm:col-span-2"><span class="mb-1 block text-sm font-bold text-slate-700">Nome</span><input name="nome" required class="ds-eval-input"></label>
+      <label><span class="mb-1 block text-sm font-bold text-slate-700">Categoria</span><select name="categoria" class="ds-eval-input"><option value="tecnica">Técnica</option><option value="tatica">Tática</option><option value="psicologica">Psicológica</option><option value="fisica">Física</option></select></label>
+      <label><span class="mb-1 block text-sm font-bold text-slate-700">Unidade física</span><input name="unidade" class="ds-eval-input" placeholder="s, cm, kg, m"></label>
+      <label><span class="mb-1 block text-sm font-bold text-slate-700">Mínimo</span><input type="number" step="any" name="valor_minimo" value="0" class="ds-eval-input"></label>
+      <label><span class="mb-1 block text-sm font-bold text-slate-700">Máximo</span><input type="number" step="any" name="valor_maximo" value="5" class="ds-eval-input"></label>
+      <label class="sm:col-span-2"><span class="mb-1 block text-sm font-bold text-slate-700">Descrição opcional</span><textarea name="descricao" rows="2" class="ds-eval-input"></textarea></label>
+    </div>
+    <p id="quick-parameter-error" class="mt-3 hidden text-sm font-semibold text-red-600"></p>
+    <div class="mt-5 flex justify-end gap-2"><button type="button" onclick="this.closest('dialog').close()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600">Cancelar</button><button class="ds-eval-primary">Adicionar</button></div>
+  </form>
+</dialog>
+
+<div id="eval-success" hidden role="status"></div>
+
+<script>
+(() => {
+  const existing = {{ valores_existentes|tojson }};
+  const escapeHTML = value => String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
+  const step1 = document.getElementById('eval-step-1');
+  const step2 = document.getElementById('eval-step-2');
+  const matrix = document.getElementById('evaluation-matrix');
+  const dateInput = document.getElementById('evaluation-date');
+
+  const checked = kind => [...document.querySelectorAll(`[data-option="${kind}"] input:checked`)];
+  function updateSummary() {
+    const players = checked('players').length;
+    const parameters = checked('parameters').length;
+    document.getElementById('selection-summary').textContent = players && parameters
+      ? `${players} atleta(s) · ${parameters} parâmetro(s)`
+      : 'Seleciona pelo menos um atleta e um parâmetro.';
+  }
+  document.addEventListener('change', event => {
+    if (event.target.closest('[data-option]')) updateSummary();
+  });
+  document.querySelectorAll('[data-select-all]').forEach(button => button.addEventListener('click', () => {
+    const options = [...document.querySelectorAll(`[data-option="${button.dataset.selectAll}"] input`)].filter(input => !input.closest('[data-option]').hidden);
+    const shouldCheck = options.some(input => !input.checked);
+    options.forEach(input => input.checked = shouldCheck);
+    button.textContent = shouldCheck ? 'Limpar seleção' : 'Selecionar todos';
+    updateSummary();
+  }));
+  document.querySelectorAll('[data-filter]').forEach(input => input.addEventListener('input', () => {
+    const query = input.value.trim().toLowerCase();
+    document.querySelectorAll(`[data-option="${input.dataset.filter}"]`).forEach(option => option.hidden = !option.dataset.search.includes(query));
+  }));
+
+  function valueInput(player, parameter) {
+    const key = `${player.value}:${parameter.value}`;
+    const current = existing[key] ?? '';
+    const unit = escapeHTML(parameter.dataset.unit);
+    const parameterName = escapeHTML(parameter.dataset.parameterName);
+    const wrapper = document.createElement('label');
+    wrapper.className = 'ds-eval-value-row';
+    wrapper.innerHTML = `<span><strong class="block text-sm text-slate-800">${parameterName}</strong><small class="text-xs text-slate-400">${parameter.dataset.category === 'fisica' ? `${parameter.dataset.min} a ${parameter.dataset.max} ${unit}` : 'Escala 0 a 5'}</small></span><span class="relative"><input class="ds-eval-input pr-12 text-right font-bold" type="number" inputmode="decimal" step="${parameter.dataset.category === 'fisica' ? 'any' : '0.5'}" min="${parameter.dataset.category === 'fisica' ? parameter.dataset.min : 0}" max="${parameter.dataset.category === 'fisica' ? parameter.dataset.max : 5}" name="valor_${player.value}_${parameter.value}" value="${current}" placeholder="-"><small class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">${unit}</small></span>`;
+    return wrapper;
+  }
+
+  document.getElementById('continue-evaluation').addEventListener('click', () => {
+    const players = checked('players');
+    const parameters = checked('parameters');
+    if (!players.length || !parameters.length) { updateSummary(); return; }
+    if (!dateInput.value) { dateInput.focus(); return; }
+    matrix.replaceChildren();
+    players.forEach(player => {
+      const card = document.createElement('article');
+      card.className = 'ds-eval-matrix-player';
+      card.innerHTML = `<input type="hidden" name="jogador_ids" value="${player.value}"><header class="flex items-center gap-3 bg-slate-50 px-4 py-3"><span class="grid h-9 w-9 place-items-center rounded-full bg-white text-xs font-black text-slate-600 shadow-sm">${escapeHTML(player.dataset.playerNumber || player.dataset.playerName.slice(0,1))}</span><div><h3 class="font-black text-slate-900">${escapeHTML(player.dataset.playerName)}</h3><p class="text-xs text-slate-400">${parameters.length} parâmetro(s)</p></div></header>`;
+      parameters.forEach(parameter => card.appendChild(valueInput(player, parameter)));
+      matrix.appendChild(card);
+    });
+    parameters.forEach(parameter => {
+      const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'parametro_ids'; hidden.value = parameter.value; matrix.appendChild(hidden);
+    });
+    document.getElementById('form-date').value = dateInput.value;
+    step1.hidden = true; step2.hidden = false;
+    document.querySelector('[data-step-indicator="1"]').classList.remove('is-active');
+    document.querySelector('[data-step-indicator="2"]').classList.add('is-active');
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  });
+  document.getElementById('back-to-selection').addEventListener('click', () => {
+    step2.hidden = true; step1.hidden = false;
+    document.querySelector('[data-step-indicator="2"]').classList.remove('is-active');
+    document.querySelector('[data-step-indicator="1"]').classList.add('is-active');
+  });
+
+  document.getElementById('evaluation-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('save-evaluation');
+    button.disabled = true; button.textContent = 'A guardar...';
+    try {
+      const response = await fetch(event.currentTarget.action, {method: 'POST', body: new FormData(event.currentTarget), headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      const result = await response.json();
+      if (!result.ok) throw new Error(result.message || 'Não foi possível guardar.');
+      event.currentTarget.querySelectorAll('input[name^="valor_"]').forEach(input => { existing[input.name.replace('valor_', '').replace('_', ':')] = input.value; });
+      const toast = document.getElementById('eval-success'); toast.textContent = result.message; toast.hidden = false;
+      setTimeout(() => toast.hidden = true, 3500);
+      button.textContent = 'Avaliações guardadas';
+    } catch (error) { alert(error.message); button.textContent = 'Guardar avaliações'; }
+    finally { button.disabled = false; }
+  });
+
+  document.getElementById('quick-parameter-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const error = document.getElementById('quick-parameter-error'); error.hidden = true;
+    const response = await fetch(event.currentTarget.action, {method: 'POST', body: new FormData(event.currentTarget), headers: {'X-Requested-With': 'XMLHttpRequest'}});
+    const result = await response.json();
+    if (!result.ok) { error.textContent = result.message; error.hidden = false; return; }
+    const item = result.parametro;
+    const label = document.createElement('label');
+    label.className = 'ds-eval-choice'; label.dataset.option = 'parameters'; label.dataset.search = `${item.nome} ${item.categoria_label}`.toLowerCase();
+    label.innerHTML = `<input type="checkbox" checked value="${item.id}" data-category="${escapeHTML(item.categoria)}" data-min="${item.minimo}" data-max="${item.maximo}"><span class="min-w-0 flex-1"><strong class="block truncate text-sm text-slate-800"></strong><small class="text-slate-400"></small></span>`;
+    const input = label.querySelector('input'); input.dataset.parameterName = item.nome; input.dataset.unit = item.unidade;
+    label.querySelector('strong').textContent = item.nome;
+    label.querySelector('small').textContent = item.categoria === 'fisica' ? `${item.minimo}-${item.maximo} ${item.unidade}` : 'Escala 0-5';
+    document.querySelector(`[data-category-list="${item.categoria}"]`).appendChild(label);
+    event.currentTarget.reset(); document.getElementById('dialog-quick-parameter').close(); updateSummary();
+  });
+  updateSummary();
+})();
+</script>
+{% endblock %}

@@ -41,7 +41,10 @@
             <p class="text-sm text-gray-500 mt-1">Um ponto de situação com a informação mais recente da jogadora.</p>
         </div>
         {% if jogador.equipa %}
-        <a href="/assiduidade/equipas/{{ jogador.equipa.id }}" class="text-sm font-medium text-orange-600 hover:underline">Ver relatório da equipa →</a>
+        <div class="flex flex-wrap gap-3">
+            <a href="/analise/jogadores/{{ jogador.id }}" class="text-sm font-bold text-[var(--clube-primary-dark)] hover:underline">Ver análise individual</a>
+            <a href="/assiduidade/equipas/{{ jogador.equipa.id }}" class="text-sm font-medium text-orange-600 hover:underline">Ver relatório da equipa →</a>
+        </div>
         {% endif %}
     </div>
 
@@ -234,10 +237,10 @@
             <h2 class="font-semibold text-gray-700">Testes Físicos</h2>
             <p class="text-gray-400 text-sm mt-1">{{ evolucao.teste_recente.tipo_teste if evolucao.teste_recente else 'Sem testes registados' }}{% if evolucao.teste_recente %} · {{ evolucao.teste_recente.data }}{% endif %}</p>
         </div>
-        <a href="/fisico/jogadores/{{ jogador.id }}"
-           class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-            Ver testes →
-        </a>
+        <div class="flex flex-wrap gap-2">
+            <a href="/analise/jogadores/{{ jogador.id }}" class="rounded-lg bg-[var(--clube-primary)] px-4 py-2 text-sm font-bold text-[var(--clube-on-primary)] transition hover:brightness-95">Ver análise</a>
+            <a href="/fisico/jogadores/{{ jogador.id }}" class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">Testes anteriores</a>
+        </div>
     </div>
 </div>
 <!-- Documentos administrativos do processo. -->

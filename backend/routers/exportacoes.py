@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from auth_deps import exigir_coordenacao, exigir_operacao_desportiva, verificar_ou_negar_equipa
 from database import get_db
+from models.avaliacao import AvaliacaoJogador, ParametroAvaliacao
 from models.assiduidade import RegistoAssiduidade
 from models.atividade import Atividade
 from models.atribuicao_espaco_semanal import AtribuicaoEspacoSemanal
@@ -288,6 +289,8 @@ def _conteudo_equipa(
         ]),
         ("05_Preparacao_fisica", "preparacao_fisica", [
             ("planeamentos_fisicos", db.query(PlaneamentoFisico).filter(PlaneamentoFisico.equipa_id == equipa_id).all()),
+            ("parametros_avaliacao", db.query(ParametroAvaliacao).filter(ParametroAvaliacao.equipa_id == equipa_id).all()),
+            ("avaliacoes_jogadores", db.query(AvaliacaoJogador).filter(AvaliacaoJogador.equipa_id == equipa_id).all()),
         ]),
         ("06_Playbook", "playbook", [
             ("playbooks", playbooks), ("setplays", setplays),

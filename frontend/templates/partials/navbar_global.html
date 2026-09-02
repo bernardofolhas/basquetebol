@@ -66,7 +66,14 @@
       {% if equipa_contexto_id %}
       <div class="ds-team-direct-nav" aria-label="Área da equipa">
         <a href="/equipas/{{ equipa_contexto_id }}/resumo" class="ds-header-trigger ds-team-direct-link ds-nav-order-resumo {% if p in ['/equipas/' ~ equipa_contexto_id, '/equipas/' ~ equipa_contexto_id ~ '/resumo'] %}is-active{% endif %}">Resumo</a>
-        <a href="/fisico/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-fisico {% if p.startswith('/fisico') %}is-active{% endif %}">Físico</a>
+        <details class="ds-menu ds-primary-menu ds-team-direct-link ds-nav-order-fisico">
+          <summary class="ds-header-trigger {% if p.startswith('/fisico') or p.startswith('/analise') %}is-active{% endif %}">Físico <span class="ds-menu-chevron">⌄</span></summary>
+          <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
+            <p class="ds-dropdown-title">Análise · {{ equipa_contexto_nome }}</p>
+            {{ menu_link('/analise/equipas/' ~ equipa_contexto_id, 'Análise de jogadores', 'Avaliações e evolução', p.startswith('/analise')) }}
+            {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id, 'Planeamento físico', 'Organização do trabalho físico', p.startswith('/fisico/equipas')) }}
+          </div>
+        </details>
         <details class="ds-menu ds-primary-menu ds-team-direct-link ds-nav-order-jogos">
           <summary class="ds-header-trigger {% if p.startswith('/jogos') or p.startswith('/scouting') %}is-active{% endif %}">Jogos <span class="ds-menu-chevron">⌄</span></summary>
           <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">

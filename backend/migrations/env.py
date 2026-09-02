@@ -14,6 +14,7 @@ from database import Base
 
 # Import all models so their tables are registered on Base.metadata
 import models.atividade
+import models.avaliacao
 import models.auditoria
 import models.clube
 import models.atribuicao_espaco_semanal
