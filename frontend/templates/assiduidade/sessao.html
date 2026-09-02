@@ -7,7 +7,7 @@
     <div>
         <p class="ds-kicker">{{ equipa.nome }}</p>
         <h1>Presenças · {% if sessao.e_jogo %}Jogo{% else %}Treino {{ sessao.numero_treino }}{% endif %}</h1>
-        <p>{{ sessao.data|data_pt }}{% if sessao.hora_inicio %} · {{ sessao.hora_inicio.strftime('%H:%M') }}{% endif %}{% if sessao.local %} · {{ sessao.local }}{% endif %}</p>
+        <p>{{ sessao.data|data_pt }}{% if sessao.hora_inicio %} · {{ sessao.hora_inicio }}{% endif %}{% if sessao.local %} · {{ sessao.local }}{% endif %}</p>
     </div>
     <div class="ds-attendance-heading-actions">
         <span class="{{ sessao.estado_operacional_visual_classes }} rounded-full px-3 py-1 text-xs font-semibold">{{ sessao.estado_operacional_visual_label }}</span>

@@ -1,4 +1,4 @@
-{% macro equipa_contexto(equipa, titulo, subtitulo="", ativo="resumo", voltar_href="/equipas", voltar_label="Voltar às equipas") %}
+{% macro equipa_contexto(equipa, titulo, subtitulo="", ativo="resumo", voltar_href="/equipas", voltar_label="Voltar às equipas", acao_principal_href="", acao_principal_label="") %}
 <div class="ds-team-context mb-6">
     <div class="ds-team-hero">
         <div class="ds-team-hero-main flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -16,18 +16,25 @@
                 </div>
             </div>
 
-            {% if caller is defined %}
-            <details class="ds-menu ds-page-actions">
-                <summary class="ds-button ds-button-secondary ds-page-actions-trigger" aria-label="Abrir ações desta página">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
-                    <span>Ações</span>
-                    <span class="ds-menu-chevron" aria-hidden="true">⌄</span>
-                </summary>
-                <div class="ds-dropdown ds-page-actions-menu">
-                    <p class="ds-dropdown-title">Ações da página</p>
-                    <div class="ds-team-actions">{{ caller() }}</div>
-                </div>
-            </details>
+            {% if acao_principal_href or caller is defined %}
+            <div class="flex flex-wrap items-center gap-2">
+                {% if acao_principal_href %}
+                <a href="{{ acao_principal_href }}" class="ds-button ds-button-primary">{{ acao_principal_label }}</a>
+                {% endif %}
+                {% if caller is defined %}
+                <details class="ds-menu ds-page-actions">
+                    <summary class="ds-button ds-button-secondary ds-page-actions-trigger" aria-label="Abrir ações desta página">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+                        <span>Ações</span>
+                        <span class="ds-menu-chevron" aria-hidden="true">⌄</span>
+                    </summary>
+                    <div class="ds-dropdown ds-page-actions-menu">
+                        <p class="ds-dropdown-title">Ações da página</p>
+                        <div class="ds-team-actions">{{ caller() }}</div>
+                    </div>
+                </details>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
 

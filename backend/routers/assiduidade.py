@@ -3,6 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth_deps import AcessoNegado, exigir_autenticacao, verificar_ou_negar_equipa
@@ -81,6 +82,34 @@ def relatorio_assiduidade_equipa(
         _data_query(inicio),
         _data_query(fim),
     )
+    total_jogadores_ativos = db.query(Jogador).filter(
+        Jogador.equipa_id == equipa_id,
+        Jogador.ativo.is_(True),
+    ).count()
+    sessoes = relatorio["sessoes"]
+    sessoes_ids = [sessao.id for sessao in sessoes]
+    contagens = dict(
+        db.query(RegistoAssiduidade.sessao_id, func.count(RegistoAssiduidade.id))
+        .filter(RegistoAssiduidade.sessao_id.in_(sessoes_ids))
+        .group_by(RegistoAssiduidade.sessao_id)
+        .all()
+    ) if sessoes_ids else {}
+    sessoes_registo = []
+    for sessao in sessoes:
+        registados = contagens.get(sessao.id, 0)
+        if total_jogadores_ativos and registados >= total_jogadores_ativos:
+            estado_registo = "concluida"
+        elif registados:
+            estado_registo = "parcial"
+        else:
+            estado_registo = "por_registar"
+        sessoes_registo.append({
+            "sessao": enriquecer_sessao_para_ui(sessao),
+            "registados": registados,
+            "total": total_jogadores_ativos,
+            "estado": estado_registo,
+        })
+    relatorio["sessoes_registo"] = sessoes_registo
     return templates.TemplateResponse(
         request,
         "assiduidade/equipa.html",
@@ -133,12 +162,9 @@ def pagina_assiduidade(
     verificar_ou_negar_equipa(utilizador, equipa.id, db)
 
     jogadores = db.query(Jogador).filter(
-        Jogador.equipa_id == equipa.id
+        Jogador.equipa_id == equipa.id,
+        Jogador.ativo.is_(True),
     ).order_by(Jogador.nome).all()
-
-    registos_existentes = db.query(RegistoAssiduidade).filter(
-        RegistoAssiduidade.sessao_id == sessao_id
-    ).all()
 
     registos = db.query(RegistoAssiduidade).filter(
         RegistoAssiduidade.sessao_id == sessao_id
@@ -179,9 +205,10 @@ async def guardar_assiduidade(
     utilizador=Depends(exigir_autenticacao),
 ):
     sessao_check = db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
-    if sessao_check:
-        equipa_check = sessao_check.microciclo.mesociclo.macrociclo.equipa
-        verificar_ou_negar_equipa(utilizador, equipa_check.id, db)
+    if not sessao_check:
+        return RedirectResponse(url="/equipas", status_code=303)
+    equipa_check = sessao_check.microciclo.mesociclo.macrociclo.equipa
+    verificar_ou_negar_equipa(utilizador, equipa_check.id, db)
 
     dados = await request.form()
 
@@ -189,10 +216,11 @@ async def guardar_assiduidade(
         RegistoAssiduidade.sessao_id == sessao_id
     ).all()
     registos_por_jogador = {registo.jogador_id: registo for registo in registos}
-    jogadores = []
-    if sessao_check:
-        equipa = sessao_check.microciclo.mesociclo.macrociclo.equipa
-        jogadores = db.query(Jogador).filter(Jogador.equipa_id == equipa.id).all()
+    equipa = sessao_check.microciclo.mesociclo.macrociclo.equipa
+    jogadores = db.query(Jogador).filter(
+        Jogador.equipa_id == equipa.id,
+        Jogador.ativo.is_(True),
+    ).all()
 
     dados_validados = []
     try:
@@ -211,6 +239,10 @@ async def guardar_assiduidade(
 
     for jogador, estado, rpe in dados_validados:
         registo = registos_por_jogador.get(jogador.id)
+        if estado == "por_registar":
+            if registo:
+                db.delete(registo)
+            continue
         if not registo:
             registo = RegistoAssiduidade(
                 sessao_id=sessao_id,

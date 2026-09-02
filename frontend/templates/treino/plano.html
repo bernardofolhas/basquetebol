@@ -36,7 +36,9 @@
     "Sessão de " ~ (sessao.data|data_pt) ~ ((" · " ~ sessao.local) if sessao.local else ""),
     "planeamento",
     "/planeamento/microciclos/" ~ sessao.microciclo_id,
-    "Voltar ao microciclo"
+    "Voltar ao microciclo",
+    "/assiduidade/sessoes/" ~ sessao.id,
+    "Assiduidade"
 ) %}
     {% if not importacao_ativa %}
     <button type="button" onclick="document.getElementById('modal-importar-plano').showModal()"
@@ -44,10 +46,6 @@
         Importar plano
     </button>
     {% endif %}
-    <a href="/assiduidade/sessoes/{{ sessao.id }}"
-       class="rounded-full bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50">
-        Assiduidade
-    </a>
     <a href="/analise/equipas/{{ equipa.id }}/registar?sessao_id={{ sessao.id }}"
        class="rounded-full bg-[var(--clube-primary)] px-4 py-2 text-sm font-bold text-[var(--clube-on-primary)] transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[var(--clube-primary)] focus:ring-offset-2">
         Avaliar jogadores

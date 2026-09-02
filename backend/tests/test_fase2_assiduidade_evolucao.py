@@ -47,6 +47,8 @@ def _criar_contexto():
         clube_id=clube_id,
         data=date(2037, 1, 6),
         local="Pavilhão Fase 2",
+        hora_inicio="18:00",
+        hora_fim="19:30",
         estado="executada",
         ativa=True,
         microciclo=micro,
@@ -146,6 +148,8 @@ def test_relatorio_assiduidade_e_ficha_evolucao_respondem_com_pdf(client_admin):
     try:
         resposta = client_admin.get(f"/assiduidade/equipas/{equipa_id}?inicio=2037-01-01&fim=2037-01-31")
         assert resposta.status_code == 200
+        assert "Escolher sessão de treino" in resposta.text
+        assert f"/assiduidade/sessoes/" in resposta.text
         assert "Resumo por jogadora" in resposta.text
         assert "Jogadora Fase 2" in resposta.text
         assert "Faltas justificadas" in resposta.text
@@ -222,6 +226,13 @@ def test_abrir_assiduidade_nao_cria_faltas_automaticamente(client_admin):
         assert "Por registar" in resposta.text
         assert "RPE individual" in resposta.text
         assert "data-attendance-row" in resposta.text
+        assert "18:00" in resposta.text
+
+        plano = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert plano.status_code == 200
+        link_assiduidade = f'/assiduidade/sessoes/{sessao.id}'
+        assert link_assiduidade in plano.text
+        assert plano.text.index(link_assiduidade) < plano.text.index('ds-page-actions')
     finally:
         _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
         db.close()
@@ -284,6 +295,29 @@ def test_guardar_cria_registo_com_rpe_e_clube_correto(client_admin):
         assert criado is not None
         assert criado.clube_id == sessao.clube_id
         assert criado.rpe_individual == 6
+    finally:
+        _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
+        db.close()
+
+
+def test_limpar_estados_remove_registos_em_vez_de_criar_estados_vazios(client_admin):
+    db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id = _criar_contexto()
+    sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.id == macro_id
+    ).first()
+    try:
+        resposta = client_admin.post(
+            f"/assiduidade/sessoes/{sessao.id}",
+            data={
+                f"estado_{jogadora_id}": "por_registar",
+                f"estado_{segunda_jogadora_id}": "por_registar",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        assert db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao.id
+        ).count() == 0
     finally:
         _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
         db.close()
