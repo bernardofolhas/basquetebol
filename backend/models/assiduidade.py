@@ -3,7 +3,7 @@
 # Regista a presença de cada jogador em cada sessão de treino
 # ─────────────────────────────────────────────────────────────
 
-from sqlalchemy import Column, Integer, Boolean, String, ForeignKey
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import backref, relationship
 from database import Base
 
@@ -28,6 +28,9 @@ class RegistoAssiduidade(Base):
 
     # Motivo da falta — só relevante quando presente=False
     motivo_falta = Column(String, nullable=True)
+
+    # Perceção de esforço comunicada pelo atleta depois da sessão (escala 0-10).
+    rpe_individual = Column(Float, nullable=True)
 
     # relationship permite aceder aos dados relacionados directamente
     sessao = relationship(

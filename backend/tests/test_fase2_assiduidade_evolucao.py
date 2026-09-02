@@ -6,37 +6,45 @@ from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.fisico import TesteFisico as ModeloTesteFisico
 from models.jogador import Jogador, RegistoAntropometrico
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
+from models.utilizador import Utilizador
 from services.assiduidade_service import calcular_resumo_assiduidade
 
 
 def _criar_contexto():
     db = SessionLocal()
+    clube_id = db.query(Utilizador.clube_id).filter(Utilizador.username == "admin").scalar()
+    assert clube_id is not None
     equipa = Equipa(
+        clube_id=clube_id,
         nome="Equipa Fase 2 Assiduidade",
         escalao=EscalaoEnum.sub18,
         genero=GeneroEnum.feminino,
     )
-    jogadora = Jogador(nome="Jogadora Fase 2", equipa=equipa, numero_camisola=7)
-    segunda_jogadora = Jogador(nome="Segunda Jogadora Fase 2", equipa=equipa)
+    jogadora = Jogador(clube_id=clube_id, nome="Jogadora Fase 2", equipa=equipa, numero_camisola=7)
+    segunda_jogadora = Jogador(clube_id=clube_id, nome="Segunda Jogadora Fase 2", equipa=equipa)
     macro = Macrociclo(
+        clube_id=clube_id,
         numero=1,
         data_inicio=date(2037, 1, 1),
         data_fim=date(2037, 12, 31),
         equipa=equipa,
     )
     meso = Mesociclo(
+        clube_id=clube_id,
         numero=1,
         data_inicio=date(2037, 1, 1),
         data_fim=date(2037, 3, 31),
         macrociclo=macro,
     )
     micro = Microciclo(
+        clube_id=clube_id,
         numero=1,
         data_inicio=date(2037, 1, 4),
         data_fim=date(2037, 1, 10),
         mesociclo=meso,
     )
     sessao = SessaoTreino(
+        clube_id=clube_id,
         data=date(2037, 1, 6),
         local="Pavilhão Fase 2",
         estado="executada",
@@ -47,12 +55,15 @@ def _criar_contexto():
     db.flush()
     db.add_all([
         RegistoAssiduidade(
+            clube_id=clube_id,
             sessao_id=sessao.id,
             jogador_id=jogadora.id,
             presente=True,
             estado="presente",
+            rpe_individual=7.5,
         ),
         RegistoAssiduidade(
+            clube_id=clube_id,
             sessao_id=sessao.id,
             jogador_id=segunda_jogadora.id,
             presente=False,
@@ -60,6 +71,7 @@ def _criar_contexto():
             motivo_falta="Consulta médica",
         ),
         RegistoAntropometrico(
+            clube_id=clube_id,
             jogador_id=jogadora.id,
             data=date(2037, 1, 5),
             altura=172,
@@ -67,6 +79,7 @@ def _criar_contexto():
             envergadura=175,
         ),
         ModeloTesteFisico(
+            clube_id=clube_id,
             jogador_id=jogadora.id,
             data=date(2037, 1, 5),
             tipo_teste="Sprint 20m",
@@ -101,8 +114,8 @@ def _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id):
 
 def test_calcula_estados_detalhados_sem_perder_compatibilidade_booleana():
     registos = [
-        RegistoAssiduidade(presente=True, estado="presente"),
-        RegistoAssiduidade(presente=True, estado="atrasada"),
+        RegistoAssiduidade(presente=True, estado="presente", rpe_individual=7),
+        RegistoAssiduidade(presente=True, estado="atrasada", rpe_individual=8),
         RegistoAssiduidade(presente=False, estado="lesionada"),
     ]
     resumo = calcular_resumo_assiduidade(registos)
@@ -111,6 +124,8 @@ def test_calcula_estados_detalhados_sem_perder_compatibilidade_booleana():
     assert resumo["por_estado"]["atrasada"] == 1
     assert resumo["por_estado"]["lesionada"] == 1
     assert resumo["percentagem"] == 66.7
+    assert resumo["rpe_medio"] == 7.5
+    assert resumo["rpe_registados"] == 2
 
 
 def test_dispensa_nao_e_falta_nem_reduz_a_percentagem_de_presencas():
@@ -164,8 +179,10 @@ def test_formulario_guarda_estado_detalhado_e_mantem_presente(client_admin):
             data={
                 f"estado_{jogadora_id}": "atrasada",
                 f"motivo_{jogadora_id}": "Chegou depois do início",
+                f"rpe_{jogadora_id}": "8,5",
                 f"estado_{segunda_jogadora_id}": "lesionada",
                 f"motivo_{segunda_jogadora_id}": "Dor no tornozelo",
+                f"rpe_{segunda_jogadora_id}": "9",
             },
             follow_redirects=False,
         )
@@ -180,8 +197,10 @@ def test_formulario_guarda_estado_detalhado_e_mantem_presente(client_admin):
         ).first()
         assert registo.estado == "atrasada"
         assert registo.presente is True
+        assert registo.rpe_individual == 8.5
         assert segundo_registo.estado == "lesionada"
         assert segundo_registo.presente is False
+        assert segundo_registo.rpe_individual is None
     finally:
         _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
         db.close()
@@ -201,6 +220,70 @@ def test_abrir_assiduidade_nao_cria_faltas_automaticamente(client_admin):
         assert antes == 2
         assert depois == antes
         assert "Por registar" in resposta.text
+        assert "RPE individual" in resposta.text
+        assert "data-attendance-row" in resposta.text
+    finally:
+        _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
+        db.close()
+
+
+def test_rpe_individual_invalido_nao_altera_o_registo(client_admin):
+    db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id = _criar_contexto()
+    sessao_id = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.id == macro_id
+    ).first().id
+    try:
+        resposta = client_admin.post(
+            f"/assiduidade/sessoes/{sessao_id}",
+            data={
+                f"estado_{jogadora_id}": "presente",
+                f"rpe_{jogadora_id}": "11",
+                f"estado_{segunda_jogadora_id}": "presente",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        db.expire_all()
+        registo = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao_id,
+            RegistoAssiduidade.jogador_id == jogadora_id,
+        ).first()
+        assert registo.rpe_individual == 7.5
+    finally:
+        _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
+        db.close()
+
+
+def test_guardar_cria_registo_com_rpe_e_clube_correto(client_admin):
+    db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id = _criar_contexto()
+    sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.id == macro_id
+    ).first()
+    try:
+        db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao.id,
+            RegistoAssiduidade.jogador_id == segunda_jogadora_id,
+        ).delete(synchronize_session=False)
+        db.commit()
+
+        resposta = client_admin.post(
+            f"/assiduidade/sessoes/{sessao.id}",
+            data={
+                f"estado_{jogadora_id}": "presente",
+                f"rpe_{jogadora_id}": "7",
+                f"estado_{segunda_jogadora_id}": "presente",
+                f"rpe_{segunda_jogadora_id}": "6",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        criado = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao.id,
+            RegistoAssiduidade.jogador_id == segunda_jogadora_id,
+        ).first()
+        assert criado is not None
+        assert criado.clube_id == sessao.clube_id
+        assert criado.rpe_individual == 6
     finally:
         _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
         db.close()

@@ -796,32 +796,42 @@ def actualizar_estrutura_mapa_conteudos() -> None:
 
 
 def actualizar_estrutura_assiduidade() -> None:
-    """Atualiza instalações antigas com o estado detalhado de assiduidade."""
+    """Atualiza instalações antigas com estado detalhado e RPE individual."""
     inspector = inspect(engine)
     if not inspector.has_table("assiduidade"):
         return
 
     colunas = {coluna["name"] for coluna in inspector.get_columns("assiduidade")}
-    if "estado" in colunas:
-        return
-
     dialecto = engine.dialect.name
     with engine.begin() as ligacao:
-        if dialecto == "postgresql":
+        if "estado" not in colunas:
+            if dialecto == "postgresql":
+                ligacao.execute(text(
+                    "ALTER TABLE assiduidade "
+                    "ADD COLUMN IF NOT EXISTS estado VARCHAR NOT NULL DEFAULT 'ausente'"
+                ))
+            else:
+                ligacao.execute(text(
+                    "ALTER TABLE assiduidade "
+                    "ADD COLUMN estado VARCHAR NOT NULL DEFAULT 'ausente'"
+                ))
             ligacao.execute(text(
-                "ALTER TABLE assiduidade "
-                "ADD COLUMN IF NOT EXISTS estado VARCHAR NOT NULL DEFAULT 'ausente'"
+                "UPDATE assiduidade SET estado = "
+                "CASE WHEN presente THEN 'presente' ELSE 'ausente' END"
             ))
-        else:
-            ligacao.execute(text(
-                "ALTER TABLE assiduidade "
-                "ADD COLUMN estado VARCHAR NOT NULL DEFAULT 'ausente'"
-            ))
-        ligacao.execute(text(
-            "UPDATE assiduidade SET estado = "
-            "CASE WHEN presente THEN 'presente' ELSE 'ausente' END"
-        ))
-    logger.info("Coluna 'estado' adicionada a assiduidade.")
+            logger.info("Coluna 'estado' adicionada a assiduidade.")
+
+        if "rpe_individual" not in colunas:
+            if dialecto == "postgresql":
+                ligacao.execute(text(
+                    "ALTER TABLE assiduidade "
+                    "ADD COLUMN IF NOT EXISTS rpe_individual DOUBLE PRECISION NULL"
+                ))
+            else:
+                ligacao.execute(text(
+                    "ALTER TABLE assiduidade ADD COLUMN rpe_individual FLOAT NULL"
+                ))
+            logger.info("Coluna 'rpe_individual' adicionada a assiduidade.")
 
 
 def actualizar_estrutura_jogadores() -> None:

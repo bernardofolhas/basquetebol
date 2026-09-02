@@ -30,7 +30,7 @@
     </div>
 </form>
 
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <p class="text-xs uppercase tracking-wide text-gray-400">Sessões no período</p>
         <p class="text-3xl font-bold text-gray-800 mt-2">{{ sessoes_total }}</p>
@@ -50,6 +50,11 @@
         <p class="text-xs uppercase tracking-wide text-gray-400">Por lesão</p>
         <p class="text-3xl font-bold text-purple-600 mt-2">{{ resumo.por_estado.lesionada }}</p>
         <p class="text-xs text-gray-500 mt-1">Acompanhar no perfil</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p class="text-xs uppercase tracking-wide text-gray-400">RPE individual médio</p>
+        <p class="text-3xl font-bold text-orange-600 mt-2">{{ resumo.rpe_medio if resumo.rpe_medio is not none else '—' }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ resumo.rpe_registados }} respostas</p>
     </div>
 </div>
 
@@ -71,6 +76,7 @@
                     <th class="px-3 py-3 text-center">Presenças</th>
                     <th class="px-3 py-3 text-center">Atrasadas</th>
                     <th class="px-3 py-3 text-center">Ausências</th>
+                    <th class="px-3 py-3 text-center">RPE médio</th>
                     <th class="px-5 py-3 text-right">Taxa</th>
                 </tr>
             </thead>
@@ -85,6 +91,7 @@
                     <td class="px-3 py-3 text-center font-semibold text-green-700">{{ linha.presentes }}</td>
                     <td class="px-3 py-3 text-center text-amber-700">{{ linha.por_estado.atrasada }}</td>
                     <td class="px-3 py-3 text-center text-red-700">{{ linha.por_estado.ausente + linha.por_estado.justificada + linha.por_estado.lesionada + linha.por_estado.dispensada }}</td>
+                    <td class="px-3 py-3 text-center font-semibold text-orange-700">{{ linha.rpe_medio if linha.rpe_medio is not none else '—' }}</td>
                     <td class="px-5 py-3 text-right">
                         <span class="font-bold {% if linha.percentagem >= 75 %}text-green-600{% elif linha.percentagem >= 50 %}text-amber-600{% else %}text-red-600{% endif %}">{{ linha.percentagem }}%</span>
                     </td>

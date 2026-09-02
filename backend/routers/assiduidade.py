@@ -37,6 +37,19 @@ def _data_query(valor: str | None) -> date | None:
         return None
 
 
+def _normalizar_rpe_individual(valor: str | None) -> float | None:
+    texto = (valor or "").strip().replace(",", ".")
+    if not texto:
+        return None
+    try:
+        rpe = float(texto)
+    except ValueError:
+        raise ValueError("O RPE individual deve ser um número entre 0 e 10.") from None
+    if not 0 <= rpe <= 10:
+        raise ValueError("O RPE individual deve estar entre 0 e 10.")
+    return rpe
+
+
 def _contexto_relatorio_equipa(request: Request, equipa, relatorio: dict, utilizador) -> dict:
     return {
         "utilizador": utilizador,
@@ -181,28 +194,42 @@ async def guardar_assiduidade(
         equipa = sessao_check.microciclo.mesociclo.macrociclo.equipa
         jogadores = db.query(Jogador).filter(Jogador.equipa_id == equipa.id).all()
 
-    for jogador in jogadores:
+    dados_validados = []
+    try:
+        for jogador in jogadores:
+            estado = normalizar_estado_assiduidade(
+                dados.get(f"estado_{jogador.id}"),
+                dados.get(f"presente_{jogador.id}") == "on",
+            )
+            rpe = _normalizar_rpe_individual(dados.get(f"rpe_{jogador.id}"))
+            if not estado_para_presenca(estado):
+                rpe = None
+            dados_validados.append((jogador, estado, rpe))
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/assiduidade/sessoes/{sessao_id}", status_code=303)
+
+    for jogador, estado, rpe in dados_validados:
         registo = registos_por_jogador.get(jogador.id)
         if not registo:
             registo = RegistoAssiduidade(
                 sessao_id=sessao_id,
                 jogador_id=jogador.id,
+                clube_id=equipa.clube_id,
             )
             db.add(registo)
-        estado_form = dados.get(f"estado_{jogador.id}")
-        checkbox_presente = dados.get(f"presente_{jogador.id}") == "on"
-        estado = normalizar_estado_assiduidade(estado_form, checkbox_presente)
         motivo = dados.get(f"motivo_{jogador.id}", "")
         registo.estado = estado
         registo.presente = estado_para_presenca(estado)
         registo.motivo_falta = motivo if not registo.presente and motivo else None
+        registo.rpe_individual = rpe
 
     if sessao_check and normalizar_estado_sessao(sessao_check.estado) == "executada" and all(
         normalizar_estado_assiduidade(
             dados.get(f"estado_{jogador.id}"),
             dados.get(f"presente_{jogador.id}") == "on",
         ) != "por_registar"
-        for jogador in jogadores
+        for jogador, _, _ in dados_validados
     ):
         sessao_check.estado = "registada"
     db.commit()

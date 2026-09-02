@@ -59,11 +59,19 @@ def calcular_resumo_assiduidade(registos: list[RegistoAssiduidade]) -> dict:
     # formalmente dispensada daquela sessão e não deve reduzir a percentagem.
     total_elegivel = total - contagem["dispensada"]
     total_presentes = sum(contagem[estado] for estado in ESTADOS_PRESENTES)
+    rpes = [
+        float(registo.rpe_individual)
+        for registo in registos
+        if normalizar_estado_assiduidade(registo.estado, registo.presente) in ESTADOS_PRESENTES
+        and getattr(registo, "rpe_individual", None) is not None
+    ]
     return {
         "total": total,
         "total_elegivel": total_elegivel,
         "presentes": total_presentes,
         "percentagem": round((total_presentes / total_elegivel) * 100, 1) if total_elegivel else 0,
+        "rpe_medio": round(sum(rpes) / len(rpes), 1) if rpes else None,
+        "rpe_registados": len(rpes),
         "por_estado": {estado: contagem[estado] for estado in ESTADOS_ASSIDUIDADE},
     }
 

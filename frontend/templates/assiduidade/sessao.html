@@ -3,153 +3,138 @@
 {% block titulo %}Assiduidade — {{ sessao.data|data_pt }}{% endblock %}
 
 {% block conteudo %}
-
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-800">Assiduidade</h1>
-    <p class="text-gray-500 mt-1">
-        {{ equipa.nome }} —
-        {% if sessao.e_jogo %}
-            Jogo
-        {% else %}
-            Treino {{ sessao.numero_treino }}
-        {% endif %}
-        de {{ sessao.data|data_pt }}
-    </p>
-    <div class="mt-3 flex flex-wrap items-center gap-2">
+<header class="ds-attendance-heading">
+    <div>
+        <p class="ds-kicker">{{ equipa.nome }}</p>
+        <h1>Presenças · {% if sessao.e_jogo %}Jogo{% else %}Treino {{ sessao.numero_treino }}{% endif %}</h1>
+        <p>{{ sessao.data|data_pt }}{% if sessao.hora_inicio %} · {{ sessao.hora_inicio.strftime('%H:%M') }}{% endif %}{% if sessao.local %} · {{ sessao.local }}{% endif %}</p>
+    </div>
+    <div class="ds-attendance-heading-actions">
         <span class="{{ sessao.estado_operacional_visual_classes }} rounded-full px-3 py-1 text-xs font-semibold">{{ sessao.estado_operacional_visual_label }}</span>
-        <a href="/treino/sessoes/{{ sessao.id }}" class="text-sm font-medium text-orange-600 hover:underline">Abrir plano de treino →</a>
+        <a href="/treino/sessoes/{{ sessao.id }}" class="ds-button ds-button-secondary ds-button-sm">Abrir plano</a>
     </div>
-</div>
+</header>
 
-<!-- Cartões de resumo -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<section class="ds-attendance-summary" aria-label="Resumo da assiduidade">
+    <div><strong>{{ total_jogadores }}</strong><span>{{ termo_jogador(equipa, plural=True) }}</span></div>
+    <div><strong data-summary-pending>{{ resumo_assiduidade.por_registar }}</strong><span>Por registar</span></div>
+    <div class="is-positive"><strong data-summary-present>{{ total_presentes }}</strong><span>Presentes</span></div>
+    <div class="is-negative"><strong data-summary-absent>{{ resumo_assiduidade.por_estado.ausente + resumo_assiduidade.por_estado.justificada + resumo_assiduidade.por_estado.lesionada }}</strong><span>Faltas</span></div>
+    <div class="is-rpe"><strong data-summary-rpe>{{ resumo_assiduidade.rpe_medio if resumo_assiduidade.rpe_medio is not none else '—' }}</strong><span>RPE médio</span></div>
+</section>
 
-    <!-- Total de jogadores -->
-    <div class="bg-white rounded-xl shadow-sm p-4 text-center border border-gray-100">
-        <p class="text-3xl font-bold text-gray-800">{{ total_jogadores }}</p>
-        <p class="text-xs text-gray-500 mt-1">Total de {{ termo_jogador(equipa, plural=True) }}</p>
-    </div>
-
-    <div class="bg-white rounded-xl shadow-sm p-4 text-center border border-gray-100">
-        <p class="text-3xl font-bold text-slate-500">{{ resumo_assiduidade.por_registar }}</p>
-        <p class="text-xs text-gray-500 mt-1">Por registar</p>
-    </div>
-
-    <div class="bg-white rounded-xl shadow-sm p-4 text-center border border-gray-100">
-        <p class="text-3xl font-bold text-red-500">{{ resumo_assiduidade.por_estado.ausente + resumo_assiduidade.por_estado.justificada + resumo_assiduidade.por_estado.lesionada }}</p>
-        <p class="text-xs text-gray-500 mt-1">Faltas</p>
-    </div>
-
-    <!-- Presentes -->
-    <div class="bg-white rounded-xl shadow-sm p-4 text-center border border-gray-100">
-        <p class="text-3xl font-bold text-green-500">{{ total_presentes }}</p>
-        <p class="text-xs text-gray-500 mt-1">Presentes</p>
-    </div>
-
-    <!-- Percentagem de presenças -->
-    <div class="bg-white rounded-xl shadow-sm p-4 text-center border border-gray-100">
-        <!-- Cor muda consoante a percentagem -->
-        <p class="text-3xl font-bold {{ 'text-green-500' if percentagem >= 75 else 'text-orange-500' if percentagem >= 50 else 'text-red-500' }}">
-            {{ percentagem }}%
-        </p>
-        <p class="text-xs text-gray-500 mt-1">Presenças</p>
-    </div>
-
-</div>
-
-<!-- Formulário de registo de presenças -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-    <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+<section class="ds-attendance-panel">
+    <div class="ds-attendance-panel-head">
         <div>
-            <h2 class="font-semibold text-gray-700">Registo de Presenças</h2>
-            <p class="mt-1 text-xs text-gray-500">{{ resumo_assiduidade.registados }} de {{ total_jogadores }} {{ termo_jogador(equipa, plural=True, capitalizar=False) }} com estado definido.</p>
+            <h2>Registo da sessão</h2>
+            <p>Marca o estado e o RPE individual de cada participante.</p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="ds-attendance-bulk-actions">
             <button type="button" data-marcar-todos="presente" class="ds-button ds-button-secondary ds-button-sm">Todos presentes</button>
             <button type="button" data-marcar-todos="por_registar" class="ds-button ds-button-secondary ds-button-sm">Limpar estados</button>
         </div>
     </div>
 
     {% if jogadores %}
-    <!-- method="POST" envia os dados para o servidor -->
-    <form method="POST" action="/assiduidade/sessoes/{{ sessao.id }}">
-        <div class="space-y-3">
+    <form method="POST" action="/assiduidade/sessoes/{{ sessao.id }}" id="attendance-form">
+        <div class="ds-attendance-roster">
             {% for jogador in jogadores %}
-            <!-- Linha de cada jogador -->
-            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div class="flex items-center gap-3">
-
-                    <!-- Nome e número do jogador -->
-                    <div>
-                        <div class="flex items-center gap-2">
-                            {% if jogador.numero_camisola %}
-                            <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                                #{{ jogador.numero_camisola }}
-                            </span>
-                            {% endif %}
-                            <span class="font-medium text-gray-800">{{ jogador.nome }}</span>
-                            {% if jogador.posicao %}
-                            <span class="text-gray-400 text-xs">{{ jogador.posicao }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
+            {% set registo = registos_dict.get(jogador.id) %}
+            {% set estado_atual = registo.estado if registo else 'por_registar' %}
+            <article class="ds-attendance-card" data-attendance-row data-estado="{{ estado_atual }}">
+                <div class="ds-attendance-player">
+                    {% if jogador.numero_camisola %}<span class="ds-attendance-number">{{ jogador.numero_camisola }}</span>{% endif %}
+                    <div><strong>{{ jogador.nome }}</strong>{% if jogador.posicao %}<small>{{ jogador.posicao }}</small>{% endif %}</div>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <select name="estado_{{ jogador.id }}"
-                            aria-label="Estado de {{ jogador.nome }}"
-                            class="w-44 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400">
-                        {% set estado_atual = registos_dict[jogador.id].estado if registos_dict.get(jogador.id) else 'por_registar' %}
-                        {% for estado in estados_assiduidade %}
-                        <option value="{{ estado }}" {% if estado_atual == estado %}selected{% endif %}>
-                            {{ estados_assiduidade_visual[estado].label }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <input type="text"
-                       name="motivo_{{ jogador.id }}"
-                       placeholder="Nota / motivo (opcional)"
-                       value="{{ registos_dict[jogador.id].motivo_falta if registos_dict.get(jogador.id) and registos_dict[jogador.id].motivo_falta else '' }}"
-                       class="w-48 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <fieldset class="ds-attendance-state-picker" aria-label="Estado de {{ jogador.nome }}">
+                    <legend class="sr-only">Estado de {{ jogador.nome }}</legend>
+                    {% for estado in estados_assiduidade %}
+                    <input class="ds-attendance-state-input" type="radio" name="estado_{{ jogador.id }}" id="estado_{{ jogador.id }}_{{ estado }}" value="{{ estado }}" {% if estado_atual == estado %}checked{% endif %}>
+                    <label for="estado_{{ jogador.id }}_{{ estado }}" data-estado="{{ estado }}">{{ estados_assiduidade_visual[estado].label }}</label>
+                    {% endfor %}
+                </fieldset>
+
+                <div class="ds-attendance-fields">
+                    <label class="ds-attendance-rpe">
+                        <span>RPE individual <small>0–10</small></span>
+                        <input type="number" inputmode="decimal" name="rpe_{{ jogador.id }}" min="0" max="10" step="0.5" value="{{ registo.rpe_individual if registo and registo.rpe_individual is not none else '' }}" placeholder="—" {% if estado_atual not in ('presente', 'atrasada') %}disabled{% endif %}>
+                    </label>
+                    <label class="ds-attendance-note">
+                        <span>Nota <small>opcional</small></span>
+                        <input type="text" name="motivo_{{ jogador.id }}" value="{{ registo.motivo_falta if registo and registo.motivo_falta else '' }}" placeholder="Motivo da ausência" {% if estado_atual in ('presente', 'atrasada', 'por_registar') %}disabled{% endif %}>
+                    </label>
                 </div>
-            </div>
+            </article>
             {% endfor %}
         </div>
 
-        <!-- Botão de guardar -->
-        <div class="mt-4 pt-4 border-t border-gray-100">
-            <button type="submit"
-                    class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
-                Guardar Presenças
-            </button>
+        <div class="ds-attendance-save-bar">
+            <span data-attendance-feedback>{{ resumo_assiduidade.registados }} de {{ total_jogadores }} com estado definido</span>
+            <button type="submit" class="ds-button ds-button-primary">Guardar presenças e RPE</button>
         </div>
     </form>
-
     {% else %}
-    <!-- Mensagem quando não há jogadores na equipa -->
-    <div class="text-center py-8">
-        <span class="text-4xl">🏃</span>
-        <p class="text-gray-500 mt-3">Ainda não há {{ termo_jogador(equipa, plural=True, capitalizar=False) }} associados a esta equipa.</p>
-        <a href="/jogadores/novo"
-           class="inline-block mt-3 text-orange-500 hover:text-orange-600 text-sm">
-            Adicionar {{ termo_jogador(equipa, plural=True, capitalizar=False) }} →
-        </a>
-    </div>
+    <div class="ds-empty-state">Ainda não há {{ termo_jogador(equipa, plural=True, capitalizar=False) }} associados a esta equipa.</div>
     {% endif %}
-</div>
-
+</section>
 {% endblock %}
 
 {% block scripts_extra %}
 <script>
-document.querySelectorAll('[data-marcar-todos]').forEach(function (button) {
-    button.addEventListener('click', function () {
-        var estado = button.dataset.marcarTodos;
-        document.querySelectorAll('select[name^="estado_"]').forEach(function (select) {
-            select.value = estado;
-            select.dispatchEvent(new Event('change', { bubbles: true }));
+(function () {
+    const linhas = Array.from(document.querySelectorAll('[data-attendance-row]'));
+    const estadosParticipacao = new Set(['presente', 'atrasada']);
+
+    function atualizarLinha(linha) {
+        const selecionado = linha.querySelector('.ds-attendance-state-input:checked');
+        const estado = selecionado ? selecionado.value : 'por_registar';
+        const rpe = linha.querySelector('input[name^="rpe_"]');
+        const nota = linha.querySelector('input[name^="motivo_"]');
+        linha.dataset.estado = estado;
+        if (rpe) rpe.disabled = !estadosParticipacao.has(estado);
+        if (nota) nota.disabled = estadosParticipacao.has(estado) || estado === 'por_registar';
+    }
+
+    function atualizarResumo() {
+        const contagem = { presente: 0, atrasada: 0, ausente: 0, justificada: 0, lesionada: 0, por_registar: 0 };
+        const rpes = [];
+        linhas.forEach(function (linha) {
+            atualizarLinha(linha);
+            const estado = linha.dataset.estado;
+            contagem[estado] = (contagem[estado] || 0) + 1;
+            const rpe = linha.querySelector('input[name^="rpe_"]');
+            if (estadosParticipacao.has(estado) && rpe && rpe.value !== '') rpes.push(Number(rpe.value));
+        });
+        const presentes = contagem.presente + contagem.atrasada;
+        const faltas = contagem.ausente + contagem.justificada + contagem.lesionada;
+        const definidos = linhas.length - contagem.por_registar;
+        const mediaRpe = rpes.length ? (rpes.reduce((total, valor) => total + valor, 0) / rpes.length).toFixed(1) : '—';
+        const definir = function (seletor, valor) { const alvo = document.querySelector(seletor); if (alvo) alvo.textContent = valor; };
+        definir('[data-summary-pending]', contagem.por_registar);
+        definir('[data-summary-present]', presentes);
+        definir('[data-summary-absent]', faltas);
+        definir('[data-summary-rpe]', mediaRpe);
+        definir('[data-attendance-feedback]', definidos + ' de ' + linhas.length + ' com estado definido');
+    }
+
+    document.querySelectorAll('.ds-attendance-state-input').forEach(function (input) {
+        input.addEventListener('change', atualizarResumo);
+    });
+    document.querySelectorAll('input[name^="rpe_"]').forEach(function (input) {
+        input.addEventListener('input', atualizarResumo);
+    });
+    document.querySelectorAll('[data-marcar-todos]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const estado = button.dataset.marcarTodos;
+            linhas.forEach(function (linha) {
+                const input = linha.querySelector('.ds-attendance-state-input[value="' + estado + '"]');
+                if (input) input.checked = true;
+            });
+            atualizarResumo();
         });
     });
-});
+    atualizarResumo();
+})();
 </script>
 {% endblock %}
