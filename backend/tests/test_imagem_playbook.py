@@ -50,6 +50,23 @@ def test_playbook_expoe_imagem_e_desenho_em_cada_passo():
     assert "passo.imagem_composta_pdf" in pdf
 
 
+def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
+    toolbar = (ROOT / "frontend/templates/partials/tactical_toolbar.html").read_text(encoding="utf-8")
+    playbook = (ROOT / "frontend/templates/playbook/detalhe.html").read_text(encoding="utf-8")
+    treino = (ROOT / "frontend/templates/treino/plano.html").read_text(encoding="utf-8")
+
+    for grupo in ("Jogadores", "Equipamento", "Movimentos", "Estilo da linha", "Edição"):
+        assert grupo in toolbar
+    for ferramenta in ("jogador_ataque", "jogador_defesa", "coach", "cone", "bola"):
+        assert f'data-ferramenta="{ferramenta}"' in toolbar
+    assert "('seta_curva','⌒','Curva')" in toolbar
+    assert "tactical_toolbar" in treino
+    assert "tactical_toolbar" in playbook
+    assert "data-playbook-player" in playbook
+    assert "inicializarAnimacaoPlaybook" in playbook
+    assert "data-player-play" in playbook
+
+
 def test_administrador_adiciona_e_remove_imagem_do_passo(client_admin):
     db = SessionLocal()
     playbook_id = None

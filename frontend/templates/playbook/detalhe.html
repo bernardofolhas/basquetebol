@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% from "partials/tactical_toolbar.html" import tactical_toolbar %}
 {% block titulo %}{{ setplay.nome }} — Playbook{% endblock %}
 
 {% block conteudo %}
@@ -26,6 +27,34 @@
         <button type="submit" class="bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">🗑️ Eliminar</button>
     </form>
 {% endcall %}
+
+{% if passos %}
+<section class="ds-playbook-player" data-playbook-player aria-label="Animação da jogada">
+    <div class="ds-playbook-player-head">
+        <div><p class="ds-kicker">Sequência tática</p><h2>Animação dos passos</h2><p>Reproduz os desenhos e imagens da jogada pela ordem definida.</p></div>
+        <div class="ds-playbook-player-controls">
+            <button type="button" data-player-prev aria-label="Passo anterior">←</button>
+            <button type="button" class="ds-playbook-play" data-player-play>Reproduzir</button>
+            <button type="button" data-player-next aria-label="Passo seguinte">→</button>
+        </div>
+    </div>
+    <div class="ds-playbook-player-body">
+        <nav class="ds-playbook-frames" aria-label="Passos da jogada">
+            {% for passo in passos %}
+            <button type="button" data-playbook-frame="{{ passo.id }}" data-frame-index="{{ loop.index0 }}" data-frame-src="{{ (passo.imagem_coach or passo.desenho or '')|e }}" data-frame-imported="{{ 'true' if passo.imagem_coach else 'false' }}" data-frame-note="{{ (passo.observacao or '')|e }}" class="{% if loop.first %}is-active{% endif %}">
+                <span>Passo {{ loop.index }}</span><small>{{ passo.observacao or ('Sem visual guardado' if not passo.imagem_coach and not passo.desenho else 'Visual tático') }}</small>
+            </button>
+            {% endfor %}
+        </nav>
+        <div class="ds-playbook-player-stage">
+            <img class="ds-playbook-player-court" src="/static/campos/campo_meio.png" alt="Campo de basquetebol">
+            <img class="ds-playbook-player-frame" data-player-image alt="Visual do passo atual">
+            <div class="ds-playbook-player-empty" data-player-empty>Este passo ainda não tem desenho ou imagem.</div>
+            <div class="ds-playbook-player-caption"><strong data-player-label>Passo 1</strong><span data-player-note></span></div>
+        </div>
+    </div>
+</section>
+{% endif %}
 
 <!-- ── PASSOS ────────────────────────────────────────────────────── -->
 {% if passos %}
@@ -67,47 +96,13 @@
             </div>
 
             <div id="modo_desenho_{{ passo.id }}" data-visual-panel="desenho">
-            <!-- Toolbar -->
-            <div id="toolbar_canvas_{{ passo.id }}" class="flex flex-wrap gap-1 mb-2">
-                {% set ferramentas = [
-                    ('jogador_ataque', '⬤ Ataque', 'orange'),
-                    ('jogador_defesa', '▲ Defesa', 'gray'),
-                    ('coach', '⊙ Coach', 'gray'),
-                    ('cone', '○ Cone', 'gray'),
-                    ('bola', '🏀 Bola', 'gray'),
-                    ('seta', '→ Seta', 'gray'),
-                    ('seta_tracejada', '⇢ Tracejada', 'gray'),
-                    ('seta_zigzag', '≋ Drible', 'gray'),
-                    ('seta_curva', '⌒ Curva', 'gray'),
-                    ('bloqueio', '⊣ Bloqueio', 'gray'),
-                    ('linha', '— Linha', 'gray'),
-                    ('seleccionar', '✥ Mover', 'gray'),
-                    ('apagar', '✕ Apagar', 'gray'),
-                ] %}
-                {% for ferramenta, label, cor in ferramentas %}
-                <button data-ferramenta="{{ ferramenta }}"
-                        onclick="definirFerramenta('canvas_{{ passo.id }}', '{{ ferramenta }}')"
-                        class="text-xs px-2 py-1 rounded border border-gray-200 {% if loop.first %}bg-orange-500 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %} transition">
-                    {{ label }}
-                </button>
-                {% endfor %}
-                <button onclick="desfazer('canvas_{{ passo.id }}')"
-                        class="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200">↩ Desfazer</button>
-                <button onclick="limparTudo('canvas_{{ passo.id }}')"
-                        class="text-xs px-2 py-1 rounded bg-red-50 text-red-500 hover:bg-red-100 border border-red-200">🗑 Limpar</button>
-            </div>
-
-            <!-- Campo de jogo -->
-            <div class="relative select-none">
-                <img src="/static/campos/campo_meio.png" class="w-full rounded-lg border border-gray-200" alt="Meio campo"
-                     id="img_campo_{{ passo.id }}">
-                <canvas id="canvas_{{ passo.id }}"
-                        class="absolute top-0 left-0 w-full h-full"
-                        style="cursor:crosshair"></canvas>
-                {% if passo.desenho %}
-                <img id="overlay_{{ passo.id }}" src="{{ passo.desenho }}"
-                     class="absolute top-0 left-0 w-full h-full pointer-events-none hidden" alt="">
-                {% endif %}
+            <div class="ds-tactical-editor">
+                <div class="ds-tactical-stage relative select-none">
+                    <img src="/static/campos/campo_meio.png" class="w-full rounded-lg border border-gray-200" alt="Meio campo" id="img_campo_{{ passo.id }}">
+                    <canvas id="canvas_{{ passo.id }}" class="absolute top-0 left-0 w-full h-full" style="cursor:crosshair"></canvas>
+                    {% if passo.desenho %}<img id="overlay_{{ passo.id }}" src="{{ passo.desenho }}" class="absolute top-0 left-0 w-full h-full pointer-events-none hidden" alt="">{% endif %}
+                </div>
+                {{ tactical_toolbar('canvas_' ~ passo.id, 'toolbar_canvas_' ~ passo.id) }}
             </div>
 
             <!-- Botão guardar -->
@@ -393,7 +388,21 @@ function definirFerramenta(canvasId, ferramenta) {
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
     est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'not-allowed' : 'crosshair';
     const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
-    if (toolbar) { toolbar.querySelectorAll('button[data-ferramenta]').forEach(btn => { const activo = btn.dataset.ferramenta === ferramenta; btn.className = btn.className.replace(/bg-orange-500 text-white|bg-gray-100 text-gray-700/g, '').trim(); btn.className += activo ? ' bg-orange-500 text-white' : ' bg-gray-100 text-gray-700'; }); }
+    if (toolbar) toolbar.querySelectorAll('button[data-ferramenta]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.ferramenta === ferramenta));
+}
+
+function definirCorLinha(canvasId, cor) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    est.corLinha = cor;
+    const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
+    if (toolbar) toolbar.querySelectorAll('[data-cor-linha]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.corLinha === cor));
+}
+
+function definirLarguraLinha(canvasId, largura) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    est.larguraLinha = largura;
+    const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
+    if (toolbar) toolbar.querySelectorAll('[data-largura-linha]').forEach(btn => btn.classList.toggle('is-active', Number(btn.dataset.larguraLinha) === largura));
 }
 
 function limparTudo(canvasId) {
@@ -418,6 +427,8 @@ function guardarDesenhoPasso(canvasId, passoId) {
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '' }
     }).then(r => r.json()).then(data => {
         if (data.sucesso && btn) {
+            const frameButton = document.querySelector(`[data-playbook-frame="${passoId}"]`);
+            if (frameButton) frameButton.dataset.frameSrc = est.canvas.toDataURL('image/png');
             btn.textContent = '✓ Guardado'; btn.classList.add('bg-green-500'); btn.classList.remove('bg-orange-500');
             setTimeout(() => { btn.textContent = '💾 Guardar desenho'; btn.classList.remove('bg-green-500'); btn.classList.add('bg-orange-500'); }, 2500);
         }
@@ -430,7 +441,56 @@ document.addEventListener('DOMContentLoaded', () => {
         inicializarDesenho(c.id);
         setTimeout(() => definirFerramenta(c.id, 'jogador_ataque'), 200);
     });
+
+    document.querySelectorAll('[data-playbook-player]').forEach(inicializarAnimacaoPlaybook);
 });
+
+function inicializarAnimacaoPlaybook(player) {
+    const botoes = Array.from(player.querySelectorAll('[data-playbook-frame]'));
+    const imagem = player.querySelector('[data-player-image]');
+    const vazio = player.querySelector('[data-player-empty]');
+    const etiqueta = player.querySelector('[data-player-label]');
+    const nota = player.querySelector('[data-player-note]');
+    const botaoPlay = player.querySelector('[data-player-play]');
+    let indice = 0;
+    let temporizador = null;
+
+    function mostrar(novoIndice) {
+        indice = (novoIndice + botoes.length) % botoes.length;
+        const botao = botoes[indice];
+        const origem = botao.dataset.frameSrc || '';
+        botoes.forEach((item, i) => item.classList.toggle('is-active', i === indice));
+        etiqueta.textContent = `Passo ${indice + 1}`;
+        nota.textContent = botao.dataset.frameNote || '';
+        imagem.classList.remove('is-visible');
+        window.setTimeout(() => {
+            imagem.src = origem;
+            imagem.classList.toggle('is-imported', botao.dataset.frameImported === 'true');
+            imagem.classList.toggle('is-visible', Boolean(origem));
+            vazio.hidden = Boolean(origem);
+        }, 90);
+    }
+
+    function parar() {
+        if (temporizador) window.clearInterval(temporizador);
+        temporizador = null;
+        botaoPlay.textContent = 'Reproduzir';
+        botaoPlay.setAttribute('aria-pressed', 'false');
+    }
+
+    function reproduzir() {
+        if (temporizador) { parar(); return; }
+        botaoPlay.textContent = 'Pausar';
+        botaoPlay.setAttribute('aria-pressed', 'true');
+        temporizador = window.setInterval(() => mostrar(indice + 1), 1800);
+    }
+
+    botoes.forEach((botao, i) => botao.addEventListener('click', () => { parar(); mostrar(i); }));
+    player.querySelector('[data-player-prev]').addEventListener('click', () => { parar(); mostrar(indice - 1); });
+    player.querySelector('[data-player-next]').addEventListener('click', () => { parar(); mostrar(indice + 1); });
+    botaoPlay.addEventListener('click', reproduzir);
+    mostrar(0);
+}
 </script>
 
 {% endblock %}

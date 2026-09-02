@@ -1,31 +1,10 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% from "partials/tactical_toolbar.html" import tactical_toolbar %}
 
 {% block titulo %}Plano de Treino — {{ sessao.data|data_pt }}{% endblock %}
 
 {% block conteudo %}
-
-{% macro toolbar(canvas_id) %}
-<div id="toolbar_{{ canvas_id }}" class="flex flex-wrap gap-1 mb-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
-    <button type="button" data-ferramenta="seleccionar" onclick="definirFerramenta('{{ canvas_id }}', 'seleccionar')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Selecionar">⊹</button>
-    <button type="button" data-ferramenta="jogador_ataque" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_ataque')" class="rounded bg-orange-500 px-2 py-1 text-xs font-bold text-white" title="Jogador ataque">⬤ A</button>
-    <button type="button" data-ferramenta="jogador_defesa" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_defesa')" class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700" title="Jogador defesa">▲ D</button>
-    <button type="button" data-ferramenta="coach" onclick="definirFerramenta('{{ canvas_id }}', 'coach')" class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700" title="Coach">⊙ C</button>
-    <button type="button" data-ferramenta="cone" onclick="definirFerramenta('{{ canvas_id }}', 'cone')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Cone">○</button>
-    <button type="button" data-ferramenta="bola" onclick="definirFerramenta('{{ canvas_id }}', 'bola')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Bola">🏀</button>
-    <span class="mx-1 border-l border-gray-300"></span>
-    <button type="button" data-ferramenta="seta" onclick="definirFerramenta('{{ canvas_id }}', 'seta')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Seta">→</button>
-    <button type="button" data-ferramenta="seta_tracejada" onclick="definirFerramenta('{{ canvas_id }}', 'seta_tracejada')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Seta tracejada">⇢</button>
-    <button type="button" data-ferramenta="seta_zigzag" onclick="definirFerramenta('{{ canvas_id }}', 'seta_zigzag')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Drible">≋</button>
-    <button type="button" data-ferramenta="seta_curva" onclick="definirFerramenta('{{ canvas_id }}', 'seta_curva')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Seta curva">⌒</button>
-    <button type="button" data-ferramenta="bloqueio" onclick="definirFerramenta('{{ canvas_id }}', 'bloqueio')" class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700" title="Bloqueio">⊣</button>
-    <button type="button" data-ferramenta="linha" onclick="definirFerramenta('{{ canvas_id }}', 'linha')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Linha">—</button>
-    <span class="mx-1 border-l border-gray-300"></span>
-    <button type="button" onclick="desfazer('{{ canvas_id }}')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Desfazer">↩</button>
-    <button type="button" data-ferramenta="apagar" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Apagar">✕</button>
-    <button type="button" onclick="limparTudo('{{ canvas_id }}')" class="rounded bg-gray-100 px-2 py-1 text-xs text-red-500" title="Limpar tudo">🗑</button>
-</div>
-{% endmacro %}
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
 <div class="rounded-2xl border border-gray-200 bg-gray-50 p-3">
@@ -35,10 +14,12 @@
         <span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">Guardado</span>
         {% endif %}
     </div>
-    {{ toolbar(canvas_id) }}
-    <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}144 / 112{% else %}209 / 141{% endif %};">
-        <img src="/static/campos/{{ campo.imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
-        <canvas id="{{ canvas_id }}" data-desenho="{{ campo.desenho|default('', true)|e }}" class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
+    <div class="ds-tactical-editor">
+        <div class="ds-tactical-stage relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}144 / 112{% else %}209 / 141{% endif %};">
+            <img src="/static/campos/{{ campo.imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
+            <canvas id="{{ canvas_id }}" data-desenho="{{ campo.desenho|default('', true)|e }}" class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
+        </div>
+        {{ tactical_toolbar(canvas_id, 'toolbar_' ~ canvas_id) }}
     </div>
     <div class="mt-2 flex flex-wrap justify-end gap-2">
         <form method="POST" action="/treino/exercicios/{{ ex_id }}/campos/{{ campo.numero }}/apagar" onsubmit="return confirm('Remover apenas este campo e o respetivo desenho?')">
@@ -907,10 +888,25 @@ function definirFerramenta(canvasId, ferramenta) {
     if (toolbar) {
         toolbar.querySelectorAll('button[data-ferramenta]').forEach(btn => {
             const activo = btn.dataset.ferramenta === ferramenta;
-            btn.className = btn.className.replace(/bg-orange-500|text-white|bg-gray-100|text-gray-700/g, '').trim();
-            btn.className += activo ? ' bg-orange-500 text-white' : ' bg-gray-100 text-gray-700';
+            btn.classList.toggle('is-active', activo);
         });
     }
+}
+
+function definirCorLinha(canvasId, cor) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est) return;
+    est.corLinha = cor;
+    const toolbar = document.getElementById('toolbar_' + canvasId);
+    if (toolbar) toolbar.querySelectorAll('[data-cor-linha]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.corLinha === cor));
+}
+
+function definirLarguraLinha(canvasId, largura) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est) return;
+    est.larguraLinha = largura;
+    const toolbar = document.getElementById('toolbar_' + canvasId);
+    if (toolbar) toolbar.querySelectorAll('[data-largura-linha]').forEach(btn => btn.classList.toggle('is-active', Number(btn.dataset.larguraLinha) === largura));
 }
 
 function limparTudo(canvasId) {

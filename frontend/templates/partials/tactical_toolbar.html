@@ -1,0 +1,44 @@
+{% macro tactical_toolbar(canvas_id, toolbar_id) %}
+<aside id="{{ toolbar_id }}" class="ds-tactical-tools" aria-label="Ferramentas de desenho tático">
+    <section class="ds-tactical-tool-group">
+        <h4>Jogadores</h4>
+        <div class="ds-tactical-tool-grid">
+            <button type="button" class="ds-tactical-tool is-active" data-ferramenta="jogador_ataque" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_ataque')" title="Adicionar jogador atacante"><span class="ds-tactical-symbol ds-tactical-symbol-attack">1</span><small>Ataque</small></button>
+            <button type="button" class="ds-tactical-tool" data-ferramenta="jogador_defesa" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_defesa')" title="Adicionar jogador defensor"><span class="ds-tactical-symbol ds-tactical-symbol-defence">X</span><small>Defesa</small></button>
+            <button type="button" class="ds-tactical-tool" data-ferramenta="coach" onclick="definirFerramenta('{{ canvas_id }}', 'coach')" title="Adicionar treinador"><span class="ds-tactical-symbol ds-tactical-symbol-coach">C</span><small>Coach</small></button>
+        </div>
+    </section>
+    <section class="ds-tactical-tool-group">
+        <h4>Equipamento</h4>
+        <div class="ds-tactical-tool-grid">
+            <button type="button" class="ds-tactical-tool" data-ferramenta="bola" onclick="definirFerramenta('{{ canvas_id }}', 'bola')" title="Adicionar bola"><span class="ds-tactical-ball">●</span><small>Bola</small></button>
+            <button type="button" class="ds-tactical-tool" data-ferramenta="cone" onclick="definirFerramenta('{{ canvas_id }}', 'cone')" title="Adicionar cone"><span class="ds-tactical-cone">▲</span><small>Cone</small></button>
+        </div>
+    </section>
+    <section class="ds-tactical-tool-group">
+        <h4>Movimentos</h4>
+        <div class="ds-tactical-tool-grid">
+            {% for ferramenta, simbolo, label in [('seta','→','Corrida'),('seta_tracejada','⇢','Passe'),('seta_zigzag','≋','Drible'),('seta_curva','⌒','Curva'),('bloqueio','⊣','Bloqueio'),('linha','—','Linha')] %}
+            <button type="button" class="ds-tactical-tool" data-ferramenta="{{ ferramenta }}" onclick="definirFerramenta('{{ canvas_id }}', '{{ ferramenta }}')" title="{{ label }}"><span>{{ simbolo }}</span><small>{{ label }}</small></button>
+            {% endfor %}
+        </div>
+    </section>
+    <section class="ds-tactical-tool-group">
+        <h4>Estilo da linha</h4>
+        <div class="ds-tactical-style-row">
+            {% for cor in ['#111827','#ffffff','#ef4444','#2563eb'] %}<button type="button" class="ds-tactical-colour{% if loop.first %} is-active{% endif %}" data-cor-linha="{{ cor }}" onclick="definirCorLinha('{{ canvas_id }}', '{{ cor }}')" style="--tool-colour:{{ cor }}" title="Cor da linha"></button>{% endfor %}
+            <button type="button" class="ds-tactical-width is-active" data-largura-linha="2" onclick="definirLarguraLinha('{{ canvas_id }}', 2)" title="Linha fina">Fina</button>
+            <button type="button" class="ds-tactical-width" data-largura-linha="4" onclick="definirLarguraLinha('{{ canvas_id }}', 4)" title="Linha grossa">Grossa</button>
+        </div>
+    </section>
+    <section class="ds-tactical-tool-group">
+        <h4>Edição</h4>
+        <div class="ds-tactical-tool-grid">
+            <button type="button" class="ds-tactical-tool" data-ferramenta="seleccionar" onclick="definirFerramenta('{{ canvas_id }}', 'seleccionar')" title="Selecionar e mover"><span>↖</span><small>Mover</small></button>
+            <button type="button" class="ds-tactical-tool" onclick="desfazer('{{ canvas_id }}')" title="Desfazer"><span>↶</span><small>Desfazer</small></button>
+            <button type="button" class="ds-tactical-tool" data-ferramenta="apagar" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')" title="Apagar um elemento"><span>×</span><small>Apagar</small></button>
+            <button type="button" class="ds-tactical-tool ds-tactical-tool-danger" onclick="limparTudo('{{ canvas_id }}')" title="Limpar o desenho"><span>□</span><small>Limpar</small></button>
+        </div>
+    </section>
+</aside>
+{% endmacro %}

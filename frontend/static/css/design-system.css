@@ -779,6 +779,51 @@ table tbody tr:hover { background:#fafbfd; }
     .ds-user-menu-dropdown { position:fixed;top:calc(var(--topbar-height) + .55rem)!important;right:.65rem!important;left:.65rem!important;z-index:110!important;width:auto!important; }
 }
 
+.ds-tactical-editor { display:grid;grid-template-columns:minmax(0,1fr) 11.5rem;gap:.8rem;align-items:start; }
+.ds-tactical-stage { min-width:0;overflow:hidden;border-radius:.75rem;background:#eef2f6; }
+.ds-tactical-tools { display:grid;gap:.65rem;border:1px solid var(--border-soft);border-radius:.75rem;background:#fff;padding:.7rem;box-shadow:0 4px 16px rgb(15 23 42 / .06); }
+.ds-tactical-tool-group { display:grid;gap:.35rem;border-bottom:1px solid #eef1f5;padding-bottom:.6rem; }
+.ds-tactical-tool-group:last-child { border-bottom:0;padding-bottom:0; }
+.ds-tactical-tool-group h4 { color:#344054;font-size:.58rem;font-weight:850;letter-spacing:.09em;text-transform:uppercase; }
+.ds-tactical-tool-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.3rem; }
+.ds-tactical-tool { display:grid;min-width:0;min-height:2.8rem;place-items:center;gap:.08rem;border:1px solid #dce2ea;border-radius:.45rem;background:#f8fafc;color:#344054;font-size:.88rem;line-height:1;transition:border-color .12s,background .12s,color .12s,transform .12s; }
+.ds-tactical-tool:hover { border-color:var(--clube-primary-border);background:var(--clube-primary-surface);transform:translateY(-1px); }
+.ds-tactical-tool.is-active { border-color:var(--clube-primary);background:var(--clube-primary);color:var(--clube-on-primary);box-shadow:0 2px 6px color-mix(in srgb,var(--clube-primary) 25%,transparent); }
+.ds-tactical-tool small { max-width:100%;overflow:hidden;font-size:.5rem;font-weight:750;line-height:1.1;text-overflow:ellipsis;white-space:nowrap; }
+.ds-tactical-tool-danger { color:#b4232f; }
+.ds-tactical-symbol { display:grid;width:1.15rem;height:1.15rem;place-items:center;border:1.5px solid currentColor;border-radius:50%;font-size:.58rem;font-weight:850; }
+.ds-tactical-symbol-defence { border-radius:.18rem;color:#ef4444; }
+.ds-tactical-symbol-coach { color:#475569; }
+.ds-tactical-ball { color:#e76f00; }
+.ds-tactical-cone { color:#f97316; }
+.ds-tactical-style-row { display:flex;flex-wrap:wrap;align-items:center;gap:.35rem; }
+.ds-tactical-colour { width:1.45rem;height:1.45rem;border:2px solid #fff;border-radius:.35rem;background:var(--tool-colour);box-shadow:0 0 0 1px #cbd5e1; }
+.ds-tactical-colour.is-active { box-shadow:0 0 0 2px var(--clube-primary); }
+.ds-tactical-width { min-height:1.6rem;border:1px solid #dce2ea;border-radius:.35rem;background:#fff;padding:.2rem .4rem;color:#64748b;font-size:.55rem;font-weight:750; }
+.ds-tactical-width.is-active { border-color:var(--clube-primary);color:var(--clube-primary-dark); }
+
+.ds-playbook-player { margin:0 0 1.25rem;overflow:hidden;border:1px solid var(--border-soft);border-radius:var(--radius-panel);background:#fff;box-shadow:var(--shadow-card); }
+.ds-playbook-player-head { display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--border-soft);padding:1rem 1.15rem; }
+.ds-playbook-player-head h2 { margin:.1rem 0;font-size:1.1rem;font-weight:850;letter-spacing:-.025em; }
+.ds-playbook-player-head p:last-child { color:#6b778b;font-size:.72rem; }
+.ds-playbook-player-controls { display:flex;flex:none;gap:.35rem; }
+.ds-playbook-player-controls button { min-height:2.2rem;border:1px solid var(--border-soft);border-radius:.5rem;background:#fff;padding:.45rem .68rem;color:#475569;font-size:.72rem;font-weight:780; }
+.ds-playbook-player-controls .ds-playbook-play { border-color:var(--clube-primary);background:var(--clube-primary);color:var(--clube-on-primary); }
+.ds-playbook-player-body { display:grid;grid-template-columns:12rem minmax(0,1fr);min-height:25rem; }
+.ds-playbook-frames { display:grid;align-content:start;gap:.35rem;max-height:32rem;overflow:auto;border-right:1px solid var(--border-soft);background:#f8fafc;padding:.75rem; }
+.ds-playbook-frames button { display:grid;gap:.15rem;border:1px solid transparent;border-radius:.55rem;padding:.65rem;text-align:left; }
+.ds-playbook-frames button:hover,.ds-playbook-frames button.is-active { border-color:var(--clube-primary-border);background:#fff;box-shadow:0 1px 3px rgb(15 23 42 / .06); }
+.ds-playbook-frames span { color:#344054;font-size:.72rem;font-weight:820; }
+.ds-playbook-frames small { overflow:hidden;color:#8290a4;font-size:.6rem;line-height:1.25;text-overflow:ellipsis;white-space:nowrap; }
+.ds-playbook-player-stage { position:relative;display:grid;min-height:25rem;place-items:center;overflow:hidden;background:#eef2f6;padding:1rem; }
+.ds-playbook-player-court,.ds-playbook-player-frame { position:absolute;inset:1rem;width:calc(100% - 2rem);height:calc(100% - 4.8rem);object-fit:contain; }
+.ds-playbook-player-frame { z-index:2;opacity:0;transition:opacity .24s ease; }
+.ds-playbook-player-frame.is-visible { opacity:1; }
+.ds-playbook-player-frame.is-imported { background:#eef2f6; }
+.ds-playbook-player-empty { z-index:3;border:1px dashed #cbd5e1;border-radius:.65rem;background:rgb(255 255 255 / .88);padding:1rem;color:#7a8699;font-size:.75rem; }
+.ds-playbook-player-caption { position:absolute;right:1rem;bottom:.8rem;left:1rem;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:1rem;border-radius:.55rem;background:rgb(15 23 42 / .84);padding:.6rem .75rem;color:#fff;backdrop-filter:blur(5px); }
+.ds-playbook-player-caption strong { font-size:.72rem; }.ds-playbook-player-caption span { overflow:hidden;color:#dbe2ea;font-size:.65rem;text-overflow:ellipsis;white-space:nowrap; }
+
 .ds-visual-switch { display:inline-flex;gap:.2rem;margin-bottom:.7rem;border:1px solid var(--border-soft);border-radius:.6rem;background:#f7f9fb;padding:.2rem; }
 .ds-visual-switch button { display:inline-flex;min-height:2.15rem;align-items:center;gap:.38rem;border-radius:.45rem;padding:.48rem .7rem;color:#6b778b;font-size:.72rem;font-weight:780; }
 .ds-visual-switch button.is-active { background:#fff;color:var(--clube-primary-dark);box-shadow:0 1px 3px rgb(15 23 42 / .1); }
@@ -793,7 +838,20 @@ table tbody tr:hover { background:#fafbfd; }
 .ds-coach-image-form { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:.55rem;margin-top:.7rem; }
 .ds-coach-image-form label { grid-column:1/-1;font-size:.72rem;font-weight:750; }
 .ds-coach-image-form input { min-width:0;font-size:.76rem; }
-@media (max-width:640px) { .ds-coach-image-form { grid-template-columns:1fr; }.ds-coach-image-form label { grid-column:auto; } }
+@media (max-width:900px) {
+    .ds-tactical-editor { grid-template-columns:1fr; }
+    .ds-tactical-tools { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .ds-playbook-player-body { grid-template-columns:1fr; }
+    .ds-playbook-frames { grid-auto-flow:column;grid-auto-columns:minmax(7.5rem,10rem);overflow-x:auto;border-right:0;border-bottom:1px solid var(--border-soft); }
+}
+@media (max-width:640px) {
+    .ds-coach-image-form { grid-template-columns:1fr; }.ds-coach-image-form label { grid-column:auto; }
+    .ds-tactical-tools { grid-template-columns:1fr; }
+    .ds-tactical-tool-group { border-bottom:1px solid #eef1f5; }
+    .ds-playbook-player-head { align-items:flex-start;flex-direction:column; }
+    .ds-playbook-player-controls { width:100%; }.ds-playbook-player-controls button { flex:1; }
+    .ds-playbook-player-stage { min-height:20rem; }
+}
 
 /* Configurador comum das exportacoes PDF. */
 .pdf-configurador { width:min(42rem,calc(100vw - 2rem));max-height:calc(100vh - 2rem);margin:auto;border:0;border-radius:1rem;background:#fff;padding:0;color:var(--text-main);box-shadow:0 24px 70px rgb(15 23 42 / .28); }
