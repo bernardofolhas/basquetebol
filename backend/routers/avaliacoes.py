@@ -457,14 +457,21 @@ def detalhe_jogador(
         AvaliacaoJogador.data.desc(), AvaliacaoJogador.id.desc()
     ).all()
     medias = {}
+    totais_categoria = {}
     for categoria in CATEGORIAS:
         valores = [item.valor for item in avaliacoes if item.parametro.categoria == categoria]
-        medias[categoria] = round(sum(valores) / len(valores), 1) if valores else None
+        totais_categoria[categoria] = len(valores)
+        medias[categoria] = (
+            round(sum(valores) / len(valores), 1)
+            if valores and categoria != "fisica"
+            else None
+        )
     return templates.TemplateResponse(request, "avaliacoes/jogador.html", {
         "utilizador": utilizador,
         "jogador": jogador,
         "equipa": jogador.equipa,
         "avaliacoes": avaliacoes,
         "medias": medias,
+        "totais_categoria": totais_categoria,
         "categorias": CATEGORIAS,
     })

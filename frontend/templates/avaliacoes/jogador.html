@@ -18,7 +18,11 @@
 {% for categoria, label in categorias.items() %}
   <article class="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
     <p class="text-xs font-bold uppercase tracking-[.14em] text-slate-400">{{ label }}</p>
-    <p class="mt-2 text-3xl font-black text-slate-900">{{ medias[categoria] if medias[categoria] is not none else '-' }}{% if categoria != 'fisica' and medias[categoria] is not none %}<span class="text-sm font-semibold text-slate-400">/5</span>{% endif %}</p>
+    {% if categoria == 'fisica' %}
+    <p class="mt-2 text-3xl font-black text-slate-900">{{ totais_categoria[categoria] }}<span class="text-sm font-semibold text-slate-400"> medições</span></p>
+    {% else %}
+    <p class="mt-2 text-3xl font-black text-slate-900">{{ medias[categoria] if medias[categoria] is not none else '-' }}{% if medias[categoria] is not none %}<span class="text-sm font-semibold text-slate-400">/5</span>{% endif %}</p>
+    {% endif %}
   </article>
 {% endfor %}
 </div>
