@@ -9,6 +9,7 @@
   const clockKey = `${storageKey}:clock`;
   const labels = {ll_c:"LL convertido",ll_f:"LL falhado",dois_c:"2P convertido",dois_f:"2P falhado",tres_c:"3P convertido",tres_f:"3P falhado",ressalto_ofensivo:"Ressalto ofensivo",ressalto_defensivo:"Ressalto defensivo",assistencia:"Assistência",roubo:"Roubo",perda:"Perda",desarme:"Desarme",falta:"Falta pessoal",falta_sofrida:"Falta sofrida"};
   const points = {ll_c:1,dois_c:2,tres_c:3};
+  const actionsWithoutPosition = new Set(["falta", "falta_sofrida"]);
   let dirty = loadJson(storageKey, []);
   let events = mergeEvents(serverEvents, dirty);
   let selectedPlayer = null;
@@ -17,6 +18,8 @@
   let syncTimer = null;
   let syncing = false;
   let syncRequested = false;
+  let pendingAction = null;
+  let selectedPosition = null;
 
   function loadJson(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (_) { return fallback; } }
   function saveLocal() { localStorage.setItem(storageKey, JSON.stringify(dirty)); localStorage.setItem(clockKey, JSON.stringify({...clock,updatedAt:Date.now()})); }
@@ -29,13 +32,29 @@
   function updateClock() { if(clockElement())clockElement().textContent=formatClock(currentSeconds()); const period=root.querySelector("[data-period]"); if(period)period.value=String(clock.period); }
   function startTimer() { clearInterval(timer); if(!clock.running)return; timer=setInterval(()=>{ if(clock.seconds<=0){clock.running=false;clearInterval(timer);}else clock.seconds-=1;updateClock();saveLocal(); },1000); }
   function markDirty(event) { dirty=dirty.filter(item=>item.client_uid!==event.client_uid); dirty.push({...event,sincronizado:false}); saveLocal(); }
-  function addEvent(type, side="equipa") {
+  function addEvent(type, side="equipa", position=null) {
     if(!canEdit)return;
     if(side==="equipa"&&!selectedPlayer){notify("Seleciona primeiro um atleta.","danger");return;}
     const playerButton=selectedPlayer?root.querySelector(`[data-player-id="${selectedPlayer}"]`):null;
-    const event={client_uid:uid(),jogador_id:side==="equipa"?selectedPlayer:null,jogador:playerButton?.dataset.playerName||null,lado:side,tipo:type,periodo:Number(root.querySelector("[data-period]")?.value||1),segundos_restantes:currentSeconds(),anulado:false,sincronizado:false};
+    const event={client_uid:uid(),jogador_id:side==="equipa"?selectedPlayer:null,jogador:playerButton?.dataset.playerName||null,lado:side,tipo:type,periodo:Number(root.querySelector("[data-period]")?.value||1),segundos_restantes:currentSeconds(),posicao_x:position?.x??null,posicao_y:position?.y??null,anulado:false,sincronizado:false};
     events.push(event); markDirty(event); render(); scheduleSync();
   }
+  function requestEvent(type, side="equipa") {
+    if(!canEdit)return;
+    if(side==="equipa"&&!selectedPlayer){notify("Seleciona primeiro um atleta.","danger");return;}
+    if(actionsWithoutPosition.has(type)){addEvent(type,side);return;}
+    const dialog=root.querySelector("[data-court-dialog]");
+    if(!dialog){addEvent(type,side);return;}
+    pendingAction={type,side};selectedPosition=null;
+    dialog.classList.toggle("is-opponent",side==="adversario");
+    dialog.querySelector("[data-court-title]").textContent=labels[type]||"Assinalar ação";
+    dialog.querySelector("[data-court-description]").textContent=`${side==="adversario"?"Adversário":"Nossa equipa"} · toca no local onde aconteceu a ação.`;
+    const marker=dialog.querySelector("[data-court-marker]");marker.hidden=true;marker.style.left="";marker.style.top="";
+    const confirm=dialog.querySelector("[data-court-confirm]");confirm.disabled=true;
+    dialog.querySelector("[data-court-hint]").textContent="Seleciona um ponto no campo para continuar.";
+    if(typeof dialog.showModal==="function")dialog.showModal();else dialog.setAttribute("open","");
+  }
+  function closeCourtDialog(){const dialog=root.querySelector("[data-court-dialog]");if(!dialog)return;pendingAction=null;selectedPosition=null;if(typeof dialog.close==="function"&&dialog.open)dialog.close();else dialog.removeAttribute("open");}
   function undo() { const event=[...events].reverse().find(item=>!item.anulado); if(!event){notify("Não existem ações para desfazer.");return;} event.anulado=true;markDirty(event);render();scheduleSync(); }
   function notify(message,tone="warning") { const stack=root.querySelector("[data-warning-stack]"); if(!stack)return; const item=document.createElement("div");item.className=`stat-warning${tone==="danger"?" is-danger":""}`;item.textContent=message;stack.prepend(item);stack.hidden=false;setTimeout(()=>{item.remove();stack.hidden=!stack.children.length},4500); }
   async function sync(showFeedback=true) {
@@ -61,18 +80,31 @@
   }
   function renderBoxscore(){root.querySelectorAll("[data-boxscore-player]").forEach(row=>{const id=Number(row.dataset.boxscorePlayer),s=totalsFor(id),cells=row.querySelectorAll("td");const values=[s.pts,`${s.llc}/${s.llt}`,`${s.c2}/${s.t2}`,`${s.c3}/${s.t3}`,s.ro,s.rd,s.rt,s.ast,s.stl,s.to,s.blk,s.pf,s.eff];values.forEach((value,index)=>cells[index+1].textContent=value);const badge=root.querySelector(`[data-player-points="${id}"]`);if(badge)badge.textContent=`${s.pts} pts`;});}
   function renderScores(){["equipa","adversario"].forEach(side=>{const score=active().filter(item=>item.lado===side).reduce((sum,item)=>sum+(points[item.tipo]||0),0);root.querySelector(`[data-score="${side}"]`).textContent=score;});}
-  function renderFeed(){const target=root.querySelector("[data-stat-feed]");if(!target)return;const list=[...active()].reverse().slice(0,20);target.innerHTML="";if(!list.length){target.innerHTML='<p class="stat-feed-empty">As ações surgem aqui durante o jogo.</p>';return;}list.forEach(item=>{const node=document.createElement("div");node.className="stat-feed-item";const who=item.lado==="adversario"?"Adversário":(item.jogador||"Atleta");node.innerHTML=`<div><strong></strong><span></span></div><b></b>`;node.querySelector("strong").textContent=who;node.querySelector("span").textContent=labels[item.tipo]||item.tipo;node.querySelector("b").textContent=`${item.periodo}º · ${formatClock(item.segundos_restantes??0)}`;target.appendChild(node);});}
+  function renderFeed(){const target=root.querySelector("[data-stat-feed]");if(!target)return;const list=[...active()].reverse().slice(0,20);target.innerHTML="";if(!list.length){target.innerHTML='<p class="stat-feed-empty">As ações surgem aqui durante o jogo.</p>';return;}list.forEach(item=>{const node=document.createElement("div");node.className="stat-feed-item";const who=item.lado==="adversario"?"Adversário":(item.jogador||"Atleta");node.innerHTML=`<div><strong></strong><span></span></div><b></b>`;node.querySelector("strong").textContent=who;node.querySelector("span").textContent=`${labels[item.tipo]||item.tipo}${item.posicao_x!=null?" · posição registada":""}`;node.querySelector("b").textContent=`${item.periodo}º · ${formatClock(item.segundos_restantes??0)}`;target.appendChild(node);});}
   function renderWarnings(){const stack=root.querySelector("[data-warning-stack]");if(!stack)return;stack.querySelectorAll("[data-auto-warning]").forEach(item=>item.remove());const list=[];root.querySelectorAll("[data-boxscore-player]").forEach(row=>{const s=totalsFor(Number(row.dataset.boxscorePlayer));if(s.pf>=5)list.push([`${row.cells[0].textContent.trim()}: ${s.pf} faltas, atleta excluído.`,"danger"]);else if(s.pf===4)list.push([`${row.cells[0].textContent.trim()}: 4 faltas pessoais.`,"warning"]);});const teamFouls=active().filter(item=>item.lado==="equipa"&&item.tipo==="falta"&&item.periodo===Number(clock.period)).length;if(teamFouls>=5)list.push([`${teamFouls} faltas de equipa no ${clock.period}º período.`,"warning"]);list.reverse().forEach(([message,tone])=>{const item=document.createElement("div");item.dataset.autoWarning="true";item.className=`stat-warning${tone==="danger"?" is-danger":""}`;item.textContent=message;stack.prepend(item);});stack.hidden=!stack.children.length;}
   function updateConnection(){const online=navigator.onLine;root.querySelector("[data-online-dot]")?.classList.toggle("is-online",online);root.querySelector("[data-online-label]").textContent=online?"Online":"Modo offline";root.querySelector("[data-sync-label]").textContent=dirty.length?`${dirty.length} ação(ões) por sincronizar`:"Tudo sincronizado";}
   function render(){renderScores();renderBoxscore();renderFeed();renderWarnings();updateConnection();updateClock();root.querySelectorAll("[data-stat-action]").forEach(button=>button.disabled=!selectedPlayer);}
 
   root.querySelectorAll("[data-player-id]").forEach(button=>button.addEventListener("click",()=>{selectedPlayer=Number(button.dataset.playerId);root.querySelectorAll("[data-player-id]").forEach(item=>item.classList.toggle("is-selected",item===button));root.querySelector("[data-selected-player]").textContent=button.dataset.playerName;render();}));
-  root.querySelectorAll("[data-stat-action]").forEach(button=>button.addEventListener("click",()=>addEvent(button.dataset.statAction)));
-  root.querySelectorAll("[data-opponent-action]").forEach(button=>button.addEventListener("click",()=>addEvent(button.dataset.opponentAction,"adversario")));
+  root.querySelectorAll("[data-stat-action]").forEach(button=>button.addEventListener("click",()=>requestEvent(button.dataset.statAction)));
+  root.querySelectorAll("[data-opponent-action]").forEach(button=>button.addEventListener("click",()=>requestEvent(button.dataset.opponentAction,"adversario")));
+  root.querySelector("[data-stat-court]")?.addEventListener("click",event=>{
+    const court=event.currentTarget,rect=court.getBoundingClientRect();
+    const x=Math.max(0,Math.min(100,((event.clientX-rect.left)/rect.width)*100));
+    const y=Math.max(0,Math.min(100,((event.clientY-rect.top)/rect.height)*100));
+    selectedPosition={x:Math.round(x*10)/10,y:Math.round(y*10)/10};
+    const marker=root.querySelector("[data-court-marker]");marker.hidden=false;marker.style.left=`${x}%`;marker.style.top=`${y}%`;
+    root.querySelector("[data-court-confirm]").disabled=false;
+    root.querySelector("[data-court-hint]").textContent="Posição selecionada. Confirma para registar a ação.";
+  });
+  root.querySelector("[data-court-confirm]")?.addEventListener("click",()=>{if(!pendingAction||!selectedPosition)return;const action=pendingAction,position=selectedPosition;closeCourtDialog();addEvent(action.type,action.side,position);});
+  root.querySelectorAll("[data-court-cancel]").forEach(button=>button.addEventListener("click",closeCourtDialog));
+  root.querySelector("[data-court-dialog]")?.addEventListener("cancel",event=>{event.preventDefault();closeCourtDialog();});
+  root.querySelector("[data-court-dialog]")?.addEventListener("click",event=>{if(event.target===event.currentTarget)closeCourtDialog();});
   root.querySelector("[data-stat-undo]")?.addEventListener("click",undo);root.querySelector("[data-stat-sync]")?.addEventListener("click",()=>sync(true));
   root.querySelector("[data-period]")?.addEventListener("change",event=>{clock.period=Number(event.target.value);clock.seconds=600;clock.running=false;startTimer();saveLocal();render();});
   clockElement()?.addEventListener("click",()=>{clock.running=!clock.running;startTimer();saveLocal();});
-  document.addEventListener("keydown",event=>{if(!canEdit||event.ctrlKey||event.metaKey||/INPUT|TEXTAREA|SELECT/.test(event.target.tagName))return;const map={"1":"ll_c","2":"dois_c","3":"tres_c",q:"ll_f",w:"dois_f",e:"tres_f",r:"ressalto_defensivo",o:"ressalto_ofensivo",a:"assistencia",s:"roubo",t:"perda",b:"desarme",f:"falta"};if(event.key.toLowerCase()==="z"){event.preventDefault();undo();}else if(map[event.key.toLowerCase()]){event.preventDefault();addEvent(map[event.key.toLowerCase()]);}});
+  document.addEventListener("keydown",event=>{if(!canEdit||root.querySelector("[data-court-dialog]")?.open||event.ctrlKey||event.metaKey||/INPUT|TEXTAREA|SELECT/.test(event.target.tagName))return;const map={"1":"ll_c","2":"dois_c","3":"tres_c",q:"ll_f",w:"dois_f",e:"tres_f",r:"ressalto_defensivo",o:"ressalto_ofensivo",a:"assistencia",s:"roubo",t:"perda",b:"desarme",f:"falta"};if(event.key.toLowerCase()==="z"){event.preventDefault();undo();}else if(map[event.key.toLowerCase()]){event.preventDefault();requestEvent(map[event.key.toLowerCase()]);}});
   window.addEventListener("online",()=>{updateConnection();sync(false)});window.addEventListener("offline",()=>{updateConnection();notify("Ligação perdida. Podes continuar: as ações ficam guardadas neste dispositivo.");});window.addEventListener("beforeunload",saveLocal);
   if("serviceWorker" in navigator){navigator.serviceWorker.ready.then(registration=>registration.active?.postMessage({type:"CACHE_STATS_PAGE",url:window.location.href})).catch(()=>{});}
   updateClock();startTimer();render();if(navigator.onLine)sync(false);

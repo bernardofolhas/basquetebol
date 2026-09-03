@@ -56,11 +56,16 @@ def test_mesa_estatistica_renderiza_registo_offline(client_admin):
         assert "Mesa estatística" in resposta.text
         assert "Guardar e sincronizar" in resposta.text
         assert 'data-stat-action="assistencia"' in resposta.text
+        assert 'data-court-dialog' in resposta.text
+        assert 'data-stat-court' in resposta.text
         assert 'data-boxscore-player="' + str(jogador_id) + '"' in resposta.text
 
         dashboard = client_admin.get(f"/estatisticas/equipas/{equipa_id}")
         assert dashboard.status_code == 200
         assert "Registo de jogo, box scores" in dashboard.text
+        assert "FIBA LiveStats" in dashboard.text
+        assert "Página FPB" in dashboard.text
+        assert "Em estudo" in dashboard.text
         assert f"/estatisticas/jogos/{jogo_id}" in dashboard.text
     finally:
         _limpar(db, equipa_id)
@@ -70,9 +75,9 @@ def test_sincronizacao_e_idempotente_e_atualiza_marcador(client_admin):
     db, equipa_id, jogador_id, jogo_id = _criar_contexto()
     try:
         eventos = [
-            {"client_uid": "stats-test-0001", "jogador_id": jogador_id, "lado": "equipa", "tipo": "dois_c", "periodo": 1, "segundos_restantes": 540},
-            {"client_uid": "stats-test-0002", "jogador_id": jogador_id, "lado": "equipa", "tipo": "tres_c", "periodo": 1, "segundos_restantes": 510},
-            {"client_uid": "stats-test-0003", "jogador_id": None, "lado": "adversario", "tipo": "dois_c", "periodo": 1, "segundos_restantes": 500},
+            {"client_uid": "stats-test-0001", "jogador_id": jogador_id, "lado": "equipa", "tipo": "dois_c", "periodo": 1, "segundos_restantes": 540, "posicao_x": 22.5, "posicao_y": 47.2},
+            {"client_uid": "stats-test-0002", "jogador_id": jogador_id, "lado": "equipa", "tipo": "tres_c", "periodo": 1, "segundos_restantes": 510, "posicao_x": 76.1, "posicao_y": 18.4},
+            {"client_uid": "stats-test-0003", "jogador_id": None, "lado": "adversario", "tipo": "dois_c", "periodo": 1, "segundos_restantes": 500, "posicao_x": 83.0, "posicao_y": 53.0},
         ]
         primeira = client_admin.post(f"/estatisticas/jogos/{jogo_id}/sincronizar", json={"eventos": eventos})
         assert primeira.status_code == 200
@@ -81,6 +86,9 @@ def test_sincronizacao_e_idempotente_e_atualiza_marcador(client_admin):
         repetida = client_admin.post(f"/estatisticas/jogos/{jogo_id}/sincronizar", json={"eventos": eventos})
         assert repetida.status_code == 200
         assert db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).count() == 3
+        db.expire_all()
+        guardado = db.query(EventoEstatistica).filter(EventoEstatistica.client_uid == "stats-test-0001").one()
+        assert (guardado.posicao_x, guardado.posicao_y) == (22.5, 47.2)
 
         eventos[0]["anulado"] = True
         anulada = client_admin.post(f"/estatisticas/jogos/{jogo_id}/sincronizar", json={"eventos": eventos})
@@ -102,6 +110,20 @@ def test_sincronizacao_rejeita_atleta_de_outra_equipa(client_admin):
         }]})
         assert resposta.status_code == 400
         assert db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).count() == 0
+    finally:
+        _limpar(db, equipa_id)
+
+
+def test_sincronizacao_rejeita_posicao_incompleta(client_admin):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    try:
+        resposta = client_admin.post(f"/estatisticas/jogos/{jogo_id}/sincronizar", json={"eventos": [{
+            "client_uid": "stats-position-invalid", "jogador_id": jogador_id,
+            "lado": "equipa", "tipo": "assistencia", "periodo": 1,
+            "posicao_x": 50,
+        }]})
+        assert resposta.status_code == 400
+        assert "posição" in resposta.json()["message"].lower()
     finally:
         _limpar(db, equipa_id)
 
@@ -140,3 +162,6 @@ def test_recursos_offline_e_atalhos_estao_configurados():
     assert 'CACHE_STATS_PAGE' in script
     assert "localStorage.setItem(storageKey" in script
     assert 'q:"ll_f"' in script
+    assert 'actionsWithoutPosition = new Set(["falta", "falta_sofrida"])' in script
+    assert "requestEvent(button.dataset.opponentAction" in script
+    assert "posicao_x:position?.x??null" in script

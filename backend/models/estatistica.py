@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import backref, relationship
 
 from database import Base
@@ -22,6 +22,8 @@ class EventoEstatistica(Base):
     tipo = Column(String(32), nullable=False, index=True)
     periodo = Column(Integer, nullable=False, default=1, server_default="1")
     segundos_restantes = Column(Integer, nullable=True)
+    posicao_x = Column(Float, nullable=True)
+    posicao_y = Column(Float, nullable=True)
     anulado = Column(Boolean, nullable=False, default=False, server_default="false")
     criado_em = Column(DateTime, nullable=False, default=datetime.now)
     atualizado_em = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)

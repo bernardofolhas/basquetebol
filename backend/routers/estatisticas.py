@@ -28,6 +28,8 @@ class EventoEntrada(BaseModel):
     tipo: str
     periodo: int = Field(default=1, ge=1, le=20)
     segundos_restantes: int | None = Field(default=None, ge=0, le=3600)
+    posicao_x: float | None = Field(default=None, ge=0, le=100)
+    posicao_y: float | None = Field(default=None, ge=0, le=100)
     anulado: bool = False
 
 
@@ -117,6 +119,8 @@ def sincronizar_jogo(jogo_id: int, lote: LoteEstatistica, request: Request, db: 
             return JSONResponse({"ok": False, "message": "Ação estatística inválida."}, status_code=400)
         if entrada.lado == "equipa" and (not entrada.jogador_id or entrada.jogador_id not in jogadores_validos):
             return JSONResponse({"ok": False, "message": "Seleciona um atleta válido."}, status_code=400)
+        if (entrada.posicao_x is None) != (entrada.posicao_y is None):
+            return JSONResponse({"ok": False, "message": "A posição da ação está incompleta."}, status_code=400)
         evento = existentes.get(entrada.client_uid)
         if evento:
             if evento.jogo_id != jogo.id:
@@ -128,6 +132,7 @@ def sincronizar_jogo(jogo_id: int, lote: LoteEstatistica, request: Request, db: 
             jogo_id=jogo.id, jogador_id=entrada.jogador_id if entrada.lado == "equipa" else None,
             registado_por_id=utilizador.id, lado=entrada.lado, tipo=entrada.tipo,
             periodo=entrada.periodo, segundos_restantes=entrada.segundos_restantes,
+            posicao_x=entrada.posicao_x, posicao_y=entrada.posicao_y,
             anulado=entrada.anulado,
         )
         db.add(evento)

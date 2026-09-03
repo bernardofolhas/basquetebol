@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}Estatísticas - {{ jogo.adversario }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-2">{% endblock %}
 {% block conteudo %}
 <main class="statboard" data-statboard data-game-id="{{ jogo.id }}" data-user-id="{{ utilizador.id }}" data-can-edit="{{ 'true' if pode_registar else 'false' }}">
   <script type="application/json" data-stats-events>{{ eventos|tojson }}</script>
@@ -45,6 +45,44 @@
       <button type="button" class="stat-sync" data-stat-sync>Guardar e sincronizar</button>
     </aside>
   </section>
+
+  <dialog class="stat-court-dialog" data-court-dialog aria-labelledby="stat-court-title">
+    <div class="stat-court-modal">
+      <header>
+        <div>
+          <p class="ds-kicker">Local da ação</p>
+          <h2 id="stat-court-title" data-court-title>Assinalar no campo</h2>
+          <p data-court-description>Toca no ponto onde aconteceu a ação.</p>
+        </div>
+        <button type="button" class="stat-court-close" data-court-cancel aria-label="Fechar">×</button>
+      </header>
+      <button type="button" class="stat-court" data-stat-court aria-label="Campo de basquetebol. Toca para marcar a posição da ação.">
+        <svg viewBox="0 0 940 500" role="img" aria-label="Campo de basquetebol completo">
+          <rect class="court-boundary" x="8" y="8" width="924" height="484" rx="2" />
+          <line x1="470" y1="8" x2="470" y2="492" />
+          <circle cx="470" cy="250" r="72" />
+          <rect x="8" y="155" width="188" height="190" />
+          <rect x="744" y="155" width="188" height="190" />
+          <circle cx="196" cy="250" r="58" />
+          <circle cx="744" cy="250" r="58" />
+          <path d="M 8 70 A 218 218 0 0 1 8 430" />
+          <path d="M 932 70 A 218 218 0 0 0 932 430" />
+          <line x1="72" y1="220" x2="72" y2="280" />
+          <line x1="868" y1="220" x2="868" y2="280" />
+          <circle cx="88" cy="250" r="9" />
+          <circle cx="852" cy="250" r="9" />
+          <path d="M 72 205 A 50 50 0 0 1 72 295" />
+          <path d="M 868 205 A 50 50 0 0 0 868 295" />
+        </svg>
+        <span class="stat-court-marker" data-court-marker hidden></span>
+      </button>
+      <p class="stat-court-hint" data-court-hint>Seleciona um ponto no campo para continuar.</p>
+      <footer>
+        <button type="button" class="ds-button ds-button-secondary" data-court-cancel>Cancelar</button>
+        <button type="button" class="ds-button ds-button-primary" data-court-confirm disabled>Guardar posição</button>
+      </footer>
+    </div>
+  </dialog>
   {% endif %}
 
   <section class="stat-lower-grid">
@@ -55,5 +93,5 @@
     <aside class="stat-feed-card"><header><div><p class="ds-kicker">Cronologia</p><h2>Últimas ações</h2></div></header><div class="stat-feed" data-stat-feed></div></aside>
   </section>
 </main>
-<script src="/static/js/basket-stats.js?v=20260903-1"></script>
+<script src="/static/js/basket-stats.js?v=20260903-2"></script>
 {% endblock %}

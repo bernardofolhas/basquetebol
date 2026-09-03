@@ -63,6 +63,8 @@ def serializar_evento(evento: EventoEstatistica) -> dict:
         "tipo": evento.tipo,
         "periodo": evento.periodo,
         "segundos_restantes": evento.segundos_restantes,
+        "posicao_x": evento.posicao_x,
+        "posicao_y": evento.posicao_y,
         "anulado": evento.anulado,
         "sincronizado": True,
     }

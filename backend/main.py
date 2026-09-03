@@ -46,6 +46,7 @@ from database import (
     Base,
     actualizar_estrutura_assiduidade,
     actualizar_estrutura_campos_desenho,
+    actualizar_estrutura_estatisticas,
     actualizar_estrutura_staff,
     actualizar_estrutura_jogadores,
     actualizar_estrutura_perfis,
@@ -125,6 +126,7 @@ try:
     actualizar_estrutura_mapa_conteudos()
     actualizar_estrutura_assiduidade()
     actualizar_estrutura_jogadores()
+    actualizar_estrutura_estatisticas()
     with SessionLocal() as db:
         renumerar_todos_os_ciclos(db)
         sincronizar_volumes_automaticos(db)

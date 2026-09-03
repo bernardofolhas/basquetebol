@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Estatísticas - {{ equipa.nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-2">{% endblock %}
 {% block conteudo %}
 {% call equipa_contexto(equipa, "Estatísticas", "Registo de jogo, box scores e evolução competitiva.", "acao", "/equipas/" ~ equipa.id ~ "/resumo", "Voltar à equipa") %}
   <a href="/jogos/equipas/{{ equipa.id }}" class="ds-button ds-button-secondary">Calendário de jogos</a>
@@ -15,7 +15,17 @@
 </div>
 
 <section class="stats-games-shell">
-  <header><div><p class="ds-kicker">Competição</p><h2>Jogos da equipa</h2><p>Abre a mesa estatística antes do jogo; depois de carregada, pode continuar offline.</p></div></header>
+  <header class="stats-games-header">
+    <div><p class="ds-kicker">Competição</p><h2>Jogos da equipa</h2><p>Abre a mesa estatística antes do jogo; depois de carregada, pode continuar offline.</p></div>
+    <details class="stats-source-menu">
+      <summary>Outras fontes</summary>
+      <div>
+        <p><strong>FIBA LiveStats</strong><span>Ficheiro oficial XML ou API</span><em>Em estudo</em></p>
+        <p><strong>Página FPB</strong><span>Ligação à estatística do jogo</span><em>Em estudo</em></p>
+        <small>Estas serão opções adicionais. O registo manual e offline continuará sempre disponível.</small>
+      </div>
+    </details>
+  </header>
   <div class="stats-games-list">
   {% for jogo in jogos %}
     <article class="stats-game-row">

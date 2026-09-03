@@ -849,6 +849,28 @@ def actualizar_estrutura_jogadores() -> None:
             ligacao.execute(text("ALTER TABLE jogadores ADD COLUMN fotografia VARCHAR NULL"))
     logger.info("Coluna 'fotografia' adicionada a jogadores.")
 
+
+def actualizar_estrutura_estatisticas() -> None:
+    """Adiciona coordenadas de campo a instalações sem Alembic automático."""
+    inspector = inspect(engine)
+    if not inspector.has_table("eventos_estatistica"):
+        return
+    colunas = {coluna["name"] for coluna in inspector.get_columns("eventos_estatistica")}
+    em_falta = [nome for nome in ("posicao_x", "posicao_y") if nome not in colunas]
+    if not em_falta:
+        return
+    with engine.begin() as ligacao:
+        for nome in em_falta:
+            if engine.dialect.name == "postgresql":
+                ligacao.execute(text(
+                    f"ALTER TABLE eventos_estatistica ADD COLUMN IF NOT EXISTS {nome} DOUBLE PRECISION NULL"
+                ))
+            else:
+                ligacao.execute(text(
+                    f"ALTER TABLE eventos_estatistica ADD COLUMN {nome} FLOAT NULL"
+                ))
+    logger.info("Coordenadas de campo adicionadas aos eventos estatísticos.")
+
 # Função que abre e fecha sessões automaticamente
 # O "yield" faz com que a sessão seja fechada no final de cada pedido
 def get_db():
