@@ -1,97 +1,69 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
-{% block titulo %}Planeamento Físico — {{ equipa.nome }}{% endblock %}
+{% block titulo %}Preparação Física — {{ equipa.nome }}{% endblock %}
 {% block conteudo %}
 
-{{ equipa_contexto(
+{% call equipa_contexto(
     equipa,
-    "Planeamento Físico",
-    "Organização semanal e mensal do trabalho físico da equipa.",
+    "Preparação Física",
+    "Testes e evolução física, independentes do planeamento da época.",
     "fisico",
-    "/equipas/" ~ equipa.id,
+    "/equipas/" ~ equipa.id ~ "/resumo",
     "Voltar à equipa"
-) }}
+) %}
+  {% if pode_editar %}<button type="button" class="ds-button ds-button-primary" data-open-physical-test>Registar teste físico</button>{% endif %}
+{% endcall %}
 
-<!-- Formulário para criar planeamento -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
-    <h2 class="font-semibold text-gray-700 mb-4">Novo Planeamento</h2>
-    <form method="POST" action="/fisico/equipas/{{ equipa.id }}/novo">
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-            <div>
-                <label class="block text-xs text-gray-500 mb-1">Data início *</label>
-                <input type="date" name="data_inicio" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-500 mb-1">Data fim *</label>
-                <input type="date" name="data_fim" required
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-500 mb-1">Tipo</label>
-                <select name="tipo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                    <option value="Semanal">Semanal</option>
-                    <option value="Mensal">Mensal</option>
-                </select>
-            </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            {% for campo, label, cor in [
-                ('resistencia', 'Resistência', 'blue'),
-                ('velocidade', 'Velocidade', 'orange'),
-                ('forca', 'Força', 'red'),
-                ('flexibilidade', 'Flexibilidade', 'green'),
-                ('coordenacao', 'Coordenação', 'purple'),
-                ('observacoes', 'Observações', 'gray')
-            ] %}
-            <div>
-                <label class="block text-xs font-semibold text-{{ cor }}-600 mb-1">{{ label }}</label>
-                <textarea name="{{ campo }}" rows="2"
-                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
-            </div>
-            {% endfor %}
-        </div>
-        <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-            Criar Planeamento
-        </button>
-    </form>
-</div>
+<nav class="mt-4 flex w-fit max-w-full gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-sm" aria-label="Preparação física">
+  <a href="/fisico/equipas/{{ equipa.id }}" class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold {% if vista != 'planeamento' %}bg-[var(--clube-primary)] text-[var(--clube-on-primary)] shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">Testes físicos</a>
+  <a href="/fisico/equipas/{{ equipa.id }}?vista=planeamento" class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold {% if vista == 'planeamento' %}bg-[var(--clube-primary)] text-[var(--clube-on-primary)] shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">Planeamento físico</a>
+</nav>
 
-<!-- Lista de planeamentos -->
-{% if planeamentos %}
-<div class="space-y-4">
-    {% for p in planeamentos %}
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <div class="flex items-center justify-between mb-4">
-            <div>
-                <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">{{ p.tipo }}</span>
-                <span class="text-gray-600 text-sm ml-2">{{ p.data_inicio|data_pt }} → {{ p.data_fim|data_pt }}</span>
-            </div>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-            {% for campo, label, cor in [
-                ('resistencia', 'Resistência', 'blue'),
-                ('velocidade', 'Velocidade', 'orange'),
-                ('forca', 'Força', 'red'),
-                ('flexibilidade', 'Flexibilidade', 'green'),
-                ('coordenacao', 'Coordenação', 'purple')
-            ] %}
-            {% if p[campo] %}
-            <div class="border-l-4 border-{{ cor }}-400 pl-3">
-                <p class="text-xs font-semibold text-gray-400 uppercase">{{ label }}</p>
-                <p class="text-gray-700 mt-1">{{ p[campo] }}</p>
-            </div>
-            {% endif %}
-            {% endfor %}
-        </div>
-    </div>
-    {% endfor %}
-</div>
+{% if vista != 'planeamento' %}
+<section id="testes-fisicos" class="ds-card mt-4 overflow-hidden">
+  <header class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-5">
+    <div><p class="ds-kicker">Avaliação física</p><h2 class="text-lg font-extrabold text-slate-900">Resultados da equipa</h2><p class="text-sm text-slate-500">Regista diretamente um teste para um ou vários atletas. Não é necessário criar qualquer planeamento.</p></div>
+    {% if pode_editar %}<button type="button" class="ds-button ds-button-primary" data-open-physical-test>+ Novo teste</button>{% endif %}
+  </header>
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[720px] text-left text-sm">
+      <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-5 py-3">Data</th><th class="px-5 py-3">Atleta</th><th class="px-5 py-3">Teste</th><th class="px-5 py-3">Resultado</th><th class="px-5 py-3">Observações</th><th class="px-5 py-3"></th></tr></thead>
+      <tbody class="divide-y divide-slate-100">
+      {% for teste in testes %}<tr class="hover:bg-slate-50/70"><td class="whitespace-nowrap px-5 py-3 text-slate-500">{{ teste.data|data_pt }}</td><td class="px-5 py-3 font-bold text-slate-800">{{ teste.jogador.nome }}</td><td class="px-5 py-3 text-slate-700">{{ teste.tipo_teste }}</td><td class="px-5 py-3 font-extrabold text-slate-900">{{ teste.resultado if teste.resultado is not none else '—' }}{% if teste.unidade %} <span class="font-medium text-slate-500">{{ teste.unidade }}</span>{% endif %}</td><td class="max-w-xs truncate px-5 py-3 text-slate-500">{{ teste.observacoes or '—' }}</td><td class="px-5 py-3 text-right"><a class="text-sm font-bold text-[var(--clube-primary)]" href="/fisico/jogadores/{{ teste.jogador_id }}">Histórico</a></td></tr>
+      {% else %}<tr><td colspan="6" class="px-5 py-12 text-center text-slate-500">Ainda não existem testes físicos. Podes criar o primeiro sem qualquer planeamento.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% else %}
-<div class="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
-    <span class="text-5xl">💪</span>
-    <p class="text-gray-500 mt-4">Ainda não há planeamentos físicos.</p>
-</div>
+<section class="ds-card mt-4 p-5">
+  <div class="mb-5"><p class="ds-kicker">Opcional</p><h2 class="text-lg font-extrabold text-slate-900">Planeamento físico</h2><p class="text-sm text-slate-500">Este planeamento organiza conteúdos, mas não é necessário para criar ou registar testes.</p></div>
+  {% if pode_editar %}
+  <details class="rounded-2xl border border-slate-200 bg-slate-50 p-4" {% if not planeamentos %}open{% endif %}>
+    <summary class="cursor-pointer font-bold text-slate-800">Criar planeamento físico</summary>
+    <form method="POST" action="/fisico/equipas/{{ equipa.id }}/novo" class="mt-4">
+      <div class="grid gap-4 md:grid-cols-3"><label class="text-sm font-bold text-slate-700">Data inicial<input type="date" name="data_inicio" required class="ds-input mt-1 w-full"></label><label class="text-sm font-bold text-slate-700">Data final<input type="date" name="data_fim" required class="ds-input mt-1 w-full"></label><label class="text-sm font-bold text-slate-700">Tipo<select name="tipo" class="ds-input mt-1 w-full"><option value="Semanal">Semanal</option><option value="Mensal">Mensal</option></select></label></div>
+      <div class="mt-4 grid gap-4 md:grid-cols-2">{% for campo, label in [('resistencia','Resistência'),('velocidade','Velocidade'),('forca','Força'),('flexibilidade','Flexibilidade'),('coordenacao','Coordenação'),('observacoes','Observações')] %}<label class="text-sm font-bold text-slate-700">{{ label }}<textarea name="{{ campo }}" rows="2" class="ds-input mt-1 w-full"></textarea></label>{% endfor %}</div>
+      <button type="submit" class="ds-button ds-button-primary mt-4">Criar planeamento</button>
+    </form>
+  </details>
+  {% endif %}
+  <div class="mt-5 grid gap-3">{% for p in planeamentos %}<article class="rounded-2xl border border-slate-200 p-4"><div class="flex flex-wrap items-center gap-2"><strong class="text-slate-900">{{ p.tipo }}</strong><span class="text-sm text-slate-500">{{ p.data_inicio|data_pt }} → {{ p.data_fim|data_pt }}</span></div><div class="mt-3 grid gap-3 text-sm md:grid-cols-3">{% for campo, label in [('resistencia','Resistência'),('velocidade','Velocidade'),('forca','Força'),('flexibilidade','Flexibilidade'),('coordenacao','Coordenação')] %}{% if p[campo] %}<div><span class="text-xs font-bold uppercase text-slate-400">{{ label }}</span><p class="text-slate-700">{{ p[campo] }}</p></div>{% endif %}{% endfor %}</div></article>{% else %}<p class="py-8 text-center text-slate-500">Ainda não existem planeamentos físicos.</p>{% endfor %}</div>
+</section>
 {% endif %}
 
+{% if pode_editar %}
+<dialog id="physical-test-dialog" class="w-[min(46rem,calc(100%-1.5rem))] rounded-3xl border-0 p-0 shadow-2xl backdrop:bg-slate-950/45">
+  <form method="POST" action="/fisico/equipas/{{ equipa.id }}/testes" class="p-5 sm:p-6">
+    <header class="flex items-start justify-between gap-4"><div><p class="ds-kicker">Sem planeamento</p><h2 class="text-xl font-extrabold text-slate-900">Registar teste físico</h2><p class="mt-1 text-sm text-slate-500">Define o teste, seleciona os atletas e introduz cada resultado.</p></div><button type="button" class="rounded-xl px-3 py-2 text-xl text-slate-500 hover:bg-slate-100" data-close-physical-test aria-label="Fechar">×</button></header>
+    <div class="mt-5 grid gap-4 sm:grid-cols-3"><label class="text-sm font-bold text-slate-700">Data<input type="date" name="data" value="{{ hoje.isoformat() }}" required class="ds-input mt-1 w-full"></label><label class="text-sm font-bold text-slate-700 sm:col-span-2">Tipo de teste<input type="text" name="tipo_teste" list="physical-test-types" placeholder="Ex.: Sprint 20 m, CMJ, Yo-Yo" required class="ds-input mt-1 w-full"><datalist id="physical-test-types">{% for tipo, unidade in tipos_testes %}<option value="{{ tipo }}">{% endfor %}</datalist></label><label class="text-sm font-bold text-slate-700">Unidade<input type="text" name="unidade" placeholder="s, cm, m, nível..." class="ds-input mt-1 w-full"></label><label class="text-sm font-bold text-slate-700 sm:col-span-2">Observações comuns<input type="text" name="observacoes" placeholder="Opcional" class="ds-input mt-1 w-full"></label></div>
+    <div class="mt-5 flex items-center justify-between"><strong class="text-sm text-slate-800">Atletas e resultados</strong><div class="flex gap-3"><button type="button" class="text-xs font-bold text-[var(--clube-primary)]" data-select-athletes>Selecionar todos</button><button type="button" class="text-xs font-bold text-slate-500" data-clear-athletes>Limpar</button></div></div>
+    <div class="mt-2 max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-2xl border border-slate-200">{% for jogador in jogadores %}<label class="grid grid-cols-[auto_minmax(0,1fr)_6.5rem] items-center gap-2 p-3 hover:bg-slate-50 sm:grid-cols-[auto_minmax(0,1fr)_8rem] sm:gap-3"><input type="checkbox" name="jogador_ids" value="{{ jogador.id }}" class="h-4 w-4 accent-[var(--clube-primary)]"><span class="truncate text-sm font-bold text-slate-700">{% if jogador.numero_camisola %}#{{ jogador.numero_camisola }} · {% endif %}{{ jogador.nome }}</span><input type="text" inputmode="decimal" name="resultado_{{ jogador.id }}" placeholder="Resultado" class="ds-input w-full text-sm"></label>{% else %}<p class="p-5 text-center text-sm text-slate-500">Não existem atletas ativos nesta equipa.</p>{% endfor %}</div>
+    <footer class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" class="ds-button ds-button-secondary" data-close-physical-test>Cancelar</button><button type="submit" class="ds-button ds-button-primary">Guardar resultados</button></footer>
+  </form>
+</dialog>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{const dialog=document.getElementById("physical-test-dialog");document.querySelectorAll("[data-open-physical-test]").forEach(button=>button.addEventListener("click",()=>dialog.showModal()));document.querySelectorAll("[data-close-physical-test]").forEach(button=>button.addEventListener("click",()=>dialog.close()));dialog?.addEventListener("click",event=>{if(event.target===dialog)dialog.close()});dialog?.querySelector("[data-select-athletes]")?.addEventListener("click",()=>dialog.querySelectorAll('input[name="jogador_ids"]').forEach(input=>input.checked=true));dialog?.querySelector("[data-clear-athletes]")?.addEventListener("click",()=>dialog.querySelectorAll('input[name="jogador_ids"]').forEach(input=>input.checked=false));});
+</script>
+{% endif %}
 {% endblock %}
