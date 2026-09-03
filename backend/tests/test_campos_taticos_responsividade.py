@@ -110,8 +110,10 @@ def test_header_liga_todos_os_niveis_a_listas_independentes():
     assert 'class="ds-team-direct-nav"' in navegacao
     assert 'ds-menu ds-primary-menu ds-nav-order-equipa' in navegacao
     assert "'/equipas/' ~ equipa_contexto_id ~ '/equipa-tecnica'" in navegacao
-    for area in ("Resumo", "Plantel", "Jogos", "Assiduidade", "Eventos", "Físico", "Playbook"):
-        assert f'>{area}</a>' in navegacao
+    for area in ("Resumo", "Planeamento", "Ação", "Análise", "Equipa"):
+        assert area in navegacao
+    for destino in ("Plantel", "Competição", "Assiduidade", "Eventos", "Análise física e testes", "Playbook"):
+        assert destino in navegacao
     assert 'class="ds-tabs"' not in contexto_equipa
     assert 'data-planning-menu' not in contexto_equipa
     for nivel in ("Plano anual", "Macrociclos", "Mesociclos", "Microciclos", "Planos de treino"):
@@ -125,14 +127,9 @@ def test_header_liga_todos_os_niveis_a_listas_independentes():
     for classe, ordem in (
         ("resumo", 1),
         ("planeamento", 2),
-        ("fisico", 3),
-        ("jogos", 4),
-        ("assiduidade", 5),
-        ("plantel", 6),
-        ("playbook", 7),
-        ("operacao", 8),
-        ("eventos", 9),
-        ("equipa", 10),
+        ("acao", 3),
+        ("analise", 4),
+        ("equipa", 5),
     ):
         assert f".ds-nav-order-{classe} {{ order:{ordem}; }}" in estilos
     assert 'menuDetails.addEventListener("mouseleave"' in base

@@ -57,7 +57,10 @@
           </div>
           {% if equipa_contexto_id %}
           <div class="ds-dropdown-section">
+            {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/resumo', 'Resumo', 'Visão rápida da equipa', p.endswith('/resumo')) }}
+            {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/plantel', 'Plantel', 'Atletas e fichas', p.endswith('/plantel')) }}
             {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/equipa-tecnica', 'Equipa técnica', 'Treinadores associados', p.endswith('/equipa-tecnica')) }}
+            {{ menu_link('/playbook/equipas/' ~ equipa_contexto_id, 'Playbook', 'Sistemas e movimentos', p.startswith('/playbook')) }}
           </div>
           {% endif %}
         </div>
@@ -66,39 +69,11 @@
       {% if equipa_contexto_id %}
       <div class="ds-team-direct-nav" aria-label="Área da equipa">
         <a href="/equipas/{{ equipa_contexto_id }}/resumo" class="ds-header-trigger ds-team-direct-link ds-nav-order-resumo {% if p in ['/equipas/' ~ equipa_contexto_id, '/equipas/' ~ equipa_contexto_id ~ '/resumo'] %}is-active{% endif %}">Resumo</a>
-        <details class="ds-menu ds-primary-menu ds-team-direct-link ds-nav-order-fisico">
-          <summary class="ds-header-trigger {% if p.startswith('/fisico') or p.startswith('/analise') %}is-active{% endif %}">Físico <span class="ds-menu-chevron">⌄</span></summary>
-          <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
-            <p class="ds-dropdown-title">Análise · {{ equipa_contexto_nome }}</p>
-            {{ menu_link('/analise/equipas/' ~ equipa_contexto_id, 'Análise de jogadores', 'Avaliações e evolução', p.startswith('/analise')) }}
-            {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id, 'Planeamento físico', 'Organização do trabalho físico', p.startswith('/fisico/equipas')) }}
-          </div>
-        </details>
-        <details class="ds-menu ds-primary-menu ds-team-direct-link ds-nav-order-jogos">
-          <summary class="ds-header-trigger {% if p.startswith('/jogos') or p.startswith('/scouting') %}is-active{% endif %}">Jogos <span class="ds-menu-chevron">⌄</span></summary>
-          <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
-            <p class="ds-dropdown-title">Jogos · {{ equipa_contexto_nome }}</p>
-            {{ menu_link('/jogos/equipas/' ~ equipa_contexto_id, 'Calendário de jogos', 'Jogos, resultados e convocatórias', p.startswith('/jogos/equipas/' ~ equipa_contexto_id)) }}
-            {% for jogo_nav in nav.jogos_proximos|default([]) if jogo_nav.equipa_id == equipa_contexto_id %}
-            <div class="ds-dropdown-section">
-              <p class="ds-dropdown-label px-2 pb-1">{{ jogo_nav.data|data_pt }} · {{ jogo_nav.adversario }}</p>
-              <div class="ds-menu-grid">
-                {% if perfil != 'staff' %}{{ menu_link('/jogos/' ~ jogo_nav.id ~ '/plano', 'Plano de jogo', 'Preparação e 5 inicial') }}{% endif %}
-                {% if perfil != 'staff' %}{{ menu_link('/scouting/jogos/' ~ jogo_nav.id, 'Scouting', 'Adversário e resposta') }}{% endif %}
-              </div>
-            </div>
-            {% else %}<p class="px-2 py-3 text-sm text-slate-500">Sem próximos jogos. O calendário mantém os planos dos jogos já registados.</p>{% endfor %}
-          </div>
-        </details>
-        <a href="/assiduidade/equipas/{{ equipa_contexto_id }}/registar" class="ds-header-trigger ds-team-direct-link ds-nav-order-assiduidade {% if p.startswith('/assiduidade') %}is-active{% endif %}">Assiduidade</a>
-        <a href="/equipas/{{ equipa_contexto_id }}/plantel" class="ds-header-trigger ds-team-direct-link ds-nav-order-plantel {% if p.endswith('/plantel') %}is-active{% endif %}">Plantel</a>
-        <a href="/playbook/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-playbook {% if p.startswith('/playbook') %}is-active{% endif %}">Playbook</a>
-        <a href="/equipas/{{ equipa_contexto_id }}/eventos" class="ds-header-trigger ds-team-direct-link ds-nav-order-eventos {% if p.endswith('/eventos') %}is-active{% endif %}">Eventos</a>
       </div>
       {% endif %}
 
       <details class="ds-menu ds-primary-menu ds-nav-order-planeamento">
-        <summary class="ds-header-trigger {% if p.startswith('/planeamento') or p.startswith('/treino') %}is-active{% endif %}">Planeamento <span class="ds-menu-chevron">⌄</span></summary>
+        <summary class="ds-header-trigger {% if p.startswith('/planeamento') or p.startswith('/fisico/equipas') %}is-active{% endif %}">Planeamento <span class="ds-menu-chevron">⌄</span></summary>
         <div class="ds-dropdown ds-navigation-dropdown w-[23rem]">
           {% if equipa_contexto_id %}
           <p class="ds-dropdown-title">Planeamento · {{ equipa_contexto_nome }}</p>
@@ -108,6 +83,8 @@
             {{ menu_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/mesociclos', 'Mesociclos', 'Períodos mensais') }}
             {{ menu_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/microciclos', 'Microciclos', 'Visão semanal') }}
             {{ menu_link('/treino/equipas/' ~ equipa_contexto_id ~ '/planos', 'Planos de treino', 'Preparar sessões') }}
+            {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id, 'Planeamento físico', 'Organização da preparação física') }}
+            {{ menu_link('/playbook/equipas/' ~ equipa_contexto_id, 'Playbook', 'Planeamento tático e sistemas') }}
             {{ menu_link('/calendario?equipa_id=' ~ equipa_contexto_id, 'Calendário da equipa', 'Todos os eventos') }}
           </div>
           {% elif nav.equipas|default([]) %}
@@ -129,24 +106,30 @@
       </details>
       {% endif %}
 
-      <details class="ds-menu ds-primary-menu ds-nav-order-operacao">
-        <summary class="ds-header-trigger {% if p.startswith('/calendario') or p.startswith('/planeamento-clube/espacos') or p.startswith('/biblioteca') or p.startswith('/dashboard/clube') %}is-active{% endif %}">Operação <span class="ds-menu-chevron">⌄</span></summary>
-        <div class="ds-dropdown ds-navigation-dropdown w-[22rem]">
-          <p class="ds-dropdown-title">Trabalho diário</p>
-          {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
-          {{ menu_link('/calendario', 'Calendário operacional', 'Treinos, jogos e atividades', p.startswith('/calendario')) }}
+      <details class="ds-menu ds-primary-menu ds-nav-order-acao">
+        <summary class="ds-header-trigger {% if p.startswith('/treino') or p.startswith('/jogos') or p.startswith('/assiduidade') or p.startswith('/calendario') or p.startswith('/biblioteca') or p.startswith('/planeamento-clube/espacos') %}is-active{% endif %}">Ação <span class="ds-menu-chevron">⌄</span></summary>
+        <div class="ds-dropdown ds-navigation-dropdown w-[24rem]">
+          <p class="ds-dropdown-title">Treino e competição{% if equipa_contexto_nome %} · {{ equipa_contexto_nome }}{% endif %}</p>
+          {% if equipa_contexto_id %}
+          <div class="ds-menu-grid">
+            {{ menu_link('/treino/equipas/' ~ equipa_contexto_id ~ '/planos', 'Treinos', 'Sessões e planos de treino', p.startswith('/treino')) }}
+            {{ menu_link('/jogos/equipas/' ~ equipa_contexto_id, 'Competição', 'Jogos, resultados e convocatórias', p.startswith('/jogos')) }}
+            {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id ~ '/registar', 'Assiduidade', 'Presenças e RPE individual', p.startswith('/assiduidade')) }}
+            {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/eventos', 'Eventos', 'Atividades da equipa', p.endswith('/eventos')) }}
+          </div>
+          {% for jogo_nav in nav.jogos_proximos|default([]) if jogo_nav.equipa_id == equipa_contexto_id %}
+          {% if perfil != 'staff' %}<div class="ds-dropdown-section">{{ menu_link('/jogos/' ~ jogo_nav.id ~ '/plano', 'Plano de jogo · ' ~ jogo_nav.adversario, 'Preparação direta do próximo jogo') }}</div>{% endif %}
+          {% endfor %}
           {% endif %}
+          {{ menu_link('/calendario', 'Calendário operacional', 'Toda a atividade do clube', p.startswith('/calendario')) }}
           {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
-          {{ menu_link('/planeamento-clube/atribuicao-espacos', 'Atribuição de espaços', 'Distribuir horários e pavilhões') }}
-          {{ menu_link('/planeamento-clube/espacos', 'Espaços e slots', 'Disponibilidades e bloqueios') }}
           <div class="ds-dropdown-section">
-            <p class="ds-dropdown-label px-2 pb-1">Acompanhamento</p>
+            <p class="ds-dropdown-label px-2 pb-1">Logística</p>
             <div class="ds-menu-grid">
-              {{ menu_link('/dashboard/clube', 'Visão do clube', 'Coberturas e operação') }}
+              {{ menu_link('/planeamento-clube/atribuicao-espacos', 'Atribuir espaços', 'Distribuir horários e pavilhões') }}
+              {{ menu_link('/planeamento-clube/espacos', 'Espaços e slots', 'Disponibilidades e bloqueios') }}
               {{ menu_link('/dashboard/clube/espacos', 'Conflitos', 'Choques de espaço e horário') }}
-              {{ menu_link('/dashboard/clube/carga', 'Carga de treino', 'Volume e intensidade') }}
-              {{ menu_link('/dashboard/clube/executado', 'Planeado vs estado', 'Execução das sessões') }}
-              {{ menu_link('/dashboard/clube/sincronizacao', 'Sincronização', 'Alterações do planeamento') }}
+              {{ menu_link('/dashboard/clube', 'Visão do clube', 'Coberturas e operação') }}
             </div>
           </div>
           {% elif perfil == 'secretaria' %}
@@ -156,6 +139,34 @@
           {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}{{ menu_link('/biblioteca', 'Biblioteca de exercícios', 'Pesquisar e reutilizar') }}{% endif %}
         </div>
       </details>
+
+      {% if equipa_contexto_id and perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
+      <details class="ds-menu ds-primary-menu ds-nav-order-analise">
+        <summary class="ds-header-trigger {% if p.startswith('/analise') or p.startswith('/fisico/jogadores') or p.startswith('/scouting') or p.startswith('/dashboard/clube/carga') or p.startswith('/dashboard/clube/executado') %}is-active{% endif %}">Análise <span class="ds-menu-chevron">⌄</span></summary>
+        <div class="ds-dropdown ds-navigation-dropdown w-[25rem]">
+          <p class="ds-dropdown-title">Análise integrada · {{ equipa_contexto_nome }}</p>
+          <div class="ds-menu-grid">
+            {{ menu_link('/analise/equipas/' ~ equipa_contexto_id, 'Desempenho da equipa', 'Técnico, tático, físico e psicológico', p.startswith('/analise')) }}
+            {{ menu_link('/analise/equipas/' ~ equipa_contexto_id ~ '/registar', 'Nova avaliação', 'Avaliar atletas e parâmetros') }}
+            {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id, 'Análise física e testes', 'Testes e evolução física') }}
+            {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id, 'Assiduidade e RPE', 'Participação e esforço percebido') }}
+          </div>
+          {% for jogo_nav in nav.jogos_proximos|default([]) if jogo_nav.equipa_id == equipa_contexto_id %}
+          {% if perfil != 'staff' %}<div class="ds-dropdown-section">{{ menu_link('/scouting/jogos/' ~ jogo_nav.id, 'Scouting · ' ~ jogo_nav.adversario, 'Análise da competição e adversário') }}</div>{% endif %}
+          {% endfor %}
+          {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
+          <div class="ds-dropdown-section">
+            <p class="ds-dropdown-label px-2 pb-1">Análise global</p>
+            <div class="ds-menu-grid">
+              {{ menu_link('/dashboard/clube/carga', 'Carga de treino', 'Volume e intensidade') }}
+              {{ menu_link('/dashboard/clube/executado', 'Planeado vs realizado', 'Execução das sessões') }}
+              {{ menu_link('/dashboard/clube/sincronizacao', 'Evolução do planeamento', 'Alterações e sincronização') }}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </details>
+      {% endif %}
 
       {% if perfil in ['administrador', 'coordenador', 'secretaria', 'staff', 'superadministrador'] %}
       <details class="ds-menu ds-primary-menu ds-nav-order-gestao">

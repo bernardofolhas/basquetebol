@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
-{% block titulo %}Análise de Jogadores - {{ equipa.nome }}{% endblock %}
+{% block titulo %}Análise de Desempenho - {{ equipa.nome }}{% endblock %}
 {% block conteudo %}
 
 {% call equipa_contexto(
     equipa,
-    "Análise de Jogadores",
-    "Avaliação integrada da evolução técnica, tática, psicológica e física.",
-    "fisico",
+    "Análise de Desempenho",
+    "Momento de análise integrada: dimensão técnica, tática, física e psicológica.",
+    "analise",
     "/equipas/" ~ equipa.id ~ "/resumo",
     "Voltar à equipa"
 ) %}

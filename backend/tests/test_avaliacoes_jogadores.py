@@ -74,7 +74,8 @@ def test_painel_cria_parametros_base_e_apresenta_area_de_analise(client_admin):
     try:
         resposta = client_admin.get(f"/analise/equipas/{equipa_id}")
         assert resposta.status_code == 200
-        assert "Análise de Jogadores" in resposta.text
+        assert "Análise de Desempenho" in resposta.text
+        assert "dimensão técnica, tática, física e psicológica" in resposta.text
         assert "Resumo por atleta" in resposta.text
         assert "Ana Avaliação" in resposta.text
         assert db.query(ParametroAvaliacao).filter(ParametroAvaliacao.equipa_id == equipa_id).count() == 15

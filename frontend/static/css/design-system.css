@@ -490,15 +490,10 @@ body { background:radial-gradient(circle at 92% 5%,color-mix(in srgb,var(--clube
 .ds-primary-nav > .ds-team-direct-nav { display:contents; }
 .ds-nav-order-resumo { order:1; }
 .ds-nav-order-planeamento { order:2; }
-.ds-nav-order-fisico { order:3; }
-.ds-nav-order-jogos { order:4; }
-.ds-nav-order-assiduidade { order:5; }
-.ds-nav-order-plantel { order:6; }
-.ds-nav-order-playbook { order:7; }
-.ds-nav-order-operacao { order:8; }
-.ds-nav-order-eventos { order:9; }
-.ds-nav-order-equipa { order:10; }
-.ds-nav-order-gestao { order:11; }
+.ds-nav-order-acao { order:3; }
+.ds-nav-order-analise { order:4; }
+.ds-nav-order-equipa { order:5; }
+.ds-nav-order-gestao { order:6; }
 .ds-primary-menu { position:relative; }
 .ds-header-trigger { display:flex;min-height:2.5rem;align-items:center;justify-content:center;gap:.35rem;border-radius:.62rem;padding:.55rem .68rem;color:inherit;font-size:.77rem;font-weight:750;line-height:1;list-style:none;white-space:nowrap;transition:background .15s,color .15s,box-shadow .15s;cursor:pointer; }
 .ds-header-trigger::-webkit-details-marker { display:none; }
