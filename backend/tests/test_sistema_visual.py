@@ -55,6 +55,17 @@ def test_base_preserva_navegacao_acessivel_e_responsiva():
     assert ".ds-team-direct-nav { display:grid;grid-template-columns:repeat(2" in CSS.read_text(encoding="utf-8")
 
 
+def test_navegacao_interna_nao_abre_novas_abas():
+    templates = list(TEMPLATES_DIR.rglob("*.html"))
+
+    for template in templates:
+        conteudo = template.read_text(encoding="utf-8")
+        assert 'target="_blank"' not in conteudo, template
+
+    base = (TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
+    assert 'element.removeAttribute("target")' in base
+
+
 def test_shell_profissional_agrupa_acoes_e_completa_o_perfil():
     estilos = CSS.read_text(encoding="utf-8")
     contexto = (TEMPLATES_DIR / "partials" / "equipa_contexto.html").read_text(encoding="utf-8")

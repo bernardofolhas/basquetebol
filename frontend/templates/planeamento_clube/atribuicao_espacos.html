@@ -11,7 +11,7 @@
     </div>
     <div class="flex flex-wrap gap-2">
         {% if semanal and resumo_slots.rascunhos %}<form method="POST" action="/planeamento-clube/atribuicao-espacos/enviar" onsubmit="return confirm('Enviar {{ resumo_slots.rascunhos }} atribuições aos treinadores? A partir desse momento ficarão visíveis nos calendários das equipas.')"><input type="hidden" name="semana_id" value="{{ semanal.id }}"><button class="ds-button bg-emerald-600 text-white hover:bg-emerald-700">Enviar aos treinadores ({{ resumo_slots.rascunhos }})</button></form>{% endif %}
-        {% if semanal %}<a href="/planeamento-clube/atribuicao-espacos/pdf?semana_id={{ semanal.id }}" target="_blank" class="ds-button ds-button-export">{{ 'Descarregar PDF enviado' if resumo_slots.rascunhos == 0 and resumo_slots.ocupados else 'Exportar mapa PDF' }}</a>{% endif %}
+        {% if semanal %}<a href="/planeamento-clube/atribuicao-espacos/pdf?semana_id={{ semanal.id }}" class="ds-button ds-button-export">{{ 'Descarregar PDF enviado' if resumo_slots.rascunhos == 0 and resumo_slots.ocupados else 'Exportar mapa PDF' }}</a>{% endif %}
         <a href="/planeamento-clube/espacos" class="ds-button ds-button-secondary">Gerir espaços</a>
     </div>
 </div>

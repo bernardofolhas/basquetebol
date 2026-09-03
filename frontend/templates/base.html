@@ -55,6 +55,7 @@
   <script>
     document.addEventListener("DOMContentLoaded",function(){
       var menu=document.getElementById("menu-mobile"),navigation=document.getElementById("header-navigation"),overlay=document.getElementById("header-overlay");
+      document.querySelectorAll("a[target], form[target]").forEach(function(element){element.removeAttribute("target")});
       document.querySelectorAll(".overflow-x-auto").forEach(function(wrapper){if(wrapper.querySelector("table"))wrapper.classList.add("ds-table-scroll")});
       function closeMenu(){navigation.classList.remove("is-open");overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}
       function openMenu(){navigation.classList.add("is-open");overlay.classList.remove("hidden");if(menu)menu.setAttribute("aria-expanded","true")}
