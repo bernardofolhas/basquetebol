@@ -17,11 +17,13 @@ from auth import verificar_perfil
 from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
+from models.avaliacao import AvaliacaoJogador
 from models.fisico import TesteFisico
 from models.jogador import Jogador, RegistoAntropometrico
 from models.utilizador import PerfilEnum
 from paths import TEMPLATES_DIR
 from services.assiduidade_service import obter_relatorio_assiduidade_jogador
+from services.avaliacao_service import dados_dashboard_avaliacoes
 from services.pdf_service import renderizar_pdf
 from services.desenho_service import imagem_estatica_data_uri
 from services.fotografia_jogador_service import apagar_fotografia, caminho_fotografia, guardar_fotografia
@@ -297,12 +299,20 @@ def detalhe_jogador(
         .order_by(TesteFisico.data.desc(), TesteFisico.id.desc())
         .all()
     )
+    avaliacoes = db.query(AvaliacaoJogador).options(
+        joinedload(AvaliacaoJogador.jogador),
+        joinedload(AvaliacaoJogador.parametro),
+        joinedload(AvaliacaoJogador.sessao),
+    ).filter(AvaliacaoJogador.jogador_id == jogador_id).order_by(
+        AvaliacaoJogador.data.desc(), AvaliacaoJogador.id.desc()
+    ).all()
     evolucao = {
         "assiduidade": obter_relatorio_assiduidade_jogador(db, jogador_id),
         "antropometria_atual": antropometrias[0] if antropometrias else None,
         "antropometria_anterior": antropometrias[1] if len(antropometrias) > 1 else None,
         "testes_recentes": testes[:5],
         "teste_recente": testes[0] if testes else None,
+        "avaliacoes": dados_dashboard_avaliacoes(avaliacoes),
     }
 
     return templates.TemplateResponse(request, "jogadores/detalhe.html", {

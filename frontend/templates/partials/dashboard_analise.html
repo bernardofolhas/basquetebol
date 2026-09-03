@@ -1,0 +1,86 @@
+{% set dashboard_id = dashboard_id|default('analise-principal') %}
+<section class="analysis-dashboard" data-analysis-dashboard data-dashboard-id="{{ dashboard_id }}" {% if jogador_fixo_id %}data-player-locked="{{ jogador_fixo_id }}"{% endif %}>
+  <script type="application/json" data-analysis-source>{{ dados_dashboard|tojson }}</script>
+  <script type="application/json" data-analysis-players>{{ jogadores_dashboard|default([], true)|tojson }}</script>
+  <script type="application/json" data-analysis-parameters>{{ parametros_dashboard|default([], true)|tojson }}</script>
+
+  <header class="analysis-filter-shell">
+    <div class="analysis-filter-heading">
+      <div>
+        <p class="analysis-eyebrow">Leitura dinâmica</p>
+        <h2>Observatório de desempenho</h2>
+        <p>Seleciona o que queres analisar. Todos os quadros atualizam imediatamente.</p>
+      </div>
+      <button type="button" class="analysis-reset" data-analysis-reset>Limpar filtros</button>
+    </div>
+    <div class="analysis-filter-grid">
+      <label class="analysis-control">
+        <span>Período</span>
+        <select data-analysis-period>
+          <option value="all">Todo o histórico</option>
+          <option value="30">Últimos 30 dias</option>
+          <option value="90">Últimos 90 dias</option>
+          <option value="180">Últimos 6 meses</option>
+          <option value="custom">Personalizado</option>
+        </select>
+      </label>
+      <label class="analysis-control analysis-date-control" data-analysis-date-control>
+        <span>Desde</span><input type="date" data-analysis-from>
+      </label>
+      <label class="analysis-control analysis-date-control" data-analysis-date-control>
+        <span>Até</span><input type="date" data-analysis-to>
+      </label>
+      {% if not jogador_fixo_id %}
+      <details class="analysis-filter-menu">
+        <summary><span>Atletas</span><strong data-analysis-player-label>Toda a equipa</strong></summary>
+        <div class="analysis-filter-popover"><div class="analysis-filter-actions"><button type="button" data-select-all="players">Todos</button><button type="button" data-clear-all="players">Limpar</button></div><div data-analysis-player-options></div></div>
+      </details>
+      {% endif %}
+      <details class="analysis-filter-menu">
+        <summary><span>Dimensões</span><strong data-analysis-category-label>Todas</strong></summary>
+        <div class="analysis-filter-popover">
+          <div class="analysis-filter-actions"><button type="button" data-select-all="categories">Todas</button><button type="button" data-clear-all="categories">Limpar</button></div>
+          <label><input type="checkbox" value="tecnica" data-analysis-category checked> Técnica</label>
+          <label><input type="checkbox" value="tatica" data-analysis-category checked> Tática</label>
+          <label><input type="checkbox" value="fisica" data-analysis-category checked> Física</label>
+          <label><input type="checkbox" value="psicologica" data-analysis-category checked> Psicológica</label>
+        </div>
+      </details>
+      <details class="analysis-filter-menu">
+        <summary><span>Parâmetros</span><strong data-analysis-parameter-label>Todos</strong></summary>
+        <div class="analysis-filter-popover analysis-parameter-popover"><div class="analysis-filter-actions"><button type="button" data-select-all="parameters">Todos</button><button type="button" data-clear-all="parameters">Limpar</button></div><div data-analysis-parameter-options></div></div>
+      </details>
+    </div>
+  </header>
+
+  <div class="analysis-kpi-grid">
+    <article class="analysis-kpi"><span>Cobertura</span><strong data-kpi="coverage">-</strong><small data-kpi-note="coverage">Atletas com avaliação</small></article>
+    <article class="analysis-kpi"><span>Índice médio</span><strong data-kpi="average">-</strong><small>Comparação relativa à escala</small></article>
+    <article class="analysis-kpi"><span>Evolução</span><strong data-kpi="evolution">-</strong><small>Primeiro para o último momento</small></article>
+    <article class="analysis-kpi"><span>Momentos</span><strong data-kpi="moments">0</strong><small data-kpi-note="moments">No período selecionado</small></article>
+  </div>
+
+  <div class="analysis-empty" data-analysis-empty hidden>
+    <strong>Sem dados para esta seleção</strong>
+    <p>Altera os filtros ou regista um novo momento de avaliação.</p>
+  </div>
+
+  <div class="analysis-visual-grid" data-analysis-content>
+    <article class="analysis-card analysis-card-wide">
+      <header><div><span>Evolução temporal</span><h3>Desempenho ao longo do tempo</h3></div><small data-chart-note="trend"></small></header>
+      <div class="analysis-chart-scroll"><div class="analysis-line-chart" data-chart="trend"></div></div>
+    </article>
+    <article class="analysis-card">
+      <header><div><span>Perfil</span><h3>Comparação por dimensão</h3></div></header>
+      <div class="analysis-dimension-bars" data-chart="dimensions"></div>
+    </article>
+    <article class="analysis-card">
+      <header><div><span>Equipa</span><h3>Comparação entre atletas</h3></div><small>Média normalizada</small></header>
+      <div class="analysis-ranking" data-chart="ranking"></div>
+    </article>
+    <article class="analysis-card analysis-card-wide">
+      <header><div><span>Detalhe</span><h3>Matriz de parâmetros</h3></div><small>Valor médio na seleção</small></header>
+      <div class="analysis-matrix-wrap" data-chart="matrix"></div>
+    </article>
+  </div>
+</section>

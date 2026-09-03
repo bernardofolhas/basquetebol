@@ -76,6 +76,9 @@ def test_painel_cria_parametros_base_e_apresenta_area_de_analise(client_admin):
         assert resposta.status_code == 200
         assert "Análise de Desempenho" in resposta.text
         assert "dimensão técnica, tática, física e psicológica" in resposta.text
+        assert "Observatório de desempenho" in resposta.text
+        assert "data-analysis-period" in resposta.text
+        assert "Matriz de parâmetros" in resposta.text
         assert "Resumo por atleta" in resposta.text
         assert "Ana Avaliação" in resposta.text
         assert db.query(ParametroAvaliacao).filter(ParametroAvaliacao.equipa_id == equipa_id).count() == 15
@@ -130,7 +133,14 @@ def test_avaliacao_multipla_guarda_e_atualiza_valores_da_sessao(client_admin):
         detalhe = client_admin.get(f"/analise/jogadores/{jogadora_1_id}")
         assert detalhe.status_code == 200
         assert "Histórico completo" in detalhe.text
+        assert "Desempenho ao longo do tempo" in detalhe.text
+        assert f'data-player-locked="{jogadora_1_id}"' in detalhe.text
         assert "5" in detalhe.text
+
+        ficha = client_admin.get(f"/jogadores/{jogadora_1_id}")
+        assert ficha.status_code == 200
+        assert 'data-workspace-tab="analise"' in ficha.text
+        assert "Abrir histórico analítico completo" in ficha.text
     finally:
         _limpar_contexto(db, equipa_id, [jogadora_1_id, jogadora_2_id], macro_id)
         db.close()

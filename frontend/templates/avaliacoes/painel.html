@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Análise de Desempenho - {{ equipa.nome }}{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/analysis-dashboard.css?v=20260903-1">{% endblock %}
 {% block conteudo %}
 
 {% call equipa_contexto(
@@ -34,20 +35,20 @@
   @media(max-width:767px){.ds-analysis-table thead{display:none}.ds-analysis-table,.ds-analysis-table tbody,.ds-analysis-table tr,.ds-analysis-table td{display:block;width:100%}.ds-analysis-table tr{margin-bottom:.75rem;border:1px solid #e2e8f0;border-radius:18px;background:#fff;padding:.85rem}.ds-analysis-table td{display:flex;align-items:center;justify-content:space-between;gap:1rem;border:0!important;padding:.38rem 0!important}.ds-analysis-table td::before{content:attr(data-label);color:#64748b;font-size:.75rem;font-weight:700}.ds-analysis-table td:first-child{display:block;padding-bottom:.7rem!important}.ds-analysis-table td:first-child::before{display:none}}
 </style>
 
-<div class="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-  <div class="ds-analysis-stat"><p class="text-xs font-bold uppercase tracking-[.14em] text-slate-400">Atletas avaliados</p><p class="mt-2 text-3xl font-black text-slate-900">{{ jogadores_avaliados }}<span class="text-base font-medium text-slate-400">/{{ jogadores|length }}</span></p></div>
-  <div class="ds-analysis-stat"><p class="text-xs font-bold uppercase tracking-[.14em] text-slate-400">Registos</p><p class="mt-2 text-3xl font-black text-slate-900">{{ total_avaliacoes }}</p></div>
-  <div class="ds-analysis-stat"><p class="text-xs font-bold uppercase tracking-[.14em] text-slate-400">Parâmetros ativos</p><p class="mt-2 text-3xl font-black text-slate-900">{{ parametros|length }}</p></div>
-  <div class="ds-analysis-stat"><p class="text-xs font-bold uppercase tracking-[.14em] text-slate-400">Testes físicos anteriores</p><p class="mt-2 text-3xl font-black text-slate-900">{{ testes_fisicos_existentes }}</p></div>
-</div>
-
 <nav class="ds-analysis-tabs mb-5" aria-label="Áreas da análise">
-  <button type="button" class="ds-analysis-tab is-active" data-analysis-tab="resumo">Resumo por atleta</button>
+  <button type="button" class="ds-analysis-tab is-active" data-analysis-tab="dashboard">Dashboard</button>
+  <button type="button" class="ds-analysis-tab" data-analysis-tab="resumo">Resumo por atleta</button>
   <button type="button" class="ds-analysis-tab" data-analysis-tab="parametros">Parâmetros</button>
   <button type="button" class="ds-analysis-tab" data-analysis-tab="historico">Histórico</button>
 </nav>
 
-<section class="ds-analysis-panel" data-analysis-panel="resumo">
+<section class="ds-analysis-panel" data-analysis-panel="dashboard">
+  {% set dashboard_id = 'analise-equipa-' ~ equipa.id %}
+  {% set jogador_fixo_id = none %}
+  {% include "partials/dashboard_analise.html" %}
+</section>
+
+<section class="ds-analysis-panel" data-analysis-panel="resumo" hidden>
   <div class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
     <div class="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div><h2 class="font-bold text-slate-900">Evolução da equipa</h2><p class="mt-1 text-sm text-slate-500">Média dos registos existentes em cada dimensão.</p></div>
@@ -163,4 +164,5 @@
   }));
 })();
 </script>
+<script src="/static/js/analysis-dashboard.js?v=20260903-1"></script>
 {% endblock %}

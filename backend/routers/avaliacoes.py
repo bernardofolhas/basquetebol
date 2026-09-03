@@ -15,6 +15,7 @@ from models.jogador import Jogador
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from paths import TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
+from services.avaliacao_service import dados_dashboard_avaliacoes
 from template_config import Jinja2Templates
 
 
@@ -156,6 +157,19 @@ def painel_equipa(
         "jogadores_avaliados": len({item.jogador_id for item in avaliacoes}),
         "testes_fisicos_existentes": db.query(TesteFisico).join(Jogador).filter(Jogador.equipa_id == equipa.id).count(),
         "pode_editar": _pode_editar(utilizador),
+        "dados_dashboard": dados_dashboard_avaliacoes(avaliacoes),
+        "jogadores_dashboard": [
+            {"id": jogador.id, "nome": jogador.nome} for jogador in jogadores
+        ],
+        "parametros_dashboard": [
+            {
+                "id": parametro.id,
+                "nome": parametro.nome,
+                "categoria": parametro.categoria,
+                "unidade": parametro.unidade or ("/5" if parametro.categoria != "fisica" else ""),
+            }
+            for parametro in parametros
+        ],
     })
 
 
@@ -452,7 +466,9 @@ def detalhe_jogador(
         return RedirectResponse("/equipas", status_code=303)
     verificar_ou_negar_equipa(utilizador, jogador.equipa_id, db)
     avaliacoes = db.query(AvaliacaoJogador).options(
-        joinedload(AvaliacaoJogador.parametro), joinedload(AvaliacaoJogador.sessao)
+        joinedload(AvaliacaoJogador.jogador),
+        joinedload(AvaliacaoJogador.parametro),
+        joinedload(AvaliacaoJogador.sessao),
     ).filter(AvaliacaoJogador.jogador_id == jogador.id).order_by(
         AvaliacaoJogador.data.desc(), AvaliacaoJogador.id.desc()
     ).all()
@@ -474,4 +490,15 @@ def detalhe_jogador(
         "medias": medias,
         "totais_categoria": totais_categoria,
         "categorias": CATEGORIAS,
+        "dados_dashboard": dados_dashboard_avaliacoes(avaliacoes),
+        "jogadores_dashboard": [{"id": jogador.id, "nome": jogador.nome}],
+        "parametros_dashboard": [
+            {
+                "id": item.parametro_id,
+                "nome": item.parametro.nome,
+                "categoria": item.parametro.categoria,
+                "unidade": item.parametro.unidade or ("/5" if item.parametro.categoria != "fisica" else ""),
+            }
+            for item in avaliacoes
+        ],
     })

@@ -121,7 +121,9 @@
           {% if perfil != 'staff' %}<div class="ds-dropdown-section">{{ menu_link('/jogos/' ~ jogo_nav.id ~ '/plano', 'Plano de jogo · ' ~ jogo_nav.adversario, 'Preparação direta do próximo jogo') }}</div>{% endif %}
           {% endfor %}
           {% endif %}
+          {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
           {{ menu_link('/calendario', 'Calendário operacional', 'Toda a atividade do clube', p.startswith('/calendario')) }}
+          {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
           <div class="ds-dropdown-section">
             <p class="ds-dropdown-label px-2 pb-1">Logística</p>

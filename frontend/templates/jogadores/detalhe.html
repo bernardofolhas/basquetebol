@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block titulo %}{{ jogador.nome }}{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/analysis-dashboard.css?v=20260903-1">{% endblock %}
 
 {% block conteudo %}
 
@@ -28,6 +29,7 @@
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resumo">Resumo</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="perfil">Perfil e contactos</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="evolucao">Evolução desportiva</button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="analise">Análise</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="processo">Processo administrativo</button>
     </div>
 </nav>
@@ -86,6 +88,15 @@
             <a href="/fisico/jogadores/{{ jogador.id }}" class="inline-block mt-3 text-sm font-medium text-orange-600 hover:underline">Histórico de testes →</a>
         </div>
     </div>
+</section>
+
+<section data-workspace-panel="jogador:analise" role="tabpanel">
+    {% set dashboard_id = 'ficha-atleta-' ~ jogador.id %}
+    {% set dados_dashboard = evolucao.avaliacoes %}
+    {% set jogadores_dashboard = [{'id': jogador.id, 'nome': jogador.nome}] %}
+    {% set jogador_fixo_id = jogador.id %}
+    {% include "partials/dashboard_analise.html" %}
+    <div class="mt-3 flex justify-end"><a href="/analise/jogadores/{{ jogador.id }}" class="ds-button ds-button-secondary">Abrir histórico analítico completo</a></div>
 </section>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -371,4 +382,5 @@
     </form>
     {% endif %}
 </div>
+<script src="/static/js/analysis-dashboard.js?v=20260903-1"></script>
 {% endblock %}

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Análise - {{ jogador.nome }}{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/analysis-dashboard.css?v=20260903-1">{% endblock %}
 {% block conteudo %}
 
 {% call equipa_contexto(
@@ -27,6 +28,10 @@
 {% endfor %}
 </div>
 
+{% set dashboard_id = 'analise-atleta-' ~ jogador.id %}
+{% set jogador_fixo_id = jogador.id %}
+{% include "partials/dashboard_analise.html" %}
+
 <section class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
   <header class="border-b border-slate-100 px-5 py-4"><h2 class="font-black text-slate-900">Histórico completo</h2><p class="mt-1 text-sm text-slate-500">Todos os valores, do mais recente para o mais antigo.</p></header>
   {% if avaliacoes %}
@@ -42,4 +47,5 @@
   </div>
   {% else %}<div class="px-6 py-14 text-center text-sm text-slate-500">Ainda não existem avaliações para este atleta.</div>{% endif %}
 </section>
+<script src="/static/js/analysis-dashboard.js?v=20260903-1"></script>
 {% endblock %}
