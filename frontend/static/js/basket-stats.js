@@ -18,11 +18,12 @@
   let syncTimer = null;
   let syncing = false;
   let syncRequested = false;
+  let resetting = false;
   let pendingAction = null;
   let selectedPosition = null;
 
   function loadJson(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (_) { return fallback; } }
-  function saveLocal() { localStorage.setItem(storageKey, JSON.stringify(dirty)); localStorage.setItem(clockKey, JSON.stringify({...clock,updatedAt:Date.now()})); }
+  function saveLocal() { if(dirty.length)localStorage.setItem(storageKey, JSON.stringify(dirty));else localStorage.removeItem(storageKey); localStorage.setItem(clockKey, JSON.stringify({...clock,updatedAt:Date.now()})); }
   function mergeEvents(base, pending) { const map=new Map(base.map(item=>[item.client_uid,item])); pending.forEach(item=>map.set(item.client_uid,{...map.get(item.client_uid),...item})); return [...map.values()]; }
   function uid() { return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
   function active() { return events.filter(item=>!item.anulado); }
@@ -56,7 +57,7 @@
   }
   function closeCourtDialog(){const dialog=root.querySelector("[data-court-dialog]");if(!dialog)return;pendingAction=null;selectedPosition=null;if(typeof dialog.close==="function"&&dialog.open)dialog.close();else dialog.removeAttribute("open");}
   function undo() { const event=[...events].reverse().find(item=>!item.anulado); if(!event){notify("Não existem ações para desfazer.");return;} event.anulado=true;markDirty(event);render();scheduleSync(); }
-  function notify(message,tone="warning") { const stack=root.querySelector("[data-warning-stack]"); if(!stack)return; const item=document.createElement("div");item.className=`stat-warning${tone==="danger"?" is-danger":""}`;item.textContent=message;stack.prepend(item);stack.hidden=false;setTimeout(()=>{item.remove();stack.hidden=!stack.children.length},4500); }
+  function notify(message,tone="warning") { const stack=root.querySelector("[data-warning-stack]"); if(!stack)return; const item=document.createElement("div");item.className=`stat-warning${tone==="danger"?" is-danger":tone==="success"?" is-success":""}`;item.textContent=message;stack.prepend(item);stack.hidden=false;setTimeout(()=>{item.remove();stack.hidden=!stack.children.length},4500); }
   async function sync(showFeedback=true) {
     if(syncing){syncRequested=true;return;}
     if(!canEdit||!dirty.length){if(showFeedback)notify("Todos os dados já estão sincronizados.");updateConnection();return;}
@@ -74,6 +75,25 @@
     finally{syncing=false;if(button)button.disabled=false;updateConnection();if(navigator.onLine&&dirty.length&&(syncRequested||completed)){syncRequested=false;setTimeout(()=>sync(false),150);}}
   }
   function scheduleSync(){if(!navigator.onLine)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>sync(false),650);}
+  async function resetStatistics(){
+    if(resetting)return;
+    if(syncing){notify("Aguarda pela sincronização atual e tenta novamente.");return;}
+    if(!navigator.onLine){notify("É necessária ligação à internet para eliminar a folha estatística.","danger");return;}
+    if(!window.confirm("Eliminar todas as ações desta folha estatística e recomeçar do zero? Esta ação não pode ser anulada."))return;
+    resetting=true;clearTimeout(syncTimer);
+    const button=root.querySelector("[data-stat-reset]");if(button)button.disabled=true;
+    try{
+      const response=await fetch(`/estatisticas/jogos/${gameId}/reiniciar`,{method:"POST",headers:{"X-CSRF-Token":document.querySelector('meta[name="csrf-token"]')?.content||""}});
+      const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.message||"Falha ao reiniciar estatística");
+      dirty=[];events=[];selectedPlayer=null;pendingAction=null;selectedPosition=null;
+      localStorage.removeItem(storageKey);localStorage.removeItem(clockKey);
+      clock={seconds:600,running:false,period:1,updatedAt:Date.now()};startTimer();
+      root.querySelectorAll("[data-player-id]").forEach(item=>item.classList.remove("is-selected"));
+      const selectedLabel=root.querySelector("[data-selected-player]");if(selectedLabel)selectedLabel.textContent="Nenhum selecionado";
+      render();notify(`Folha estatística eliminada. ${result.eventos_eliminados||0} ação(ões) removida(s).`,"success");
+    }catch(error){notify(error.message||"Não foi possível reiniciar a estatística.","danger");}
+    finally{resetting=false;if(button)button.disabled=false;updateConnection();}
+  }
   function totalsFor(playerId) {
     const list=active().filter(item=>item.lado==="equipa"&&item.jogador_id===playerId);const count=type=>list.filter(item=>item.tipo===type).length;
     const llc=count("ll_c"),llt=llc+count("ll_f"),c2=count("dois_c"),t2=c2+count("dois_f"),c3=count("tres_c"),t3=c3+count("tres_f"),ro=count("ressalto_ofensivo"),rd=count("ressalto_defensivo"),ast=count("assistencia"),stl=count("roubo"),to=count("perda"),blk=count("desarme"),pf=count("falta"),pts=llc+c2*2+c3*3;return{pts,llc,llt,c2,t2,c3,t3,ro,rd,rt:ro+rd,ast,stl,to,blk,pf,eff:pts+ro+rd+ast+stl+blk-(llt-llc)-(t2-c2)-(t3-c3)-to};
@@ -102,6 +122,7 @@
   root.querySelector("[data-court-dialog]")?.addEventListener("cancel",event=>{event.preventDefault();closeCourtDialog();});
   root.querySelector("[data-court-dialog]")?.addEventListener("click",event=>{if(event.target===event.currentTarget)closeCourtDialog();});
   root.querySelector("[data-stat-undo]")?.addEventListener("click",undo);root.querySelector("[data-stat-sync]")?.addEventListener("click",()=>sync(true));
+  root.querySelector("[data-stat-reset]")?.addEventListener("click",resetStatistics);
   root.querySelector("[data-period]")?.addEventListener("change",event=>{clock.period=Number(event.target.value);clock.seconds=600;clock.running=false;startTimer();saveLocal();render();});
   clockElement()?.addEventListener("click",()=>{clock.running=!clock.running;startTimer();saveLocal();});
   document.addEventListener("keydown",event=>{if(!canEdit||root.querySelector("[data-court-dialog]")?.open||event.ctrlKey||event.metaKey||/INPUT|TEXTAREA|SELECT/.test(event.target.tagName))return;const map={"1":"ll_c","2":"dois_c","3":"tres_c",q:"ll_f",w:"dois_f",e:"tres_f",r:"ressalto_defensivo",o:"ressalto_ofensivo",a:"assistencia",s:"roubo",t:"perda",b:"desarme",f:"falta"};if(event.key.toLowerCase()==="z"){event.preventDefault();undo();}else if(map[event.key.toLowerCase()]){event.preventDefault();requestEvent(map[event.key.toLowerCase()]);}});

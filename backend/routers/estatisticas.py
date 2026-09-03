@@ -150,3 +150,34 @@ def sincronizar_jogo(jogo_id: int, lote: LoteEstatistica, request: Request, db: 
         "ok": True, "eventos": [serializar_evento(item) for item in eventos],
         "marcador": {"equipa": pontos_eventos(eventos, "equipa"), "adversario": pontos_eventos(eventos, "adversario")},
     }
+
+
+@router.post("/jogos/{jogo_id}/reiniciar")
+def reiniciar_estatistica_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    jogo = _jogo_acessivel(db, jogo_id, utilizador)
+    if not jogo:
+        return JSONResponse({"ok": False, "message": "Jogo não encontrado."}, status_code=404)
+    if not _pode_registar(utilizador):
+        return JSONResponse({"ok": False, "message": "Sem permissão para eliminar estatísticas."}, status_code=403)
+
+    total = db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo.id).delete(
+        synchronize_session=False
+    )
+    jogo.pontos_nos = None
+    jogo.pontos_adversario = None
+    registar_auditoria(
+        db,
+        utilizador,
+        "eliminar",
+        "estatisticas_jogo",
+        jogo.id,
+        f"Folha estatística reiniciada · {total} ação(ões) eliminada(s) · {jogo.adversario}",
+        request,
+    )
+    db.commit()
+    return {"ok": True, "eventos_eliminados": total, "marcador": {"equipa": 0, "adversario": 0}}

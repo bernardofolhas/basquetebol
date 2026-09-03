@@ -58,6 +58,8 @@ def test_mesa_estatistica_renderiza_registo_offline(client_admin):
         assert 'data-stat-action="assistencia"' in resposta.text
         assert 'data-court-dialog' in resposta.text
         assert 'data-stat-court' in resposta.text
+        assert 'data-stat-reset' in resposta.text
+        assert "Recomeçar estatística" in resposta.text
         assert 'data-boxscore-player="' + str(jogador_id) + '"' in resposta.text
 
         dashboard = client_admin.get(f"/estatisticas/equipas/{equipa_id}")
@@ -128,6 +130,30 @@ def test_sincronizacao_rejeita_posicao_incompleta(client_admin):
         _limpar(db, equipa_id)
 
 
+def test_reiniciar_folha_elimina_acoes_e_repor_resultado(client_admin):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    try:
+        criada = client_admin.post(f"/estatisticas/jogos/{jogo_id}/sincronizar", json={"eventos": [{
+            "client_uid": "stats-reset-event", "jogador_id": jogador_id,
+            "lado": "equipa", "tipo": "tres_c", "periodo": 1,
+            "segundos_restantes": 420, "posicao_x": 18.5, "posicao_y": 30.0,
+        }]})
+        assert criada.status_code == 200
+        assert criada.json()["marcador"] == {"equipa": 3, "adversario": 0}
+
+        resposta = client_admin.post(f"/estatisticas/jogos/{jogo_id}/reiniciar")
+        assert resposta.status_code == 200
+        assert resposta.json()["eventos_eliminados"] == 1
+        assert resposta.json()["marcador"] == {"equipa": 0, "adversario": 0}
+        assert db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).count() == 0
+        db.expire_all()
+        jogo = db.query(Jogo).filter(Jogo.id == jogo_id).one()
+        assert jogo.pontos_nos is None
+        assert jogo.pontos_adversario is None
+    finally:
+        _limpar(db, equipa_id)
+
+
 def test_sincronizacao_rejeita_identificador_de_outro_jogo(client_admin):
     db, equipa_id, jogador_id, jogo_id = _criar_contexto()
     outro = Jogo(
@@ -165,3 +191,5 @@ def test_recursos_offline_e_atalhos_estao_configurados():
     assert 'actionsWithoutPosition = new Set(["falta", "falta_sofrida"])' in script
     assert "requestEvent(button.dataset.opponentAction" in script
     assert "posicao_x:position?.x??null" in script
+    assert "/reiniciar" in script
+    assert "localStorage.removeItem(storageKey)" in script

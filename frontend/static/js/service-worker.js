@@ -1,4 +1,4 @@
-const CACHE = "basket-platform-offline-v2";
+const CACHE = "basket-platform-offline-v3";
 const CORE = [
   "/static/css/design-system.css",
   "/static/css/basket-stats.css",
