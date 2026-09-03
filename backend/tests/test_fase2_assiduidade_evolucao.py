@@ -157,6 +157,18 @@ def test_relatorio_assiduidade_e_ficha_evolucao_respondem_com_pdf(client_admin):
         assert "Jogadora Fase 2" in resposta.text
         assert "Justificadas" in resposta.text
 
+        acesso_direto = client_admin.get(
+            f"/assiduidade/equipas/{equipa_id}/registar",
+            follow_redirects=False,
+        )
+        assert acesso_direto.status_code == 303
+        assert acesso_direto.headers["location"].startswith("/assiduidade/sessoes/")
+
+        folha = client_admin.get(acesso_direto.headers["location"])
+        assert folha.status_code == 200
+        assert 'aria-label="Selecionar sessão de treino"' in folha.text
+        assert f'/assiduidade/equipas/{equipa_id}"' in folha.text
+
         pdf = client_admin.get(f"/assiduidade/equipas/{equipa_id}/pdf?inicio=2037-01-01&fim=2037-01-31")
         assert pdf.status_code == 200
         assert pdf.headers["content-type"] == "application/pdf"

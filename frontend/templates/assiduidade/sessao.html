@@ -10,8 +10,18 @@
         <p>{{ sessao.data|data_pt }}{% if sessao.hora_inicio %} · {{ sessao.hora_inicio }}{% endif %}{% if sessao.local %} · {{ sessao.local }}{% endif %}</p>
     </div>
     <div class="ds-attendance-heading-actions">
-        <span class="{{ sessao.estado_operacional_visual_classes }} rounded-full px-3 py-1 text-xs font-semibold">{{ sessao.estado_operacional_visual_label }}</span>
-        <a href="/treino/sessoes/{{ sessao.id }}" class="ds-button ds-button-secondary ds-button-sm">Abrir plano</a>
+        <label class="ds-attendance-session-picker">
+            <span>Selecionar sessão</span>
+            <select aria-label="Selecionar sessão de treino" onchange="if(this.value) window.location.assign(this.value)">
+                {% for opcao in sessoes_equipa %}
+                <option value="/assiduidade/sessoes/{{ opcao.id }}" {% if opcao.id == sessao.id %}selected{% endif %}>{% if opcao.e_jogo %}Jogo{% elif opcao.tipo_treino == 'fisico' %}Treino físico {{ opcao.numero_treino or '' }}{% else %}Treino {{ opcao.numero_treino or '' }}{% endif %} · {{ opcao.data|data_pt }}{% if opcao.hora_inicio %} · {{ opcao.hora_inicio }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div class="ds-attendance-heading-links">
+            <a href="/assiduidade/equipas/{{ equipa.id }}" class="ds-button ds-button-secondary ds-button-sm">Análise da equipa</a>
+            <a href="/treino/sessoes/{{ sessao.id }}" class="ds-button ds-button-secondary ds-button-sm">Abrir plano</a>
+        </div>
     </div>
 </header>
 

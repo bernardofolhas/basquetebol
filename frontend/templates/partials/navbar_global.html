@@ -90,7 +90,7 @@
             {% else %}<p class="px-2 py-3 text-sm text-slate-500">Sem próximos jogos. O calendário mantém os planos dos jogos já registados.</p>{% endfor %}
           </div>
         </details>
-        <a href="/assiduidade/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-assiduidade {% if p.startswith('/assiduidade') %}is-active{% endif %}">Assiduidade</a>
+        <a href="/assiduidade/equipas/{{ equipa_contexto_id }}/registar" class="ds-header-trigger ds-team-direct-link ds-nav-order-assiduidade {% if p.startswith('/assiduidade') %}is-active{% endif %}">Assiduidade</a>
         <a href="/equipas/{{ equipa_contexto_id }}/plantel" class="ds-header-trigger ds-team-direct-link ds-nav-order-plantel {% if p.endswith('/plantel') %}is-active{% endif %}">Plantel</a>
         <a href="/playbook/equipas/{{ equipa_contexto_id }}" class="ds-header-trigger ds-team-direct-link ds-nav-order-playbook {% if p.startswith('/playbook') %}is-active{% endif %}">Playbook</a>
         <a href="/equipas/{{ equipa_contexto_id }}/eventos" class="ds-header-trigger ds-team-direct-link ds-nav-order-eventos {% if p.endswith('/eventos') %}is-active{% endif %}">Eventos</a>

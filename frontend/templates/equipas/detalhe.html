@@ -36,12 +36,15 @@
 
 <div class="contents">
     <section data-workspace-panel="equipa:atividade" role="tabpanel" class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
-        <div class="flex items-start justify-between gap-4">
+        <div class="flex flex-col items-start justify-between gap-4 sm:flex-row">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-orange-500">A seguir</p>
                 <h2 class="mt-1 text-xl font-bold text-gray-800">Próxima atividade</h2>
             </div>
-            <a href="/calendario?equipa_id={{ equipa.id }}" class="text-sm font-semibold text-orange-600 hover:text-orange-700">Ver calendário</a>
+            <div class="ds-action-bar w-full sm:w-auto">
+                <a href="/assiduidade/equipas/{{ equipa.id }}/registar" class="ds-button ds-button-primary ds-button-sm">Registar presenças</a>
+                <a href="/calendario?equipa_id={{ equipa.id }}" class="ds-button ds-button-secondary ds-button-sm">Calendário</a>
+            </div>
         </div>
 
         {% if agenda_proxima %}

@@ -12,7 +12,7 @@ from flash import set_flash
 from models.assiduidade import RegistoAssiduidade
 from models.equipa import Equipa
 from models.jogador import Jogador
-from models.planeamento import SessaoTreino
+from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from paths import TEMPLATES_DIR
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
 from services.pdf_service import renderizar_pdf
@@ -60,6 +60,38 @@ def _contexto_relatorio_equipa(request: Request, equipa, relatorio: dict, utiliz
         "estados_assiduidade_visual": ESTADOS_ASSIDUIDADE_VISUAL,
         "request": request,
     }
+
+
+def _sessoes_assiduidade_equipa(db: Session, equipa_id: int):
+    return (
+        db.query(SessaoTreino)
+        .join(Microciclo, SessaoTreino.microciclo_id == Microciclo.id)
+        .join(Mesociclo, Microciclo.mesociclo_id == Mesociclo.id)
+        .join(Macrociclo, Mesociclo.macrociclo_id == Macrociclo.id)
+        .filter(
+            Macrociclo.equipa_id == equipa_id,
+            SessaoTreino.ativa.is_(True),
+        )
+        .order_by(SessaoTreino.data.desc(), SessaoTreino.hora_inicio.desc())
+        .limit(100)
+        .all()
+    )
+
+
+@router.get("/equipas/{equipa_id}/registar")
+def abrir_folha_assiduidade_equipa(
+    equipa_id: int,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    sessoes = _sessoes_assiduidade_equipa(db, equipa_id)
+    hoje = date.today()
+    sessao = next((item for item in sessoes if item.data <= hoje), None)
+    if not sessao and sessoes:
+        sessao = min(sessoes, key=lambda item: (item.data, item.hora_inicio or ""))
+    destino = f"/assiduidade/sessoes/{sessao.id}" if sessao else f"/assiduidade/equipas/{equipa_id}"
+    return RedirectResponse(url=destino, status_code=303)
 
 
 @router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
@@ -161,6 +193,11 @@ def pagina_assiduidade(
     equipa = sessao.microciclo.mesociclo.macrociclo.equipa
     verificar_ou_negar_equipa(utilizador, equipa.id, db)
 
+    sessoes_equipa = [
+        enriquecer_sessao_para_ui(item)
+        for item in _sessoes_assiduidade_equipa(db, equipa.id)
+    ]
+
     jogadores = db.query(Jogador).filter(
         Jogador.equipa_id == equipa.id,
         Jogador.ativo.is_(True),
@@ -186,6 +223,7 @@ def pagina_assiduidade(
         "utilizador": utilizador,
         "sessao": sessao,
         "equipa": equipa,
+        "sessoes_equipa": sessoes_equipa,
         "jogadores": jogadores,
         "registos_dict": registos_dict,
         "total_presentes": resumo["presentes"],

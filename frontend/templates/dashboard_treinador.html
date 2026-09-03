@@ -21,6 +21,7 @@
             <h2 class="mt-1 truncate text-xl font-extrabold text-slate-900">{{ item.equipa.nome }}</h2>
         </div>
         <div class="ds-action-bar shrink-0">
+            <a href="/assiduidade/equipas/{{ item.equipa.id }}/registar" class="ds-button ds-button-secondary ds-button-sm">Presenças</a>
             <a href="/exportacoes/equipas/{{ item.equipa.id }}/dados" class="ds-button ds-button-secondary ds-button-sm">Backup</a>
             <a href="/equipas/{{ item.equipa.id }}/resumo" class="ds-button ds-button-primary">Abrir equipa</a>
         </div>
