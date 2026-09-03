@@ -3,146 +3,116 @@
 {% block titulo %}Assiduidade — {{ equipa.nome }}{% endblock %}
 
 {% block conteudo %}
-<div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+<header class="ds-page-header ds-attendance-overview-heading">
     <div>
-        <p class="text-xs font-semibold uppercase tracking-widest text-orange-500">Área operacional</p>
-        <h1 class="text-3xl font-bold text-gray-800 mt-1">Assiduidade</h1>
-        <p class="text-gray-500 mt-1">Regista cada treino e acompanha o resumo da equipa no mesmo local.</p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-        {% if sessoes_registo %}<a href="/assiduidade/sessoes/{{ sessoes_registo[0].sessao.id }}" class="inline-flex items-center justify-center rounded-xl bg-[var(--clube-primary)] px-4 py-2.5 text-sm font-bold text-[var(--clube-on-primary)] hover:brightness-95">Registar última sessão</a>{% endif %}
-        <a href="/assiduidade/equipas/{{ equipa.id }}/pdf{% if data_inicio %}?inicio={{ data_inicio|data_iso }}{% if data_fim %}&amp;fim={{ data_fim|data_iso }}{% endif %}{% elif data_fim %}?fim={{ data_fim|data_iso }}{% endif %}"
-           class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-            Exportar relatório PDF
-        </a>
-    </div>
-</div>
-
-<form method="get" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
-    <div class="flex flex-col gap-3 md:flex-row md:items-end">
-        <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Data inicial</label>
-            <input type="date" name="inicio" value="{{ data_inicio|data_iso }}" class="rounded-lg border-gray-200 text-sm focus:border-orange-400 focus:ring-orange-400">
-        </div>
-        <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Data final</label>
-            <input type="date" name="fim" value="{{ data_fim|data_iso }}" class="rounded-lg border-gray-200 text-sm focus:border-orange-400 focus:ring-orange-400">
-        </div>
-        <button class="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600">Aplicar filtro</button>
-        <a href="/assiduidade/equipas/{{ equipa.id }}" class="px-3 py-2 text-sm text-gray-500 hover:text-orange-600">Limpar</a>
-    </div>
-</form>
-
-<section class="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <div class="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <p class="text-xs font-bold uppercase tracking-[.14em] text-[var(--clube-primary-dark)]">Registo operacional</p>
-            <h2 class="mt-1 text-lg font-bold text-slate-900">Escolher sessão de treino</h2>
-            <p class="mt-1 text-sm text-slate-500">Abre uma sessão para marcar presenças, estados e RPE individual.</p>
-        </div>
-        <span class="text-xs font-semibold text-slate-400">{{ sessoes_registo|length }} sessão(ões) no período</span>
+        <p class="ds-section-label">Área operacional</p>
+        <h1>Assiduidade</h1>
+        <p>Regista presenças e consulta a evolução da equipa sem misturar tarefas.</p>
     </div>
     {% if sessoes_registo %}
-    <div class="max-h-[30rem] divide-y divide-slate-100 overflow-y-auto">
-        {% for item in sessoes_registo %}
-        <a href="/assiduidade/sessoes/{{ item.sessao.id }}" class="group flex flex-col gap-3 px-5 py-4 transition hover:bg-[var(--clube-primary-surface)] sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex min-w-0 items-center gap-3">
-                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-xs font-black text-slate-600">{{ item.sessao.data.strftime('%d') }}</span>
-                <div class="min-w-0">
-                    <p class="truncate font-bold text-slate-900">{% if item.sessao.e_jogo %}Jogo{% elif item.sessao.tipo_treino == 'fisico' %}Treino físico {{ item.sessao.numero_treino or '' }}{% else %}Treino {{ item.sessao.numero_treino or '' }}{% endif %}</p>
-                    <p class="mt-0.5 truncate text-sm text-slate-500">{{ item.sessao.data|data_pt }}{% if item.sessao.hora_inicio %} · {{ item.sessao.hora_inicio }}{% if item.sessao.hora_fim %}-{{ item.sessao.hora_fim }}{% endif %}{% endif %}{% if item.sessao.local %} · {{ item.sessao.local }}{% endif %}</p>
-                </div>
-            </div>
-            <div class="flex items-center justify-between gap-3 sm:justify-end">
-                {% if item.estado == 'concluida' %}<span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">Concluída · {{ item.registados }}/{{ item.total }}</span>
-                {% elif item.estado == 'parcial' %}<span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">Parcial · {{ item.registados }}/{{ item.total }}</span>
-                {% else %}<span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">Por registar</span>{% endif %}
-                <span class="text-sm font-bold text-[var(--clube-primary-dark)]">{{ 'Editar' if item.estado == 'concluida' else 'Registar' }}</span>
-            </div>
-        </a>
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="px-5 py-10 text-center"><p class="font-semibold text-slate-700">Não existem sessões neste período.</p><p class="mt-1 text-sm text-slate-500">Cria ou seleciona outro intervalo para registar assiduidade.</p></div>
+    <a href="/assiduidade/sessoes/{{ sessoes_registo[0].sessao.id }}" class="ds-button ds-button-primary">Registar última sessão</a>
     {% endif %}
+</header>
+
+<nav class="ds-workspace-tabs ds-attendance-tabs" data-workspace-tabs="assiduidade" data-workspace-default="registar" data-workspace-always-default="true" aria-label="Áreas da assiduidade">
+    <div class="ds-workspace-tabs-list" role="tablist">
+        <button type="button" class="ds-workspace-tab" data-workspace-tab="registar" role="tab" aria-selected="true">Registar presenças</button>
+        <button type="button" class="ds-workspace-tab" data-workspace-tab="analise" role="tab" aria-selected="false">Análise da equipa</button>
+    </div>
+</nav>
+
+<section data-workspace-panel="assiduidade:registar">
+    <div class="ds-attendance-session-panel">
+        <div class="ds-attendance-session-head">
+            <div>
+                <p class="ds-section-label">Sessões de treino</p>
+                <h2>Escolhe uma sessão para registar</h2>
+                <p>Marca presenças, estados e RPE individual.</p>
+            </div>
+            <span>{{ sessoes_registo|length }} no período</span>
+        </div>
+
+        {% if sessoes_registo %}
+        <div class="ds-attendance-session-list">
+            {% for item in sessoes_registo %}
+            <a href="/assiduidade/sessoes/{{ item.sessao.id }}" class="ds-attendance-session-row" data-status="{{ item.estado }}">
+                <time datetime="{{ item.sessao.data|data_iso }}" class="ds-attendance-session-date">
+                    <strong>{{ item.sessao.data.strftime('%d') }}</strong>
+                    <span>{{ item.sessao.data.strftime('%m') }}</span>
+                </time>
+                <div class="ds-attendance-session-info">
+                    <strong>{% if item.sessao.e_jogo %}Jogo{% elif item.sessao.tipo_treino == 'fisico' %}Treino físico {{ item.sessao.numero_treino or '' }}{% else %}Treino {{ item.sessao.numero_treino or '' }}{% endif %}</strong>
+                    <span>{{ item.sessao.data|data_pt }}{% if item.sessao.hora_inicio %} · {{ item.sessao.hora_inicio }}{% if item.sessao.hora_fim %}-{{ item.sessao.hora_fim }}{% endif %}{% endif %}{% if item.sessao.local %} · {{ item.sessao.local }}{% endif %}</span>
+                </div>
+                {% if item.estado == 'concluida' %}<span class="ds-attendance-status is-complete">Concluída · {{ item.registados }}/{{ item.total }}</span>
+                {% elif item.estado == 'parcial' %}<span class="ds-attendance-status is-partial">Parcial · {{ item.registados }}/{{ item.total }}</span>
+                {% else %}<span class="ds-attendance-status is-pending">Por registar</span>{% endif %}
+                <span class="ds-attendance-session-action">{{ 'Editar' if item.estado == 'concluida' else 'Registar' }} <span aria-hidden="true">→</span></span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="ds-empty-state">
+            <strong>Não existem sessões neste período.</strong>
+            <p>Consulta outro intervalo na área de análise.</p>
+        </div>
+        {% endif %}
+    </div>
 </section>
 
-<div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <p class="text-xs uppercase tracking-wide text-gray-400">Sessões no período</p>
-        <p class="text-3xl font-bold text-gray-800 mt-2">{{ sessoes_total }}</p>
-        <p class="text-xs text-gray-500 mt-1">{{ sessoes_com_registo }} com registos</p>
+<section data-workspace-panel="assiduidade:analise" hidden>
+    <div class="ds-attendance-analysis-toolbar">
+        <form method="get" class="ds-attendance-filter">
+            <label><span>Data inicial</span><input type="date" name="inicio" value="{{ data_inicio|data_iso }}"></label>
+            <label><span>Data final</span><input type="date" name="fim" value="{{ data_fim|data_iso }}"></label>
+            <button class="ds-button ds-button-primary">Aplicar</button>
+            <a href="/assiduidade/equipas/{{ equipa.id }}" class="ds-button ds-button-secondary">Limpar</a>
+        </form>
+        <a href="/assiduidade/equipas/{{ equipa.id }}/pdf{% if data_inicio %}?inicio={{ data_inicio|data_iso }}{% if data_fim %}&amp;fim={{ data_fim|data_iso }}{% endif %}{% elif data_fim %}?fim={{ data_fim|data_iso }}{% endif %}" class="ds-button ds-button-secondary">Exportar PDF</a>
     </div>
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <p class="text-xs uppercase tracking-wide text-gray-400">Presenças registadas</p>
-        <p class="text-3xl font-bold text-green-600 mt-2">{{ resumo.presentes }}</p>
-        <p class="text-xs text-gray-500 mt-1">{{ resumo.percentagem }}% do total registado</p>
-    </div>
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <p class="text-xs uppercase tracking-wide text-gray-400">Faltas justificadas</p>
-        <p class="text-3xl font-bold text-blue-600 mt-2">{{ resumo.por_estado.justificada }}</p>
-        <p class="text-xs text-gray-500 mt-1">Com motivo administrativo</p>
-    </div>
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <p class="text-xs uppercase tracking-wide text-gray-400">Por lesão</p>
-        <p class="text-3xl font-bold text-purple-600 mt-2">{{ resumo.por_estado.lesionada }}</p>
-        <p class="text-xs text-gray-500 mt-1">Acompanhar no perfil</p>
-    </div>
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <p class="text-xs uppercase tracking-wide text-gray-400">RPE individual médio</p>
-        <p class="text-3xl font-bold text-orange-600 mt-2">{{ resumo.rpe_medio if resumo.rpe_medio is not none else '—' }}</p>
-        <p class="text-xs text-gray-500 mt-1">{{ resumo.rpe_registados }} respostas</p>
-    </div>
-</div>
 
-<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <div class="flex flex-col gap-2 border-b border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
-        <div>
-            <h2 class="font-semibold text-gray-800">Resumo por {{ termo_jogador(equipa, capitalizar=False) }}</h2>
-            <p class="text-sm text-gray-500">Só entram no cálculo os registos efetivamente guardados.</p>
+    <div class="ds-attendance-overview-kpis" aria-label="Resumo da equipa">
+        <div><span>Sessões</span><strong>{{ sessoes_total }}</strong><small>{{ sessoes_com_registo }} com registos</small></div>
+        <div class="is-positive"><span>Presenças</span><strong>{{ resumo.presentes }}</strong><small>{{ resumo.percentagem }}% dos registos</small></div>
+        <div class="is-info"><span>Justificadas</span><strong>{{ resumo.por_estado.justificada }}</strong><small>Ausências justificadas</small></div>
+        <div class="is-injury"><span>Por lesão</span><strong>{{ resumo.por_estado.lesionada }}</strong><small>A acompanhar</small></div>
+        <div class="is-rpe"><span>RPE médio</span><strong>{{ resumo.rpe_medio if resumo.rpe_medio is not none else '—' }}</strong><small>{{ resumo.rpe_registados }} respostas</small></div>
+    </div>
+
+    <div class="ds-attendance-report">
+        <div class="ds-attendance-report-head">
+            <div>
+                <h2>Resumo por {{ termo_jogador(equipa, capitalizar=False) }}</h2>
+                <p>Apenas são considerados os registos guardados.</p>
+            </div>
+            <a href="/equipas/{{ equipa.id }}/plantel" class="ds-quiet-link">Abrir plantel →</a>
         </div>
-        <a href="/jogadores" class="text-sm font-medium text-orange-600 hover:underline">Abrir plantel →</a>
+        {% if linhas %}
+        <div class="overflow-x-auto">
+            <table class="ds-attendance-report-table">
+                <thead>
+                    <tr><th>{{ termo_jogador(equipa) }}</th><th>Registos</th><th>Presenças</th><th>Atrasadas</th><th>Ausências</th><th>RPE médio</th><th>Taxa</th></tr>
+                </thead>
+                <tbody>
+                    {% for linha in linhas %}
+                    <tr>
+                        <td data-label="{{ termo_jogador(equipa) }}"><a href="/jogadores/{{ linha.jogador.id }}">{{ linha.jogador.nome }}</a>{% if linha.jogador.numero_camisola %}<small>#{{ linha.jogador.numero_camisola }}</small>{% endif %}</td>
+                        <td data-label="Registos">{{ linha.total }}</td>
+                        <td data-label="Presenças" class="is-positive">{{ linha.presentes }}</td>
+                        <td data-label="Atrasadas">{{ linha.por_estado.atrasada }}</td>
+                        <td data-label="Ausências" class="is-negative">{{ linha.por_estado.ausente + linha.por_estado.justificada + linha.por_estado.lesionada }}</td>
+                        <td data-label="RPE médio">{{ linha.rpe_medio if linha.rpe_medio is not none else '—' }}</td>
+                        <td data-label="Taxa"><strong>{{ linha.percentagem }}%</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="ds-empty-state">Ainda não existem {{ termo_jogador(equipa, plural=True, capitalizar=False) }} nesta equipa.</div>
+        {% endif %}
     </div>
-    {% if linhas %}
-    <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-            <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-400">
-                <tr>
-                    <th class="px-5 py-3">{{ termo_jogador(equipa) }}</th>
-                    <th class="px-3 py-3 text-center">Registos</th>
-                    <th class="px-3 py-3 text-center">Presenças</th>
-                    <th class="px-3 py-3 text-center">Atrasadas</th>
-                    <th class="px-3 py-3 text-center">Ausências</th>
-                    <th class="px-3 py-3 text-center">RPE médio</th>
-                    <th class="px-5 py-3 text-right">Taxa</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                {% for linha in linhas %}
-                <tr class="hover:bg-orange-50/40">
-                    <td class="px-5 py-3">
-                        <a href="/jogadores/{{ linha.jogador.id }}" class="font-semibold text-gray-800 hover:text-orange-600">{{ linha.jogador.nome }}</a>
-                        {% if linha.jogador.numero_camisola %}<span class="ml-2 text-xs text-gray-400">#{{ linha.jogador.numero_camisola }}</span>{% endif %}
-                    </td>
-                    <td class="px-3 py-3 text-center text-gray-600">{{ linha.total }}</td>
-                    <td class="px-3 py-3 text-center font-semibold text-green-700">{{ linha.presentes }}</td>
-                    <td class="px-3 py-3 text-center text-amber-700">{{ linha.por_estado.atrasada }}</td>
-                    <td class="px-3 py-3 text-center text-red-700">{{ linha.por_estado.ausente + linha.por_estado.justificada + linha.por_estado.lesionada }}</td>
-                    <td class="px-3 py-3 text-center font-semibold text-orange-700">{{ linha.rpe_medio if linha.rpe_medio is not none else '—' }}</td>
-                    <td class="px-5 py-3 text-right">
-                        <span class="font-bold {% if linha.percentagem >= 75 %}text-green-600{% elif linha.percentagem >= 50 %}text-amber-600{% else %}text-red-600{% endif %}">{{ linha.percentagem }}%</span>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="px-5 py-12 text-center text-gray-500">Ainda não existem {{ termo_jogador(equipa, plural=True, capitalizar=False) }} nesta equipa.</div>
-    {% endif %}
-</div>
 
-<div class="mt-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-    <strong>Leitura do relatório:</strong> a taxa considera Presente e Atrasada como participação. Registos em falta não são convertidos automaticamente em ausências.
-</div>
+    <p class="ds-attendance-report-note"><strong>Como é calculado:</strong> Presente e Atrasada contam como participação; Dispensada não conta como falta.</p>
+</section>
 {% endblock %}

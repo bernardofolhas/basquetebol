@@ -148,11 +148,14 @@ def test_relatorio_assiduidade_e_ficha_evolucao_respondem_com_pdf(client_admin):
     try:
         resposta = client_admin.get(f"/assiduidade/equipas/{equipa_id}?inicio=2037-01-01&fim=2037-01-31")
         assert resposta.status_code == 200
-        assert "Escolher sessão de treino" in resposta.text
+        assert "Escolhe uma sessão para registar" in resposta.text
+        assert 'data-workspace-tab="registar"' in resposta.text
+        assert 'data-workspace-panel="assiduidade:analise"' in resposta.text
+        assert "ds-attendance-session-row" in resposta.text
         assert f"/assiduidade/sessoes/" in resposta.text
         assert "Resumo por jogadora" in resposta.text
         assert "Jogadora Fase 2" in resposta.text
-        assert "Faltas justificadas" in resposta.text
+        assert "Justificadas" in resposta.text
 
         pdf = client_admin.get(f"/assiduidade/equipas/{equipa_id}/pdf?inicio=2037-01-01&fim=2037-01-31")
         assert pdf.status_code == 200
