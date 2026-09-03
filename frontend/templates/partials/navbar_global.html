@@ -107,13 +107,14 @@
       {% endif %}
 
       <details class="ds-menu ds-primary-menu ds-nav-order-acao">
-        <summary class="ds-header-trigger {% if p.startswith('/treino') or p.startswith('/jogos') or p.startswith('/assiduidade') or p.startswith('/calendario') or p.startswith('/biblioteca') or p.startswith('/planeamento-clube/espacos') %}is-active{% endif %}">Ação <span class="ds-menu-chevron">⌄</span></summary>
+        <summary class="ds-header-trigger {% if p.startswith('/treino') or p.startswith('/jogos') or p.startswith('/estatisticas') or p.startswith('/assiduidade') or p.startswith('/calendario') or p.startswith('/biblioteca') or p.startswith('/planeamento-clube/espacos') %}is-active{% endif %}">Ação <span class="ds-menu-chevron">⌄</span></summary>
         <div class="ds-dropdown ds-navigation-dropdown w-[24rem]">
           <p class="ds-dropdown-title">Treino e competição{% if equipa_contexto_nome %} · {{ equipa_contexto_nome }}{% endif %}</p>
           {% if equipa_contexto_id %}
           <div class="ds-menu-grid">
             {{ menu_link('/treino/equipas/' ~ equipa_contexto_id ~ '/planos', 'Treinos', 'Sessões e planos de treino', p.startswith('/treino')) }}
             {{ menu_link('/jogos/equipas/' ~ equipa_contexto_id, 'Competição', 'Jogos, resultados e convocatórias', p.startswith('/jogos')) }}
+            {{ menu_link('/estatisticas/equipas/' ~ equipa_contexto_id, 'Estatísticas', 'Registo offline e box scores', p.startswith('/estatisticas')) }}
             {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id ~ '/registar', 'Assiduidade', 'Presenças e RPE individual', p.startswith('/assiduidade')) }}
             {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/eventos', 'Eventos', 'Atividades da equipa', p.endswith('/eventos')) }}
           </div>

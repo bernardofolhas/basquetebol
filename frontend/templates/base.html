@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="/static/manifest.webmanifest">
   <title>{% block titulo %}Plataforma de Basquetebol{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +12,7 @@
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
   {% set identidade = request.state.identidade_clube|default({}, true) %}
   {% set modo_plataforma = utilizador is defined and utilizador.perfil.value == 'superadministrador' and not request.state.clube_atual %}
+  <meta name="theme-color" content="{{ '#334155' if modo_plataforma else identidade.cor_principal|default('#b91c1c') }}">
   {% if not modo_plataforma and identidade.logo_principal %}
   <link rel="icon" href="{{ identidade.logo_principal }}">
   <link rel="apple-touch-icon" href="{{ identidade.logo_principal }}">
@@ -134,6 +136,7 @@
     });
   </script>
   <script src="/static/js/pdf-configurador.js?v=20260827-1"></script>
+  <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/service-worker.js").catch(function(){})})}</script>
   {% block scripts_extra %}{% endblock %}
 </body>
 </html>

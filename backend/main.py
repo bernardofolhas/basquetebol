@@ -1,5 +1,5 @@
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from template_config import Jinja2Templates
 from slowapi import _rate_limit_exceeded_handler
@@ -76,6 +76,7 @@ from routers import auth_web
 from routers import biblioteca
 from routers import calendario
 from routers import espacos_agenda
+from routers import estatisticas
 from routers import exportacoes
 from routers import dashboard
 from routers import equipas
@@ -175,6 +176,7 @@ app.include_router(biblioteca.router)
 app.include_router(agenda.router)
 app.include_router(avaliacoes.router)
 app.include_router(espacos_agenda.router)
+app.include_router(estatisticas.router)
 app.include_router(exportacoes.router)
 app.include_router(equipas.router)
 app.include_router(treinadores.router)
@@ -198,6 +200,15 @@ app.include_router(dashboard.router)
 app.include_router(atividades.router)
 app.include_router(calendario.router)
 app.include_router(auth_web.router)
+
+
+@app.get("/service-worker.js", include_in_schema=False)
+def service_worker():
+    return FileResponse(
+        STATIC_DIR / "js" / "service-worker.js",
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
 
 
 # ─────────────────────────────────────────────────────────────

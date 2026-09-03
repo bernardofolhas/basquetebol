@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block titulo %}Estatísticas - {{ jogo.adversario }}{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-1">{% endblock %}
+{% block conteudo %}
+<main class="statboard" data-statboard data-game-id="{{ jogo.id }}" data-user-id="{{ utilizador.id }}" data-can-edit="{{ 'true' if pode_registar else 'false' }}">
+  <script type="application/json" data-stats-events>{{ eventos|tojson }}</script>
+  <script type="application/json" data-stats-players>{{ jogadores|map(attribute='id')|list|tojson }}</script>
+  <header class="statboard-head">
+    <div><p class="ds-kicker">Mesa estatística</p><h1>{{ nome_clube }} <span>vs</span> {{ jogo.adversario }}</h1><p>{{ jogo.data|data_pt }}{% if jogo.hora %} · {{ jogo.hora }}{% endif %}{% if jogo.competicao %} · {{ jogo.competicao }}{% endif %}</p></div>
+    <div class="statboard-connection"><span data-online-dot></span><strong data-online-label>A verificar ligação</strong><small data-sync-label></small></div>
+  </header>
+
+  <section class="stat-scorebar">
+    <div class="stat-score-team"><span>{{ nome_clube }}</span><strong data-score="equipa">0</strong></div>
+    <div class="stat-clock-panel">
+      <div class="stat-period"><label>Período <select data-period {% if not pode_registar %}disabled{% endif %}>{% for numero in range(1, 9) %}<option value="{{ numero }}">{{ numero }}º</option>{% endfor %}</select></label></div>
+      <button type="button" class="stat-clock" data-clock {% if not pode_registar %}disabled{% endif %}>10:00</button>
+      <small>Clicar para iniciar/pausar</small>
+    </div>
+    <div class="stat-score-team stat-score-opponent"><span>{{ jogo.adversario }}</span><strong data-score="adversario">0</strong></div>
+  </section>
+
+  <div class="stat-warning-stack" data-warning-stack hidden></div>
+
+  {% if pode_registar %}
+  <section class="stat-entry-grid">
+    <aside class="stat-roster-panel">
+      <header><span>1</span><div><h2>Selecionar atleta</h2><p data-selected-player>Nenhum selecionado</p></div></header>
+      <div class="stat-player-grid">
+      {% for jogador in jogadores %}<button type="button" class="stat-player" data-player-id="{{ jogador.id }}" data-player-name="{{ jogador.nome }}"><strong>{{ jogador.numero_camisola or jogador.nome[:1] }}</strong><span>{{ jogador.nome }}</span><small data-player-points="{{ jogador.id }}">0 pts</small></button>{% endfor %}
+      </div>
+    </aside>
+
+    <section class="stat-actions-panel">
+      <header><span>2</span><div><h2>Registar ação</h2><p>Seleciona o atleta e clica. Os atalhos aceleram o registo.</p></div></header>
+      <div class="stat-action-group"><h3>Lançamentos convertidos</h3><div class="stat-action-row"><button data-stat-action="ll_c" class="is-positive"><strong>+1</strong><span>Lance livre</span><kbd>1</kbd></button><button data-stat-action="dois_c" class="is-positive"><strong>+2</strong><span>2 pontos</span><kbd>2</kbd></button><button data-stat-action="tres_c" class="is-positive"><strong>+3</strong><span>3 pontos</span><kbd>3</kbd></button></div></div>
+      <div class="stat-action-group"><h3>Lançamentos falhados</h3><div class="stat-action-row"><button data-stat-action="ll_f"><strong>LL−</strong><span>Lance livre</span><kbd>Q</kbd></button><button data-stat-action="dois_f"><strong>2−</strong><span>2 pontos</span><kbd>W</kbd></button><button data-stat-action="tres_f"><strong>3−</strong><span>3 pontos</span><kbd>E</kbd></button></div></div>
+      <div class="stat-action-group"><h3>Jogo</h3><div class="stat-action-row stat-action-row-wide"><button data-stat-action="ressalto_defensivo"><strong>RD</strong><span>Ressalto def.</span><kbd>R</kbd></button><button data-stat-action="ressalto_ofensivo"><strong>RO</strong><span>Ressalto of.</span><kbd>O</kbd></button><button data-stat-action="assistencia"><strong>AST</strong><span>Assistência</span><kbd>A</kbd></button><button data-stat-action="roubo"><strong>RB</strong><span>Roubo</span><kbd>S</kbd></button><button data-stat-action="perda" class="is-negative"><strong>TO</strong><span>Perda</span><kbd>T</kbd></button><button data-stat-action="desarme"><strong>DL</strong><span>Desarme</span><kbd>B</kbd></button><button data-stat-action="falta" class="is-negative"><strong>FP</strong><span>Falta</span><kbd>F</kbd></button><button data-stat-action="falta_sofrida"><strong>FS</strong><span>Falta sofrida</span></button></div></div>
+    </section>
+
+    <aside class="stat-opponent-panel">
+      <header><span>3</span><div><h2>Adversário</h2><p>Registo rápido do marcador.</p></div></header>
+      <div class="stat-opponent-actions"><button data-opponent-action="ll_c">+1</button><button data-opponent-action="dois_c">+2</button><button data-opponent-action="tres_c">+3</button></div>
+      <button type="button" class="stat-undo" data-stat-undo>Desfazer última ação <kbd>Z</kbd></button>
+      <button type="button" class="stat-sync" data-stat-sync>Guardar e sincronizar</button>
+    </aside>
+  </section>
+  {% endif %}
+
+  <section class="stat-lower-grid">
+    <article class="stat-boxscore-card">
+      <header><div><p class="ds-kicker">Em direto</p><h2>Box score</h2></div><small>Atualização automática</small></header>
+      <div class="stat-table-wrap"><table class="stat-boxscore"><thead><tr><th>Atleta</th><th>PTS</th><th>LL</th><th>2P</th><th>3P</th><th>RO</th><th>RD</th><th>RT</th><th>AST</th><th>RB</th><th>TO</th><th>DL</th><th>FP</th><th>EFF</th></tr></thead><tbody data-boxscore-body>{% for jogador in jogadores %}<tr data-boxscore-player="{{ jogador.id }}"><td><strong>#{{ jogador.numero_camisola or '–' }}</strong> {{ jogador.nome }}</td>{% for campo in range(13) %}<td>0</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+    </article>
+    <aside class="stat-feed-card"><header><div><p class="ds-kicker">Cronologia</p><h2>Últimas ações</h2></div></header><div class="stat-feed" data-stat-feed></div></aside>
+  </section>
+</main>
+<script src="/static/js/basket-stats.js?v=20260903-1"></script>
+{% endblock %}

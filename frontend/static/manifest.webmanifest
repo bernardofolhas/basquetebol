@@ -1,0 +1,9 @@
+{
+  "name": "Plataforma de Basquetebol",
+  "short_name": "Basquetebol",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#b91c1c",
+  "icons": [{"src":"/static/img/favicon-plataforma.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

@@ -19,6 +19,7 @@
     <span class="{% if jogo.em_casa %}bg-rose-100 text-rose-700{% else %}bg-blue-100 text-blue-700{% endif %} px-4 py-2 rounded-full text-sm font-medium">
         {% if jogo.em_casa %}Casa{% else %}Fora{% endif %}
     </span>
+    <a href="/estatisticas/jogos/{{ jogo.id }}?offline={{ utilizador.id }}" class="ds-button ds-button-primary">Estatísticas</a>
     {% if utilizador.perfil.value != 'staff' %}<a href="/jogos/{{ jogo.id }}/editar"
        class="bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">
         ✏️ Editar Jogo
