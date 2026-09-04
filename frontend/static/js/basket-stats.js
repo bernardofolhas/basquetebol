@@ -16,6 +16,7 @@
     entrada_campo: "Entrada em campo", saida_campo: "Saída de campo",
   };
   const points = { ll_c: 1, dois_c: 2, tres_c: 3 };
+  const fieldGoalTypes = new Set(["dois_c", "dois_f", "tres_c", "tres_f"]);
   const actionsWithoutPosition = new Set(["falta", "falta_sofrida"]);
   const lineupTypes = new Set(["entrada_campo", "saida_campo"]);
   const playerButtons = [...root.querySelectorAll("[data-player-id]")];
@@ -39,6 +40,7 @@
   let pendingAction = null;
   let selectedPosition = null;
   let lineupDraft = new Set();
+  let shotSide = "equipa";
 
   function loadJson(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (_) { return fallback; }
@@ -171,7 +173,10 @@
     }
     if (actionsWithoutPosition.has(type)) { addEvent(type, side); return; }
     const dialog = root.querySelector("[data-court-dialog]");
-    if (!dialog) { addEvent(type, side); return; }
+    if (!dialog) {
+      notify("Não foi possível abrir o campo. Atualiza a página e volta a tentar.", "danger");
+      return;
+    }
     pendingAction = { type, side };
     selectedPosition = null;
     dialog.classList.toggle("is-opponent", side === "adversario");
@@ -495,6 +500,28 @@
     });
   }
 
+  function renderShotChart() {
+    const target = root.querySelector("[data-shot-points]");
+    if (!target) return;
+    const shots = active().filter(item => item.lado === shotSide && fieldGoalTypes.has(item.tipo) && item.posicao_x != null && item.posicao_y != null);
+    const made = shots.filter(item => item.tipo.endsWith("_c")).length;
+    target.innerHTML = "";
+    shots.forEach(item => {
+      const marker = document.createElement("span");
+      const converted = item.tipo.endsWith("_c");
+      marker.className = `stat-shot-point ${converted ? "is-made" : "is-missed"}`;
+      marker.style.left = `${item.posicao_x}%`;
+      marker.style.top = `${item.posicao_y}%`;
+      marker.title = `${labels[item.tipo]} · ${item.jogador || (shotSide === "adversario" ? "Adversário" : "Atleta")}`;
+      marker.setAttribute("aria-label", marker.title);
+      target.append(marker);
+    });
+    const percentage = shots.length ? Math.round((made / shots.length) * 100) : 0;
+    root.querySelector("[data-shot-summary]").textContent = `${made}/${shots.length} · ${percentage}%`;
+    root.querySelector("[data-shot-empty]").hidden = shots.length > 0;
+    root.querySelectorAll("[data-shot-side]").forEach(button => button.classList.toggle("is-active", button.dataset.shotSide === shotSide));
+  }
+
   function renderWarnings() {
     const stack = root.querySelector("[data-warning-stack]");
     if (!stack) return;
@@ -535,6 +562,7 @@
     renderLineup();
     renderBoxscore();
     renderFeed();
+    renderShotChart();
     renderWarnings();
     updateConnection();
     updateClock();
@@ -544,6 +572,7 @@
   playerButtons.forEach(button => button.addEventListener("click", () => selectPlayer(Number(button.dataset.playerId))));
   root.querySelectorAll("[data-stat-action]").forEach(button => button.addEventListener("click", () => requestEvent(button.dataset.statAction)));
   root.querySelectorAll("[data-opponent-action]").forEach(button => button.addEventListener("click", () => requestEvent(button.dataset.opponentAction, "adversario")));
+  root.querySelectorAll("[data-shot-side]").forEach(button => button.addEventListener("click", () => { shotSide = button.dataset.shotSide; renderShotChart(); }));
   root.querySelector("[data-lineup-manage]")?.addEventListener("click", openLineupDialog);
   root.querySelectorAll("[data-lineup-option]").forEach(button => button.addEventListener("click", () => {
     const id = Number(button.dataset.lineupOption);

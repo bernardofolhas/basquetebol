@@ -5,10 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import ssl
 import unicodedata
 from difflib import SequenceMatcher
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlparse
 
 import httpx
 from defusedxml import ElementTree
@@ -19,6 +20,7 @@ from config import config
 
 MAX_FIBA_BYTES = 8 * 1024 * 1024
 EXTENSOES_FIBA = {".json", ".xml"}
+HOSTS_ESTATISTICA_PUBLICA = {"fpb.pt", "www.fpb.pt"}
 
 
 class ErroImportacaoFiba(ValueError):
@@ -96,7 +98,7 @@ def _lista_qualificadores(valor: Any) -> list[str]:
 def _tipo_evento(registo: dict[str, Any]) -> str | None:
     acao = _texto(_pick(registo, "actionType", "action_type", "eventType", "event_type", "statType", "tipo")).lower()
     subtipo = _texto(_pick(registo, "subType", "sub_type", "subtipo")).lower()
-    qualificadores = " ".join(_lista_qualificadores(_pick(registo, "qualifiers", "qualificadores"))).lower()
+    qualificadores = " ".join(_lista_qualificadores(_pick(registo, "qualifiers", "qualifier", "qualificadores"))).lower()
     resultado = _pick(registo, "success", "successful", "made", "convertido", "shotResult", "result", "outcome")
     sucesso = _booleano(resultado, default=True)
 
@@ -151,6 +153,40 @@ def _registo_xml(elemento) -> dict[str, Any]:
 
 
 def _extrair_json(payload: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    # FIBA LiveStats Webcast exposes the match in data.json. Shot coordinates
+    # are stored separately and are joined to play-by-play by actionNumber.
+    if isinstance(payload, dict) and isinstance(payload.get("pbp"), list) and isinstance(payload.get("tm"), dict):
+        equipas: list[dict[str, Any]] = []
+        lancamentos: dict[str, dict[str, Any]] = {}
+        for numero_equipa, equipa_bruta in payload["tm"].items():
+            if not isinstance(equipa_bruta, dict):
+                continue
+            equipa = dict(equipa_bruta)
+            equipa["teamNumber"] = str(numero_equipa)
+            plantel = equipa.get("pl")
+            if isinstance(plantel, dict):
+                equipa["players"] = [
+                    {**jogador, "pno": str(numero_jogador)}
+                    for numero_jogador, jogador in plantel.items()
+                    if isinstance(jogador, dict)
+                ]
+            equipas.append(equipa)
+            for lancamento in equipa.get("shot") or []:
+                if isinstance(lancamento, dict) and lancamento.get("actionNumber") is not None:
+                    lancamentos[str(lancamento["actionNumber"])] = lancamento
+
+        acoes = []
+        for acao_bruta in payload["pbp"]:
+            if not isinstance(acao_bruta, dict):
+                continue
+            acao = dict(acao_bruta)
+            lancamento = lancamentos.get(str(acao.get("actionNumber")))
+            if lancamento:
+                acao["x"] = lancamento.get("x")
+                acao["y"] = lancamento.get("y")
+            acoes.append(acao)
+        return acoes, equipas
+
     acoes: list[dict[str, Any]] = []
     equipas: list[dict[str, Any]] = []
 
@@ -253,10 +289,10 @@ def interpretar_fiba(conteudo: bytes, nome_ficheiro: str = "estatistica.json", c
         if not tipo:
             ignorados += 1
             continue
-        equipa_numero = _texto(_pick(acao, "teamNumber", "team_number", "team", "competitorNumber"))
+        equipa_numero = _texto(_pick(acao, "teamNumber", "team_number", "team", "competitorNumber", "tno"))
         jogador_externo = _texto(_pick(acao, "pno", "personId", "playerId", "player", "person"))
         atleta = nomes_jogadores.get((equipa_numero, jogador_externo), {})
-        qualificadores = _lista_qualificadores(_pick(acao, "qualifiers", "qualificadores"))
+        qualificadores = _lista_qualificadores(_pick(acao, "qualifiers", "qualifier", "qualificadores"))
         externo = _texto(_pick(acao, "messageId", "actionId", "actionNumber", "eventId", "id"))
         if not externo:
             assinatura = json.dumps(acao, ensure_ascii=True, sort_keys=True, default=str)
@@ -355,3 +391,115 @@ async def obter_estatistica_api(identificador_jogo: str) -> tuple[bytes, str, st
     content_type = resposta.headers.get("content-type", "application/json")
     extensao = ".xml" if "xml" in content_type.lower() else ".json"
     return resposta.content, f"api-{identificador_jogo}{extensao}", content_type
+
+
+def _validar_url_estatistica(url: str) -> str:
+    valor = (url or "").strip()
+    try:
+        parsed = urlparse(valor)
+        porta = parsed.port
+    except ValueError as exc:
+        raise ErroImportacaoFiba("O endereço da estatística não é válido.") from exc
+    host = (parsed.hostname or "").lower().rstrip(".")
+    host_genius = host.endswith(".shared.geniussports.com")
+    if parsed.scheme != "https" or not host or parsed.username or parsed.password or porta not in (None, 443):
+        raise ErroImportacaoFiba("Utiliza uma ligação HTTPS pública da FPB ou FIBA LiveStats.")
+    if host not in HOSTS_ESTATISTICA_PUBLICA and not host_genius:
+        raise ErroImportacaoFiba("Por segurança, só são aceites ligações públicas da FPB ou FIBA LiveStats.")
+    return valor
+
+
+def _contexto_ssl_sistema() -> ssl.SSLContext:
+    contexto = ssl.create_default_context()
+    enum_certificados = getattr(ssl, "enum_certificates", None)
+    if not enum_certificados:
+        return contexto
+    for certificado, encoding, _ in enum_certificados("ROOT"):
+        if encoding != "x509_asn":
+            continue
+        try:
+            contexto.load_verify_locations(cadata=ssl.DER_cert_to_PEM_cert(certificado))
+        except ssl.SSLError:
+            continue
+    return contexto
+
+
+async def _descarregar_url_estatistica(cliente: httpx.AsyncClient, url: str) -> httpx.Response:
+    atual = _validar_url_estatistica(url)
+    for _ in range(3):
+        try:
+            resposta = await cliente.get(
+                atual,
+                headers={
+                    "Accept": "application/json, application/xml, text/html;q=0.8",
+                    "User-Agent": "Mozilla/5.0 (compatible; BasketballClubStats/1.0)",
+                },
+            )
+        except httpx.HTTPError as exc:
+            raise ErroImportacaoFiba("Não foi possível abrir a ligação da estatística.") from exc
+        if resposta.is_redirect:
+            destino = resposta.headers.get("location")
+            if not destino:
+                break
+            atual = _validar_url_estatistica(urljoin(atual, destino))
+            continue
+        try:
+            resposta.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise ErroImportacaoFiba("A ligação da estatística não está disponível publicamente.") from exc
+        if len(resposta.content) > MAX_FIBA_BYTES:
+            raise ErroImportacaoFiba("A resposta da estatística excede o limite de 8 MB.")
+        return resposta
+    raise ErroImportacaoFiba("A ligação da estatística redirecionou demasiadas vezes.")
+
+
+def _url_dados_livestats(html: str, url_origem: str) -> str | None:
+    # Webcast pages expose the public data folder in a hidden input.
+    datapath = re.search(
+        r"id\s*=\s*['\"]datapath['\"][^>]*value\s*=\s*['\"]([^'\"]+)['\"]",
+        html,
+        flags=re.IGNORECASE,
+    )
+    if datapath:
+        return urljoin(url_origem, datapath.group(1).rstrip("/") + "/data.json")
+
+    # FPB match pages keep the linked LiveStats match id in data-id.
+    match_id = re.search(r"id\s*=\s*['\"]inputHiddenMatchId['\"][^>]*data-id\s*=\s*['\"](\d+)['\"]", html, re.I)
+    if match_id:
+        return f"https://fibalivestats.dcd.shared.geniussports.com/data/{match_id.group(1)}/data.json"
+
+    webcast = re.search(
+        r"https://[a-z0-9.-]+\.shared\.geniussports\.com/[^'\"\s<>]+/p\.html",
+        html,
+        flags=re.IGNORECASE,
+    )
+    return webcast.group(0) if webcast else None
+
+
+async def obter_estatistica_link(url_estatistica: str) -> tuple[bytes, str, str]:
+    """Resolve a public FPB/FIBA LiveStats page or a direct XML/JSON URL."""
+    url = _validar_url_estatistica(url_estatistica)
+    async with httpx.AsyncClient(timeout=25, follow_redirects=False, verify=_contexto_ssl_sistema()) as cliente:
+        resposta = await _descarregar_url_estatistica(cliente, url)
+        content_type = resposta.headers.get("content-type", "").lower()
+        nome = urlparse(str(resposta.url)).path.rsplit("/", 1)[-1] or "estatistica.json"
+        if any(tipo in content_type for tipo in ("json", "javascript", "xml")) or nome.lower().endswith((".json", ".xml")):
+            return resposta.content, nome, content_type
+
+        html = resposta.content.decode("utf-8", errors="replace")
+        url_dados = _url_dados_livestats(html, str(resposta.url))
+        if not url_dados:
+            raise ErroImportacaoFiba(
+                "Este jogo ainda não disponibiliza dados FIBA LiveStats públicos. Usa a exportação XML/JSON como alternativa."
+            )
+        if url_dados.endswith("/p.html"):
+            pagina_livestats = await _descarregar_url_estatistica(cliente, url_dados)
+            url_dados = _url_dados_livestats(
+                pagina_livestats.content.decode("utf-8", errors="replace"),
+                str(pagina_livestats.url),
+            )
+        if not url_dados or url_dados.endswith("/p.html"):
+            raise ErroImportacaoFiba("Não foi possível localizar o JSON público deste jogo.")
+        dados = await _descarregar_url_estatistica(cliente, url_dados)
+        tipo_dados = dados.headers.get("content-type", "application/json")
+        return dados.content, "fiba-livestats-data.json", tipo_dados

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Importar estatística FIBA - {{ equipa.nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-4">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260904-3">{% endblock %}
 {% block conteudo %}
 {% call equipa_contexto(equipa, "Importar estatística oficial", "Pré-visualiza, associa os atletas e confirma sem alterar o registo manual.", "acao", "/estatisticas/jogos/" ~ jogo.id, "Voltar à mesa") %}
   <a href="/estatisticas/jogos/{{ jogo.id }}?offline={{ utilizador.id }}" class="ds-button ds-button-secondary">Mesa estatística</a>
@@ -14,18 +14,24 @@
       <h2>{{ equipa.nome }} vs {{ jogo.adversario }}</h2>
       <p>As ações oficiais são adicionadas à folha atual. As ações registadas manualmente nunca são eliminadas ou substituídas.</p>
     </div>
-    <div class="fiba-safety"><strong>Importação segura</strong><span>XML e JSON até 8 MB</span><span>Sem duplicações</span><span>Com registo de auditoria</span></div>
+    <div class="fiba-safety"><strong>Importação segura</strong><span>Link, XML ou JSON</span><span>Sem duplicações</span><span>Com registo de auditoria</span></div>
   </section>
 
   <section class="fiba-source-grid">
-    <form class="fiba-source-card is-active" data-fiba-source="file">
+    <form class="fiba-source-card is-active" data-fiba-source="link">
       <span class="fiba-source-number">1</span>
-      <div><p class="ds-kicker">Recomendado</p><h3>Ficheiro FIBA LiveStats</h3><p>Seleciona a exportação XML ou JSON fornecida pelo sistema oficial.</p></div>
+      <div><p class="ds-kicker">Mais rápido</p><h3>Link da estatística do jogo</h3><p>Cola a página pública da FPB ou FIBA LiveStats. O JSON do jogo é localizado automaticamente.</p></div>
+      <label>Ligação pública<input type="url" name="url_estatistica" placeholder="https://www.fpb.pt/ficha-de-jogo/?internalID=..." inputmode="url" required></label>
+      <button type="submit" class="ds-button ds-button-primary">Consultar link</button>
+    </form>
+    <form class="fiba-source-card" data-fiba-source="file">
+      <span class="fiba-source-number">2</span>
+      <div><p class="ds-kicker">Alternativa</p><h3>Ficheiro FIBA LiveStats</h3><p>Seleciona a exportação XML ou JSON fornecida pelo sistema oficial.</p></div>
       <label class="fiba-file-field">Escolher ficheiro<input type="file" name="ficheiro" accept=".xml,.json,application/xml,application/json" required></label>
       <button type="submit" class="ds-button ds-button-primary">Pré-visualizar ficheiro</button>
     </form>
     <form class="fiba-source-card{% if not api_configurada %} is-disabled{% endif %}" data-fiba-source="api">
-      <span class="fiba-source-number">2</span>
+      <span class="fiba-source-number">3</span>
       <div><p class="ds-kicker">Ligação oficial</p><h3>FIBA/Genius Sports API</h3><p>{% if api_configurada %}Introduz o identificador oficial do jogo.{% else %}Disponível quando as credenciais oficiais forem configuradas no Railway.{% endif %}</p></div>
       <label>Identificador do jogo<input type="text" name="identificador_jogo" placeholder="Ex.: 123456" {% if not api_configurada %}disabled{% else %}required{% endif %}></label>
       <button type="submit" class="ds-button ds-button-secondary" {% if not api_configurada %}disabled{% endif %}>Consultar API</button>
@@ -70,5 +76,5 @@
     {% for jogador in jogadores %}<option value="{{ jogador.id }}">{% if jogador.numero_camisola %}#{{ jogador.numero_camisola }} · {% endif %}{{ jogador.nome }}</option>{% endfor %}
   </template>
 </main>
-<script src="/static/js/fiba-import.js?v=20260903-2"></script>
+<script src="/static/js/fiba-import.js?v=20260904-1"></script>
 {% endblock %}

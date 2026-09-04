@@ -8,6 +8,7 @@ from models.estatistica import EventoEstatistica, MapeamentoJogadorEstatistica
 from models.jogador import Jogador
 from models.jogo import Jogo
 from models.utilizador import Utilizador
+from routers import estatisticas as estatisticas_router
 from services.estatistica_service import box_score_eventos, segundos_jogados_eventos
 from services.fiba_stats_service import ErroImportacaoFiba, interpretar_fiba
 
@@ -68,6 +69,8 @@ def test_mesa_estatistica_renderiza_registo_offline(client_admin):
         assert 'data-lineup-shell' in resposta.text
         assert 'data-lineup-manage' in resposta.text
         assert 'data-lineup-dialog' in resposta.text
+        assert 'data-shot-chart' in resposta.text
+        assert 'data-shot-points' in resposta.text
         assert '<th>MIN</th>' in resposta.text
         assert "Recomeçar estatística" in resposta.text
         assert 'data-boxscore-player="' + str(jogador_id) + '"' in resposta.text
@@ -199,6 +202,25 @@ def test_sincronizacao_rejeita_posicao_incompleta(client_admin):
         _limpar(db, equipa_id)
 
 
+def test_sincronizacao_exige_campo_exceto_faltas(client_admin):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    try:
+        sem_campo = client_admin.post(f"/estatisticas/jogos/{jogo_id}/sincronizar", json={"eventos": [{
+            "client_uid": "stats-position-required", "jogador_id": jogador_id,
+            "lado": "equipa", "tipo": "assistencia", "periodo": 1,
+        }]})
+        assert sem_campo.status_code == 400
+        assert "campo" in sem_campo.json()["message"].lower()
+
+        falta = client_admin.post(f"/estatisticas/jogos/{jogo_id}/sincronizar", json={"eventos": [{
+            "client_uid": "stats-foul-no-position", "jogador_id": jogador_id,
+            "lado": "equipa", "tipo": "falta", "periodo": 1,
+        }]})
+        assert falta.status_code == 200
+    finally:
+        _limpar(db, equipa_id)
+
+
 def test_reiniciar_folha_elimina_acoes_e_repor_resultado(client_admin):
     db, equipa_id, jogador_id, jogo_id = _criar_contexto()
     try:
@@ -236,7 +258,10 @@ def test_sincronizacao_rejeita_identificador_de_outro_jogo(client_admin):
     db.add(outro)
     db.commit()
     try:
-        evento = {"client_uid": "stats-shared-uid", "jogador_id": jogador_id, "lado": "equipa", "tipo": "assistencia", "periodo": 1}
+        evento = {
+            "client_uid": "stats-shared-uid", "jogador_id": jogador_id, "lado": "equipa",
+            "tipo": "assistencia", "periodo": 1, "posicao_x": 50, "posicao_y": 50,
+        }
         primeira = client_admin.post(f"/estatisticas/jogos/{jogo_id}/sincronizar", json={"eventos": [evento]})
         segunda = client_admin.post(f"/estatisticas/jogos/{outro.id}/sincronizar", json={"eventos": [evento]})
         assert primeira.status_code == 200
@@ -263,6 +288,8 @@ def test_recursos_offline_e_atalhos_estao_configurados():
     assert "Define primeiro os cinco" in script
     assert "data-lineup-player" in script
     assert "posicao_x: position?.x ?? null" in script
+    assert 'fieldGoalTypes = new Set(["dois_c", "dois_f", "tres_c", "tres_f"])' in script
+    assert "function renderShotChart()" in script
     assert "/reiniciar" in script
     assert "localStorage.removeItem(storageKey)" in script
 
@@ -301,6 +328,34 @@ def test_normalizador_fiba_interpreta_json_e_xml():
     assert xml_resultado["eventos"][0]["segundos_restantes"] == 330
 
 
+def test_normalizador_fiba_interpreta_data_json_e_associa_coordenadas():
+    payload = {
+        "tm": {
+            "1": {
+                "name": "Equipa Teste Estatísticas",
+                "pl": {"7": {"firstName": "Atleta", "familyName": "Estatística", "shirtNumber": "7"}},
+                "shot": [{"actionNumber": 12, "x": 24.5, "y": 61.0}],
+            },
+            "2": {"name": "Adversário Estatística", "pl": {}, "shot": []},
+        },
+        "pbp": [
+            {
+                "actionNumber": 12, "tno": 1, "pno": 7, "period": 1, "clock": "08:45:00",
+                "actionType": "2pt", "success": 1, "subType": "layup", "qualifier": ["fastbreak"],
+            },
+            {"actionNumber": 13, "tno": 2, "period": 1, "clock": "08:31:00", "actionType": "turnover"},
+        ],
+    }
+
+    resultado = interpretar_fiba(json.dumps(payload).encode(), "data.json", "application/javascript")
+
+    assert [equipa["nome"] for equipa in resultado["equipas"]] == ["Equipa Teste Estatísticas", "Adversário Estatística"]
+    assert resultado["jogadores"][0]["identificador"] == "7"
+    assert [evento["tipo"] for evento in resultado["eventos"]] == ["dois_c", "perda"]
+    assert resultado["eventos"][0]["equipa_numero"] == "1"
+    assert (resultado["eventos"][0]["posicao_x"], resultado["eventos"][0]["posicao_y"]) == (24.5, 61.0)
+
+
 def test_normalizador_fiba_rejeita_xml_perigoso():
     xml = b"<!DOCTYPE game [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><game><action actionType='2pt'>&xxe;</action></game>"
     try:
@@ -318,6 +373,7 @@ def test_importacao_fiba_previsualiza_associa_e_nao_duplica(client_admin):
         pagina = client_admin.get(f"/estatisticas/jogos/{jogo_id}/importar")
         assert pagina.status_code == 200
         assert "Importar estatística oficial" in pagina.text
+        assert "Link da estatística do jogo" in pagina.text
         assert "Ficheiro FIBA LiveStats" in pagina.text
 
         preview = client_admin.post(
@@ -356,5 +412,24 @@ def test_importacao_fiba_previsualiza_associa_e_nao_duplica(client_admin):
         assert db.query(MapeamentoJogadorEstatistica).filter(
             MapeamentoJogadorEstatistica.equipa_id == equipa_id
         ).count() == 1
+    finally:
+        _limpar(db, equipa_id)
+
+
+def test_importacao_por_link_publico_previsualiza_json(client_admin, monkeypatch):
+    db, equipa_id, _, jogo_id = _criar_contexto()
+
+    async def obter_link_teste(url):
+        assert url == "https://www.fpb.pt/ficha-de-jogo/?internalID=123"
+        return _ficheiro_fiba_json(), "data.json", "application/json"
+
+    monkeypatch.setattr(estatisticas_router, "obter_estatistica_link", obter_link_teste)
+    try:
+        resposta = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/previsualizar-link",
+            data={"url_estatistica": "https://www.fpb.pt/ficha-de-jogo/?internalID=123"},
+        )
+        assert resposta.status_code == 200
+        assert resposta.json()["eventos_suportados"] == 3
     finally:
         _limpar(db, equipa_id)

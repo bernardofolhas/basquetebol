@@ -28,6 +28,7 @@ from services.fiba_stats_service import (
     MAX_FIBA_BYTES,
     interpretar_fiba,
     obter_estatistica_api,
+    obter_estatistica_link,
     sugerir_mapeamentos,
 )
 from template_config import Jinja2Templates
@@ -344,6 +345,46 @@ async def importar_fiba_ficheiro(
         return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
 
 
+@router.post("/jogos/{jogo_id}/fiba/previsualizar-link")
+async def previsualizar_fiba_link(
+    jogo_id: int,
+    request: Request,
+    url_estatistica: str = Form(...),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    jogo = _jogo_acessivel(db, jogo_id, utilizador)
+    if not jogo or not _pode_registar(utilizador):
+        return JSONResponse({"ok": False, "message": "Sem permissão para importar estatísticas."}, status_code=403)
+    try:
+        conteudo, nome, content_type = await obter_estatistica_link(url_estatistica)
+        return _resumo_previsualizacao(db, jogo, interpretar_fiba(conteudo, nome, content_type))
+    except ErroImportacaoFiba as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+
+
+@router.post("/jogos/{jogo_id}/fiba/importar-link")
+async def importar_fiba_link(
+    jogo_id: int,
+    request: Request,
+    url_estatistica: str = Form(...),
+    equipa_ficheiro: str = Form(...),
+    mapeamentos: str = Form("{}"),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    jogo = _jogo_acessivel(db, jogo_id, utilizador)
+    if not jogo or not _pode_registar(utilizador):
+        return JSONResponse({"ok": False, "message": "Sem permissão para importar estatísticas."}, status_code=403)
+    try:
+        conteudo, nome, content_type = await obter_estatistica_link(url_estatistica)
+        dados = interpretar_fiba(conteudo, nome, content_type)
+        return _guardar_importacao(db, jogo, dados, equipa_ficheiro, mapeamentos, "fiba_link", conteudo, utilizador, request)
+    except ErroImportacaoFiba as exc:
+        db.rollback()
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+
+
 @router.post("/jogos/{jogo_id}/fiba/previsualizar-api")
 async def previsualizar_fiba_api(
     jogo_id: int,
@@ -405,6 +446,8 @@ def sincronizar_jogo(jogo_id: int, lote: LoteEstatistica, request: Request, db: 
             return JSONResponse({"ok": False, "message": "Seleciona um atleta válido."}, status_code=400)
         if (entrada.posicao_x is None) != (entrada.posicao_y is None):
             return JSONResponse({"ok": False, "message": "A posição da ação está incompleta."}, status_code=400)
+        if entrada.tipo not in {"falta", "falta_sofrida", *TIPOS_ALINHAMENTO} and entrada.posicao_x is None:
+            return JSONResponse({"ok": False, "message": "Assinala no campo onde aconteceu a ação."}, status_code=400)
         evento = existentes.get(entrada.client_uid)
         if evento:
             if evento.jogo_id != jogo.id:
