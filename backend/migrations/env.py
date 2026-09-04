@@ -16,6 +16,7 @@ from database import Base
 import models.atividade
 import models.avaliacao
 import models.auditoria
+import models.assiduidade
 import models.clube
 import models.atribuicao_espaco_semanal
 import models.equipa

@@ -834,6 +834,14 @@ def actualizar_estrutura_assiduidade() -> None:
             logger.info("Coluna 'rpe_individual' adicionada a assiduidade.")
 
 
+def actualizar_estrutura_convocacoes_assiduidade() -> None:
+    """Cria a tabela de convocatórias pontuais para instalações antigas."""
+    tabela = Base.metadata.tables.get("convocacoes_assiduidade")
+    if tabela is None:
+        return
+    tabela.create(bind=engine, checkfirst=True)
+
+
 def actualizar_estrutura_jogadores() -> None:
     """Adiciona suporte de fotografia a instalações anteriores às migrações."""
     inspector = inspect(engine)

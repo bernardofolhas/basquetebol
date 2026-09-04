@@ -1,7 +1,7 @@
 from datetime import date
 
 from database import SessionLocal
-from models.assiduidade import RegistoAssiduidade
+from models.assiduidade import ConvocacaoAssiduidade, RegistoAssiduidade
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.fisico import TesteFisico as ModeloTesteFisico
 from models.jogador import Jogador, RegistoAntropometrico
@@ -221,6 +221,104 @@ def test_formulario_guarda_estado_detalhado_e_mantem_presente(client_admin):
         assert segundo_registo.presente is False
         assert segundo_registo.rpe_individual is None
     finally:
+        _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
+        db.close()
+
+
+def test_convocacao_de_outro_escalao_fica_limitada_a_uma_sessao(client_admin):
+    db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id = _criar_contexto()
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).one()
+    outra_equipa = Equipa(
+        clube_id=equipa.clube_id,
+        nome="Equipa Inferior Convocação",
+        escalao=EscalaoEnum.sub16,
+        genero=GeneroEnum.feminino,
+    )
+    chamada = Jogador(
+        clube_id=equipa.clube_id,
+        nome="Jogadora Convocada Fase 2",
+        equipa=outra_equipa,
+    )
+    sessao_atual = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.id == macro_id
+    ).first()
+    sessao_seguinte = SessaoTreino(
+        clube_id=equipa.clube_id,
+        data=date(2037, 1, 7),
+        local="Pavilhão seguinte",
+        microciclo_id=sessao_atual.microciclo_id,
+        estado="planeada",
+        ativa=True,
+    )
+    db.add_all([outra_equipa, chamada, sessao_seguinte])
+    db.flush()
+    chamada_id = chamada.id
+    sessao_seguinte_id = sessao_seguinte.id
+    db.commit()
+    try:
+        resposta = client_admin.post(
+            f"/assiduidade/sessoes/{sessao_atual.id}/convocados",
+            data={"jogador_id": str(chamada_id)},
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        assert db.query(ConvocacaoAssiduidade).filter(
+            ConvocacaoAssiduidade.sessao_id == sessao_atual.id,
+            ConvocacaoAssiduidade.jogador_id == chamada_id,
+        ).count() == 1
+
+        folha = client_admin.get(f"/assiduidade/sessoes/{sessao_atual.id}")
+        assert folha.status_code == 200
+        assert "Jogadora Convocada Fase 2" in folha.text
+        assert "Equipa Inferior Convocação" in folha.text
+
+        dados = {
+            f"estado_{jogadora_id}": "presente",
+            f"estado_{segunda_jogadora_id}": "presente",
+            f"estado_{chamada_id}": "presente",
+            f"rpe_{chamada_id}": "8",
+        }
+        guardar = client_admin.post(
+            f"/assiduidade/sessoes/{sessao_atual.id}",
+            data=dados,
+            follow_redirects=False,
+        )
+        assert guardar.status_code == 303
+        registo_chamada = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao_atual.id,
+            RegistoAssiduidade.jogador_id == chamada_id,
+        ).one()
+        assert registo_chamada.presente is True
+        assert registo_chamada.rpe_individual == 8
+
+        folha_seguinte = client_admin.get(f"/assiduidade/sessoes/{sessao_seguinte_id}")
+        assert folha_seguinte.status_code == 200
+        assert f'data-jogador-id="{chamada_id}"' not in folha_seguinte.text
+
+        remover = client_admin.post(
+            f"/assiduidade/sessoes/{sessao_atual.id}/convocados/{chamada_id}/eliminar",
+            follow_redirects=False,
+        )
+        assert remover.status_code == 303
+        assert db.query(ConvocacaoAssiduidade).filter(
+            ConvocacaoAssiduidade.sessao_id == sessao_atual.id,
+            ConvocacaoAssiduidade.jogador_id == chamada_id,
+        ).count() == 0
+        assert db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao_atual.id,
+            RegistoAssiduidade.jogador_id == chamada_id,
+        ).count() == 0
+    finally:
+        db.query(ConvocacaoAssiduidade).filter(
+            ConvocacaoAssiduidade.jogador_id == chamada_id,
+        ).delete(synchronize_session=False)
+        db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.jogador_id == chamada_id,
+        ).delete(synchronize_session=False)
+        db.delete(sessao_seguinte)
+        db.delete(chamada)
+        db.delete(outra_equipa)
+        db.commit()
         _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
         db.close()
 

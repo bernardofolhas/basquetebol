@@ -3,13 +3,13 @@ from datetime import date
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from auth_deps import AcessoNegado, exigir_autenticacao, verificar_ou_negar_equipa
 from database import get_db
 from flash import set_flash
-from models.assiduidade import RegistoAssiduidade
+from models.assiduidade import ConvocacaoAssiduidade, RegistoAssiduidade
 from models.equipa import Equipa
 from models.jogador import Jogador
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
@@ -78,6 +78,45 @@ def _sessoes_assiduidade_equipa(db: Session, equipa_id: int):
     )
 
 
+def _jogadores_folha_assiduidade(db: Session, equipa, sessao_id: int):
+    """Devolve o plantel da equipa mais os convocados apenas para esta sessão."""
+    plantel = db.query(Jogador).filter(
+        Jogador.equipa_id == equipa.id,
+        Jogador.ativo.is_(True),
+    ).order_by(Jogador.nome).all()
+    convocados = (
+        db.query(Jogador)
+        .join(ConvocacaoAssiduidade, ConvocacaoAssiduidade.jogador_id == Jogador.id)
+        .filter(
+            ConvocacaoAssiduidade.sessao_id == sessao_id,
+            ConvocacaoAssiduidade.clube_id == equipa.clube_id,
+            Jogador.ativo.is_(True),
+        )
+        .order_by(Jogador.nome)
+        .all()
+    )
+    ids_plantel = {jogador.id for jogador in plantel}
+    return plantel + [jogador for jogador in convocados if jogador.id not in ids_plantel], convocados
+
+
+def _jogadores_disponiveis_para_convocatoria(db: Session, equipa, sessao_id: int):
+    convocados_ids = db.query(ConvocacaoAssiduidade.jogador_id).filter(
+        ConvocacaoAssiduidade.sessao_id == sessao_id,
+        ConvocacaoAssiduidade.clube_id == equipa.clube_id,
+    )
+    return (
+        db.query(Jogador)
+        .filter(
+            Jogador.clube_id == equipa.clube_id,
+            Jogador.ativo.is_(True),
+            or_(Jogador.equipa_id.is_(None), Jogador.equipa_id != equipa.id),
+            ~Jogador.id.in_(convocados_ids),
+        )
+        .order_by(Jogador.nome)
+        .all()
+    )
+
+
 @router.get("/equipas/{equipa_id}/registar")
 def abrir_folha_assiduidade_equipa(
     equipa_id: int,
@@ -126,10 +165,17 @@ def relatorio_assiduidade_equipa(
         .group_by(RegistoAssiduidade.sessao_id)
         .all()
     ) if sessoes_ids else {}
+    convocacoes_por_sessao = dict(
+        db.query(ConvocacaoAssiduidade.sessao_id, func.count(ConvocacaoAssiduidade.id))
+        .filter(ConvocacaoAssiduidade.sessao_id.in_(sessoes_ids))
+        .group_by(ConvocacaoAssiduidade.sessao_id)
+        .all()
+    ) if sessoes_ids else {}
     sessoes_registo = []
     for sessao in sessoes:
         registados = contagens.get(sessao.id, 0)
-        if total_jogadores_ativos and registados >= total_jogadores_ativos:
+        total_sessao = total_jogadores_ativos + convocacoes_por_sessao.get(sessao.id, 0)
+        if total_sessao and registados >= total_sessao:
             estado_registo = "concluida"
         elif registados:
             estado_registo = "parcial"
@@ -138,7 +184,7 @@ def relatorio_assiduidade_equipa(
         sessoes_registo.append({
             "sessao": enriquecer_sessao_para_ui(sessao),
             "registados": registados,
-            "total": total_jogadores_ativos,
+            "total": total_sessao,
             "estado": estado_registo,
         })
     relatorio["sessoes_registo"] = sessoes_registo
@@ -198,10 +244,12 @@ def pagina_assiduidade(
         for item in _sessoes_assiduidade_equipa(db, equipa.id)
     ]
 
-    jogadores = db.query(Jogador).filter(
-        Jogador.equipa_id == equipa.id,
-        Jogador.ativo.is_(True),
-    ).order_by(Jogador.nome).all()
+    jogadores, convocados = _jogadores_folha_assiduidade(db, equipa, sessao_id)
+    jogadores_disponiveis_convocatoria = _jogadores_disponiveis_para_convocatoria(
+        db,
+        equipa,
+        sessao_id,
+    )
 
     registos = db.query(RegistoAssiduidade).filter(
         RegistoAssiduidade.sessao_id == sessao_id
@@ -225,6 +273,8 @@ def pagina_assiduidade(
         "equipa": equipa,
         "sessoes_equipa": sessoes_equipa,
         "jogadores": jogadores,
+        "convocados": convocados,
+        "jogadores_disponiveis_convocatoria": jogadores_disponiveis_convocatoria,
         "registos_dict": registos_dict,
         "total_presentes": resumo["presentes"],
         "total_jogadores": len(jogadores),
@@ -233,6 +283,91 @@ def pagina_assiduidade(
         "estados_assiduidade": ESTADOS_ASSIDUIDADE,
         "estados_assiduidade_visual": ESTADOS_ASSIDUIDADE_VISUAL,
     })
+
+
+@router.post("/sessoes/{sessao_id}/convocados")
+async def adicionar_convocados_assiduidade(
+    sessao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Adiciona atletas de outras equipas somente à folha desta sessão."""
+    sessao = db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
+    if not sessao:
+        return RedirectResponse(url="/equipas", status_code=303)
+    equipa = sessao.microciclo.mesociclo.macrociclo.equipa
+    verificar_ou_negar_equipa(utilizador, equipa.id, db)
+
+    dados = await request.form()
+    ids = {
+        int(valor)
+        for valor in dados.getlist("jogador_id")
+        if str(valor).strip().isdigit()
+    }
+    if not ids:
+        set_flash(request, "Seleciona pelo menos um atleta para convocar.", "error")
+        return RedirectResponse(url=f"/assiduidade/sessoes/{sessao_id}", status_code=303)
+
+    existentes = {
+        jogador_id
+        for jogador_id, in db.query(ConvocacaoAssiduidade.jogador_id).filter(
+            ConvocacaoAssiduidade.sessao_id == sessao_id,
+            ConvocacaoAssiduidade.clube_id == equipa.clube_id,
+        ).all()
+    }
+    jogadores = db.query(Jogador).filter(
+        Jogador.id.in_(ids),
+        Jogador.clube_id == equipa.clube_id,
+        Jogador.ativo.is_(True),
+    ).all()
+    adicionados = 0
+    for jogador in jogadores:
+        if jogador.equipa_id == equipa.id or jogador.id in existentes:
+            continue
+        db.add(ConvocacaoAssiduidade(
+            clube_id=equipa.clube_id,
+            sessao_id=sessao_id,
+            jogador_id=jogador.id,
+        ))
+        adicionados += 1
+    db.commit()
+    set_flash(
+        request,
+        f"{adicionados} atleta(s) adicionado(s) à folha deste treino." if adicionados else "Os atletas selecionados já estavam convocados.",
+    )
+    return RedirectResponse(url=f"/assiduidade/sessoes/{sessao_id}", status_code=303)
+
+
+@router.post("/sessoes/{sessao_id}/convocados/{jogador_id}/eliminar")
+def remover_convocado_assiduidade(
+    sessao_id: int,
+    jogador_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Retira a convocatória e qualquer registo desse atleta nesta sessão."""
+    sessao = db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
+    if not sessao:
+        return RedirectResponse(url="/equipas", status_code=303)
+    equipa = sessao.microciclo.mesociclo.macrociclo.equipa
+    verificar_ou_negar_equipa(utilizador, equipa.id, db)
+
+    convocacao = db.query(ConvocacaoAssiduidade).filter(
+        ConvocacaoAssiduidade.sessao_id == sessao_id,
+        ConvocacaoAssiduidade.jogador_id == jogador_id,
+        ConvocacaoAssiduidade.clube_id == equipa.clube_id,
+    ).first()
+    if convocacao:
+        db.delete(convocacao)
+        db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao_id,
+            RegistoAssiduidade.jogador_id == jogador_id,
+        ).delete(synchronize_session=False)
+        db.commit()
+        set_flash(request, "Convocatória retirada deste treino.")
+    return RedirectResponse(url=f"/assiduidade/sessoes/{sessao_id}", status_code=303)
 
 
 @router.post("/sessoes/{sessao_id}")
@@ -255,10 +390,7 @@ async def guardar_assiduidade(
     ).all()
     registos_por_jogador = {registo.jogador_id: registo for registo in registos}
     equipa = sessao_check.microciclo.mesociclo.macrociclo.equipa
-    jogadores = db.query(Jogador).filter(
-        Jogador.equipa_id == equipa.id,
-        Jogador.ativo.is_(True),
-    ).all()
+    jogadores, _ = _jogadores_folha_assiduidade(db, equipa, sessao_id)
 
     dados_validados = []
     try:

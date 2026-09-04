@@ -33,6 +33,61 @@
     <div class="is-rpe"><strong data-summary-rpe>{{ resumo_assiduidade.rpe_medio if resumo_assiduidade.rpe_medio is not none else '—' }}</strong><span>RPE médio</span></div>
 </section>
 
+<details class="ds-attendance-callup">
+    <summary>
+        <span>
+            <strong>Convocar atletas de outros escalões</strong>
+            <small>Disponível apenas nesta folha de treino</small>
+        </span>
+        <span class="ds-attendance-callup-count">{{ convocados|length }} convocado(s)</span>
+    </summary>
+    <div class="ds-attendance-callup-body">
+        <p class="ds-attendance-callup-help">Seleciona jogadores já criados no clube para participarem neste treino. A convocatória não fica ativa nas folhas seguintes.</p>
+
+        {% if convocados %}
+        <div class="ds-attendance-callup-selected">
+            <h3>Convocados neste treino</h3>
+            <div class="ds-attendance-callup-list">
+                {% for jogador in convocados %}
+                <div class="ds-attendance-callup-item">
+                    <span>
+                        <strong>{{ jogador.nome }}</strong>
+                        <small>{{ jogador.equipa.nome if jogador.equipa else 'Sem equipa' }}</small>
+                    </span>
+                    <form method="POST" action="/assiduidade/sessoes/{{ sessao.id }}/convocados/{{ jogador.id }}/eliminar">
+                        <button type="submit" class="ds-button ds-button-danger ds-button-sm">Retirar</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if jogadores_disponiveis_convocatoria %}
+        <form method="POST" action="/assiduidade/sessoes/{{ sessao.id }}/convocados" class="ds-attendance-callup-form">
+            <div class="ds-attendance-callup-form-head">
+                <h3>Adicionar ao treino</h3>
+                <input type="search" placeholder="Procurar atleta" aria-label="Procurar atleta para convocar" data-convocatoria-search>
+            </div>
+            <div class="ds-attendance-callup-options">
+                {% for jogador in jogadores_disponiveis_convocatoria %}
+                <label class="ds-attendance-callup-option" data-convocatoria-option>
+                    <input type="checkbox" name="jogador_id" value="{{ jogador.id }}">
+                    <span>
+                        <strong>{{ jogador.nome }}</strong>
+                        <small>{{ jogador.equipa.nome if jogador.equipa else 'Sem equipa' }}</small>
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+            <button type="submit" class="ds-button ds-button-primary ds-button-sm">Adicionar selecionados à folha</button>
+        </form>
+        {% else %}
+        <p class="ds-attendance-callup-empty">Não há outros atletas ativos disponíveis para convocar neste momento.</p>
+        {% endif %}
+    </div>
+</details>
+
 <section class="ds-attendance-panel">
     <div class="ds-attendance-panel-head">
         <div>
@@ -51,10 +106,13 @@
             {% for jogador in jogadores %}
             {% set registo = registos_dict.get(jogador.id) %}
             {% set estado_atual = registo.estado if registo else 'por_registar' %}
-            <article class="ds-attendance-card" data-attendance-row data-estado="{{ estado_atual }}">
+            <article class="ds-attendance-card" data-attendance-row data-jogador-id="{{ jogador.id }}" data-estado="{{ estado_atual }}">
                 <div class="ds-attendance-player">
                     {% if jogador.numero_camisola %}<span class="ds-attendance-number">{{ jogador.numero_camisola }}</span>{% endif %}
-                    <div><strong>{{ jogador.nome }}</strong>{% if jogador.posicao %}<small>{{ jogador.posicao }}</small>{% endif %}</div>
+                    <div>
+                        <strong>{{ jogador.nome }}</strong>
+                        {% if jogador.equipa_id != equipa.id %}<small class="ds-attendance-callup-badge">Convocado · {{ jogador.equipa.nome if jogador.equipa else 'Sem equipa' }}</small>{% elif jogador.posicao %}<small>{{ jogador.posicao }}</small>{% endif %}
+                    </div>
                 </div>
 
                 <fieldset class="ds-attendance-state-picker" aria-label="Estado de {{ jogador.nome }}">
@@ -95,6 +153,15 @@
 (function () {
     const linhas = Array.from(document.querySelectorAll('[data-attendance-row]'));
     const estadosParticipacao = new Set(['presente', 'atrasada']);
+    const pesquisaConvocatoria = document.querySelector('[data-convocatoria-search]');
+    if (pesquisaConvocatoria) {
+        pesquisaConvocatoria.addEventListener('input', function () {
+            const termo = this.value.trim().toLocaleLowerCase();
+            document.querySelectorAll('[data-convocatoria-option]').forEach(function (opcao) {
+                opcao.hidden = termo && !opcao.textContent.toLocaleLowerCase().includes(termo);
+            });
+        });
+    }
 
     function atualizarLinha(linha) {
         const selecionado = linha.querySelector('.ds-attendance-state-input:checked');
