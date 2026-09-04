@@ -146,6 +146,15 @@ def test_microciclo_adiciona_conteudos_individualmente_em_cada_celula():
     assert "Use o sinal + de cada célula" in conteudo
 
 
+def test_plano_treino_apresenta_conteudos_previstos_no_microciclo():
+    conteudo = (TEMPLATES_DIR / "treino" / "plano.html").read_text(encoding="utf-8")
+
+    assert "Conteúdos previstos para este treino" in conteudo
+    assert "conteudos_previstos.grupos" in conteudo
+    assert "prioridades_microciclo.itens" in conteudo
+    assert "#conteudos-microciclo" in conteudo
+
+
 def test_microciclo_guarda_cargas_e_reflexao_sem_navegar():
     conteudo = (
         TEMPLATES_DIR / "planeamento" / "microciclos" / "detalhe.html"

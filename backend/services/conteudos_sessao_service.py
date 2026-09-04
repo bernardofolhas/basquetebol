@@ -62,6 +62,40 @@ def calcular_balanco_minutos(sessao, ignorar_conteudo_id: int | None = None) -> 
     }
 
 
+def construir_sugestoes_plano_treino(sessao) -> dict:
+    """Agrupa o que o microciclo programou especificamente para esta sessão."""
+    grupos = []
+    total_minutos = 0
+    for codigo, label, sigla, _ in CATEGORIAS_CONTEUDO_SESSAO:
+        itens = [
+            {
+                "id": getattr(conteudo, "id", None),
+                "descricao": conteudo.descricao,
+                "minutos": conteudo.minutos or 0,
+            }
+            for conteudo in sessao.conteudos
+            if conteudo.categoria == codigo
+        ]
+        if not itens:
+            continue
+        minutos = sum(item["minutos"] for item in itens)
+        total_minutos += minutos
+        grupos.append({
+            "codigo": codigo,
+            "label": label,
+            "sigla": sigla,
+            "minutos": minutos,
+            "itens": itens,
+        })
+
+    return {
+        "grupos": grupos,
+        "total_itens": sum(len(grupo["itens"]) for grupo in grupos),
+        "total_minutos": total_minutos,
+        "limite_minutos": getattr(sessao, "volume_minutos", None),
+    }
+
+
 def construir_visao_semanal_conteudos(
     sessoes: list,
 ) -> list[dict]:

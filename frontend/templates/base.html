@@ -126,6 +126,11 @@
         }else{
           try{window.sessionStorage.removeItem(storageKey)}catch(error){}
         }
+        if(window.location.hash){
+          var hashTarget=document.querySelector(window.location.hash);
+          var hashPanel=hashTarget&&hashTarget.closest('[data-workspace-panel^="'+group+':"]');
+          if(hashPanel)initial=hashPanel.dataset.workspacePanel.slice(group.length+1);
+        }
         activate(initial,false);
       });
     });

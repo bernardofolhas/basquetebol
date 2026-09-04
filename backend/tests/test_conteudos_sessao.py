@@ -7,6 +7,7 @@ from services.conteudos_sessao_service import (
     atualizar_minutos_por_componente,
     calcular_balanco_minutos,
     categorias_conteudo_para_ui,
+    construir_sugestoes_plano_treino,
     construir_visao_semanal_conteudos,
 )
 from services.volume_sessao_service import atualizar_volume_automatico
@@ -84,6 +85,26 @@ def test_balanco_de_conteudos_respeita_volume_e_edicao_existente():
         "limite": 90,
         "disponiveis": 60,
     }
+
+
+def test_plano_recebe_sugestoes_programadas_na_sessao_do_microciclo():
+    sessao = SimpleNamespace(
+        volume_minutos=90,
+        conteudos=[
+            SimpleNamespace(id=1, categoria="tecnica_individual_ofensiva", descricao="Finalizações", minutos=20),
+            SimpleNamespace(id=2, categoria="tecnica_individual_ofensiva", descricao="Passe e receção", minutos=15),
+            SimpleNamespace(id=3, categoria="tatica_coletiva_defensiva", descricao="Defesa do bloqueio", minutos=25),
+        ],
+    )
+
+    sugestoes = construir_sugestoes_plano_treino(sessao)
+
+    assert sugestoes["total_itens"] == 3
+    assert sugestoes["total_minutos"] == 60
+    assert sugestoes["limite_minutos"] == 90
+    assert [grupo["sigla"] for grupo in sugestoes["grupos"]] == ["TIO", "TCD"]
+    assert sugestoes["grupos"][0]["minutos"] == 35
+    assert sugestoes["grupos"][0]["itens"][1]["descricao"] == "Passe e receção"
 
 
 def test_graficos_do_microciclo_usam_o_nome_do_treino():

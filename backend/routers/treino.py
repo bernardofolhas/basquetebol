@@ -35,6 +35,8 @@ from services.desenho_service import (
     imagem_estatica_data_uri,
     normalizar_data_uri,
 )
+from services.conteudos_sessao_service import construir_sugestoes_plano_treino
+from services.mapa_conteudos_service import obter_sugestoes_conteudos_microciclo
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
 from services.auditoria_service import registar_auditoria
 from services.importacao_plano_treino_service import (
@@ -503,6 +505,17 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
     duracao_prevista = _duracao_prevista_minutos(sessao)
     importacao_ativa = _importacao_ativa(plano)
     modo_edicao_importacao = bool(importacao_ativa and request.query_params.get("editar") == "1")
+    conteudos_previstos = construir_sugestoes_plano_treino(sessao)
+    prioridades_microciclo = obter_sugestoes_conteudos_microciclo(db, sessao.microciclo)
+    nomes_previstos = {
+        item["descricao"].strip().casefold()
+        for grupo in conteudos_previstos["grupos"]
+        for item in grupo["itens"]
+    }
+    prioridades_microciclo["itens"] = [
+        item for item in prioridades_microciclo["itens"]
+        if item["nome"].strip().casefold() not in nomes_previstos
+    ]
     return templates.TemplateResponse(request, "treino/plano.html", {
         "utilizador": utilizador,
         "sessao": sessao,
@@ -524,6 +537,8 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "modo_edicao_importacao": modo_edicao_importacao,
         "previsualizacao_importacao": _texto_previsualizacao(importacao_ativa),
         "resumo_setores": _resumo_setores(sessao),
+        "conteudos_previstos": conteudos_previstos,
+        "prioridades_microciclo": prioridades_microciclo,
     })
 
 

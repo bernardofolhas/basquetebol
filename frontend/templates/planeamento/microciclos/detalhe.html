@@ -191,7 +191,7 @@
 
 {{ agenda_modal(agenda_contexto, agenda_tipos, espacos_agenda, equipas_agenda|default([]), request.session.get('_csrf', '')) }}
 
-<section data-workspace-panel="micro:conteudos" role="tabpanel" class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
+<section id="conteudos-microciclo" data-workspace-panel="micro:conteudos" role="tabpanel" class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
     <div class="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 md:flex-row md:items-end md:justify-between">
         <div>
             <h2 class="font-semibold text-gray-800">Visão semanal dos conteúdos</h2>
