@@ -345,6 +345,7 @@ def test_abrir_assiduidade_nao_cria_faltas_automaticamente(client_admin):
         assert plano.status_code == 200
         link_assiduidade = f'/assiduidade/sessoes/{sessao.id}'
         assert link_assiduidade in plano.text
+        assert "Abrir assiduidade" in plano.text
         assert plano.text.index(link_assiduidade) < plano.text.index('ds-page-actions')
     finally:
         _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
