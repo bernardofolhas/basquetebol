@@ -103,6 +103,8 @@
     selectedPlayer = null;
     const label = root.querySelector("[data-selected-player]");
     if (label) label.textContent = "Nenhum selecionado";
+    const mobileLabel = root.querySelector("[data-mobile-selected-player]");
+    if (mobileLabel) mobileLabel.textContent = "Nenhum atleta selecionado";
   }
 
   function buildEvent(type, side = "equipa", position = null, playerId = selectedPlayer) {
@@ -248,7 +250,38 @@
     root.querySelectorAll("[data-lineup-player]").forEach(item => item.classList.toggle("is-selected", Number(item.dataset.lineupPlayer) === player.id));
     const label = root.querySelector("[data-selected-player]");
     if (label) label.textContent = player.name;
+    const mobileLabel = root.querySelector("[data-mobile-selected-player]");
+    if (mobileLabel) mobileLabel.textContent = player.name;
     renderActionState();
+  }
+
+  function renderBench(lineup) {
+    const target = root.querySelector("[data-bench-players]");
+    if (!target) return;
+    const bench = [...players.values()].filter(player => !lineup.has(player.id));
+    target.innerHTML = "";
+    bench.forEach(player => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "stat-bench-player";
+      button.dataset.benchPlayer = String(player.id);
+      button.innerHTML = "<strong></strong><span></span><small></small>";
+      button.querySelector("strong").textContent = player.number;
+      button.querySelector("span").textContent = player.name;
+      button.querySelector("small").textContent = `${totalsFor(player.id).pts} pts`;
+      button.setAttribute("aria-label", `${player.name}, no banco. Abrir substituições.`);
+      if (canEdit) button.addEventListener("click", openLineupDialog);
+      else button.disabled = true;
+      target.append(button);
+    });
+    if (!bench.length) {
+      const empty = document.createElement("p");
+      empty.className = "stat-bench-empty";
+      empty.textContent = "Sem atletas no banco.";
+      target.append(empty);
+    }
+    const count = root.querySelector("[data-bench-count]");
+    if (count) count.textContent = `${bench.length} atleta${bench.length === 1 ? "" : "s"}`;
   }
 
   function renderLineup() {
@@ -286,6 +319,7 @@
     const manage = root.querySelector("[data-lineup-manage]");
     if (manage) manage.textContent = lineup.size === requiredLineupSize ? "Alterar cinco" : "Definir cinco";
     playerButtons.forEach(button => button.classList.toggle("is-on-court", lineup.has(Number(button.dataset.playerId))));
+    renderBench(lineup);
   }
 
   function renderLineupDialog(message = "") {
@@ -431,6 +465,8 @@
       playerButtons.forEach(item => item.classList.remove("is-selected", "is-on-court"));
       const selectedLabel = root.querySelector("[data-selected-player]");
       if (selectedLabel) selectedLabel.textContent = "Nenhum selecionado";
+      const mobileSelectedLabel = root.querySelector("[data-mobile-selected-player]");
+      if (mobileSelectedLabel) mobileSelectedLabel.textContent = "Nenhum atleta selecionado";
       render();
       notify(`Folha estatística eliminada. ${result.eventos_eliminados || 0} ação(ões) removida(s).`, "success");
     } catch (error) {

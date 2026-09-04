@@ -69,6 +69,8 @@ def test_mesa_estatistica_renderiza_registo_offline(client_admin):
         assert 'data-lineup-shell' in resposta.text
         assert 'data-lineup-manage' in resposta.text
         assert 'data-lineup-dialog' in resposta.text
+        assert 'data-bench-players' in resposta.text
+        assert 'data-mobile-selected-player' in resposta.text
         assert 'data-shot-chart' in resposta.text
         assert 'data-shot-points' in resposta.text
         assert '<th>MIN</th>' in resposta.text

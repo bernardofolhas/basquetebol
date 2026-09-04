@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}Estatísticas - {{ jogo.adversario }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260904-3">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260904-4">{% endblock %}
 {% block conteudo %}
 <main class="statboard" data-statboard data-game-id="{{ jogo.id }}" data-user-id="{{ utilizador.id }}" data-can-edit="{{ 'true' if pode_registar else 'false' }}">
   <script type="application/json" data-stats-events>{{ eventos|tojson }}</script>
@@ -30,6 +30,11 @@
       <div class="stat-lineup-tools"><span data-lineup-count>0/5</span>{% if pode_registar %}<button type="button" data-lineup-manage>Definir cinco</button>{% endif %}</div>
     </header>
     <div class="stat-lineup-slots" data-lineup-slots></div>
+    <div class="stat-mobile-selection">Próxima ação: <strong data-mobile-selected-player>Nenhum atleta selecionado</strong></div>
+    <div class="stat-bench-panel" data-bench-shell>
+      <div class="stat-bench-heading"><strong>Banco</strong><span data-bench-count>0 atletas</span></div>
+      <div class="stat-bench-players" data-bench-players></div>
+    </div>
   </section>
 
   <div class="stat-warning-stack" data-warning-stack hidden></div>
@@ -142,5 +147,5 @@
     <footer><span><i class="is-made"></i>Convertido</span><span><i class="is-missed"></i>Falhado</span><small data-shot-empty>Regista lançamentos para preencher o mapa.</small></footer>
   </section>
 </main>
-<script src="/static/js/basket-stats.js?v=20260904-3"></script>
+<script src="/static/js/basket-stats.js?v=20260904-4"></script>
 {% endblock %}
