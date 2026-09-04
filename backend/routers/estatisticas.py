@@ -16,7 +16,13 @@ from models.jogador import Jogador
 from models.jogo import Convocado, Jogo
 from paths import TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
-from services.estatistica_service import TIPOS_EVENTO, box_score_eventos, pontos_eventos, serializar_evento
+from services.estatistica_service import (
+    TIPOS_ALINHAMENTO,
+    TIPOS_EVENTO,
+    box_score_eventos,
+    pontos_eventos,
+    serializar_evento,
+)
 from services.fiba_stats_service import (
     ErroImportacaoFiba,
     MAX_FIBA_BYTES,
@@ -228,15 +234,19 @@ def dashboard_equipa(equipa_id: int, request: Request, db: Session = Depends(get
         return RedirectResponse("/equipas", status_code=303)
     jogos = db.query(Jogo).filter(Jogo.equipa_id == equipa_id).order_by(Jogo.data.desc(), Jogo.hora.desc()).all()
     eventos = db.query(EventoEstatistica).filter(EventoEstatistica.equipa_id == equipa_id, EventoEstatistica.anulado.is_(False)).all()
+    eventos_estatisticos = [evento for evento in eventos if evento.tipo not in TIPOS_ALINHAMENTO]
     jogos_concluidos = [jogo for jogo in jogos if jogo.pontos_nos is not None and jogo.pontos_adversario is not None]
     resumo = {
         "jogos": len(jogos_concluidos),
         "vitorias": sum(jogo.pontos_nos > jogo.pontos_adversario for jogo in jogos_concluidos),
         "pontos": sum(jogo.pontos_nos or 0 for jogo in jogos_concluidos),
         "media": round(sum(jogo.pontos_nos or 0 for jogo in jogos_concluidos) / len(jogos_concluidos), 1) if jogos_concluidos else 0,
-        "acoes": len(eventos),
+        "acoes": len(eventos_estatisticos),
     }
-    eventos_por_jogo = {jogo.id: sum(evento.jogo_id == jogo.id for evento in eventos) for jogo in jogos}
+    eventos_por_jogo = {
+        jogo.id: sum(evento.jogo_id == jogo.id for evento in eventos_estatisticos)
+        for jogo in jogos
+    }
     identidade = getattr(request.state, "identidade_clube", {}) or {}
     return templates.TemplateResponse(request, "estatisticas/dashboard.html", {
         "utilizador": utilizador, "equipa": equipa, "jogos": jogos,

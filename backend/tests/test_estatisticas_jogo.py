@@ -8,6 +8,7 @@ from models.estatistica import EventoEstatistica, MapeamentoJogadorEstatistica
 from models.jogador import Jogador
 from models.jogo import Jogo
 from models.utilizador import Utilizador
+from services.estatistica_service import box_score_eventos, segundos_jogados_eventos
 from services.fiba_stats_service import ErroImportacaoFiba, interpretar_fiba
 
 
@@ -64,6 +65,10 @@ def test_mesa_estatistica_renderiza_registo_offline(client_admin):
         assert 'data-court-dialog' in resposta.text
         assert 'data-stat-court' in resposta.text
         assert 'data-stat-reset' in resposta.text
+        assert 'data-lineup-shell' in resposta.text
+        assert 'data-lineup-manage' in resposta.text
+        assert 'data-lineup-dialog' in resposta.text
+        assert '<th>MIN</th>' in resposta.text
         assert "Recomeçar estatística" in resposta.text
         assert 'data-boxscore-player="' + str(jogador_id) + '"' in resposta.text
 
@@ -105,6 +110,64 @@ def test_sincronizacao_e_idempotente_e_atualiza_marcador(client_admin):
         db.expire_all()
         jogo = db.query(Jogo).filter(Jogo.id == jogo_id).one()
         assert (jogo.pontos_nos, jogo.pontos_adversario) == (3, 2)
+    finally:
+        _limpar(db, equipa_id)
+
+
+def test_cinco_em_campo_sincroniza_e_calcula_minutos(client_admin):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    try:
+        eventos = [
+            {
+                "client_uid": "stats-lineup-in-0001",
+                "jogador_id": jogador_id,
+                "lado": "equipa",
+                "tipo": "entrada_campo",
+                "periodo": 1,
+                "segundos_restantes": 600,
+            },
+            {
+                "client_uid": "stats-lineup-out-0001",
+                "jogador_id": jogador_id,
+                "lado": "equipa",
+                "tipo": "saida_campo",
+                "periodo": 1,
+                "segundos_restantes": 420,
+            },
+        ]
+        resposta = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/sincronizar",
+            json={"eventos": eventos},
+        )
+        assert resposta.status_code == 200
+        assert resposta.json()["marcador"] == {"equipa": 0, "adversario": 0}
+
+        db.expire_all()
+        guardados = db.query(EventoEstatistica).filter(
+            EventoEstatistica.jogo_id == jogo_id
+        ).order_by(EventoEstatistica.id).all()
+        assert segundos_jogados_eventos(guardados)[jogador_id] == 180
+        assert box_score_eventos(guardados)[jogador_id]["segundos_jogados"] == 180
+
+        entrada_segundo_periodo = EventoEstatistica(
+            id=999999,
+            jogador_id=jogador_id,
+            lado="equipa",
+            tipo="entrada_campo",
+            periodo=2,
+            segundos_restantes=600,
+            anulado=False,
+        )
+        em_direto = segundos_jogados_eventos(
+            [*guardados, entrada_segundo_periodo],
+            periodo_atual=2,
+            segundos_restantes=510,
+        )
+        assert em_direto[jogador_id] == 270
+
+        dashboard = client_admin.get(f"/estatisticas/equipas/{equipa_id}")
+        assert dashboard.status_code == 200
+        assert "2 ações" not in dashboard.text
     finally:
         _limpar(db, equipa_id)
 
@@ -193,10 +256,13 @@ def test_recursos_offline_e_atalhos_estao_configurados():
     assert 'CACHE_STATS_PAGE' in worker
     assert 'CACHE_STATS_PAGE' in script
     assert "localStorage.setItem(storageKey" in script
-    assert 'q:"ll_f"' in script
+    assert 'q: "ll_f"' in script
     assert 'actionsWithoutPosition = new Set(["falta", "falta_sofrida"])' in script
     assert "requestEvent(button.dataset.opponentAction" in script
-    assert "posicao_x:position?.x??null" in script
+    assert 'lineupTypes = new Set(["entrada_campo", "saida_campo"])' in script
+    assert "Define primeiro os cinco" in script
+    assert "data-lineup-player" in script
+    assert "posicao_x: position?.x ?? null" in script
     assert "/reiniciar" in script
     assert "localStorage.removeItem(storageKey)" in script
 

@@ -100,6 +100,14 @@ def _tipo_evento(registo: dict[str, Any]) -> str | None:
     resultado = _pick(registo, "success", "successful", "made", "convertido", "shotResult", "result", "outcome")
     sucesso = _booleano(resultado, default=True)
 
+    if "substitution" in acao or "substituicao" in acao or "substituição" in acao:
+        detalhe = f"{subtipo} {qualificadores}".strip()
+        if any(token in detalhe for token in ("player in", "sub in", "entrada", "enter", " in")) or detalhe == "in":
+            return "entrada_campo"
+        if any(token in detalhe for token in ("player out", "sub out", "saida", "saída", "leave", " out")) or detalhe == "out":
+            return "saida_campo"
+        return None
+
     if any(token in acao for token in ("freethrow", "free_throw", "free throw", "1pt", "lance_livre", "ll_")):
         return "ll_c" if sucesso and "miss" not in acao else "ll_f"
     if any(token in acao for token in ("3pt", "3points", "threepoint", "three_point", "triplo", "tres_")):
