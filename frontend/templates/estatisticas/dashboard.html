@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Estatísticas - {{ equipa.nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-2">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-4">{% endblock %}
 {% block conteudo %}
 {% call equipa_contexto(equipa, "Estatísticas", "Registo de jogo, box scores e evolução competitiva.", "acao", "/equipas/" ~ equipa.id ~ "/resumo", "Voltar à equipa") %}
   <a href="/jogos/equipas/{{ equipa.id }}" class="ds-button ds-button-secondary">Calendário de jogos</a>
@@ -20,7 +20,7 @@
     <details class="stats-source-menu">
       <summary>Outras fontes</summary>
       <div>
-        <p><strong>FIBA LiveStats</strong><span>Ficheiro oficial XML ou API</span><em>Em estudo</em></p>
+        <p><strong>FIBA LiveStats</strong><span>Ficheiro oficial XML/JSON ou API</span><em>Disponível</em></p>
         <p><strong>Página FPB</strong><span>Ligação à estatística do jogo</span><em>Em estudo</em></p>
         <small>Estas serão opções adicionais. O registo manual e offline continuará sempre disponível.</small>
       </div>
@@ -32,7 +32,10 @@
       <time><strong>{{ jogo.data.strftime('%d') }}</strong><span>{{ jogo.data.strftime('%m/%Y') }}</span></time>
       <div class="stats-game-main"><strong>{{ nome_clube|default(equipa.nome) if jogo.em_casa else jogo.adversario }} <span>vs</span> {{ jogo.adversario if jogo.em_casa else nome_clube|default(equipa.nome) }}</strong><small>{{ jogo.competicao or 'Competição' }}{% if jogo.hora %} · {{ jogo.hora }}{% endif %}{% if jogo.local %} · {{ jogo.local }}{% endif %}</small></div>
       <div class="stats-game-score">{% if jogo.pontos_nos is not none %}<strong>{{ jogo.pontos_nos }}–{{ jogo.pontos_adversario }}</strong>{% else %}<span>Por jogar</span>{% endif %}<small>{{ eventos_por_jogo[jogo.id] }} ações</small></div>
-      <a href="/estatisticas/jogos/{{ jogo.id }}?offline={{ utilizador.id }}" class="ds-button ds-button-primary">{{ 'Abrir estatísticas' if pode_registar else 'Consultar' }}</a>
+      <div class="stats-game-actions">
+        {% if pode_registar %}<a href="/estatisticas/jogos/{{ jogo.id }}/importar" class="ds-button ds-button-secondary">Importar FIBA</a>{% endif %}
+        <a href="/estatisticas/jogos/{{ jogo.id }}?offline={{ utilizador.id }}" class="ds-button ds-button-primary">{{ 'Abrir estatísticas' if pode_registar else 'Consultar' }}</a>
+      </div>
     </article>
   {% else %}<div class="ds-empty">Ainda não existem jogos nesta equipa.</div>{% endfor %}
   </div>

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% block titulo %}Importar estatística FIBA - {{ equipa.nome }}{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-4">{% endblock %}
+{% block conteudo %}
+{% call equipa_contexto(equipa, "Importar estatística oficial", "Pré-visualiza, associa os atletas e confirma sem alterar o registo manual.", "acao", "/estatisticas/jogos/" ~ jogo.id, "Voltar à mesa") %}
+  <a href="/estatisticas/jogos/{{ jogo.id }}?offline={{ utilizador.id }}" class="ds-button ds-button-secondary">Mesa estatística</a>
+{% endcall %}
+
+<main class="fiba-import" data-fiba-import data-game-id="{{ jogo.id }}">
+  <section class="fiba-import-intro">
+    <div>
+      <p class="ds-kicker">{{ jogo.data|data_pt }} · {{ jogo.hora or 'Hora por definir' }}</p>
+      <h2>{{ equipa.nome }} vs {{ jogo.adversario }}</h2>
+      <p>As ações oficiais são adicionadas à folha atual. As ações registadas manualmente nunca são eliminadas ou substituídas.</p>
+    </div>
+    <div class="fiba-safety"><strong>Importação segura</strong><span>XML e JSON até 8 MB</span><span>Sem duplicações</span><span>Com registo de auditoria</span></div>
+  </section>
+
+  <section class="fiba-source-grid">
+    <form class="fiba-source-card is-active" data-fiba-source="file">
+      <span class="fiba-source-number">1</span>
+      <div><p class="ds-kicker">Recomendado</p><h3>Ficheiro FIBA LiveStats</h3><p>Seleciona a exportação XML ou JSON fornecida pelo sistema oficial.</p></div>
+      <label class="fiba-file-field">Escolher ficheiro<input type="file" name="ficheiro" accept=".xml,.json,application/xml,application/json" required></label>
+      <button type="submit" class="ds-button ds-button-primary">Pré-visualizar ficheiro</button>
+    </form>
+    <form class="fiba-source-card{% if not api_configurada %} is-disabled{% endif %}" data-fiba-source="api">
+      <span class="fiba-source-number">2</span>
+      <div><p class="ds-kicker">Ligação oficial</p><h3>FIBA/Genius Sports API</h3><p>{% if api_configurada %}Introduz o identificador oficial do jogo.{% else %}Disponível quando as credenciais oficiais forem configuradas no Railway.{% endif %}</p></div>
+      <label>Identificador do jogo<input type="text" name="identificador_jogo" placeholder="Ex.: 123456" {% if not api_configurada %}disabled{% else %}required{% endif %}></label>
+      <button type="submit" class="ds-button ds-button-secondary" {% if not api_configurada %}disabled{% endif %}>Consultar API</button>
+    </form>
+  </section>
+
+  <div class="fiba-feedback" role="status" aria-live="polite" data-fiba-feedback hidden></div>
+
+  <section class="fiba-preview" data-fiba-preview hidden>
+    <header>
+      <div><p class="ds-kicker">Pré-visualização</p><h2>Confirmar dados oficiais</h2><p>Confirma a equipa e revê as associações antes de importar.</p></div>
+      <div class="fiba-preview-summary">
+        <span><strong data-fiba-supported>0</strong>Ações suportadas</span>
+        <span><strong data-fiba-ignored>0</strong>Ignoradas</span>
+        <span><strong data-fiba-format>–</strong>Formato</span>
+      </div>
+    </header>
+
+    <div class="fiba-team-choice">
+      <label>Qual é a nossa equipa neste ficheiro?<select data-fiba-team required></select></label>
+      <p>Esta escolha determina quais ações pertencem à equipa e quais pertencem ao adversário.</p>
+    </div>
+
+    <div class="fiba-mapping-shell">
+      <div class="fiba-section-heading"><div><h3>Associação de atletas</h3><p>As sugestões são automáticas por associação guardada, nome ou número.</p></div><span data-fiba-mapped-count>0 associados</span></div>
+      <div class="fiba-mapping-list" data-fiba-mappings></div>
+    </div>
+
+    <details class="fiba-sample">
+      <summary>Ver amostra das ações</summary>
+      <div class="fiba-sample-table"><table><thead><tr><th>Período</th><th>Relógio</th><th>Ação</th><th>Atleta externo</th><th>Posição</th></tr></thead><tbody data-fiba-sample></tbody></table></div>
+    </details>
+
+    <footer>
+      <p>A importação pode ser repetida: as ações oficiais existentes serão atualizadas, não duplicadas.</p>
+      <button type="button" class="ds-button ds-button-primary" data-fiba-confirm>Importar para esta folha</button>
+    </footer>
+  </section>
+
+  <template data-local-player-options>
+    <option value="">Sem associação</option>
+    {% for jogador in jogadores %}<option value="{{ jogador.id }}">{% if jogador.numero_camisola %}#{{ jogador.numero_camisola }} · {% endif %}{{ jogador.nome }}</option>{% endfor %}
+  </template>
+</main>
+<script src="/static/js/fiba-import.js?v=20260903-2"></script>
+{% endblock %}

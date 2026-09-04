@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}Estatísticas - {{ jogo.adversario }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-3">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-4">{% endblock %}
 {% block conteudo %}
 <main class="statboard" data-statboard data-game-id="{{ jogo.id }}" data-user-id="{{ utilizador.id }}" data-can-edit="{{ 'true' if pode_registar else 'false' }}">
   <script type="application/json" data-stats-events>{{ eventos|tojson }}</script>
@@ -8,6 +8,7 @@
   <header class="statboard-head">
     <div><p class="ds-kicker">Mesa estatística</p><h1>{{ nome_clube }} <span>vs</span> {{ jogo.adversario }}</h1><p>{{ jogo.data|data_pt }}{% if jogo.hora %} · {{ jogo.hora }}{% endif %}{% if jogo.competicao %} · {{ jogo.competicao }}{% endif %}</p></div>
     <div class="statboard-head-actions">
+      {% if pode_registar %}<a href="/estatisticas/jogos/{{ jogo.id }}/importar" class="stat-import-button">Importar FIBA</a>{% endif %}
       <div class="statboard-connection"><span data-online-dot></span><strong data-online-label>A verificar ligação</strong><small data-sync-label></small></div>
       {% if pode_registar %}<button type="button" class="stat-reset-button" data-stat-reset>Recomeçar estatística</button>{% endif %}
     </div>

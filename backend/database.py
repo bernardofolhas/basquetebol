@@ -851,25 +851,35 @@ def actualizar_estrutura_jogadores() -> None:
 
 
 def actualizar_estrutura_estatisticas() -> None:
-    """Adiciona coordenadas de campo a instalações sem Alembic automático."""
+    """Atualiza instalações existentes para o registo e importação estatística."""
     inspector = inspect(engine)
     if not inspector.has_table("eventos_estatistica"):
         return
     colunas = {coluna["name"] for coluna in inspector.get_columns("eventos_estatistica")}
-    em_falta = [nome for nome in ("posicao_x", "posicao_y") if nome not in colunas]
+    definicoes = {
+        "posicao_x": "DOUBLE PRECISION NULL" if engine.dialect.name == "postgresql" else "FLOAT NULL",
+        "posicao_y": "DOUBLE PRECISION NULL" if engine.dialect.name == "postgresql" else "FLOAT NULL",
+        "origem": "VARCHAR(24) NOT NULL DEFAULT 'manual'",
+        "identificador_externo": "VARCHAR(160) NULL",
+        "jogador_externo": "VARCHAR(120) NULL",
+        "subtipo": "VARCHAR(60) NULL",
+        "qualificadores": "TEXT NULL",
+        "importacao_uid": "VARCHAR(80) NULL",
+    }
+    em_falta = [nome for nome in definicoes if nome not in colunas]
     if not em_falta:
         return
     with engine.begin() as ligacao:
         for nome in em_falta:
             if engine.dialect.name == "postgresql":
                 ligacao.execute(text(
-                    f"ALTER TABLE eventos_estatistica ADD COLUMN IF NOT EXISTS {nome} DOUBLE PRECISION NULL"
+                    f"ALTER TABLE eventos_estatistica ADD COLUMN IF NOT EXISTS {nome} {definicoes[nome]}"
                 ))
             else:
                 ligacao.execute(text(
-                    f"ALTER TABLE eventos_estatistica ADD COLUMN {nome} FLOAT NULL"
+                    f"ALTER TABLE eventos_estatistica ADD COLUMN {nome} {definicoes[nome]}"
                 ))
-    logger.info("Coordenadas de campo adicionadas aos eventos estatísticos.")
+    logger.info("Estrutura de importação estatística atualizada.")
 
 # Função que abre e fecha sessões automaticamente
 # O "yield" faz com que a sessão seja fechada no final de cada pedido

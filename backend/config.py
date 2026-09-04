@@ -39,6 +39,9 @@ class Configuracao:
     smtp_from_email: str | None
     smtp_use_tls: bool
     brevo_api_key: str | None
+    fiba_stats_api_url_template: str | None
+    fiba_stats_api_key: str | None
+    fiba_stats_api_key_header: str
 
 
 def _obter_variavel_obrigatoria(nome: str) -> str:
@@ -177,6 +180,9 @@ def _criar_configuracao() -> Configuracao:
         smtp_from_email=(os.getenv("SMTP_FROM_EMAIL") or "").strip() or None,
         smtp_use_tls=_obter_bool_ambiente("SMTP_USE_TLS", True),
         brevo_api_key=(os.getenv("BREVO_API_KEY") or "").strip() or None,
+        fiba_stats_api_url_template=(os.getenv("FIBA_STATS_API_URL_TEMPLATE") or "").strip() or None,
+        fiba_stats_api_key=(os.getenv("FIBA_STATS_API_KEY") or "").strip() or None,
+        fiba_stats_api_key_header=(os.getenv("FIBA_STATS_API_KEY_HEADER") or "x-api-key").strip(),
     )
 
     logger.info("Configuração da aplicação carregada para o ambiente '%s'.", configuracao.ambiente)

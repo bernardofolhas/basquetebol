@@ -1,12 +1,14 @@
+import json
 from datetime import date
 from pathlib import Path
 
 from database import SessionLocal
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
-from models.estatistica import EventoEstatistica
+from models.estatistica import EventoEstatistica, MapeamentoJogadorEstatistica
 from models.jogador import Jogador
 from models.jogo import Jogo
 from models.utilizador import Utilizador
+from services.fiba_stats_service import ErroImportacaoFiba, interpretar_fiba
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,6 +42,9 @@ def _limpar(db, equipa_id):
     if jogos_ids:
         db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id.in_(jogos_ids)).delete(synchronize_session=False)
         db.query(Jogo).filter(Jogo.id.in_(jogos_ids)).delete(synchronize_session=False)
+    db.query(MapeamentoJogadorEstatistica).filter(
+        MapeamentoJogadorEstatistica.equipa_id == equipa_id
+    ).delete(synchronize_session=False)
     db.query(Jogador).filter(Jogador.equipa_id == equipa_id).delete(synchronize_session=False)
     equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
     if equipa:
@@ -67,7 +72,8 @@ def test_mesa_estatistica_renderiza_registo_offline(client_admin):
         assert "Registo de jogo, box scores" in dashboard.text
         assert "FIBA LiveStats" in dashboard.text
         assert "Página FPB" in dashboard.text
-        assert "Em estudo" in dashboard.text
+        assert "Disponível" in dashboard.text
+        assert f"/estatisticas/jogos/{jogo_id}/importar" in dashboard.text
         assert f"/estatisticas/jogos/{jogo_id}" in dashboard.text
     finally:
         _limpar(db, equipa_id)
@@ -193,3 +199,96 @@ def test_recursos_offline_e_atalhos_estao_configurados():
     assert "posicao_x:position?.x??null" in script
     assert "/reiniciar" in script
     assert "localStorage.removeItem(storageKey)" in script
+
+
+def _ficheiro_fiba_json(nome_atleta="Atleta Estatística"):
+    return json.dumps({
+        "type": "playbyplay",
+        "teams": [
+            {
+                "teamNumber": 1,
+                "teamName": "Equipa Teste Estatísticas",
+                "players": [{"pno": 7, "firstName": nome_atleta.split()[0], "familyName": " ".join(nome_atleta.split()[1:]), "shirtNumber": "7"}],
+            },
+            {"teamNumber": 2, "teamName": "Adversário Estatística", "players": []},
+        ],
+        "actions": [
+            {"type": "action", "messageId": 101, "teamNumber": 1, "pno": 7, "period": 1, "clock": "09:31:00", "actionType": "2pt", "subType": "layup", "success": 1, "x": 22.5, "y": 47.2},
+            {"type": "action", "messageId": 102, "teamNumber": 2, "period": 1, "clock": "09:10:00", "actionType": "3pt", "success": 0, "x": 75, "y": 20},
+            {"type": "action", "messageId": 103, "teamNumber": 1, "pno": 7, "period": 1, "clock": "08:55:00", "actionType": "assist"},
+            {"type": "action", "messageId": 104, "teamNumber": 1, "period": 1, "clock": "08:50:00", "actionType": "substitution"},
+        ],
+    }).encode()
+
+
+def test_normalizador_fiba_interpreta_json_e_xml():
+    json_resultado = interpretar_fiba(_ficheiro_fiba_json(), "jogo.json", "application/json")
+    assert [item["tipo"] for item in json_resultado["eventos"]] == ["dois_c", "tres_f", "assistencia"]
+    assert json_resultado["eventos"][0]["segundos_restantes"] == 571
+    assert json_resultado["eventos"][0]["posicao_x"] == 22.5
+    assert json_resultado["eventos_ignorados"] == 1
+    assert json_resultado["jogadores"][0]["nome"] == "Atleta Estatística"
+
+    xml = b"""<?xml version='1.0'?><game><teams><team teamNumber='1' teamName='Casa'><players><player pno='7' name='Atleta Estatistica' shirtNumber='7'/></players></team><team teamNumber='2' teamName='Fora'/></teams><playbyplay><action messageId='1' teamNumber='1' pno='7' period='2' clock='05:30:00' actionType='freethrow' success='1'/><action messageId='2' teamNumber='2' period='2' actionType='rebound' subType='offensive'/></playbyplay></game>"""
+    xml_resultado = interpretar_fiba(xml, "jogo.xml", "application/xml")
+    assert [item["tipo"] for item in xml_resultado["eventos"]] == ["ll_c", "ressalto_ofensivo"]
+    assert xml_resultado["eventos"][0]["segundos_restantes"] == 330
+
+
+def test_normalizador_fiba_rejeita_xml_perigoso():
+    xml = b"<!DOCTYPE game [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><game><action actionType='2pt'>&xxe;</action></game>"
+    try:
+        interpretar_fiba(xml, "jogo.xml", "application/xml")
+    except Exception as exc:
+        assert isinstance(exc, (ErroImportacaoFiba, ValueError))
+    else:
+        raise AssertionError("XML com entidades externas devia ser rejeitado")
+
+
+def test_importacao_fiba_previsualiza_associa_e_nao_duplica(client_admin):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    conteudo = _ficheiro_fiba_json()
+    try:
+        pagina = client_admin.get(f"/estatisticas/jogos/{jogo_id}/importar")
+        assert pagina.status_code == 200
+        assert "Importar estatística oficial" in pagina.text
+        assert "Ficheiro FIBA LiveStats" in pagina.text
+
+        preview = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/previsualizar-ficheiro",
+            files={"ficheiro": ("jogo.json", conteudo, "application/json")},
+        )
+        assert preview.status_code == 200
+        assert preview.json()["eventos_suportados"] == 3
+        assert preview.json()["eventos_ignorados"] == 1
+        assert preview.json()["jogadores"][0]["jogador_id_sugerido"] == jogador_id
+
+        dados = {"equipa_ficheiro": "1", "mapeamentos": json.dumps({"7": jogador_id})}
+        primeira = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/importar-ficheiro",
+            data=dados,
+            files={"ficheiro": ("jogo.json", conteudo, "application/json")},
+        )
+        assert primeira.status_code == 200
+        assert primeira.json()["criadas"] == 3
+        assert primeira.json()["marcador"] == {"equipa": 2, "adversario": 0}
+
+        segunda = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/importar-ficheiro",
+            data=dados,
+            files={"ficheiro": ("jogo.json", conteudo, "application/json")},
+        )
+        assert segunda.status_code == 200
+        assert segunda.json()["criadas"] == 0
+        assert segunda.json()["atualizadas"] == 3
+        assert db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).count() == 3
+        db.expire_all()
+        evento = db.query(EventoEstatistica).filter(EventoEstatistica.tipo == "dois_c").one()
+        assert evento.origem == "fiba_ficheiro"
+        assert evento.subtipo == "layup"
+        assert evento.jogador_id == jogador_id
+        assert db.query(MapeamentoJogadorEstatistica).filter(
+            MapeamentoJogadorEstatistica.equipa_id == equipa_id
+        ).count() == 1
+    finally:
+        _limpar(db, equipa_id)

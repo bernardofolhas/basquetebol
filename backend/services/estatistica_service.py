@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 
 from models.estatistica import EventoEstatistica
@@ -65,6 +66,9 @@ def serializar_evento(evento: EventoEstatistica) -> dict:
         "segundos_restantes": evento.segundos_restantes,
         "posicao_x": evento.posicao_x,
         "posicao_y": evento.posicao_y,
+        "origem": evento.origem,
+        "subtipo": evento.subtipo,
+        "qualificadores": json.loads(evento.qualificadores or "[]"),
         "anulado": evento.anulado,
         "sincronizado": True,
     }

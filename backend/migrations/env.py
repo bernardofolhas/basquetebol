@@ -21,6 +21,7 @@ import models.atribuicao_espaco_semanal
 import models.equipa
 import models.espaco_treino
 import models.fisico
+import models.estatistica
 import models.jogador
 import models.jogo
 import models.identidade_clube
