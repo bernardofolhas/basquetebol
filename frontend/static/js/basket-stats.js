@@ -41,6 +41,8 @@
   let selectedPosition = null;
   let lineupDraft = new Set();
   let shotSide = "equipa";
+  let analysisTab = "resumo";
+  let feedPeriod = "all";
 
   function loadJson(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (_) { return fallback; }
@@ -73,6 +75,8 @@
     if (clockElement()) clockElement().textContent = formatClock(currentSeconds());
     const period = root.querySelector("[data-period]");
     if (period) period.value = String(clock.period);
+    root.querySelectorAll("[data-analysis-period]").forEach(item => { item.textContent = `${clock.period}º`; });
+    root.querySelectorAll("[data-analysis-clock]").forEach(item => { item.textContent = formatClock(currentSeconds()); });
   }
 
   function startTimer() {
@@ -488,6 +492,110 @@
     return { pts, llc, llt, c2, t2, c3, t3, ro, rd, rt: ro + rd, ast, stl, to, blk, pf, eff: pts + ro + rd + ast + stl + blk - (llt - llc) - (t2 - c2) - (t3 - c3) - to };
   }
 
+  function totalsForSide(side) {
+    const list = active().filter(item => item.lado === side && !lineupTypes.has(item.tipo));
+    const count = type => list.filter(item => item.tipo === type).length;
+    const llc = count("ll_c"), llt = llc + count("ll_f"), c2 = count("dois_c"), t2 = c2 + count("dois_f");
+    const c3 = count("tres_c"), t3 = c3 + count("tres_f"), ro = count("ressalto_ofensivo"), rd = count("ressalto_defensivo");
+    return {
+      pts: llc + c2 * 2 + c3 * 3,
+      llc, llt, c2, t2, c3, t3, fgc: c2 + c3, fgt: t2 + t3,
+      ro, rd, rt: ro + rd,
+      ast: count("assistencia"), stl: count("roubo"), to: count("perda"),
+      blk: count("desarme"), pf: count("falta"),
+    };
+  }
+
+  function percent(made, attempted) {
+    return attempted ? Math.round((made / attempted) * 100) : 0;
+  }
+
+  const comparisonMetrics = [
+    ["Pontos", "pts"], ["Lançamentos de campo", "fg"], ["2 pontos", "two"],
+    ["3 pontos", "three"], ["Lances livres", "free"], ["Ressaltos", "rt"],
+    ["Assistências", "ast"], ["Roubos", "stl"], ["Desarmes", "blk"],
+    ["Perdas", "to"], ["Faltas", "pf"],
+  ];
+
+  function metricValue(stats, key) {
+    if (key === "fg") return `${stats.fgc}/${stats.fgt} (${percent(stats.fgc, stats.fgt)}%)`;
+    if (key === "two") return `${stats.c2}/${stats.t2} (${percent(stats.c2, stats.t2)}%)`;
+    if (key === "three") return `${stats.c3}/${stats.t3} (${percent(stats.c3, stats.t3)}%)`;
+    if (key === "free") return `${stats.llc}/${stats.llt} (${percent(stats.llc, stats.llt)}%)`;
+    return stats[key] ?? 0;
+  }
+
+  function renderComparisonRows(target, compact = false) {
+    if (!target) return;
+    const home = totalsForSide("equipa");
+    const away = totalsForSide("adversario");
+    const metrics = compact ? comparisonMetrics.slice(0, 7) : comparisonMetrics;
+    target.innerHTML = "";
+    metrics.forEach(([label, key]) => {
+      const row = document.createElement("div");
+      row.className = "stat-comparison-row";
+      row.innerHTML = "<strong></strong><span></span><strong></strong>";
+      row.children[0].textContent = metricValue(home, key);
+      row.children[1].textContent = label;
+      row.children[2].textContent = metricValue(away, key);
+      target.append(row);
+    });
+  }
+
+  function leaderData(metric) {
+    return [...players.values()].map(player => ({ player, stats: totalsFor(player.id) }))
+      .filter(entry => entry.stats[metric] !== 0)
+      .sort((a, b) => b.stats[metric] - a.stats[metric] || a.player.name.localeCompare(b.player.name, "pt"));
+  }
+
+  function appendLeaderList(target, title, metric, limit = 5) {
+    const card = document.createElement("article");
+    card.className = "stat-leader-card";
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    card.append(heading);
+    const entries = leaderData(metric).slice(0, limit);
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "stat-leader-empty";
+      empty.textContent = "Sem dados registados";
+      card.append(empty);
+    }
+    entries.forEach((entry, index) => {
+      const row = document.createElement("div");
+      row.className = `stat-leader-row${index === 0 ? " is-first" : ""}`;
+      row.innerHTML = "<i></i><span><strong></strong><small></small></span><b></b>";
+      row.querySelector("i").textContent = index + 1;
+      row.querySelector("strong").textContent = entry.player.name;
+      row.querySelector("small").textContent = `#${entry.player.number}`;
+      row.querySelector("b").textContent = entry.stats[metric];
+      card.append(row);
+    });
+    target.append(card);
+  }
+
+  function renderLeaders() {
+    const target = root.querySelector("[data-leaders-grid]");
+    if (!target) return;
+    target.innerHTML = "";
+    [["Pontos", "pts"], ["Ressaltos", "rt"], ["Assistências", "ast"], ["Roubos", "stl"], ["Desarmes", "blk"], ["Eficiência", "eff"]]
+      .forEach(([title, metric]) => appendLeaderList(target, title, metric));
+
+    const summary = root.querySelector("[data-leaders-summary]");
+    if (!summary) return;
+    summary.innerHTML = "";
+    [["Pontos", "pts"], ["Ressaltos", "rt"], ["Assistências", "ast"]].forEach(([title, metric]) => {
+      const first = leaderData(metric)[0];
+      const row = document.createElement("div");
+      row.className = "stat-summary-leader";
+      row.innerHTML = "<span></span><strong></strong><b></b>";
+      row.children[0].textContent = title;
+      row.children[1].textContent = first?.player.name || "Sem dados";
+      row.children[2].textContent = first?.stats[metric] ?? 0;
+      summary.append(row);
+    });
+  }
+
   function renderBoxscore() {
     const lineup = currentLineup();
     root.querySelectorAll("[data-boxscore-player]").forEach(row => {
@@ -511,29 +619,35 @@
   function renderScores() {
     ["equipa", "adversario"].forEach(side => {
       const score = active().filter(item => item.lado === side).reduce((sum, item) => sum + (points[item.tipo] || 0), 0);
-      root.querySelector(`[data-score="${side}"]`).textContent = score;
+      root.querySelectorAll(`[data-score="${side}"], [data-analysis-score="${side}"]`).forEach(item => { item.textContent = score; });
     });
+    root.querySelectorAll("[data-analysis-period]").forEach(item => { item.textContent = `${clock.period}º`; });
+    root.querySelectorAll("[data-analysis-clock]").forEach(item => { item.textContent = formatClock(currentSeconds()); });
   }
 
   function renderFeed() {
-    const target = root.querySelector("[data-stat-feed]");
-    if (!target) return;
-    const list = [...active()].filter(item => !lineupTypes.has(item.tipo)).reverse().slice(0, 20);
-    target.innerHTML = "";
-    if (!list.length) {
-      target.innerHTML = '<p class="stat-feed-empty">As ações surgem aqui durante o jogo.</p>';
-      return;
-    }
-    list.forEach(item => {
-      const node = document.createElement("div");
-      node.className = "stat-feed-item";
-      const who = item.lado === "adversario" ? "Adversário" : (item.jogador || "Atleta");
-      node.innerHTML = "<div><strong></strong><span></span></div><b></b>";
-      node.querySelector("strong").textContent = who;
-      node.querySelector("span").textContent = `${labels[item.tipo] || item.tipo}${item.posicao_x != null ? " · posição registada" : ""}`;
-      node.querySelector("b").textContent = `${item.periodo}º · ${formatClock(item.segundos_restantes ?? 0)}`;
-      target.appendChild(node);
-    });
+    const all = [...active()].filter(item => !lineupTypes.has(item.tipo)).reverse();
+    const renderInto = (target, list) => {
+      if (!target) return;
+      target.innerHTML = "";
+      if (!list.length) {
+        target.innerHTML = '<p class="stat-feed-empty">As ações surgem aqui durante o jogo.</p>';
+        return;
+      }
+      list.forEach(item => {
+        const node = document.createElement("div");
+        node.className = `stat-feed-item is-${item.lado || "equipa"}`;
+        const who = item.jogador || (item.lado === "adversario" ? "Adversário" : "Atleta");
+        node.innerHTML = "<div><strong></strong><span></span></div><b></b>";
+        node.querySelector("strong").textContent = who;
+        node.querySelector("span").textContent = `${labels[item.tipo] || item.tipo}${item.posicao_x != null ? " · posição registada" : ""}`;
+        node.querySelector("b").textContent = `${item.periodo}º · ${formatClock(item.segundos_restantes ?? 0)}`;
+        target.appendChild(node);
+      });
+    };
+    const filtered = feedPeriod === "all" ? all : all.filter(item => Number(item.periodo) === Number(feedPeriod));
+    renderInto(root.querySelector("[data-stat-feed]"), filtered);
+    renderInto(root.querySelector("[data-summary-feed]"), all.slice(0, 5));
   }
 
   function renderShotChart() {
@@ -556,6 +670,86 @@
     root.querySelector("[data-shot-summary]").textContent = `${made}/${shots.length} · ${percentage}%`;
     root.querySelector("[data-shot-empty]").hidden = shots.length > 0;
     root.querySelectorAll("[data-shot-side]").forEach(button => button.classList.toggle("is-active", button.dataset.shotSide === shotSide));
+  }
+
+  function renderShootingRates() {
+    const target = root.querySelector("[data-shooting-rates]");
+    if (!target) return;
+    target.innerHTML = "";
+    [["equipa", "Equipa"], ["adversario", "Adversário"]].forEach(([side, sideLabel]) => {
+      const stats = totalsForSide(side);
+      const group = document.createElement("article");
+      group.className = `stat-rate-group is-${side}`;
+      const heading = document.createElement("h3");
+      heading.textContent = sideLabel;
+      group.append(heading);
+      [["2P", stats.c2, stats.t2], ["3P", stats.c3, stats.t3], ["LL", stats.llc, stats.llt]].forEach(([label, made, attempted]) => {
+        const rate = percent(made, attempted);
+        const item = document.createElement("div");
+        item.className = "stat-rate";
+        item.style.setProperty("--rate", `${rate * 3.6}deg`);
+        item.innerHTML = "<div><small></small><strong></strong></div><span></span>";
+        item.querySelector("small").textContent = label;
+        item.querySelector("strong").textContent = `${rate}%`;
+        item.querySelector("span").textContent = `${made}/${attempted}`;
+        group.append(item);
+      });
+      target.append(group);
+    });
+  }
+
+  function renderScoringChart() {
+    const target = root.querySelector("[data-scoring-chart]");
+    if (!target) return;
+    const scoring = active().filter(item => points[item.tipo]).sort((a, b) => {
+      const period = Number(a.periodo || 1) - Number(b.periodo || 1);
+      return period || Number(b.segundos_restantes || 0) - Number(a.segundos_restantes || 0);
+    });
+    let home = 0, away = 0;
+    const seriesHome = [{ x: 32, score: 0 }], seriesAway = [{ x: 32, score: 0 }];
+    scoring.forEach((item, index) => {
+      if (item.lado === "adversario") away += points[item.tipo]; else home += points[item.tipo];
+      const x = 32 + ((index + 1) / Math.max(1, scoring.length)) * 736;
+      seriesHome.push({ x, score: home });
+      seriesAway.push({ x, score: away });
+    });
+    const maxScore = Math.max(10, home, away);
+    const y = score => 226 - (score / maxScore) * 190;
+    const line = series => series.map(point => `${point.x.toFixed(1)},${y(point.score).toFixed(1)}`).join(" ");
+    const grid = [0, .25, .5, .75, 1].map(step => {
+      const gridY = 226 - step * 190;
+      return `<line x1="32" y1="${gridY}" x2="768" y2="${gridY}"/><text x="24" y="${gridY + 4}" text-anchor="end">${Math.round(maxScore * step)}</text>`;
+    }).join("");
+    target.innerHTML = `<svg viewBox="0 0 800 260" role="img" aria-label="Evolução da pontuação"><g class="stat-chart-grid">${grid}</g><polyline class="is-home" points="${line(seriesHome)}"/><polyline class="is-away" points="${line(seriesAway)}"/></svg><div class="stat-chart-legend"><span><i class="is-home"></i>Equipa</span><span><i class="is-away"></i>Adversário</span></div>`;
+  }
+
+  function renderComparisonBars() {
+    const target = root.querySelector("[data-comparison-bars]");
+    if (!target) return;
+    const home = totalsForSide("equipa"), away = totalsForSide("adversario");
+    target.innerHTML = "";
+    [["Ressaltos", "rt"], ["Assistências", "ast"], ["Roubos", "stl"], ["Perdas", "to"], ["Desarmes", "blk"], ["Faltas", "pf"]].forEach(([label, key]) => {
+      const max = Math.max(1, home[key], away[key]);
+      const card = document.createElement("article");
+      card.className = "stat-bar-card";
+      card.innerHTML = "<h3></h3><div class=\"stat-bars\"><div class=\"is-home\"><span></span><b></b></div><div class=\"is-away\"><span></span><b></b></div></div>";
+      card.querySelector("h3").textContent = label;
+      const bars = card.querySelectorAll(".stat-bars > div");
+      bars[0].querySelector("span").style.height = `${Math.max(5, (home[key] / max) * 100)}%`;
+      bars[0].querySelector("b").textContent = home[key];
+      bars[1].querySelector("span").style.height = `${Math.max(5, (away[key] / max) * 100)}%`;
+      bars[1].querySelector("b").textContent = away[key];
+      target.append(card);
+    });
+  }
+
+  function renderAnalysis() {
+    renderComparisonRows(root.querySelector("[data-team-summary]"), true);
+    renderComparisonRows(root.querySelector("[data-comparison-table]"));
+    renderLeaders();
+    renderShootingRates();
+    renderScoringChart();
+    renderComparisonBars();
   }
 
   function renderWarnings() {
@@ -599,6 +793,7 @@
     renderBoxscore();
     renderFeed();
     renderShotChart();
+    renderAnalysis();
     renderWarnings();
     updateConnection();
     updateClock();
@@ -609,6 +804,24 @@
   root.querySelectorAll("[data-stat-action]").forEach(button => button.addEventListener("click", () => requestEvent(button.dataset.statAction)));
   root.querySelectorAll("[data-opponent-action]").forEach(button => button.addEventListener("click", () => requestEvent(button.dataset.opponentAction, "adversario")));
   root.querySelectorAll("[data-shot-side]").forEach(button => button.addEventListener("click", () => { shotSide = button.dataset.shotSide; renderShotChart(); }));
+  root.querySelectorAll("[data-analysis-tab]").forEach(button => button.addEventListener("click", () => {
+    analysisTab = button.dataset.analysisTab;
+    root.querySelectorAll("[data-analysis-tab]").forEach(item => {
+      const active = item.dataset.analysisTab === analysisTab;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-selected", String(active));
+    });
+    root.querySelectorAll("[data-analysis-panel]").forEach(panel => {
+      const active = panel.dataset.analysisPanel === analysisTab;
+      panel.classList.toggle("is-active", active);
+      panel.hidden = !active;
+    });
+  }));
+  root.querySelectorAll("[data-feed-period]").forEach(button => button.addEventListener("click", () => {
+    feedPeriod = button.dataset.feedPeriod;
+    root.querySelectorAll("[data-feed-period]").forEach(item => item.classList.toggle("is-active", item.dataset.feedPeriod === feedPeriod));
+    renderFeed();
+  }));
   root.querySelector("[data-lineup-manage]")?.addEventListener("click", openLineupDialog);
   root.querySelectorAll("[data-lineup-option]").forEach(button => button.addEventListener("click", () => {
     const id = Number(button.dataset.lineupOption);

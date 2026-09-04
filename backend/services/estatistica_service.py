@@ -101,7 +101,7 @@ def serializar_evento(evento: EventoEstatistica) -> dict:
         "id": evento.id,
         "client_uid": evento.client_uid,
         "jogador_id": evento.jogador_id,
-        "jogador": evento.jogador.nome if evento.jogador else None,
+        "jogador": evento.jogador.nome if evento.jogador else evento.jogador_externo,
         "lado": evento.lado,
         "tipo": evento.tipo,
         "periodo": evento.periodo,

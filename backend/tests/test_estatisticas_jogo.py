@@ -73,6 +73,13 @@ def test_mesa_estatistica_renderiza_registo_offline(client_admin):
         assert 'data-mobile-selected-player' in resposta.text
         assert 'data-shot-chart' in resposta.text
         assert 'data-shot-points' in resposta.text
+        assert 'data-analysis-tab="resumo"' in resposta.text
+        assert 'data-analysis-panel="boxscore"' in resposta.text
+        assert 'data-analysis-panel="lideres"' in resposta.text
+        assert 'data-analysis-panel="cronologia"' in resposta.text
+        assert 'data-analysis-panel="comparacao"' in resposta.text
+        assert 'data-scoring-chart' in resposta.text
+        assert 'data-leaders-grid' in resposta.text
         assert '<th>MIN</th>' in resposta.text
         assert "Recomeçar estatística" in resposta.text
         assert 'data-boxscore-player="' + str(jogador_id) + '"' in resposta.text
@@ -292,6 +299,10 @@ def test_recursos_offline_e_atalhos_estao_configurados():
     assert "posicao_x: position?.x ?? null" in script
     assert 'fieldGoalTypes = new Set(["dois_c", "dois_f", "tres_c", "tres_f"])' in script
     assert "function renderShotChart()" in script
+    assert "function renderAnalysis()" in script
+    assert "function renderScoringChart()" in script
+    assert "function renderComparisonBars()" in script
+    assert 'data-analysis-tab' in script
     assert "/reiniciar" in script
     assert "localStorage.removeItem(storageKey)" in script
 

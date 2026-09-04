@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}Estatísticas - {{ jogo.adversario }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260904-4">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260904-5">{% endblock %}
 {% block conteudo %}
 <main class="statboard" data-statboard data-game-id="{{ jogo.id }}" data-user-id="{{ utilizador.id }}" data-can-edit="{{ 'true' if pode_registar else 'false' }}">
   <script type="application/json" data-stats-events>{{ eventos|tojson }}</script>
@@ -112,40 +112,81 @@
   </dialog>
   {% endif %}
 
-  <section class="stat-lower-grid">
-    <article class="stat-boxscore-card">
-      <header><div><p class="ds-kicker">Em direto</p><h2>Box score</h2></div><small>Atualização automática</small></header>
-      <div class="stat-table-wrap"><table class="stat-boxscore"><thead><tr><th>Atleta</th><th>MIN</th><th>PTS</th><th>LL</th><th>2P</th><th>3P</th><th>RO</th><th>RD</th><th>RT</th><th>AST</th><th>RB</th><th>TO</th><th>DL</th><th>FP</th><th>EFF</th></tr></thead><tbody data-boxscore-body>{% for jogador in jogadores %}<tr data-boxscore-player="{{ jogador.id }}"><td><strong>#{{ jogador.numero_camisola or '–' }}</strong> {{ jogador.nome }}</td>{% for campo in range(14) %}<td>0</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
-    </article>
-    <aside class="stat-feed-card"><header><div><p class="ds-kicker">Cronologia</p><h2>Últimas ações</h2></div></header><div class="stat-feed" data-stat-feed></div></aside>
-  </section>
-
-  <section class="stat-shot-card" data-shot-chart>
-    <header>
-      <div><p class="ds-kicker">Leitura espacial</p><h2>Mapa de lançamentos</h2><p>Localização dos lançamentos de campo registados.</p></div>
-      <div class="stat-shot-tools">
-        <div class="stat-shot-tabs" role="group" aria-label="Equipa do mapa de lançamentos">
-          <button type="button" class="is-active" data-shot-side="equipa">{{ nome_clube }}</button>
-          <button type="button" data-shot-side="adversario">{{ jogo.adversario }}</button>
-        </div>
-        <strong data-shot-summary>0/0 · 0%</strong>
-      </div>
+  <section class="stat-analysis" data-analysis>
+    <header class="stat-analysis-header">
+      <div><p class="ds-kicker">Leitura do jogo</p><h2>Análise estatística</h2><p>Resumo, evolução e detalhe das ações num único painel.</p></div>
+      <span class="stat-analysis-live"><i></i> Atualização automática</span>
     </header>
-    <div class="stat-shot-court" data-shot-court>
-      <svg viewBox="0 0 940 500" role="img" aria-label="Mapa de lançamentos num campo completo">
-        <rect class="court-boundary" x="8" y="8" width="924" height="484" rx="2" />
-        <line x1="470" y1="8" x2="470" y2="492" /><circle cx="470" cy="250" r="72" />
-        <rect x="8" y="155" width="188" height="190" /><rect x="744" y="155" width="188" height="190" />
-        <circle cx="196" cy="250" r="58" /><circle cx="744" cy="250" r="58" />
-        <path d="M 8 70 A 218 218 0 0 1 8 430" /><path d="M 932 70 A 218 218 0 0 0 932 430" />
-        <line x1="72" y1="220" x2="72" y2="280" /><line x1="868" y1="220" x2="868" y2="280" />
-        <circle cx="88" cy="250" r="9" /><circle cx="852" cy="250" r="9" />
-        <path d="M 72 205 A 50 50 0 0 1 72 295" /><path d="M 868 205 A 50 50 0 0 0 868 295" />
-      </svg>
-      <div class="stat-shot-points" data-shot-points aria-live="polite"></div>
+    <nav class="stat-analysis-tabs" role="tablist" aria-label="Áreas da análise estatística">
+      <button type="button" class="is-active" role="tab" aria-selected="true" data-analysis-tab="resumo">Resumo</button>
+      <button type="button" role="tab" aria-selected="false" data-analysis-tab="boxscore">Box score</button>
+      <button type="button" role="tab" aria-selected="false" data-analysis-tab="lideres">Líderes</button>
+      <button type="button" role="tab" aria-selected="false" data-analysis-tab="cronologia">Jogada a jogada</button>
+      <button type="button" role="tab" aria-selected="false" data-analysis-tab="lancamentos">Mapa de lançamentos</button>
+      <button type="button" role="tab" aria-selected="false" data-analysis-tab="comparacao">Comparação</button>
+    </nav>
+
+    <div class="stat-analysis-panel is-active" role="tabpanel" data-analysis-panel="resumo">
+      <div class="stat-analysis-score">
+        <div class="stat-analysis-team is-home"><span>{{ nome_clube }}</span><strong data-analysis-score="equipa">0</strong></div>
+        <div class="stat-analysis-period"><small>Período atual</small><b data-analysis-period>1º</b><span data-analysis-clock>10:00</span></div>
+        <div class="stat-analysis-team is-away"><strong data-analysis-score="adversario">0</strong><span>{{ jogo.adversario }}</span></div>
+      </div>
+      <div class="stat-summary-layout">
+        <article class="stat-insight-card"><header><h3>Comparação rápida</h3><small>Dados registados</small></header><div data-team-summary></div></article>
+        <article class="stat-insight-card"><header><h3>Destaques da equipa</h3><small>Top do jogo</small></header><div class="stat-summary-leaders" data-leaders-summary></div></article>
+        <article class="stat-insight-card stat-summary-feed-card"><header><h3>Últimas ações</h3><small>Mais recentes</small></header><div class="stat-feed stat-summary-feed" data-summary-feed></div></article>
+      </div>
     </div>
-    <footer><span><i class="is-made"></i>Convertido</span><span><i class="is-missed"></i>Falhado</span><small data-shot-empty>Regista lançamentos para preencher o mapa.</small></footer>
+
+    <div class="stat-analysis-panel" role="tabpanel" data-analysis-panel="boxscore" hidden>
+      <article class="stat-boxscore-card stat-analysis-card">
+        <header><div><p class="ds-kicker">Detalhe individual</p><h2>Box score</h2></div><small>Atualização automática</small></header>
+        <div class="stat-table-wrap"><table class="stat-boxscore"><thead><tr><th>Atleta</th><th>MIN</th><th>PTS</th><th>LL</th><th>2P</th><th>3P</th><th>RO</th><th>RD</th><th>RT</th><th>AST</th><th>RB</th><th>TO</th><th>DL</th><th>FP</th><th>EFF</th></tr></thead><tbody data-boxscore-body>{% for jogador in jogadores %}<tr data-boxscore-player="{{ jogador.id }}"><td><strong>#{{ jogador.numero_camisola or '–' }}</strong> {{ jogador.nome }}</td>{% for campo in range(14) %}<td>0</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+      </article>
+    </div>
+
+    <div class="stat-analysis-panel" role="tabpanel" data-analysis-panel="lideres" hidden>
+      <header class="stat-panel-title"><div><p class="ds-kicker">Destaques</p><h2>Líderes estatísticos</h2></div><p>Classificação dos atletas em cada indicador registado.</p></header>
+      <div class="stat-leaders-grid" data-leaders-grid></div>
+    </div>
+
+    <div class="stat-analysis-panel" role="tabpanel" data-analysis-panel="cronologia" hidden>
+      <div class="stat-timeline-layout">
+        <header class="stat-panel-title"><div><p class="ds-kicker">Cronologia</p><h2>Jogada a jogada</h2></div><div class="stat-period-filters" role="group" aria-label="Filtrar por período"><button type="button" class="is-active" data-feed-period="all">Todos</button>{% for numero in range(1, 9) %}<button type="button" data-feed-period="{{ numero }}">P{{ numero }}</button>{% endfor %}</div></header>
+        <div class="stat-feed stat-timeline" data-stat-feed></div>
+      </div>
+    </div>
+
+    <div class="stat-analysis-panel" role="tabpanel" data-analysis-panel="lancamentos" hidden>
+      <section class="stat-shot-card stat-analysis-card" data-shot-chart>
+        <header>
+          <div><p class="ds-kicker">Leitura espacial</p><h2>Mapa de lançamentos</h2><p>Localização dos lançamentos de campo registados.</p></div>
+          <div class="stat-shot-tools"><div class="stat-shot-tabs" role="group" aria-label="Equipa do mapa de lançamentos"><button type="button" class="is-active" data-shot-side="equipa">{{ nome_clube }}</button><button type="button" data-shot-side="adversario">{{ jogo.adversario }}</button></div><strong data-shot-summary>0/0 · 0%</strong></div>
+        </header>
+        <div class="stat-shot-court" data-shot-court>
+          <svg viewBox="0 0 940 500" role="img" aria-label="Mapa de lançamentos num campo completo">
+            <rect class="court-boundary" x="8" y="8" width="924" height="484" rx="2" /><line x1="470" y1="8" x2="470" y2="492" /><circle cx="470" cy="250" r="72" />
+            <rect x="8" y="155" width="188" height="190" /><rect x="744" y="155" width="188" height="190" /><circle cx="196" cy="250" r="58" /><circle cx="744" cy="250" r="58" />
+            <path d="M 8 70 A 218 218 0 0 1 8 430" /><path d="M 932 70 A 218 218 0 0 0 932 430" /><line x1="72" y1="220" x2="72" y2="280" /><line x1="868" y1="220" x2="868" y2="280" />
+            <circle cx="88" cy="250" r="9" /><circle cx="852" cy="250" r="9" /><path d="M 72 205 A 50 50 0 0 1 72 295" /><path d="M 868 205 A 50 50 0 0 0 868 295" />
+          </svg>
+          <div class="stat-shot-points" data-shot-points aria-live="polite"></div>
+        </div>
+        <footer><span><i class="is-made"></i>Convertido</span><span><i class="is-missed"></i>Falhado</span><small data-shot-empty>Regista lançamentos para preencher o mapa.</small></footer>
+        <div class="stat-shot-rates" data-shooting-rates></div>
+      </section>
+    </div>
+
+    <div class="stat-analysis-panel" role="tabpanel" data-analysis-panel="comparacao" hidden>
+      <header class="stat-panel-title"><div><p class="ds-kicker">Equipa vs adversário</p><h2>Comparação estatística</h2></div><p>Todos os valores resultam das ações efetivamente registadas.</p></header>
+      <div class="stat-comparison-layout">
+        <article class="stat-insight-card"><header><h3>Indicadores do jogo</h3></header><div data-comparison-table></div></article>
+        <article class="stat-insight-card stat-scoring-card"><header><h3>Evolução da pontuação</h3></header><div class="stat-scoring-chart" data-scoring-chart></div></article>
+      </div>
+      <div class="stat-comparison-bars" data-comparison-bars></div>
+    </div>
   </section>
 </main>
-<script src="/static/js/basket-stats.js?v=20260904-4"></script>
+<script src="/static/js/basket-stats.js?v=20260904-5"></script>
 {% endblock %}
