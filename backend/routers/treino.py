@@ -1418,6 +1418,31 @@ async def atualizar_exercicio(
     return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}", status_code=303)
 
 
+@router.post("/exercicios/{exercicio_id}/notas")
+async def atualizar_notas_exercicio(
+    exercicio_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    organizacao: str = Form(""),
+    coaching_points: str = Form(""),
+):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
+    exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
+    if not exercicio:
+        return JSONResponse({"sucesso": False, "erro": "Exercício não encontrado"}, status_code=404)
+
+    exercicio.organizacao = organizacao.strip() or None
+    exercicio.coaching_points = coaching_points.strip() or None
+    _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+    db.commit()
+    return JSONResponse({
+        "sucesso": True,
+        "organizacao": exercicio.organizacao or "",
+        "coaching_points": exercicio.coaching_points or "",
+    })
+
+
 # ─────────────────────────────────────────
 # GUARDAR REFLEXÃO DO PLANO
 # URL: POST /treino/planos/{plano_id}/reflexao

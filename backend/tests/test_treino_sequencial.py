@@ -65,10 +65,30 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         for texto in (
             "Finalização em vantagem", "Hora", "18:15", "Duração", "20 min",
             "Tipo", "TIO", "RPE", "Organização", "Três filas na linha final.",
-            "Coaching points", "Atacar o cesto sem hesitar.",
+            "Coaching points", "Atacar o cesto sem hesitar.", "Editar desenho",
         ):
             assert texto in pagina.text
         assert 'class="training-exercise-card"' in pagina.text
+        assert 'data-drawing-preview=' in pagina.text
+        assert 'data-drawing-editor' in pagina.text
+        assert 'action="/treino/exercicios/' in pagina.text
+        assert "/notas" in pagina.text
+        assert "Editar dados do exercício" not in pagina.text
+
+        exercicio = db.query(ExercicioPlano).filter_by(plano_id=plano.id).one()
+        notas = client_admin.post(
+            f"/treino/exercicios/{exercicio.id}/notas",
+            data={"organizacao": "Quatro grupos.", "coaching_points": "Passe forte."},
+        )
+        assert notas.status_code == 200
+        assert notas.json() == {
+            "sucesso": True,
+            "organizacao": "Quatro grupos.",
+            "coaching_points": "Passe forte.",
+        }
+        db.refresh(exercicio)
+        assert exercicio.organizacao == "Quatro grupos."
+        assert exercicio.coaching_points == "Passe forte."
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()

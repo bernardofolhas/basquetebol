@@ -31,6 +31,16 @@
 </div>
 {% endmacro %}
 
+{% macro campo_previsualizacao(ex_id, campo) %}
+<figure class="training-drawing-preview">
+    <div class="training-drawing-preview-stage" style="aspect-ratio: {% if campo.tipo == 'meio' %}144 / 112{% else %}209 / 141{% endif %};">
+        <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}" class="training-drawing-court">
+        <img src="{{ campo.desenho|default('', true)|e }}" alt="Desenho de {{ campo.label }}" class="training-drawing-overlay" data-drawing-preview="{{ ex_id }}-{{ campo.numero }}" {% if not campo.desenho %}hidden{% endif %}>
+    </div>
+    <figcaption>{{ campo.label }}</figcaption>
+</figure>
+{% endmacro %}
+
 {% call equipa_contexto(
     equipa,
     "Plano de Treino",
@@ -457,6 +467,7 @@
                                     <h3>{{ ex.nome if ex.nome else "Exercício sem nome" }}</h3>
                                 </div>
                                 <div class="training-exercise-actions">
+                                    <button type="button" onclick="abrirModalExercicio({{ ex.id }})" class="ds-button ds-button-secondary ds-button-sm">Editar dados</button>
                                     <form method="POST" action="/treino/exercicios/{{ ex.id }}/duplicar">
                                         <button type="submit" class="ds-button ds-button-secondary ds-button-sm">Duplicar</button>
                                     </form>
@@ -475,92 +486,105 @@
                             </dl>
                             {% endif %}
 
-                            {% if ex.organizacao or ex.coaching_points %}
-                            <div class="training-exercise-content">
-                                {% if ex.organizacao %}<section><h4>Organização</h4><p>{{ ex.organizacao }}</p></section>{% endif %}
-                                {% if ex.coaching_points %}<section><h4>Coaching points</h4><p>{{ ex.coaching_points }}</p></section>{% endif %}
-                            </div>
-                            {% endif %}
-
-                            <details class="mt-5 rounded-2xl border border-gray-200 bg-white">
-                                <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-gray-700">Editar dados do exercício</summary>
-                                <div class="border-t border-gray-100 px-4 py-4">
-                            <form id="form_exercicio_{{ ex.id }}" method="POST" action="/treino/exercicios/{{ ex.id }}/atualizar" class="space-y-4">
-                                <div class="training-exercise-fields">
-                                    <div data-training-block-only hidden>
-                                        <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
-                                        <select name="bloco_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                                            <option value="" {% if not ex.bloco_id %}selected{% endif %}>Sem bloco</option>
-                                            {% for bloco in blocos_ui if not bloco.legado %}<option value="{{ bloco.id }}" {% if ex.bloco_id == bloco.id %}selected{% endif %}>{{ bloco.nome }}</option>{% endfor %}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium text-gray-500">Exercício</label>
-                                        <div class="flex gap-2">
-                                            <input type="text" name="nome" value="{{ ex.nome if ex.nome else '' }}" placeholder="Nome do exercício" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                                            <button type="button" onclick="abrirBiblioteca('form_exercicio_{{ ex.id }}')" class="ds-button ds-button-secondary ds-button-sm">Biblioteca</button>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium text-gray-500">Categoria</label>
-                                        <select name="categoria" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                                            <option value="">Sem categoria</option>
-                                            {% for categoria in categorias_exercicio %}
-                                            <option value="{{ categoria }}" {% if ex.categoria == categoria %}selected{% endif %}>{{ categoria }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium text-gray-500">Hora</label>
-                                        <input type="text" name="hora" value="{{ ex.hora if ex.hora else '' }}" placeholder="18:15" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium text-gray-500">Minutos</label>
-                                        <input type="number" name="minutos" value="{{ ex.minutos if ex.minutos else '' }}" placeholder="15" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium text-gray-500">RPE (1-10)</label>
-                                        <input type="number" name="rpe" min="1" max="10" step="0.5" value="{{ ex.rpe if ex.rpe is not none else '' }}" placeholder="Ex: 7" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                                    </div>
+                            <form method="POST" action="/treino/exercicios/{{ ex.id }}/notas" class="training-exercise-inline-form" onsubmit="guardarNotasExercicio(event, this, {{ ex.id }})">
+                                <div class="training-exercise-content training-exercise-content-editable">
+                                    <label>
+                                        <span>Organização</span>
+                                        <textarea name="organizacao" rows="3" placeholder="Grupos, rotações, material e organização do exercício...">{{ ex.organizacao if ex.organizacao else "" }}</textarea>
+                                    </label>
+                                    <label>
+                                        <span>Coaching points</span>
+                                        <textarea name="coaching_points" rows="3" placeholder="Pontos-chave de intervenção do treinador...">{{ ex.coaching_points if ex.coaching_points else "" }}</textarea>
+                                    </label>
                                 </div>
-
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium text-gray-500">Organização</label>
-                                        <textarea name="organizacao" rows="4" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ ex.organizacao if ex.organizacao else "" }}</textarea>
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium text-gray-500">Coaching points</label>
-                                        <textarea name="coaching_points" rows="4" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ ex.coaching_points if ex.coaching_points else "" }}</textarea>
-                                    </div>
-                                </div>
-
-                                <div class="flex justify-end">
-                                    <button type="submit" class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black">Guardar exercício</button>
+                                <div class="training-inline-save">
+                                    <span data-notes-status="{{ ex.id }}" aria-live="polite"></span>
+                                    <button type="submit" class="ds-button ds-button-primary ds-button-sm">Guardar conteúdo</button>
                                 </div>
                             </form>
-                                </div>
-                            </details>
 
-                            <details class="mt-4 rounded-2xl border border-gray-200 bg-white" data-drawings="true" data-exercicio-id="{{ ex.id }}" ontoggle="togglePainelDesenhos('{{ ex.id }}', this.open)">
-                                <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-gray-700">Quadros táticos e desenhos</summary>
-                                <div class="border-t border-gray-100 px-4 py-4">
-                                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                                        <p class="text-sm text-gray-500">Adiciona apenas os campos necessários. O exercício pode ficar sem quadros.</p>
-                                        <div class="flex flex-wrap gap-2">
-                                            <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos"><input type="hidden" name="tipo" value="meio"><button class="rounded-lg border border-orange-200 px-3 py-1.5 text-xs font-medium text-orange-600 hover:bg-orange-50">+ Campo meio</button></form>
-                                            <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos"><input type="hidden" name="tipo" value="completo"><button class="rounded-lg border border-orange-200 px-3 py-1.5 text-xs font-medium text-orange-600 hover:bg-orange-50">+ Campo completo</button></form>
+                            <dialog id="modal_exercicio_{{ ex.id }}" class="training-editor-dialog" aria-labelledby="titulo_modal_exercicio_{{ ex.id }}">
+                                <div class="training-editor-dialog-shell">
+                                    <header class="training-editor-dialog-head">
+                                        <div><p>Exercício {{ loop.index }}</p><h2 id="titulo_modal_exercicio_{{ ex.id }}">Editar exercício</h2></div>
+                                        <button type="button" onclick="fecharModalExercicio({{ ex.id }})" aria-label="Fechar">×</button>
+                                    </header>
+                                    <form id="form_exercicio_{{ ex.id }}" method="POST" action="/treino/exercicios/{{ ex.id }}/atualizar" class="space-y-4 p-5">
+                                        <input type="hidden" name="organizacao" data-modal-organizacao="{{ ex.id }}" value="{{ ex.organizacao if ex.organizacao else '' }}">
+                                        <input type="hidden" name="coaching_points" data-modal-coaching="{{ ex.id }}" value="{{ ex.coaching_points if ex.coaching_points else '' }}">
+                                        <div class="training-exercise-fields">
+                                            <div data-training-block-only hidden>
+                                                <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
+                                                <select name="bloco_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                                    <option value="" {% if not ex.bloco_id %}selected{% endif %}>Sem bloco</option>
+                                                    {% for bloco in blocos_ui if not bloco.legado %}<option value="{{ bloco.id }}" {% if ex.bloco_id == bloco.id %}selected{% endif %}>{{ bloco.nome }}</option>{% endfor %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-gray-500">Exercício</label>
+                                                <div class="flex gap-2">
+                                                    <input type="text" name="nome" value="{{ ex.nome if ex.nome else '' }}" placeholder="Nome do exercício" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                                    <button type="button" onclick="abrirBiblioteca('form_exercicio_{{ ex.id }}')" class="ds-button ds-button-secondary ds-button-sm">Biblioteca</button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-gray-500">Categoria</label>
+                                                <select name="categoria" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                                    <option value="">Sem categoria</option>
+                                                    {% for categoria in categorias_exercicio %}<option value="{{ categoria }}" {% if ex.categoria == categoria %}selected{% endif %}>{{ categoria }}</option>{% endfor %}
+                                                </select>
+                                            </div>
+                                            <div><label class="mb-1 block text-xs font-medium text-gray-500">Hora</label><input type="text" name="hora" value="{{ ex.hora if ex.hora else '' }}" placeholder="18:15" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></div>
+                                            <div><label class="mb-1 block text-xs font-medium text-gray-500">Minutos</label><input type="number" name="minutos" value="{{ ex.minutos if ex.minutos else '' }}" placeholder="15" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></div>
+                                            <div><label class="mb-1 block text-xs font-medium text-gray-500">RPE (1-10)</label><input type="number" name="rpe" min="1" max="10" step="0.5" value="{{ ex.rpe if ex.rpe is not none else '' }}" placeholder="Ex: 7" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></div>
+                                        </div>
+                                        <div class="flex justify-end gap-2 border-t border-gray-100 pt-4">
+                                            <button type="button" onclick="fecharModalExercicio({{ ex.id }})" class="ds-button ds-button-secondary">Cancelar</button>
+                                            <button type="submit" class="ds-button ds-button-primary">Guardar exercício</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </dialog>
+
+                            <section class="training-exercise-visuals">
+                                <header>
+                                    <div><h4>Desenhos táticos</h4><p>Visualização direta dos campos usados neste exercício.</p></div>
+                                    <button type="button" onclick="abrirEditorDesenho({{ ex.id }})" class="ds-button ds-button-secondary ds-button-sm">Editar desenho</button>
+                                </header>
+                                <div class="training-drawing-preview-grid">
+                                    {% for campo in ex.campos_ui %}
+                                    {{ campo_previsualizacao(ex.id, campo) }}
+                                    {% else %}
+                                    <div class="training-drawing-empty">Ainda não existem campos neste exercício. Usa <b>Editar desenho</b> para acrescentar um.</div>
+                                    {% endfor %}
+                                </div>
+                            </section>
+
+                            <dialog id="modal_desenho_{{ ex.id }}" class="training-editor-dialog training-drawing-dialog" data-drawing-editor data-exercicio-id="{{ ex.id }}" aria-labelledby="titulo_modal_desenho_{{ ex.id }}">
+                                <div class="training-editor-dialog-shell">
+                                    <header class="training-editor-dialog-head">
+                                        <div><p>Exercício {{ loop.index }}</p><h2 id="titulo_modal_desenho_{{ ex.id }}">Editor tático</h2></div>
+                                        <button type="button" onclick="fecharEditorDesenho({{ ex.id }})" aria-label="Fechar">×</button>
+                                    </header>
+                                    <div class="training-drawing-dialog-body">
+                                        <div class="training-drawing-dialog-actions">
+                                            <p>Escolhe apenas os campos necessários para representar o exercício.</p>
+                                            <div>
+                                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos"><input type="hidden" name="tipo" value="meio"><button class="ds-button ds-button-secondary ds-button-sm">+ Campo meio</button></form>
+                                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos"><input type="hidden" name="tipo" value="completo"><button class="ds-button ds-button-secondary ds-button-sm">+ Campo completo</button></form>
+                                            </div>
+                                        </div>
+                                        <div class="training-drawing-editor-grid">
+                                            {% for campo in ex.campos_ui %}
+                                            {{ campo_desenho('canvas' ~ campo.numero ~ '_' ~ ex.id, ex.id, campo) }}
+                                            {% else %}
+                                            <div class="training-drawing-empty">Acrescenta um campo meio ou completo para começar a desenhar.</div>
+                                            {% endfor %}
                                         </div>
                                     </div>
-                                    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                                        {% for campo in ex.campos_ui %}
-                                        {{ campo_desenho('canvas' ~ campo.numero ~ '_' ~ ex.id, ex.id, campo) }}
-                                        {% else %}
-                                        <div class="col-span-full rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-5 py-8 text-center text-sm text-gray-500">Este exercício não tem campos. Podes acrescentar um quando for útil.</div>
-                                        {% endfor %}
-                                    </div>
+                                    <footer class="training-editor-dialog-footer"><button type="button" onclick="fecharEditorDesenho({{ ex.id }})" class="ds-button ds-button-primary">Concluir</button></footer>
                                 </div>
-                            </details>
+                            </dialog>
                         </article>
                         {% endfor %}
                     </div>
@@ -737,7 +761,7 @@ function inicializarDesenho(canvasId) {
 
 function togglePainelDesenhos(exercicioId, aberto) {
     if (!aberto) return;
-    const painel = document.querySelector(`details[data-exercicio-id="${exercicioId}"]`);
+    const painel = document.querySelector(`[data-drawing-editor][data-exercicio-id="${exercicioId}"]`);
     if (!painel) return;
     painel.querySelectorAll('canvas').forEach((canvas) => {
         const canvasId = canvas.id;
@@ -746,6 +770,62 @@ function togglePainelDesenhos(exercicioId, aberto) {
             setTimeout(() => definirFerramenta(canvasId, 'jogador_ataque'), 200);
         }
     });
+}
+
+function abrirEditorDesenho(exercicioId) {
+    const modal = document.getElementById(`modal_desenho_${exercicioId}`);
+    if (!modal) return;
+    modal.showModal();
+    requestAnimationFrame(() => togglePainelDesenhos(String(exercicioId), true));
+}
+
+function fecharEditorDesenho(exercicioId) {
+    document.getElementById(`modal_desenho_${exercicioId}`)?.close();
+}
+
+function abrirModalExercicio(exercicioId) {
+    const modal = document.getElementById(`modal_exercicio_${exercicioId}`);
+    const notas = document.querySelector(`form[action="/treino/exercicios/${exercicioId}/notas"]`);
+    if (!modal) return;
+    if (notas) {
+        modal.querySelector(`[data-modal-organizacao="${exercicioId}"]`).value = notas.elements.organizacao.value;
+        modal.querySelector(`[data-modal-coaching="${exercicioId}"]`).value = notas.elements.coaching_points.value;
+    }
+    modal.showModal();
+}
+
+function fecharModalExercicio(exercicioId) {
+    document.getElementById(`modal_exercicio_${exercicioId}`)?.close();
+}
+
+async function guardarNotasExercicio(evento, formulario, exercicioId) {
+    evento.preventDefault();
+    const botao = formulario.querySelector('button[type="submit"]');
+    const estado = formulario.querySelector(`[data-notes-status="${exercicioId}"]`);
+    botao.disabled = true;
+    estado.textContent = 'A guardar...';
+    try {
+        const resposta = await fetch(formulario.action, {
+            method: 'POST',
+            body: new FormData(formulario),
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            }
+        });
+        const dados = await resposta.json();
+        if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível guardar.');
+        formulario.elements.organizacao.value = dados.organizacao;
+        formulario.elements.coaching_points.value = dados.coaching_points;
+        document.querySelector(`[data-modal-organizacao="${exercicioId}"]`).value = dados.organizacao;
+        document.querySelector(`[data-modal-coaching="${exercicioId}"]`).value = dados.coaching_points;
+        estado.textContent = 'Guardado';
+        setTimeout(() => { estado.textContent = ''; }, 1800);
+    } catch (erro) {
+        estado.textContent = erro.message;
+    } finally {
+        botao.disabled = false;
+    }
 }
 
 function simularMouse(e) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY, button: 0 }; }
@@ -1007,15 +1087,21 @@ function desfazer(canvasId) {
 function guardarDesenho(canvasId, exercicioId, numeroDesenho) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
+    const desenho = est.canvas.toDataURL('image/png');
     fetch(`/treino/exercicios/${exercicioId}/desenho`, {
         method: 'POST',
-        body: JSON.stringify({ numero: numeroDesenho, dados: est.canvas.toDataURL('image/png') }),
+        body: JSON.stringify({ numero: numeroDesenho, dados: desenho }),
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
         }
     }).then(r => r.json()).then(data => {
         if (data.sucesso) {
+            const preview = document.querySelector(`[data-drawing-preview="${exercicioId}-${numeroDesenho}"]`);
+            if (preview) {
+                preview.src = desenho;
+                preview.hidden = false;
+            }
             const btn = document.querySelector(`[onclick="guardarDesenho('${canvasId}', ${exercicioId}, ${numeroDesenho})"]`);
             if (btn) {
                 btn.textContent = '✓ Guardado';
@@ -1087,10 +1173,6 @@ function selecionarDaBiblioteca(ex) {
 
 let _bibDebounce = null;
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('details[data-drawings="true"][open]').forEach((painel) => {
-        togglePainelDesenhos(painel.dataset.exercicioId, true);
-    });
-
     const pesquisaEl = document.getElementById('bib_pesquisa');
     if (pesquisaEl) {
         pesquisaEl.addEventListener('input', () => {
