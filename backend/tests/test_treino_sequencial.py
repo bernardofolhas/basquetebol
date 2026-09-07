@@ -36,3 +36,39 @@ def test_exercicios_sem_blocos_persistem_e_podem_ser_editados(client_admin):
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()
+
+
+def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={
+                "nome": "Finalização em vantagem",
+                "categoria": "TIO",
+                "hora": "18:15",
+                "minutos": "20",
+                "rpe": "7",
+                "organizacao": "Três filas na linha final.",
+                "coaching_points": "Atacar o cesto sem hesitar.",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert pagina.status_code == 200
+        for texto in (
+            "Finalização em vantagem", "Hora", "18:15", "Duração", "20 min",
+            "Tipo", "TIO", "RPE", "Organização", "Três filas na linha final.",
+            "Coaching points", "Atacar o cesto sem hesitar.",
+        ):
+            assert texto in pagina.text
+        assert 'class="training-exercise-card"' in pagina.text
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
