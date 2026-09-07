@@ -54,6 +54,7 @@ def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
     toolbar = (ROOT / "frontend/templates/partials/tactical_toolbar.html").read_text(encoding="utf-8")
     playbook = (ROOT / "frontend/templates/playbook/detalhe.html").read_text(encoding="utf-8")
     treino = (ROOT / "frontend/templates/treino/plano.html").read_text(encoding="utf-8")
+    compatibilidade = (ROOT / "frontend/static/js/tactical-legacy.js").read_text(encoding="utf-8")
 
     for grupo in ("Jogadores", "Equipamento", "Movimentos", "Estilo da linha", "Edição"):
         assert grupo in toolbar
@@ -71,6 +72,16 @@ def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
     assert "estadoDesenhoParaGuardar" in playbook
     assert "sincronizarNumeroJogador" in treino
     assert "sincronizarNumeroJogador" in playbook
+    assert "tactical-legacy.js" in treino
+    assert "tactical-legacy.js" in playbook
+    assert 'TIPO_RECORTE = "recorte_legado"' in compatibilidade
+    assert "decomporImagem" in compatibilidade
+    assert "contemPonto" in compatibilidade
+    assert "converterImagemLegada(canvasId, imagemGuardada)" in treino
+    assert "TacticalLegacy.contemPonto" in treino
+    assert "TacticalLegacy.contemPonto" in playbook
+    assert "await window.TacticalLegacy.aguardarRecortes" in treino
+    assert "await window.TacticalLegacy.aguardarRecortes" in playbook
 
 
 def test_administrador_adiciona_e_remove_imagem_do_passo(client_admin):

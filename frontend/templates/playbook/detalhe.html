@@ -4,6 +4,7 @@
 {% block titulo %}{{ setplay.nome }} — Playbook{% endblock %}
 
 {% block conteudo %}
+<script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
 {% set apenas_imagem_ebp = setplay.origem == 'ebp' %}
 
 <!-- ── CABEÇALHO ─────────────────────────────────────────────────── -->
@@ -256,7 +257,7 @@ function inicializarDesenho(canvasId) {
         const overlay = document.getElementById('overlay_' + passoId);
         if (canvas.dataset.estado) restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
         else if (overlay) {
-            const carregar = () => { CANVAS_ESTADO[canvasId].imagemBase = overlay; redesenhar(canvasId); };
+            const carregar = () => { converterImagemLegada(canvasId, overlay); redesenhar(canvasId); };
             if (overlay.complete) carregar(); else overlay.addEventListener('load', carregar, { once: true });
         } else redesenhar(canvasId);
     };
@@ -274,6 +275,20 @@ function inicializarDesenho(canvasId) {
 function simularMouse(e) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY, button: 0 }; }
 function obterPos(canvas, e) { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; }
 
+function converterImagemLegada(canvasId, imagem, manterObjectos = false) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est) return;
+    if (!window.TacticalLegacy) { est.imagemBase = imagem; return; }
+    const recortes = window.TacticalLegacy.decomporImagem(imagem, est.canvas.width, est.canvas.height);
+    est.objectos = manterObjectos ? [...recortes, ...est.objectos] : recortes;
+    est.imagemBase = null;
+}
+
+function eObjectoMovel(obj) {
+    return ['jogador_ataque','jogador_defesa','cone','bola','coach'].includes(obj.tipo)
+        || Boolean(window.TacticalLegacy?.eRecorte(obj));
+}
+
 function restaurarEstadoDesenho(canvasId, estadoSerializado) {
     const est = CANVAS_ESTADO[canvasId]; if (!est) return;
     try {
@@ -286,7 +301,10 @@ function restaurarEstadoDesenho(canvasId, estadoSerializado) {
             if (Number.isFinite(Number(obj.x))) obj.x = Number(obj.x) * escalaX;
             if (Number.isFinite(Number(obj.y))) obj.y = Number(obj.y) * escalaY;
             if (Array.isArray(obj.pontos)) obj.pontos = obj.pontos.map(p => ({ x: Number(p.x) * escalaX, y: Number(p.y) * escalaY }));
-            if (Number.isFinite(Number(obj.largura))) obj.largura = Number(obj.largura) * ((escalaX + escalaY) / 2);
+            if (window.TacticalLegacy?.eRecorte(obj)) {
+                obj.largura = Number(obj.largura) * escalaX;
+                obj.altura = Number(obj.altura) * escalaY;
+            } else if (Number.isFinite(Number(obj.largura))) obj.largura = Number(obj.largura) * ((escalaX + escalaY) / 2);
             return obj;
         }) : [];
         const maiorAtaque = Math.max(0, ...est.objectos.filter(o => o.tipo === 'jogador_ataque').map(o => Number(o.numero) || 0));
@@ -297,7 +315,7 @@ function restaurarEstadoDesenho(canvasId, estadoSerializado) {
         est.corLinha = guardado.corLinha || est.corLinha;
         if (guardado.fundoLegado) {
             const fundo = new Image();
-            fundo.onload = () => { est.imagemBase = fundo; redesenhar(canvasId); };
+            fundo.onload = () => { converterImagemLegada(canvasId, fundo, true); redesenhar(canvasId); };
             fundo.src = guardado.fundoLegado;
         }
         redesenhar(canvasId); sincronizarNumeroJogador(canvasId);
@@ -316,7 +334,7 @@ function aoPremir(canvasId, e) {
     if (est.ferramenta === 'apagar') { est.objectos = est.objectos.filter(o => !estaNoObj(o, pos)); redesenhar(canvasId); return; }
     if (est.ferramenta === 'seleccionar') {
         est.objectoSeleccionado = null;
-        for (let i = est.objectos.length - 1; i >= 0; i--) { if (estaNoObj(est.objectos[i], pos)) { est.objectoSeleccionado = est.objectos[i]; if (simbolos.includes(est.objectos[i].tipo)) est.offsetMover = { x: pos.x - est.objectos[i].x, y: pos.y - est.objectos[i].y }; else est.offsetMover = { x: pos.x - est.objectos[i].pontos[0].x, y: pos.y - est.objectos[i].pontos[0].y }; est.aDesconhar = true; break; } }
+        for (let i = est.objectos.length - 1; i >= 0; i--) { if (estaNoObj(est.objectos[i], pos)) { est.objectoSeleccionado = est.objectos[i]; if (eObjectoMovel(est.objectos[i])) est.offsetMover = { x: pos.x - est.objectos[i].x, y: pos.y - est.objectos[i].y }; else est.offsetMover = { x: pos.x - est.objectos[i].pontos[0].x, y: pos.y - est.objectos[i].pontos[0].y }; est.aDesconhar = true; break; } }
         redesenhar(canvasId); if (est.objectoSeleccionado) desenharSeleccao(est.ctx, est.objectoSeleccionado); return;
     }
     if (simbolos.includes(est.ferramenta)) {
@@ -338,7 +356,7 @@ function aoMover(canvasId, e) {
     est.posicaoCursor = pos;
     if (est.ferramenta === 'seleccionar' && est.aDesconhar && est.objectoSeleccionado) {
         const obj = est.objectoSeleccionado;
-        if (simbolos.includes(obj.tipo)) { obj.x = pos.x - est.offsetMover.x; obj.y = pos.y - est.offsetMover.y; }
+        if (eObjectoMovel(obj)) { obj.x = pos.x - est.offsetMover.x; obj.y = pos.y - est.offsetMover.y; }
         else if (obj.pontos) { const dx = pos.x - est.offsetMover.x - obj.pontos[0].x, dy = pos.y - est.offsetMover.y - obj.pontos[0].y; obj.pontos.forEach(p => { p.x += dx; p.y += dy; }); est.offsetMover.x = pos.x - obj.pontos[0].x; est.offsetMover.y = pos.y - obj.pontos[0].y; }
         redesenhar(canvasId); desenharSeleccao(est.ctx, est.objectoSeleccionado); return;
     }
@@ -355,7 +373,11 @@ function redesenhar(canvasId) {
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
     est.ctx.clearRect(0, 0, est.canvas.width, est.canvas.height);
     if (est.imagemBase) est.ctx.drawImage(est.imagemBase, 0, 0, est.canvas.width, est.canvas.height);
-    est.objectos.forEach(obj => { if (simbolos.includes(obj.tipo)) desenharSimbolo(est.ctx, obj); else desenharLinhaMultipla(est.ctx, obj, null); });
+    est.objectos.forEach(obj => {
+        if (simbolos.includes(obj.tipo)) desenharSimbolo(est.ctx, obj);
+        else if (window.TacticalLegacy?.eRecorte(obj)) window.TacticalLegacy.desenharRecorte(est.ctx, obj, () => redesenhar(canvasId));
+        else desenharLinhaMultipla(est.ctx, obj, null);
+    });
 }
 
 function desenharSimbolo(ctx, obj) {
@@ -390,6 +412,7 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
 function estaNoObj(obj, pos) {
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
     if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x-obj.x, pos.y-obj.y) < 18;
+    if (window.TacticalLegacy?.eRecorte(obj)) return window.TacticalLegacy.contemPonto(obj, pos);
     if (!obj.pontos || obj.pontos.length < 2) return false;
     for (let i=0; i<obj.pontos.length-1; i++) { const p1=obj.pontos[i], p2=obj.pontos[i+1]; const dx=p2.x-p1.x, dy=p2.y-p1.y, len2=dx*dx+dy*dy; if (len2===0) { if (Math.hypot(pos.x-p1.x, pos.y-p1.y)<10) return true; continue; } const t=Math.max(0,Math.min(1,((pos.x-p1.x)*dx+(pos.y-p1.y)*dy)/len2)); if (Math.hypot(pos.x-(p1.x+t*dx), pos.y-(p1.y+t*dy))<10) return true; }
     return false;
@@ -399,6 +422,7 @@ function desenharSeleccao(ctx, obj) {
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
     ctx.save(); ctx.strokeStyle = '#3B82F6'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
     if (simbolos.includes(obj.tipo)) { ctx.beginPath(); ctx.arc(obj.x, obj.y, 20*(obj.tamanho||1), 0, Math.PI*2); ctx.stroke(); }
+    else if (window.TacticalLegacy?.eRecorte(obj)) window.TacticalLegacy.desenharSeleccao(ctx, obj);
     else if (obj.pontos && obj.pontos.length >= 2) { ctx.beginPath(); ctx.moveTo(obj.pontos[0].x, obj.pontos[0].y); obj.pontos.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#3B82F6'; obj.pontos.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill(); }); }
     ctx.restore();
 }
@@ -480,9 +504,12 @@ function desfazer(canvasId) {
     redesenhar(canvasId);
 }
 
-function guardarDesenhoPasso(canvasId, passoId) {
+async function guardarDesenhoPasso(canvasId, passoId) {
     const est = CANVAS_ESTADO[canvasId]; if (!est) return;
     const btn = document.getElementById('btn_guardar_' + passoId);
+    if (window.TacticalLegacy) await window.TacticalLegacy.aguardarRecortes(est.objectos);
+    est.objectoSeleccionado = null;
+    redesenhar(canvasId);
     const desenho = est.canvas.toDataURL('image/png');
     const estadoEditavel = estadoDesenhoParaGuardar(est);
     fetch(`/playbook/passos/${passoId}/desenho`, {
