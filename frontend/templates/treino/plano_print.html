@@ -23,10 +23,8 @@
             </div>
         </section>
         {% endif %}
-        {% if ex.campos_pdf and (ex.organizacao or ex.coaching_points) %}<div class="exercise-notes">{% endif %}
-            {% if ex.organizacao %}<section class="exercise-cell exercise-organization"><h4>Organização</h4><p>{{ ex.organizacao }}</p></section>{% endif %}
-            {% if ex.coaching_points %}<section class="exercise-cell exercise-coaching"><h4>Coaching points</h4><p>{{ ex.coaching_points }}</p></section>{% endif %}
-        {% if ex.campos_pdf and (ex.organizacao or ex.coaching_points) %}</div>{% endif %}
+        {% if ex.organizacao %}<section class="exercise-cell exercise-organization"><h4>Organização</h4><p>{{ ex.organizacao }}</p></section>{% endif %}
+        {% if ex.coaching_points %}<section class="exercise-cell exercise-coaching"><h4>Coaching points</h4><p>{{ ex.coaching_points }}</p></section>{% endif %}
     </div>
     {% endif %}
 </article>
@@ -81,22 +79,20 @@
         .exercise-head div:not(.exercise-name) label, .exercise-head div:not(.exercise-name) strong { white-space: nowrap; }
         .exercise-body { display: grid; grid-template-columns: 1fr; }
         .exercise-body.two-texts { grid-template-columns: minmax(0, 64%) minmax(0, 36%); }
-        .exercise-body.with-courts.one-text,.exercise-body.with-courts.two-texts { grid-template-columns: minmax(0, 39%) minmax(0, 61%); }
+        .exercise-body.with-courts.one-text { grid-template-columns: minmax(0, 38%) minmax(0, 62%); }
+        .exercise-body.with-courts.two-texts { grid-template-columns: minmax(0, 36%) minmax(0, 40%) minmax(0, 24%); }
         .exercise-body.with-courts.courts-only { grid-template-columns: minmax(0, 1fr); }
         .exercise-cell { min-width: 0; border-right: 1px solid #d7dde5; padding: 7px; overflow-wrap: anywhere; }
         .exercise-cell:last-child { border-right: 0; }
         .exercise-cell h4 { font-size: 8px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px; }
         .exercise-cell p { white-space: pre-line; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
-        .exercise-notes { min-width: 0; align-self: start; }
-        .exercise-notes .exercise-cell { border-right: 0; }
-        .exercise-notes .exercise-cell + .exercise-cell { border-top: 1px solid #d7dde5; }
-        .exercise-notes .exercise-coaching { padding-top: 5px; padding-bottom: 5px; }
+        .exercise-coaching { padding-top: 7px; padding-bottom: 7px; }
         .courts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items:start; gap: 5px; }
         .courts-grid.court-count-1 { grid-template-columns: minmax(0, 1fr); }
         .court-card { min-width: 0; break-inside: avoid; page-break-inside: avoid; }
         .court-card h5 { margin-bottom: 2px; color: #64748b; font-size: 7px; text-transform: uppercase; overflow-wrap: anywhere; }
-        .court { display: flex; align-items: center; justify-content: center; position: relative; border: 1px solid #cbd5e1; background: #fff; padding: 2px; overflow: hidden; }
-        .court img { display: block; width: auto; height: auto; max-width: 100%; max-height: 30mm; object-fit: contain; object-position: center; }
+        .court { position: relative; background: #fff; padding: 0; overflow: hidden; text-align: center; }
+        .court img { display: block; width: auto; height: auto; max-width: 100%; max-height: 27mm; margin: 0 auto; object-fit: contain; object-position: center; }
 
         .reflection { margin-top: 16px; border: 1px solid #d1d5db; min-height: 90px; padding: 12px; }
         .reflection h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 8px; }
