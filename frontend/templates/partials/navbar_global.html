@@ -54,17 +54,11 @@
             {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/resumo', 'Resumo', 'Visão rápida da equipa', p.endswith('/resumo')) }}
             {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/plantel', 'Plantel', 'Atletas e fichas', p.endswith('/plantel')) }}
             {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/equipa-tecnica', 'Equipa técnica', 'Treinadores associados', p.endswith('/equipa-tecnica')) }}
-            {{ menu_link('/playbook/equipas/' ~ equipa_contexto_id, 'Playbook', 'Sistemas e movimentos', p.startswith('/playbook')) }}
           </div>
           {% endif %}
         </div>
       </section>
 
-      {% if equipa_contexto_id %}
-      <div class="sidebar-direct" aria-label="Área da equipa">
-        <a href="/equipas/{{ equipa_contexto_id }}/resumo" class="sidebar-heading sidebar-link ds-nav-order-resumo {% if p in ['/equipas/' ~ equipa_contexto_id, '/equipas/' ~ equipa_contexto_id ~ '/resumo'] %}is-active{% endif %}">Resumo</a>
-      </div>
-      {% endif %}
 
       <section class="sidebar-group ds-nav-order-planeamento">
         <h2 class="sidebar-heading {% if p.startswith('/planeamento') or p.startswith('/fisico/equipas') %}is-active{% endif %}">Planeamento </h2>
@@ -112,9 +106,6 @@
             {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id ~ '/registar', 'Assiduidade', 'Presenças e RPE individual', p.startswith('/assiduidade')) }}
             {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/eventos', 'Eventos', 'Atividades da equipa', p.endswith('/eventos')) }}
           </div>
-          {% for jogo_nav in nav.jogos_proximos|default([]) if jogo_nav.equipa_id == equipa_contexto_id %}
-          {% if perfil != 'staff' %}<div class="ds-dropdown-section">{{ menu_link('/jogos/' ~ jogo_nav.id ~ '/plano', 'Plano de jogo · ' ~ jogo_nav.adversario, 'Preparação direta do próximo jogo') }}</div>{% endif %}
-          {% endfor %}
           {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
           {{ menu_link('/calendario', 'Calendário operacional', 'Toda a atividade do clube', p.startswith('/calendario')) }}
@@ -148,9 +139,6 @@
             {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id, 'Análise física e testes', 'Testes e evolução física') }}
             {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id, 'Assiduidade e RPE', 'Participação e esforço percebido') }}
           </div>
-          {% for jogo_nav in nav.jogos_proximos|default([]) if jogo_nav.equipa_id == equipa_contexto_id %}
-          {% if perfil != 'staff' %}<div class="ds-dropdown-section">{{ menu_link('/scouting/jogos/' ~ jogo_nav.id, 'Scouting · ' ~ jogo_nav.adversario, 'Análise da competição e adversário') }}</div>{% endif %}
-          {% endfor %}
           {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
           <div class="ds-dropdown-section">
             <p class="ds-dropdown-label px-2 pb-1">Análise global</p>
@@ -192,18 +180,24 @@
       {% for acao in nav.acoes_rapidas|default([]) %}<a class="sidebar-link" href="{{ acao.link }}">{{ acao.label }}</a>{% endfor %}
     </section>
     {% endif %}
+  </nav>
+  <footer class="sidebar-account">
     {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
-    <section class="sidebar-inbox" aria-label="Caixa de entrada">
-      <div class="flex items-center justify-between border-b border-slate-100 px-3 py-3"><div><p class="font-bold text-slate-900">Caixa de entrada</p><p class="text-xs text-slate-500">Pendências e avisos num só local</p></div><div class="flex gap-2">{% if nav.total_notificacoes %}<form method="POST" action="/notificacoes/ler-todas"><button class="text-xs font-semibold text-[var(--clube-primary)]">Marcar lidas</button></form>{% endif %}{% if nav.notificacoes|default([]) %}<form method="POST" action="/notificacoes/limpar-lidas"><button class="text-xs font-semibold text-slate-500">Limpar</button></form>{% endif %}</div></div>
+    <button type="button" class="sidebar-link sidebar-inbox-open" data-inbox-open aria-haspopup="dialog" aria-controls="sidebar-inbox-dialog">Caixa de entrada{% if total_caixa_entrada %}<span class="sidebar-badge">{{ total_caixa_entrada }}</span>{% endif %}</button>
+    {% endif %}
+    <a class="sidebar-link" href="/minha-conta"><strong>{{ utilizador.nome }}</strong><span>Minha conta</span></a>
+    <form method="POST" action="/logout"><input type="hidden" name="csrf_token" value="{{ request.session.get('_csrf', '') }}"><button type="submit">Terminar sessão</button></form>
+
+  </footer>
+</aside>
+    {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
+    <dialog id="sidebar-inbox-dialog" class="sidebar-inbox-dialog" aria-labelledby="sidebar-inbox-title">
+      <div class="sidebar-inbox-title"><h2 id="sidebar-inbox-title">Caixa de entrada</h2><button type="button" data-inbox-close aria-label="Fechar caixa de entrada">×</button></div>
+      <div class="flex items-center justify-between border-b border-slate-100 px-3 py-3"><p class="text-xs text-slate-500">Pendências e avisos</p><div class="flex gap-2">{% if nav.total_notificacoes %}<form method="POST" action="/notificacoes/ler-todas"><button class="text-xs font-semibold text-[var(--clube-primary)]">Marcar lidas</button></form>{% endif %}{% if nav.notificacoes|default([]) %}<form method="POST" action="/notificacoes/limpar-lidas"><button class="text-xs font-semibold text-slate-500">Limpar</button></form>{% endif %}</div></div>
       {% if nav.pendencias|default([]) %}<p class="ds-inbox-heading">Pendências</p>{% for grupo in nav.pendencias %}<section class="border-b border-slate-100 p-2"><p class="px-2 py-1 text-[0.68rem] font-bold uppercase tracking-wider text-slate-400">{{ grupo.label }}</p>{% for tarefa in grupo.itens %}<a href="{{ tarefa.link }}" class="ds-task-link"><span class="ds-priority-dot {% if tarefa.urgente %}bg-red-500{% else %}bg-amber-400{% endif %}"></span><span class="min-w-0"><strong>{{ tarefa.titulo }}</strong><small>{{ tarefa.item.equipa_nome or tarefa.item.titulo }}{% if tarefa.item.data %} · {{ tarefa.item.data|data_pt }}{% endif %}</small></span></a>{% endfor %}</section>{% endfor %}{% endif %}
       <p class="ds-inbox-heading">Avisos</p>
       {% for notificacao in nav.notificacoes|default([]) %}<form method="POST" action="/notificacoes/{{ notificacao.id }}/ler" class="border-b border-slate-100 last:border-0"><button class="block w-full px-3 py-3 text-left hover:bg-slate-50 {% if not notificacao.lida %}bg-blue-50/50{% endif %}"><strong class="block text-sm text-slate-800">{{ notificacao.titulo }}</strong><span class="mt-1 block text-xs text-slate-500">{{ notificacao.mensagem }}</span></button></form>{% else %}<div class="px-4 py-5 text-center text-sm text-slate-500">Não há avisos novos.</div>{% endfor %}
-    </section>
+    </dialog>
     {% endif %}
-  </nav>
-  <footer class="sidebar-account">
-    <a class="sidebar-link" href="/minha-conta"><strong>{{ utilizador.nome }}</strong><span>Minha conta</span></a>
-    <form method="POST" action="/logout"><input type="hidden" name="csrf_token" value="{{ request.session.get('_csrf', '') }}"><button type="submit">Terminar sessão</button></form>
-    <script src="/static/js/sidebar.js?v=20260907"></script>
-  </footer>
-</aside>
+
+<script src="/static/js/sidebar.js?v=20260907-design-fix"></script>

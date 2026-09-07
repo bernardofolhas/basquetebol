@@ -79,18 +79,9 @@
 
 <details class="training-guidance" aria-label="Conteúdos sugeridos pelo microciclo">
     <summary>Conteúdos previstos pelo microciclo <span>{{ conteudos_previstos.total_minutos }} min</span></summary>
-    <div class="flex flex-col gap-3 border-b border-amber-100 bg-amber-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <p class="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">Orientação do microciclo</p>
-            <h2 class="mt-1 text-lg font-bold text-slate-900">Conteúdos previstos para este treino</h2>
-            <p class="mt-1 text-sm text-slate-600">Sugestão baseada no que foi programado para esta sessão no Microciclo {{ sessao.microciclo.numero }}.</p>
-        </div>
-        <div class="flex shrink-0 items-center gap-3">
-            <span class="rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-amber-900">
-                {{ conteudos_previstos.total_minutos }}{% if conteudos_previstos.limite_minutos is not none %}/{{ conteudos_previstos.limite_minutos }}{% endif %} min
-            </span>
-            <a href="/planeamento/microciclos/{{ sessao.microciclo_id }}#conteudos-microciclo" class="text-sm font-semibold text-amber-800 hover:text-amber-950">Abrir microciclo →</a>
-        </div>
+    <div class="training-guidance-header">
+        <p>{{ conteudos_previstos.total_minutos }}{% if conteudos_previstos.limite_minutos is not none %}/{{ conteudos_previstos.limite_minutos }}{% endif %} min previstos nesta sessão</p>
+        <a href="/planeamento/microciclos/{{ sessao.microciclo_id }}#conteudos-microciclo" class="ds-quiet-link">Abrir microciclo {{ sessao.microciclo.numero }} →</a>
     </div>
     {% if conteudos_previstos.grupos %}
     <div class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
@@ -267,37 +258,14 @@
     <div class="contents">
         <div data-workspace-panel="treino:dados" role="tabpanel" class="training-session-data overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
             <div class="training-session-heading">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-orange-100">Ficha de treino</p>
-                        <h2 class="mt-2 text-3xl font-bold">
-                            Dados do treino
-                        </h2>
-                        <p class="mt-2 text-sm text-orange-50">
-                            {{ sessao.data|data_pt }}{% if sessao.hora_inicio or sessao.hora_fim %} · {{ sessao.hora_inicio if sessao.hora_inicio else "?" }}{% if sessao.hora_fim %} - {{ sessao.hora_fim }}{% endif %}{% endif %}
-                        </p>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                        <div data-training-block-only hidden class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
-                            <p class="text-[11px] uppercase tracking-[0.18em] text-orange-100">Blocos</p>
-                            <p class="mt-2 text-2xl font-bold">{{ resumo_blocos | length }}</p>
-                        </div>
-                        <div class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
-                            <p class="text-[11px] uppercase tracking-[0.18em] text-orange-100">Exercícios</p>
-                            <p class="mt-2 text-2xl font-bold">{{ total_exercicios }}</p>
-                        </div>
-                        <div class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
-                            <p class="text-[11px] uppercase tracking-[0.18em] text-orange-100">Minutos</p>
-                            <p class="mt-2 text-2xl font-bold">{{ volume_planeado if volume_planeado else "—" }}</p>
-                        </div>
-                        <div class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
-                            <p class="text-[11px] uppercase tracking-[0.18em] text-orange-100">RPE geral</p>
-                            <p class="mt-2 text-2xl font-bold">{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else "—" }}</p>
-                        </div>
-                    </div>
-                </div>
+                <h2>Dados do treino</h2>
+                <dl class="training-session-stats">
+                    <div data-training-block-only hidden><dt>Blocos</dt><dd>{{ resumo_blocos | length }}</dd></div>
+                    <div><dt>Exercícios</dt><dd>{{ total_exercicios }}</dd></div>
+                    <div><dt>Minutos</dt><dd>{{ volume_planeado if volume_planeado else "—" }}</dd></div>
+                    <div><dt>RPE</dt><dd>{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else "—" }}</dd></div>
+                </dl>
             </div>
-
             <form method="POST" action="/treino/planos/{{ plano.id }}/cabecalho" class="space-y-6 px-6 py-6">
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
@@ -401,14 +369,14 @@
                     <h2 class="text-xl font-semibold text-gray-800">Adicionar exercício</h2>
                     <p class="mt-1 text-sm text-gray-500">Define o conteúdo, a duração e os pontos de intervenção.</p>
                 </div>
-                <button type="button" onclick="abrirBiblioteca('form_adicionar_exercicio')" class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100">
+                <button type="button" onclick="abrirBiblioteca('form_adicionar_exercicio')" class="ds-button ds-button-secondary">
                     📖 Usar biblioteca
                 </button>
             </div>
 
             <form id="form_adicionar_exercicio" method="POST" action="/treino/planos/{{ plano.id }}/exercicios" class="mt-5 space-y-4">
                 <input type="hidden" name="biblioteca_id" id="biblioteca_id_form_adicionar_exercicio" value="">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div class="training-exercise-fields">
                     <div data-training-block-only hidden>
                         <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
                         <select name="bloco_id" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
@@ -434,7 +402,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-[140px_1fr_1fr]">
+                <div class="training-exercise-load">
                     <div>
                         <label class="mb-1 block text-xs font-medium text-gray-500">Minutos</label>
                         <input type="number" name="minutos" placeholder="15" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
@@ -506,10 +474,10 @@
                                 </div>
                                 <div class="flex flex-wrap gap-2">
                                     <form method="POST" action="/treino/exercicios/{{ ex.id }}/duplicar">
-                                        <button type="submit" class="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-50">Duplicar</button>
+                                        <button type="submit" class="ds-button ds-button-secondary ds-button-sm">Duplicar</button>
                                     </form>
                                     <form method="POST" action="/treino/exercicios/{{ ex.id }}/apagar">
-                                        <button type="button" onclick="if(confirm('Apagar este exercício?')) this.closest('form').submit()" class="rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-500 transition hover:bg-red-50">Apagar</button>
+                                        <button type="button" onclick="if(confirm('Apagar este exercício?')) this.closest('form').submit()" class="ds-button ds-button-danger ds-button-sm">Apagar</button>
                                     </form>
                                 </div>
                             </div>
@@ -518,7 +486,7 @@
                                 <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-gray-700">Editar dados do exercício</summary>
                                 <div class="border-t border-gray-100 px-4 py-4">
                             <form id="form_exercicio_{{ ex.id }}" method="POST" action="/treino/exercicios/{{ ex.id }}/atualizar" class="space-y-4">
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+                                <div class="training-exercise-fields">
                                     <div data-training-block-only hidden>
                                         <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
                                         <select name="bloco_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
@@ -530,7 +498,7 @@
                                         <label class="mb-1 block text-xs font-medium text-gray-500">Exercício</label>
                                         <div class="flex gap-2">
                                             <input type="text" name="nome" value="{{ ex.nome if ex.nome else '' }}" placeholder="Nome do exercício" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                                            <button type="button" onclick="abrirBiblioteca('form_exercicio_{{ ex.id }}')" class="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100">Biblioteca</button>
+                                            <button type="button" onclick="abrirBiblioteca('form_exercicio_{{ ex.id }}')" class="ds-button ds-button-secondary ds-button-sm">Biblioteca</button>
                                         </div>
                                     </div>
                                     <div>

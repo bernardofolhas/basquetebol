@@ -4,6 +4,9 @@
     const close = document.getElementById('sidebar-close');
     const overlay = document.getElementById('sidebar-overlay');
     const scroll = document.getElementById('sidebar-scroll');
+    const inbox = document.getElementById('sidebar-inbox-dialog');
+    document.querySelector('[data-inbox-open]')?.addEventListener('click', () => inbox.showModal());
+    document.querySelector('[data-inbox-close]')?.addEventListener('click', () => inbox.close());
     const mobile = window.matchMedia('(max-width: 900px)');
     let desktopHidden = false;
     try { desktopHidden = localStorage.getItem('sidebar-hidden') === 'true'; } catch (_) {}
@@ -24,6 +27,7 @@
     overlay.addEventListener('click', hide);
     mobile.addEventListener('change', () => setHidden(mobile.matches || desktopHidden, false));
     document.addEventListener('keydown', event => {
+        if (document.querySelector('dialog[open]')) return;
         if (document.body.classList.contains('sidebar-hidden')) return;
         if (event.key === 'Escape' && !document.querySelector('dialog[open]')) hide();
         if (event.key !== 'Tab' || !mobile.matches) return;
