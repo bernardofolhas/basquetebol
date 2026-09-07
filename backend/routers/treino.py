@@ -274,6 +274,32 @@ def _duracao_prevista_minutos(sessao: SessaoTreino) -> int | None:
     return duracao if duracao > 0 else None
 
 
+def _somar_minutos_hora(hora: str | None, minutos: int | None) -> str | None:
+    """Soma uma duração a uma hora válida e devolve HH:MM."""
+    hora_normalizada = normalizar_hora(hora, permitir_vazio=False)
+    if not hora_normalizada or minutos is None or minutos < 0:
+        return hora_normalizada
+    hora_h, hora_m = map(int, hora_normalizada.split(":"))
+    total = (hora_h * 60 + hora_m + minutos) % (24 * 60)
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def _hora_sugerida_exercicio(sessao: SessaoTreino, exercicios: list[ExercicioPlano]) -> str | None:
+    """Sugere o início do próximo exercício a partir da sequência já inserida."""
+    hora_inicio = normalizar_hora(sessao.hora_inicio, permitir_vazio=False)
+    if not exercicios:
+        return hora_inicio
+
+    ultimo = max(exercicios, key=lambda ex: (ex.id is not None, ex.id or 0))
+    hora_ultimo = normalizar_hora(ultimo.hora, permitir_vazio=False)
+    if hora_ultimo:
+        return _somar_minutos_hora(hora_ultimo, ultimo.minutos)
+
+    if hora_inicio:
+        return _somar_minutos_hora(hora_inicio, sum(ex.minutos or 0 for ex in exercicios))
+    return None
+
+
 def _normalizar_bloco(bloco: str | None) -> str:
     valor = (bloco or "A").strip().upper()
     if valor not in {"A", "B", "C", "D"}:
@@ -543,6 +569,7 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "resumo_setores": _resumo_setores(sessao),
         "conteudos_previstos": conteudos_previstos,
         "prioridades_microciclo": prioridades_microciclo,
+        "hora_sugerida_exercicio": _hora_sugerida_exercicio(sessao, list(plano.exercicios)),
     })
 
 
@@ -1188,6 +1215,9 @@ async def adicionar_exercicio(
         categoria = categoria or biblioteca.categoria or ""
         organizacao = organizacao or biblioteca.organizacao or ""
         coaching_points = coaching_points or biblioteca.coaching_points or ""
+
+    if not (hora or "").strip():
+        hora = _hora_sugerida_exercicio(plano.sessao, list(plano.exercicios)) or ""
 
     exercicio = ExercicioPlano(
         plano_id=plano_id,

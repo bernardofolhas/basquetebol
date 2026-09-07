@@ -38,6 +38,36 @@ def test_exercicios_sem_blocos_persistem_e_podem_ser_editados(client_admin):
         db.close()
 
 
+def test_hora_do_novo_exercicio_continua_a_sequencia_do_plano(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert 'name="hora" value="18:00"' in pagina.text
+
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={"nome": "Primeiro", "minutos": "15"},
+            follow_redirects=False,
+        )
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert 'name="hora" value="18:15"' in pagina.text
+
+        client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={"nome": "Segundo", "minutos": "20"},
+            follow_redirects=False,
+        )
+        exercicios = db.query(ExercicioPlano).filter_by(plano_id=plano.id).order_by(ExercicioPlano.id).all()
+        assert [(ex.hora, ex.minutos) for ex in exercicios] == [("18:00", 15), ("18:15", 20)]
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
