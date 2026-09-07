@@ -16,7 +16,7 @@
         {% endif %}
     </div>
     <div class="ds-tactical-editor">
-        <div class="ds-tactical-stage relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}700 / 520{% else %}940 / 500{% endif %};">
+        <div class="ds-tactical-stage relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}500 / 700{% else %}940 / 500{% endif %};">
             <img src="/static/campos/{{ campo.imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
             <canvas id="{{ canvas_id }}" data-desenho="{{ campo.desenho|default('', true)|e }}" class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
         </div>
@@ -33,7 +33,7 @@
 
 {% macro campo_previsualizacao(ex_id, campo) %}
 <figure class="training-drawing-preview">
-    <div class="training-drawing-preview-stage" style="aspect-ratio: {% if campo.tipo == 'meio' %}700 / 520{% else %}940 / 500{% endif %};">
+    <div class="training-drawing-preview-stage" style="aspect-ratio: {% if campo.tipo == 'meio' %}500 / 700{% else %}940 / 500{% endif %};">
         <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}" class="training-drawing-court">
         <img src="{{ campo.desenho|default('', true)|e }}" alt="Desenho de {{ campo.label }}" class="training-drawing-overlay" data-drawing-preview="{{ ex_id }}-{{ campo.numero }}" {% if not campo.desenho %}hidden{% endif %}>
     </div>
