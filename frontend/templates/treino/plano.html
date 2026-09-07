@@ -18,7 +18,7 @@
     <div class="ds-tactical-editor">
         <div class="ds-tactical-stage relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %};">
             <img src="/static/campos/{{ campo.imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
-            <canvas id="{{ canvas_id }}" data-desenho="{{ campo.desenho|default('', true)|e }}" class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
+            <canvas id="{{ canvas_id }}" data-desenho="{{ campo.desenho|default('', true)|e }}"{% if campo.estado_desenho %} data-estado="{{ campo.estado_desenho|tojson|forceescape }}"{% endif %} class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
         </div>
         {{ tactical_toolbar(canvas_id, 'toolbar_' ~ canvas_id) }}
     </div>
@@ -733,10 +733,13 @@ function inicializarDesenho(canvasId) {
         redesenhar(canvasId);
     };
     const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033' };
-    requestAnimationFrame(configurarCanvas);
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033' };
+    requestAnimationFrame(() => {
+        configurarCanvas();
+        if (canvas.dataset.estado) restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
+    });
     setTimeout(configurarCanvas, 120);
-    if (canvas.dataset.desenho) {
+    if (canvas.dataset.desenho && !canvas.dataset.estado) {
         const imagemGuardada = new Image();
         imagemGuardada.onload = () => {
             const estado = CANVAS_ESTADO[canvasId];
@@ -834,6 +837,61 @@ async function guardarNotasExercicio(evento, formulario, exercicioId) {
 function simularMouse(e) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY, button: 0 }; }
 function obterPos(canvas, e) { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; }
 
+function restaurarEstadoDesenho(canvasId, estadoSerializado) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est) return;
+    try {
+        const guardado = JSON.parse(estadoSerializado);
+        const larguraOrigem = Math.max(1, Number(guardado.largura) || est.canvas.width);
+        const alturaOrigem = Math.max(1, Number(guardado.altura) || est.canvas.height);
+        const escalaX = est.canvas.width / larguraOrigem;
+        const escalaY = est.canvas.height / alturaOrigem;
+        est.objectos = Array.isArray(guardado.objectos) ? guardado.objectos.map((original) => {
+            const obj = JSON.parse(JSON.stringify(original));
+            if (Number.isFinite(Number(obj.x))) obj.x = Number(obj.x) * escalaX;
+            if (Number.isFinite(Number(obj.y))) obj.y = Number(obj.y) * escalaY;
+            if (Array.isArray(obj.pontos)) obj.pontos = obj.pontos.map(p => ({ x: Number(p.x) * escalaX, y: Number(p.y) * escalaY }));
+            if (Number.isFinite(Number(obj.largura))) obj.largura = Number(obj.largura) * ((escalaX + escalaY) / 2);
+            return obj;
+        }) : [];
+        const maiorAtaque = Math.max(0, ...est.objectos.filter(o => o.tipo === 'jogador_ataque').map(o => Number(o.numero) || 0));
+        const maiorDefesa = Math.max(0, ...est.objectos.filter(o => o.tipo === 'jogador_defesa').map(o => Number(o.numero) || 0));
+        est.contadores = {
+            ataque: Number(guardado.contadores?.ataque) || maiorAtaque + 1,
+            defesa: Number(guardado.contadores?.defesa) || maiorDefesa + 1,
+        };
+        est.numerosSelecionados = {
+            ataque: Number(guardado.numerosSelecionados?.ataque) || est.contadores.ataque,
+            defesa: Number(guardado.numerosSelecionados?.defesa) || est.contadores.defesa,
+        };
+        est.larguraLinha = Number(guardado.larguraLinha) || est.larguraLinha;
+        est.corLinha = guardado.corLinha || est.corLinha;
+        if (guardado.fundoLegado) {
+            const fundo = new Image();
+            fundo.onload = () => { est.imagemFundo = fundo; redesenhar(canvasId); };
+            fundo.src = guardado.fundoLegado;
+        }
+        redesenhar(canvasId);
+        sincronizarNumeroJogador(canvasId);
+    } catch (_) {
+        est.objectos = [];
+        redesenhar(canvasId);
+    }
+}
+
+function estadoDesenhoParaGuardar(est) {
+    return {
+        largura: est.canvas.width,
+        altura: est.canvas.height,
+        objectos: est.objectos,
+        contadores: est.contadores,
+        numerosSelecionados: est.numerosSelecionados,
+        larguraLinha: est.larguraLinha,
+        corLinha: est.corLinha,
+        fundoLegado: est.imagemFundo?.src || null,
+    };
+}
+
 function aoPremir(canvasId, e) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
@@ -869,8 +927,16 @@ function aoPremir(canvasId, e) {
         return;
     }
     if (simbolos.includes(est.ferramenta)) {
-        est.objectos.push({ tipo: est.ferramenta, x: pos.x, y: pos.y, tamanho: 1, numero: est.ferramenta === 'jogador_ataque' ? est.contadores.ataque++ : est.ferramenta === 'jogador_defesa' ? est.contadores.defesa++ : null });
+        let numero = null;
+        if (est.ferramenta === 'jogador_ataque' || est.ferramenta === 'jogador_defesa') {
+            const lado = est.ferramenta === 'jogador_ataque' ? 'ataque' : 'defesa';
+            numero = est.numerosSelecionados[lado];
+            est.contadores[lado] = Math.max(est.contadores[lado], numero + 1);
+            est.numerosSelecionados[lado] = Math.min(99, numero + 1);
+        }
+        est.objectos.push({ tipo: est.ferramenta, x: pos.x, y: pos.y, tamanho: 1, numero });
         redesenhar(canvasId);
+        sincronizarNumeroJogador(canvasId);
         return;
     }
     if (!est.linhaMultipla) est.linhaMultipla = { tipo: est.ferramenta, pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 };
@@ -1055,6 +1121,29 @@ function definirFerramenta(canvasId, ferramenta) {
             btn.classList.toggle('is-active', activo);
         });
     }
+    sincronizarNumeroJogador(canvasId);
+}
+
+function definirNumeroJogador(canvasId, valor) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est) return;
+    const lado = est.ferramenta === 'jogador_defesa' ? 'defesa' : 'ataque';
+    est.numerosSelecionados[lado] = Math.max(0, Math.min(99, Number.parseInt(valor, 10) || 0));
+    est.contadores[lado] = Math.max(est.contadores[lado], est.numerosSelecionados[lado] + 1);
+    sincronizarNumeroJogador(canvasId);
+}
+
+function sincronizarNumeroJogador(canvasId) {
+    const est = CANVAS_ESTADO[canvasId];
+    const toolbar = document.getElementById('toolbar_' + canvasId);
+    if (!est || !toolbar) return;
+    const lado = est.ferramenta === 'jogador_defesa' ? 'defesa' : 'ataque';
+    const input = toolbar.querySelector('[data-numero-jogador]');
+    if (input) input.value = est.numerosSelecionados[lado];
+    [['jogador_ataque', 'ataque'], ['jogador_defesa', 'defesa']].forEach(([ferramenta, chave]) => {
+        const simbolo = toolbar.querySelector(`[data-ferramenta="${ferramenta}"] .ds-tactical-symbol`);
+        if (simbolo) simbolo.textContent = est.numerosSelecionados[chave];
+    });
 }
 
 function definirCorLinha(canvasId, cor) {
@@ -1077,8 +1166,11 @@ function limparTudo(canvasId) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
     est.objectos = [];
+    est.imagemFundo = null;
     est.contadores = { ataque: 1, defesa: 1 };
+    est.numerosSelecionados = { ataque: 1, defesa: 1 };
     redesenhar(canvasId);
+    sincronizarNumeroJogador(canvasId);
 }
 
 function desfazer(canvasId) {
@@ -1094,15 +1186,18 @@ function guardarDesenho(canvasId, exercicioId, numeroDesenho) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
     const desenho = est.canvas.toDataURL('image/png');
+    const estadoEditavel = estadoDesenhoParaGuardar(est);
     fetch(`/treino/exercicios/${exercicioId}/desenho`, {
         method: 'POST',
-        body: JSON.stringify({ numero: numeroDesenho, dados: desenho }),
+        body: JSON.stringify({ numero: numeroDesenho, dados: desenho, estado: estadoEditavel }),
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
         }
     }).then(r => r.json()).then(data => {
         if (data.sucesso) {
+            est.canvas.dataset.desenho = desenho;
+            est.canvas.dataset.estado = JSON.stringify(estadoEditavel);
             const preview = document.querySelector(`[data-drawing-preview="${exercicioId}-${numeroDesenho}"]`);
             if (preview) {
                 preview.src = desenho;

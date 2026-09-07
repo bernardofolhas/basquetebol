@@ -10,7 +10,11 @@ from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
 from models.playbook import Playbook, PassoSetPlay, SetPlay
-from services.desenho_service import compor_desenho_sobre_campo, normalizar_data_uri
+from services.desenho_service import (
+    compor_desenho_sobre_campo,
+    decompor_desenho_editavel,
+    empacotar_desenho_editavel,
+)
 from services.imagem_playbook_service import preparar_imagem_passo
 from services.importacao_ebp_service import (
     MAX_FICHEIRO_EBP_BYTES,
@@ -179,6 +183,9 @@ def detalhe_setplay(setplay_id: int, request: Request, db: Session = Depends(get
     if not setplay:
         return RedirectResponse(url="/equipas")
 
+    for passo in setplay.passos:
+        passo.desenho_imagem, passo.desenho_estado = decompor_desenho_editavel(passo.desenho)
+
     categorias = ["Ataque", "Defesa", "Transição Ofensiva", "Transição Defensiva", "Zona", "Bola Parada", "Outro"]
     return templates.TemplateResponse(request, "playbook/detalhe.html", {
         "utilizador": utilizador,
@@ -287,7 +294,7 @@ async def guardar_desenho_passo(passo_id: int, request: Request, db: Session = D
         equipa_id = _equipa_id_por_passo(db, passo_id)
         _verificar_acesso_playbook(utilizador, equipa_id, db)
         body = await request.json()
-        dados = normalizar_data_uri(body.get("dados", ""))
+        dados = empacotar_desenho_editavel(body.get("dados"), body.get("estado"))
         passo = db.query(PassoSetPlay).filter(PassoSetPlay.id == passo_id).first()
         if not passo:
             return JSONResponse({"sucesso": False, "erro": "Passo não encontrado"})
@@ -378,7 +385,8 @@ def exportar_pdf_setplay(setplay_id: int, request: Request, db: Session = Depend
 
     caminho_campo = STATIC_DIR / "campos" / "campo_meio.png"
     for passo in setplay.passos:
-        passo.imagem_composta_pdf = passo.imagem_coach or compor_desenho_sobre_campo(caminho_campo, passo.desenho)
+        desenho_imagem, _ = decompor_desenho_editavel(passo.desenho)
+        passo.imagem_composta_pdf = passo.imagem_coach or compor_desenho_sobre_campo(caminho_campo, desenho_imagem)
 
     pdf_bytes = renderizar_pdf(request, "playbook/pdf.html", {
         "setplay": setplay,

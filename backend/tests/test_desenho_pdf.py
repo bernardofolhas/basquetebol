@@ -5,6 +5,8 @@ from PIL import Image, ImageDraw
 
 from services.desenho_service import (
     compor_desenho_sobre_campo,
+    decompor_desenho_editavel,
+    empacotar_desenho_editavel,
     imagem_estatica_data_uri,
     normalizar_data_uri,
 )
@@ -42,3 +44,22 @@ def test_compoe_desenho_transparente_sobre_campo(tmp_path):
 
     assert imagem_final.getpixel((50, 50))[:3] == (255, 0, 0)
     assert imagem_final.getpixel((5, 5))[:3] == (255, 255, 255)
+
+
+def test_desenho_editavel_guarda_imagem_e_objectos_sem_quebrar_formato_legado():
+    buffer = BytesIO()
+    Image.new("RGBA", (32, 24), (0, 0, 0, 0)).save(buffer, format="PNG")
+    imagem = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+    estado = {
+        "largura": 800,
+        "altura": 600,
+        "objectos": [{"tipo": "jogador_defesa", "x": 120, "y": 90, "numero": 4}],
+        "contadores": {"ataque": 1, "defesa": 5},
+    }
+
+    pacote = empacotar_desenho_editavel(imagem, estado)
+    imagem_recuperada, estado_recuperado = decompor_desenho_editavel(pacote)
+
+    assert imagem_recuperada == imagem
+    assert estado_recuperado == estado
+    assert decompor_desenho_editavel(imagem) == (imagem, None)

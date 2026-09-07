@@ -46,7 +46,7 @@ class PassoSetPlay(Base):
     setplay_id = Column(Integer, ForeignKey("setplays.id"), nullable=False)
     ordem = Column(Integer, nullable=False, default=0)
     observacao = Column(Text, nullable=True)
-    desenho = Column(Text, nullable=True)   # base64 PNG data URL
+    desenho = Column(Text, nullable=True)   # imagem e estado vetorial do desenho tático
     imagem_coach = Column(Text, nullable=True)  # fotografia/imagem alternativa otimizada
 
     setplay = relationship("SetPlay", back_populates="passos")

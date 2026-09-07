@@ -122,9 +122,8 @@ class ExercicioPlano(Base):
     # Categoria do exercício (TIO, TID, TCO, etc.)
     categoria = Column(String, nullable=True)
 
-    # Desenhos guardados como base64 (imagem em texto)
-    # base64 é uma forma de converter uma imagem binária para texto
-    # que pode ser guardado numa coluna de texto normal da BD
+    # Cada desenho guarda a imagem de apresentação e, nas versões novas,
+    # o estado vetorial que permite voltar a selecionar os seus elementos.
     desenho_1 = Column(Text, nullable=True)  # Campo meio court
     desenho_2 = Column(Text, nullable=True)  # Campo completo
     # Campos de desenho extra (opcionais)

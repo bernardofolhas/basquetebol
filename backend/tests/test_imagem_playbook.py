@@ -65,6 +65,12 @@ def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
     assert "data-playbook-player" in playbook
     assert "inicializarAnimacaoPlaybook" in playbook
     assert "data-player-play" in playbook
+    assert "data-numero-jogador" in toolbar
+    assert ">X</span><small>Defesa" not in toolbar
+    assert "estadoDesenhoParaGuardar" in treino
+    assert "estadoDesenhoParaGuardar" in playbook
+    assert "sincronizarNumeroJogador" in treino
+    assert "sincronizarNumeroJogador" in playbook
 
 
 def test_administrador_adiciona_e_remove_imagem_do_passo(client_admin):

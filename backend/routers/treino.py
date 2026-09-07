@@ -32,8 +32,9 @@ from models.treino import (
 from paths import STATIC_DIR, TEMPLATES_DIR
 from services.desenho_service import (
     compor_desenho_sobre_campo,
+    decompor_desenho_editavel,
+    empacotar_desenho_editavel,
     imagem_estatica_data_uri,
-    normalizar_data_uri,
 )
 from services.conteudos_sessao_service import construir_sugestoes_plano_treino
 from services.mapa_conteudos_service import obter_sugestoes_conteudos_microciclo
@@ -84,16 +85,18 @@ def _definir_slots_ativos(exercicio: ExercicioPlano, slots: list[int]) -> None:
 
 
 def _campos_exercicio(exercicio: ExercicioPlano) -> list[dict]:
-    return [
-        {
+    campos = []
+    for numero in _slots_ativos(exercicio):
+        desenho, estado_desenho = decompor_desenho_editavel(getattr(exercicio, f"desenho_{numero}"))
+        campos.append({
             "numero": numero,
             "tipo": TIPOS_CAMPO[numero][0],
             "label": TIPOS_CAMPO[numero][1],
             "imagem": TIPOS_CAMPO[numero][2],
-            "desenho": getattr(exercicio, f"desenho_{numero}"),
-        }
-        for numero in _slots_ativos(exercicio)
-    ]
+            "desenho": desenho,
+            "estado_desenho": estado_desenho,
+        })
+    return campos
 
 
 def _reordenar_exercicios_bloco(db: Session, plano_id: int, bloco: str) -> None:
@@ -1509,7 +1512,7 @@ async def guardar_desenho(exercicio_id: int, request: Request, db: Session = Dep
 
     dados = await request.json()
     numero = dados.get("numero")
-    desenho_base64 = dados.get("dados")
+    desenho_guardado = empacotar_desenho_editavel(dados.get("dados"), dados.get("estado"))
 
     exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
 
@@ -1519,7 +1522,10 @@ async def guardar_desenho(exercicio_id: int, request: Request, db: Session = Dep
     if numero not in TIPOS_CAMPO:
         return JSONResponse({"sucesso": False, "erro": "Campo inválido"}, status_code=422)
 
-    setattr(exercicio, f"desenho_{numero}", desenho_base64)
+    if not desenho_guardado:
+        return JSONResponse({"sucesso": False, "erro": "O desenho enviado não é válido."}, status_code=400)
+
+    setattr(exercicio, f"desenho_{numero}", desenho_guardado)
     slots = _slots_ativos(exercicio)
     if numero not in slots:
         slots.append(numero)

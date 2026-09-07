@@ -41,7 +41,7 @@
     <div class="ds-playbook-player-body">
         <nav class="ds-playbook-frames" aria-label="Passos da jogada">
             {% for passo in passos %}
-            <button type="button" data-playbook-frame="{{ passo.id }}" data-frame-index="{{ loop.index0 }}" data-frame-src="{{ (passo.imagem_coach or passo.desenho or '')|e }}" data-frame-imported="{{ 'true' if passo.imagem_coach else 'false' }}" data-frame-note="{{ (passo.observacao or '')|e }}" class="{% if loop.first %}is-active{% endif %}">
+            <button type="button" data-playbook-frame="{{ passo.id }}" data-frame-index="{{ loop.index0 }}" data-frame-src="{{ (passo.imagem_coach or passo.desenho_imagem or '')|e }}" data-frame-imported="{{ 'true' if passo.imagem_coach else 'false' }}" data-frame-note="{{ (passo.observacao or '')|e }}" class="{% if loop.first %}is-active{% endif %}">
                 <span>Passo {{ loop.index }}</span><small>{{ passo.observacao or ('Sem visual guardado' if not passo.imagem_coach and not passo.desenho else 'Visual tático') }}</small>
             </button>
             {% endfor %}
@@ -99,8 +99,8 @@
             <div class="ds-tactical-editor">
                 <div class="ds-tactical-stage relative select-none">
                     <img src="/static/campos/campo_meio.png?v=20260907-official-1" class="w-full rounded-lg border border-gray-200" alt="Meio campo" id="img_campo_{{ passo.id }}">
-                    <canvas id="canvas_{{ passo.id }}" class="absolute top-0 left-0 w-full h-full" style="cursor:crosshair"></canvas>
-                    {% if passo.desenho %}<img id="overlay_{{ passo.id }}" src="{{ passo.desenho }}" class="absolute top-0 left-0 w-full h-full pointer-events-none hidden" alt="">{% endif %}
+                    <canvas id="canvas_{{ passo.id }}" data-desenho="{{ passo.desenho_imagem|default('', true)|e }}"{% if passo.desenho_estado %} data-estado="{{ passo.desenho_estado|tojson|forceescape }}"{% endif %} class="absolute top-0 left-0 w-full h-full" style="cursor:crosshair"></canvas>
+                    {% if passo.desenho_imagem %}<img id="overlay_{{ passo.id }}" src="{{ passo.desenho_imagem }}" class="absolute top-0 left-0 w-full h-full pointer-events-none hidden" alt="">{% endif %}
                 </div>
                 {{ tactical_toolbar('canvas_' ~ passo.id, 'toolbar_canvas_' ~ passo.id) }}
             </div>
@@ -247,14 +247,15 @@ function inicializarDesenho(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemBase: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 2, corLinha: '#333333' };
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemBase: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 2, corLinha: '#333333' };
     const configurarCanvas = () => {
         const imgEl = canvas.parentElement.querySelector('img');
         if (imgEl && imgEl.offsetWidth > 0) { canvas.width = imgEl.offsetWidth; canvas.height = imgEl.offsetHeight; }
         else { canvas.width = 400; canvas.height = 300; }
         const passoId = canvasId.replace('canvas_', '');
         const overlay = document.getElementById('overlay_' + passoId);
-        if (overlay) {
+        if (canvas.dataset.estado) restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
+        else if (overlay) {
             const carregar = () => { CANVAS_ESTADO[canvasId].imagemBase = overlay; redesenhar(canvasId); };
             if (overlay.complete) carregar(); else overlay.addEventListener('load', carregar, { once: true });
         } else redesenhar(canvasId);
@@ -273,6 +274,40 @@ function inicializarDesenho(canvasId) {
 function simularMouse(e) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY, button: 0 }; }
 function obterPos(canvas, e) { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; }
 
+function restaurarEstadoDesenho(canvasId, estadoSerializado) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    try {
+        const guardado = JSON.parse(estadoSerializado);
+        const larguraOrigem = Math.max(1, Number(guardado.largura) || est.canvas.width);
+        const alturaOrigem = Math.max(1, Number(guardado.altura) || est.canvas.height);
+        const escalaX = est.canvas.width / larguraOrigem, escalaY = est.canvas.height / alturaOrigem;
+        est.objectos = Array.isArray(guardado.objectos) ? guardado.objectos.map((original) => {
+            const obj = JSON.parse(JSON.stringify(original));
+            if (Number.isFinite(Number(obj.x))) obj.x = Number(obj.x) * escalaX;
+            if (Number.isFinite(Number(obj.y))) obj.y = Number(obj.y) * escalaY;
+            if (Array.isArray(obj.pontos)) obj.pontos = obj.pontos.map(p => ({ x: Number(p.x) * escalaX, y: Number(p.y) * escalaY }));
+            if (Number.isFinite(Number(obj.largura))) obj.largura = Number(obj.largura) * ((escalaX + escalaY) / 2);
+            return obj;
+        }) : [];
+        const maiorAtaque = Math.max(0, ...est.objectos.filter(o => o.tipo === 'jogador_ataque').map(o => Number(o.numero) || 0));
+        const maiorDefesa = Math.max(0, ...est.objectos.filter(o => o.tipo === 'jogador_defesa').map(o => Number(o.numero) || 0));
+        est.contadores = { ataque: Number(guardado.contadores?.ataque) || maiorAtaque + 1, defesa: Number(guardado.contadores?.defesa) || maiorDefesa + 1 };
+        est.numerosSelecionados = { ataque: Number(guardado.numerosSelecionados?.ataque) || est.contadores.ataque, defesa: Number(guardado.numerosSelecionados?.defesa) || est.contadores.defesa };
+        est.larguraLinha = Number(guardado.larguraLinha) || est.larguraLinha;
+        est.corLinha = guardado.corLinha || est.corLinha;
+        if (guardado.fundoLegado) {
+            const fundo = new Image();
+            fundo.onload = () => { est.imagemBase = fundo; redesenhar(canvasId); };
+            fundo.src = guardado.fundoLegado;
+        }
+        redesenhar(canvasId); sincronizarNumeroJogador(canvasId);
+    } catch (_) { est.objectos = []; redesenhar(canvasId); }
+}
+
+function estadoDesenhoParaGuardar(est) {
+    return { largura: est.canvas.width, altura: est.canvas.height, objectos: est.objectos, contadores: est.contadores, numerosSelecionados: est.numerosSelecionados, larguraLinha: est.larguraLinha, corLinha: est.corLinha, fundoLegado: est.imagemBase?.src || null };
+}
+
 function aoPremir(canvasId, e) {
     const est = CANVAS_ESTADO[canvasId]; if (!est) return;
     const pos = obterPos(est.canvas, e);
@@ -284,7 +319,14 @@ function aoPremir(canvasId, e) {
         for (let i = est.objectos.length - 1; i >= 0; i--) { if (estaNoObj(est.objectos[i], pos)) { est.objectoSeleccionado = est.objectos[i]; if (simbolos.includes(est.objectos[i].tipo)) est.offsetMover = { x: pos.x - est.objectos[i].x, y: pos.y - est.objectos[i].y }; else est.offsetMover = { x: pos.x - est.objectos[i].pontos[0].x, y: pos.y - est.objectos[i].pontos[0].y }; est.aDesconhar = true; break; } }
         redesenhar(canvasId); if (est.objectoSeleccionado) desenharSeleccao(est.ctx, est.objectoSeleccionado); return;
     }
-    if (simbolos.includes(est.ferramenta)) { est.objectos.push({ tipo: est.ferramenta, x: pos.x, y: pos.y, tamanho: 1, numero: est.ferramenta === 'jogador_ataque' ? est.contadores.ataque++ : est.ferramenta === 'jogador_defesa' ? est.contadores.defesa++ : null }); redesenhar(canvasId); return; }
+    if (simbolos.includes(est.ferramenta)) {
+        let numero = null;
+        if (est.ferramenta === 'jogador_ataque' || est.ferramenta === 'jogador_defesa') {
+            const lado = est.ferramenta === 'jogador_ataque' ? 'ataque' : 'defesa';
+            numero = est.numerosSelecionados[lado]; est.contadores[lado] = Math.max(est.contadores[lado], numero + 1); est.numerosSelecionados[lado] = Math.min(99, numero + 1);
+        }
+        est.objectos.push({ tipo: est.ferramenta, x: pos.x, y: pos.y, tamanho: 1, numero }); redesenhar(canvasId); sincronizarNumeroJogador(canvasId); return;
+    }
     if (!est.linhaMultipla) { est.linhaMultipla = { tipo: est.ferramenta, pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 }; est.posicaoCursor = pos; }
     else est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
     redesenhar(canvasId); if (est.posicaoCursor) desenharLinhaMultipla(est.ctx, est.linhaMultipla, est.posicaoCursor);
@@ -389,6 +431,26 @@ function definirFerramenta(canvasId, ferramenta) {
     est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'not-allowed' : 'crosshair';
     const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
     if (toolbar) toolbar.querySelectorAll('button[data-ferramenta]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.ferramenta === ferramenta));
+    sincronizarNumeroJogador(canvasId);
+}
+
+function definirNumeroJogador(canvasId, valor) {
+    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
+    const lado = est.ferramenta === 'jogador_defesa' ? 'defesa' : 'ataque';
+    est.numerosSelecionados[lado] = Math.max(0, Math.min(99, Number.parseInt(valor, 10) || 0));
+    est.contadores[lado] = Math.max(est.contadores[lado], est.numerosSelecionados[lado] + 1);
+    sincronizarNumeroJogador(canvasId);
+}
+
+function sincronizarNumeroJogador(canvasId) {
+    const est = CANVAS_ESTADO[canvasId];
+    const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
+    if (!est || !toolbar) return;
+    const lado = est.ferramenta === 'jogador_defesa' ? 'defesa' : 'ataque';
+    const input = toolbar.querySelector('[data-numero-jogador]'); if (input) input.value = est.numerosSelecionados[lado];
+    [['jogador_ataque', 'ataque'], ['jogador_defesa', 'defesa']].forEach(([ferramenta, chave]) => {
+        const simbolo = toolbar.querySelector(`[data-ferramenta="${ferramenta}"] .ds-tactical-symbol`); if (simbolo) simbolo.textContent = est.numerosSelecionados[chave];
+    });
 }
 
 function definirCorLinha(canvasId, cor) {
@@ -407,7 +469,7 @@ function definirLarguraLinha(canvasId, largura) {
 
 function limparTudo(canvasId) {
     const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    est.objectos = []; est.imagemBase = null; est.linhaMultipla = null; est.contadores = { ataque: 1, defesa: 1 }; redesenhar(canvasId);
+    est.objectos = []; est.imagemBase = null; est.linhaMultipla = null; est.contadores = { ataque: 1, defesa: 1 }; est.numerosSelecionados = { ataque: 1, defesa: 1 }; redesenhar(canvasId); sincronizarNumeroJogador(canvasId);
 }
 
 function desfazer(canvasId) {
@@ -421,14 +483,18 @@ function desfazer(canvasId) {
 function guardarDesenhoPasso(canvasId, passoId) {
     const est = CANVAS_ESTADO[canvasId]; if (!est) return;
     const btn = document.getElementById('btn_guardar_' + passoId);
+    const desenho = est.canvas.toDataURL('image/png');
+    const estadoEditavel = estadoDesenhoParaGuardar(est);
     fetch(`/playbook/passos/${passoId}/desenho`, {
         method: 'POST',
-        body: JSON.stringify({ dados: est.canvas.toDataURL('image/png') }),
+        body: JSON.stringify({ dados: desenho, estado: estadoEditavel }),
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '' }
     }).then(r => r.json()).then(data => {
         if (data.sucesso && btn) {
             const frameButton = document.querySelector(`[data-playbook-frame="${passoId}"]`);
-            if (frameButton) frameButton.dataset.frameSrc = est.canvas.toDataURL('image/png');
+            if (frameButton) frameButton.dataset.frameSrc = desenho;
+            est.canvas.dataset.desenho = desenho;
+            est.canvas.dataset.estado = JSON.stringify(estadoEditavel);
             btn.textContent = '✓ Guardado'; btn.classList.add('bg-green-500'); btn.classList.remove('bg-orange-500');
             setTimeout(() => { btn.textContent = '💾 Guardar desenho'; btn.classList.remove('bg-green-500'); btn.classList.add('bg-orange-500'); }, 2500);
         }

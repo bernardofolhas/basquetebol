@@ -4,9 +4,13 @@
         <h4>Jogadores</h4>
         <div class="ds-tactical-tool-grid">
             <button type="button" class="ds-tactical-tool is-active" data-ferramenta="jogador_ataque" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_ataque')" title="Adicionar jogador atacante"><span class="ds-tactical-symbol ds-tactical-symbol-attack">1</span><small>Ataque</small></button>
-            <button type="button" class="ds-tactical-tool" data-ferramenta="jogador_defesa" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_defesa')" title="Adicionar jogador defensor"><span class="ds-tactical-symbol ds-tactical-symbol-defence">X</span><small>Defesa</small></button>
+            <button type="button" class="ds-tactical-tool" data-ferramenta="jogador_defesa" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_defesa')" title="Adicionar jogador defensor"><span class="ds-tactical-symbol ds-tactical-symbol-defence">1</span><small>Defesa</small></button>
             <button type="button" class="ds-tactical-tool" data-ferramenta="coach" onclick="definirFerramenta('{{ canvas_id }}', 'coach')" title="Adicionar treinador"><span class="ds-tactical-symbol ds-tactical-symbol-coach">C</span><small>Coach</small></button>
         </div>
+        <label class="ds-tactical-player-number">
+            <span>Número do jogador</span>
+            <input type="number" min="0" max="99" value="1" inputmode="numeric" data-numero-jogador oninput="definirNumeroJogador('{{ canvas_id }}', this.value)" aria-label="Número do próximo jogador">
+        </label>
     </section>
     <section class="ds-tactical-tool-group">
         <h4>Equipamento</h4>

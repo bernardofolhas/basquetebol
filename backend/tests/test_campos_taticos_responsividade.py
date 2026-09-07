@@ -46,6 +46,7 @@ def test_campos_mantem_ordem_e_desenhos_independentes():
     campos = _campos_exercicio(exercicio)
     assert [campo["numero"] for campo in campos] == [1, 2, 3, 4]
     assert [campo["desenho"] for campo in campos] == ["meio-1", "completo-1", "meio-2", "completo-2"]
+    assert all(campo["estado_desenho"] is None for campo in campos)
 
 
 def test_contexto_pdf_prepara_todos_os_campos_ativos():

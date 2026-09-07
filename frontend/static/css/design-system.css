@@ -1026,8 +1026,11 @@ table tbody tr:hover { background:#fafbfd; }
 .ds-tactical-tool small { max-width:100%;overflow:hidden;font-size:.5rem;font-weight:750;line-height:1.1;text-overflow:ellipsis;white-space:nowrap; }
 .ds-tactical-tool-danger { color:#b4232f; }
 .ds-tactical-symbol { display:grid;width:1.35rem;height:1.35rem;place-items:center;border:2px solid currentColor;border-radius:50%;font-size:.7rem;font-weight:850; }
-.ds-tactical-symbol-defence { border-radius:.18rem;color:#ef4444; }
+.ds-tactical-symbol-defence { width:1.5rem;height:1.4rem;border:0;border-radius:0;background:#2563eb;color:#fff;clip-path:polygon(50% 0,100% 100%,0 100%);padding-top:.28rem; }
 .ds-tactical-symbol-coach { color:#475569; }
+.ds-tactical-player-number { display:grid;grid-template-columns:minmax(0,1fr) 3.6rem;align-items:center;gap:.45rem;border-radius:.5rem;background:#f8fafc;padding:.45rem .5rem;color:#475569;font-size:.56rem;font-weight:800; }
+.ds-tactical-player-number input { width:100%;height:1.8rem;border:1px solid #d5dce6;border-radius:.4rem;background:#fff;padding:.2rem .35rem;color:#172033;font-size:.72rem;font-weight:850;text-align:center; }
+.ds-tactical-player-number:focus-within { box-shadow:0 0 0 2px var(--clube-primary-soft); }
 .ds-tactical-ball { color:#e76f00; }
 .ds-tactical-cone { color:#f97316; }
 .ds-tactical-style-row { display:flex;flex-wrap:wrap;align-items:center;gap:.35rem; }
