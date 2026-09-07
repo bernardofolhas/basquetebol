@@ -47,7 +47,7 @@
             {% endfor %}
         </nav>
         <div class="ds-playbook-player-stage">
-            <img class="ds-playbook-player-court" src="/static/campos/campo_meio.png" alt="Campo de basquetebol">
+            <img class="ds-playbook-player-court" src="/static/campos/campo_meio.png?v=20260907-official-1" alt="Campo de basquetebol">
             <img class="ds-playbook-player-frame" data-player-image alt="Visual do passo atual">
             <div class="ds-playbook-player-empty" data-player-empty>Este passo ainda não tem desenho ou imagem.</div>
             <div class="ds-playbook-player-caption"><strong data-player-label>Passo 1</strong><span data-player-note></span></div>
@@ -98,7 +98,7 @@
             <div id="modo_desenho_{{ passo.id }}" data-visual-panel="desenho">
             <div class="ds-tactical-editor">
                 <div class="ds-tactical-stage relative select-none">
-                    <img src="/static/campos/campo_meio.png" class="w-full rounded-lg border border-gray-200" alt="Meio campo" id="img_campo_{{ passo.id }}">
+                    <img src="/static/campos/campo_meio.png?v=20260907-official-1" class="w-full rounded-lg border border-gray-200" alt="Meio campo" id="img_campo_{{ passo.id }}">
                     <canvas id="canvas_{{ passo.id }}" class="absolute top-0 left-0 w-full h-full" style="cursor:crosshair"></canvas>
                     {% if passo.desenho %}<img id="overlay_{{ passo.id }}" src="{{ passo.desenho }}" class="absolute top-0 left-0 w-full h-full pointer-events-none hidden" alt="">{% endif %}
                 </div>

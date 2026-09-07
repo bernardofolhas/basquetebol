@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}Estatísticas - {{ jogo.adversario }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260904-5">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260907-fields-1">{% endblock %}
 {% block conteudo %}
 <main class="statboard" data-statboard data-game-id="{{ jogo.id }}" data-user-id="{{ utilizador.id }}" data-can-edit="{{ 'true' if pode_registar else 'false' }}">
   <script type="application/json" data-stats-events>{{ eventos|tojson }}</script>
@@ -84,23 +84,7 @@
         <button type="button" class="stat-court-close" data-court-cancel aria-label="Fechar">×</button>
       </header>
       <button type="button" class="stat-court" data-stat-court aria-label="Campo de basquetebol. Toca para marcar a posição da ação.">
-        <svg viewBox="0 0 940 500" role="img" aria-label="Campo de basquetebol completo">
-          <rect class="court-boundary" x="8" y="8" width="924" height="484" rx="2" />
-          <line x1="470" y1="8" x2="470" y2="492" />
-          <circle cx="470" cy="250" r="72" />
-          <rect x="8" y="155" width="188" height="190" />
-          <rect x="744" y="155" width="188" height="190" />
-          <circle cx="196" cy="250" r="58" />
-          <circle cx="744" cy="250" r="58" />
-          <path d="M 8 70 A 218 218 0 0 1 8 430" />
-          <path d="M 932 70 A 218 218 0 0 0 932 430" />
-          <line x1="72" y1="220" x2="72" y2="280" />
-          <line x1="868" y1="220" x2="868" y2="280" />
-          <circle cx="88" cy="250" r="9" />
-          <circle cx="852" cy="250" r="9" />
-          <path d="M 72 205 A 50 50 0 0 1 72 295" />
-          <path d="M 868 205 A 50 50 0 0 0 868 295" />
-        </svg>
+        <img src="/static/campos/campo_completo.png?v=20260907-official-1" alt="Campo de basquetebol completo">
         <span class="stat-court-marker" data-court-marker hidden></span>
       </button>
       <p class="stat-court-hint" data-court-hint>Seleciona um ponto no campo para continuar.</p>
@@ -165,12 +149,7 @@
           <div class="stat-shot-tools"><div class="stat-shot-tabs" role="group" aria-label="Equipa do mapa de lançamentos"><button type="button" class="is-active" data-shot-side="equipa">{{ nome_clube }}</button><button type="button" data-shot-side="adversario">{{ jogo.adversario }}</button></div><strong data-shot-summary>0/0 · 0%</strong></div>
         </header>
         <div class="stat-shot-court" data-shot-court>
-          <svg viewBox="0 0 940 500" role="img" aria-label="Mapa de lançamentos num campo completo">
-            <rect class="court-boundary" x="8" y="8" width="924" height="484" rx="2" /><line x1="470" y1="8" x2="470" y2="492" /><circle cx="470" cy="250" r="72" />
-            <rect x="8" y="155" width="188" height="190" /><rect x="744" y="155" width="188" height="190" /><circle cx="196" cy="250" r="58" /><circle cx="744" cy="250" r="58" />
-            <path d="M 8 70 A 218 218 0 0 1 8 430" /><path d="M 932 70 A 218 218 0 0 0 932 430" /><line x1="72" y1="220" x2="72" y2="280" /><line x1="868" y1="220" x2="868" y2="280" />
-            <circle cx="88" cy="250" r="9" /><circle cx="852" cy="250" r="9" /><path d="M 72 205 A 50 50 0 0 1 72 295" /><path d="M 868 205 A 50 50 0 0 0 868 295" />
-          </svg>
+          <img src="/static/campos/campo_completo.png?v=20260907-official-1" alt="Mapa de lançamentos num campo completo">
           <div class="stat-shot-points" data-shot-points aria-live="polite"></div>
         </div>
         <footer><span><i class="is-made"></i>Convertido</span><span><i class="is-missed"></i>Falhado</span><small data-shot-empty>Regista lançamentos para preencher o mapa.</small></footer>
