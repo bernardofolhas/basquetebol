@@ -68,6 +68,51 @@ def test_hora_do_novo_exercicio_continua_a_sequencia_do_plano(client_admin):
         db.close()
 
 
+def test_reordenar_exercicios_atualiza_ordem_e_horas_sem_redirect(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+
+        for nome, minutos in (("Primeiro", 10), ("Segundo", 15), ("Terceiro", 20)):
+            client_admin.post(
+                f"/treino/planos/{plano.id}/exercicios",
+                data={"nome": nome, "minutos": str(minutos)},
+                follow_redirects=False,
+            )
+
+        exercicios = db.query(ExercicioPlano).filter_by(plano_id=plano.id).order_by(ExercicioPlano.ordem).all()
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios/reordenar",
+            json={"exercicio_ids": [exercicios[2].id, exercicios[0].id, exercicios[1].id]},
+        )
+
+        assert resposta.status_code == 200
+        assert resposta.json()["sucesso"] is True
+        assert resposta.json()["proxima_hora"] == "18:45"
+        db.expire_all()
+        reordenados = db.query(ExercicioPlano).filter_by(plano_id=plano.id).order_by(ExercicioPlano.ordem).all()
+        assert [(ex.nome, ex.hora, ex.ordem) for ex in reordenados] == [
+            ("Terceiro", "18:00", 1),
+            ("Primeiro", "18:20", 2),
+            ("Segundo", "18:30", 3),
+        ]
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert 'name="hora" value="18:45" data-training-next-time' in pagina.text
+
+        invalida = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios/reordenar",
+            json={"exercicio_ids": [reordenados[0].id, reordenados[0].id, reordenados[2].id]},
+        )
+        assert invalida.status_code == 422
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
@@ -99,7 +144,10 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         ):
             assert texto in pagina.text
         assert 'class="training-exercise-card"' in pagina.text
+        assert 'data-training-exercise-drag' in pagina.text
+        assert 'data-training-reorder-url=' in pagina.text
         assert 'data-drawing-preview=' in pagina.text
+        assert '<figcaption>' not in pagina.text
         assert 'data-drawing-editor' in pagina.text
         assert "est.ctx.drawImage(est.imagemFundo" in pagina.text
         assert 'action="/treino/exercicios/' in pagina.text
@@ -144,6 +192,7 @@ def test_pdf_sem_modulo_de_blocos_nao_mostra_blocos_tecnicos(client_admin):
         assert '<div class="block-summary">' not in pagina.text
         assert '<div class="block-title">' not in pagina.text
         assert "Bloco A" not in pagina.text
+        assert '<div class="court-card">\n                    <h5>' not in pagina.text
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()

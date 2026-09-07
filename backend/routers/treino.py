@@ -293,7 +293,7 @@ def _hora_sugerida_exercicio(sessao: SessaoTreino, exercicios: list[ExercicioPla
     if not exercicios:
         return hora_inicio
 
-    ultimo = max(exercicios, key=lambda ex: (ex.id is not None, ex.id or 0))
+    ultimo = max(exercicios, key=lambda ex: (ex.ordem or 0, ex.id or 0))
     hora_ultimo = normalizar_hora(ultimo.hora, permitir_vazio=False)
     if hora_ultimo:
         return _somar_minutos_hora(hora_ultimo, ultimo.minutos)
@@ -301,6 +301,23 @@ def _hora_sugerida_exercicio(sessao: SessaoTreino, exercicios: list[ExercicioPla
     if hora_inicio:
         return _somar_minutos_hora(hora_inicio, sum(ex.minutos or 0 for ex in exercicios))
     return None
+
+
+def _aplicar_ordem_e_horas_exercicios(
+    plano: PlanoTreino,
+    exercicios_ordenados: list[ExercicioPlano],
+) -> str | None:
+    """Guarda a sequência visual e recalcula cada início a partir da sessão."""
+    hora_corrente = normalizar_hora(
+        plano.sessao.hora_inicio or plano.hora_inicio,
+        permitir_vazio=False,
+    )
+    for indice, exercicio in enumerate(exercicios_ordenados, start=1):
+        exercicio.ordem = indice
+        if hora_corrente:
+            exercicio.hora = hora_corrente
+            hora_corrente = _somar_minutos_hora(hora_corrente, exercicio.minutos)
+    return hora_corrente
 
 
 def _normalizar_bloco(bloco: str | None) -> str:
@@ -1168,6 +1185,57 @@ async def apagar_bloco(bloco_id: int, request: Request, db: Session = Depends(ge
 # ADICIONAR EXERCÍCIO A UM BLOCO
 # URL: POST /treino/planos/{plano_id}/exercicios
 # ─────────────────────────────────────────
+@router.post("/planos/{plano_id}/exercicios/reordenar")
+async def reordenar_exercicios(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Reordena os cartões e atualiza as horas sem recarregar o plano."""
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
+    plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+    if not plano:
+        return JSONResponse({"sucesso": False, "erro": "Plano de treino não encontrado."}, status_code=404)
+
+    try:
+        dados = await request.json()
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JSONResponse({"sucesso": False, "erro": "A ordem enviada não é válida."}, status_code=400)
+
+    ids_recebidos = dados.get("exercicio_ids") if isinstance(dados, dict) else None
+    if not isinstance(ids_recebidos, list) or any(
+        isinstance(valor, bool) or not isinstance(valor, int) for valor in ids_recebidos
+    ):
+        return JSONResponse({"sucesso": False, "erro": "A ordem enviada não é válida."}, status_code=422)
+
+    exercicios = db.query(ExercicioPlano).filter(ExercicioPlano.plano_id == plano_id).all()
+    ids_existentes = {exercicio.id for exercicio in exercicios}
+    if len(ids_recebidos) != len(set(ids_recebidos)) or set(ids_recebidos) != ids_existentes:
+        return JSONResponse(
+            {"sucesso": False, "erro": "A lista deve incluir todos os exercícios do plano uma única vez."},
+            status_code=422,
+        )
+
+    por_id = {exercicio.id: exercicio for exercicio in exercicios}
+    exercicios_ordenados = [por_id[exercicio_id] for exercicio_id in ids_recebidos]
+    proxima_hora = _aplicar_ordem_e_horas_exercicios(plano, exercicios_ordenados)
+    _marcar_sessao_como_alterada_manual(plano.sessao)
+    db.flush()
+    sincronizar_minutos_categorias(plano, db)
+    db.commit()
+
+    return JSONResponse({
+        "sucesso": True,
+        "mensagem": "Ordem e horários guardados.",
+        "proxima_hora": proxima_hora,
+        "exercicios": [
+            {"id": exercicio.id, "ordem": exercicio.ordem, "hora": exercicio.hora}
+            for exercicio in exercicios_ordenados
+        ],
+    })
+
+
 @router.post("/planos/{plano_id}/exercicios")
 async def adicionar_exercicio(
     plano_id: int,

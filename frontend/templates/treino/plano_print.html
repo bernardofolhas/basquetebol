@@ -16,7 +16,6 @@
             <div class="courts-grid court-count-{{ ex.campos_pdf|length }}">
                 {% for campo in ex.campos_pdf %}
                 <div class="court-card">
-                    <h5>{{ campo.label }}</h5>
                     <div class="court">{% if campo.imagem_composta %}<img src="{{ campo.imagem_composta }}" alt="{{ campo.label }} com desenho tático">{% endif %}</div>
                 </div>
                 {% endfor %}
@@ -90,7 +89,6 @@
         .courts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items:start; gap: 5px; }
         .courts-grid.court-count-1 { grid-template-columns: minmax(0, 1fr); }
         .court-card { min-width: 0; break-inside: avoid; page-break-inside: avoid; }
-        .court-card h5 { margin-bottom: 2px; color: #64748b; font-size: 7px; text-transform: uppercase; overflow-wrap: anywhere; }
         .court { position: relative; background: #fff; padding: 0; overflow: hidden; text-align: center; }
         .court img { display: block; width: auto; height: auto; max-width: 100%; max-height: 27mm; margin: 0 auto; object-fit: contain; object-position: center; }
 
