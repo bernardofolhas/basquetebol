@@ -60,6 +60,8 @@ def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
         assert grupo in toolbar
     for ferramenta in ("jogador_ataque", "jogador_defesa", "coach", "cone", "bola"):
         assert f'data-ferramenta="{ferramenta}"' in toolbar
+    assert 'data-ferramenta="caneta"' in toolbar
+    assert "Caneta livre" in toolbar
     assert "('seta_curva','⌒','Curva')" in toolbar
     assert "tactical_toolbar" in treino
     assert "tactical_toolbar" in playbook
@@ -82,6 +84,22 @@ def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
     assert "TacticalLegacy.contemPonto" in playbook
     assert "await window.TacticalLegacy.aguardarRecortes" in treino
     assert "await window.TacticalLegacy.aguardarRecortes" in playbook
+
+
+def test_editor_tatico_suporta_apple_pencil_e_borracha_continua():
+    treino = (ROOT / "frontend/templates/treino/plano.html").read_text(encoding="utf-8")
+    playbook = (ROOT / "frontend/templates/playbook/detalhe.html").read_text(encoding="utf-8")
+    biblioteca = (ROOT / "frontend/templates/biblioteca/detalhe.html").read_text(encoding="utf-8")
+
+    for template in (treino, playbook, biblioteca):
+        assert "pointerdown" in template
+        assert "setPointerCapture" in template
+        assert "pointercancel" in template
+        assert "pointerType === 'pen'" in template
+        assert "function apagarNaPosicao" in template
+        assert "est.ferramenta === 'caneta'" in template
+        assert "linha.tipo === 'caneta'" in template
+        assert "finalizarLinhaPendente(canvasId)" in template
 
 
 def test_administrador_adiciona_e_remove_imagem_do_passo(client_admin):

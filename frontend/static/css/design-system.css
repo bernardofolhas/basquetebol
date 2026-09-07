@@ -1023,12 +1023,15 @@ table tbody tr:hover { background:#fafbfd; }
 
 .ds-tactical-editor { display:grid;grid-template-columns:minmax(0,1fr) 11.5rem;gap:.8rem;align-items:start; }
 .ds-tactical-stage { min-width:0;overflow:hidden;border-radius:.75rem;background:#eef2f6; }
+.ds-tactical-stage canvas { touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none; }
 .ds-tactical-tools { display:grid;gap:.65rem;border:1px solid var(--border-soft);border-radius:.75rem;background:#fff;padding:.7rem;box-shadow:0 4px 16px rgb(15 23 42 / .06); }
 .ds-tactical-tool-group { display:grid;gap:.35rem;border-bottom:1px solid #eef1f5;padding-bottom:.6rem; }
 .ds-tactical-tool-group:last-child { border-bottom:0;padding-bottom:0; }
 .ds-tactical-tool-group h4 { color:#344054;font-size:.58rem;font-weight:850;letter-spacing:.09em;text-transform:uppercase; }
 .ds-tactical-tool-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.3rem; }
 .ds-tactical-tool { display:grid;min-width:0;min-height:2.8rem;place-items:center;gap:.08rem;border:1px solid #dce2ea;border-radius:.45rem;background:#f8fafc;color:#344054;font-size:.88rem;line-height:1;transition:border-color .12s,background .12s,color .12s,transform .12s; }
+.ds-tactical-tool-pen { grid-column:1/-1;grid-template-columns:auto auto;justify-content:center;gap:.4rem;min-height:2.65rem;background:#fff7ed; }
+.ds-tactical-tool-pen small { font-size:.58rem; }
 .ds-tactical-tool:hover { border-color:var(--clube-primary-border);background:var(--clube-primary-surface);transform:translateY(-1px); }
 .ds-tactical-tool.is-active { border-color:var(--clube-primary);background:var(--clube-primary);color:var(--clube-on-primary);box-shadow:0 2px 6px color-mix(in srgb,var(--clube-primary) 25%,transparent); }
 .ds-tactical-tool small { max-width:100%;overflow:hidden;font-size:.5rem;font-weight:750;line-height:1.1;text-overflow:ellipsis;white-space:nowrap; }
@@ -1096,6 +1099,12 @@ table tbody tr:hover { background:#fafbfd; }
     .ds-playbook-player-head { align-items:flex-start;flex-direction:column; }
     .ds-playbook-player-controls { width:100%; }.ds-playbook-player-controls button { flex:1; }
     .ds-playbook-player-stage { min-height:20rem; }
+}
+@media (pointer:coarse) {
+    .ds-tactical-tool { min-height:3.35rem; }
+    .ds-tactical-tool-pen { min-height:3rem; }
+    .ds-tactical-colour { width:2rem;height:2rem; }
+    .ds-tactical-width { min-height:2.25rem; }
 }
 
 /* Configurador comum das exportacoes PDF. */

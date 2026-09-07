@@ -22,6 +22,7 @@
     <section class="ds-tactical-tool-group">
         <h4>Movimentos</h4>
         <div class="ds-tactical-tool-grid">
+            <button type="button" class="ds-tactical-tool ds-tactical-tool-pen" data-ferramenta="caneta" onclick="definirFerramenta('{{ canvas_id }}', 'caneta')" title="Desenhar livremente com Apple Pencil, toque ou rato"><span aria-hidden="true">&#9998;</span><small>Caneta livre</small></button>
             {% for ferramenta, simbolo, label in [('seta','→','Corrida'),('seta_tracejada','⇢','Passe'),('seta_zigzag','≋','Drible'),('seta_curva','⌒','Curva'),('bloqueio','⊣','Bloqueio'),('linha','—','Linha')] %}
             <button type="button" class="ds-tactical-tool" data-ferramenta="{{ ferramenta }}" onclick="definirFerramenta('{{ canvas_id }}', '{{ ferramenta }}')" title="{{ label }}"><span>{{ simbolo }}</span><small>{{ label }}</small></button>
             {% endfor %}

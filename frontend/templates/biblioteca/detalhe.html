@@ -6,7 +6,7 @@
 
 {% macro toolbar_biblioteca(canvas_id) %}
 <div id="toolbar_{{ canvas_id }}" class="mb-2 flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-2">
-    {% for ferramenta, texto, titulo in [('seleccionar','⊹','Selecionar e mover'),('jogador_ataque','⬤ A','Jogador ataque'),('jogador_defesa','▲ D','Jogador defesa'),('coach','⊙ C','Treinador'),('cone','△','Cone'),('bola','●','Bola'),('seta','→','Seta'),('seta_tracejada','⇢','Seta tracejada'),('seta_zigzag','≋','Drible'),('seta_curva','⌒','Seta curva'),('bloqueio','⊣','Bloqueio'),('linha','—','Linha'),('apagar','✕','Apagar elemento')] %}
+    {% for ferramenta, texto, titulo in [('caneta','✎','Caneta livre para Apple Pencil, toque ou rato'),('seleccionar','⊹','Selecionar e mover'),('jogador_ataque','⬤ A','Jogador ataque'),('jogador_defesa','▲ D','Jogador defesa'),('coach','⊙ C','Treinador'),('cone','△','Cone'),('bola','●','Bola'),('seta','→','Seta'),('seta_tracejada','⇢','Seta tracejada'),('seta_zigzag','≋','Drible'),('seta_curva','⌒','Seta curva'),('bloqueio','⊣','Bloqueio'),('linha','—','Linha'),('apagar','✕','Apagar elemento')] %}
     <button type="button" data-ferramenta="{{ ferramenta }}" onclick="definirFerramenta('{{ canvas_id }}', '{{ ferramenta }}')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="{{ titulo }}">{{ texto }}</button>
     {% endfor %}
     <button type="button" onclick="desfazer('{{ canvas_id }}')" class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700" title="Desfazer">↩</button>
@@ -122,15 +122,47 @@ function inicializarDesenho(canvasId) {
     };
     setTimeout(configurarCanvas, 100);
     const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 2, corLinha: '#333333' };
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033' };
+    ligarEventosDesenho(canvasId);
+}
+
+function ligarEventosDesenho(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    if (window.PointerEvent) {
+        canvas.addEventListener('pointerdown', (e) => {
+            const est = CANVAS_ESTADO[canvasId];
+            if (!est || est.pointerActivo !== null || (e.pointerType === 'touch' && !e.isPrimary)) return;
+            e.preventDefault(); est.pointerActivo = e.pointerId;
+            est.apagarComPonteiro = e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) === 32);
+            try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+            aoPremir(canvasId, e);
+        }, { passive: false });
+        canvas.addEventListener('pointermove', (e) => {
+            const est = CANVAS_ESTADO[canvasId];
+            if (!est || (est.pointerActivo !== null && est.pointerActivo !== e.pointerId)) return;
+            if (est.pointerActivo !== null) e.preventDefault();
+            aoMover(canvasId, e);
+        }, { passive: false });
+        const terminar = (e) => {
+            const est = CANVAS_ESTADO[canvasId];
+            if (!est || est.pointerActivo !== e.pointerId) return;
+            e.preventDefault(); aoSoltar(canvasId, e);
+            try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+            est.pointerActivo = null; est.apagarComPonteiro = false;
+        };
+        canvas.addEventListener('pointerup', terminar, { passive: false });
+        canvas.addEventListener('pointercancel', terminar, { passive: false });
+        return;
+    }
     canvas.addEventListener('mousedown', (e) => aoPremir(canvasId, e));
     canvas.addEventListener('mousemove', (e) => aoMover(canvasId, e));
     canvas.addEventListener('mouseup', (e) => aoSoltar(canvasId, e));
-    canvas.addEventListener('mouseleave', () => { if (CANVAS_ESTADO[canvasId]) CANVAS_ESTADO[canvasId].aDesconhar = false; });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); aoPremir(canvasId, simularMouse(e)); });
-    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); aoMover(canvasId, simularMouse(e)); });
-    canvas.addEventListener('touchend', (e) => { e.preventDefault(); aoSoltar(canvasId, simularMouse(e)); });
+    canvas.addEventListener('mouseleave', (e) => aoSoltar(canvasId, e));
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); aoPremir(canvasId, simularMouse(e)); }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); aoMover(canvasId, simularMouse(e)); }, { passive: false });
+    canvas.addEventListener('touchend', (e) => { e.preventDefault(); aoSoltar(canvasId, simularMouse(e)); }, { passive: false });
 }
 
 function simularMouse(e) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY, button: 0 }; }
@@ -146,7 +178,7 @@ function aoPremir(canvasId, e) {
         if (est.linhaMultipla) { if (est.linhaMultipla.pontos.length >= 2) est.objectos.push({...est.linhaMultipla}); est.linhaMultipla = null; redesenhar(canvasId); }
         return;
     }
-    if (est.ferramenta === 'apagar') { est.objectos = est.objectos.filter(o => !estaNoObj(o, pos)); redesenhar(canvasId); return; }
+    if (est.ferramenta === 'apagar' || est.apagarComPonteiro) { est.aDesconhar = true; apagarNaPosicao(canvasId, pos, e.pointerType); return; }
     if (est.ferramenta === 'seleccionar') {
         est.objectoSeleccionado = null;
         for (let i = est.objectos.length - 1; i >= 0; i--) {
@@ -165,6 +197,13 @@ function aoPremir(canvasId, e) {
         est.objectos.push({ tipo: est.ferramenta, x: pos.x, y: pos.y, tamanho: 1, numero: est.ferramenta === 'jogador_ataque' ? est.contadores.ataque++ : est.ferramenta === 'jogador_defesa' ? est.contadores.defesa++ : null });
         redesenhar(canvasId); return;
     }
+    if (est.ferramenta === 'caneta') {
+        est.aDesconhar = true;
+        est.linhaMultipla = { tipo: 'caneta', pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 };
+        est.posicaoCursor = pos;
+        redesenhar(canvasId);
+        return;
+    }
     if (!est.linhaMultipla) est.linhaMultipla = { tipo: est.ferramenta, pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 };
     else est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
     redesenhar(canvasId);
@@ -177,6 +216,15 @@ function aoMover(canvasId, e) {
     const pos = obterPos(est.canvas, e);
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
     est.posicaoCursor = pos;
+    if (est.aDesconhar && (est.ferramenta === 'apagar' || est.apagarComPonteiro)) { apagarNaPosicao(canvasId, pos, e.pointerType); return; }
+    if (est.ferramenta === 'caneta' && est.aDesconhar && est.linhaMultipla) {
+        const ultimo = est.linhaMultipla.pontos[est.linhaMultipla.pontos.length - 1];
+        if (Math.hypot(pos.x - ultimo.x, pos.y - ultimo.y) >= 1.25) {
+            est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
+            redesenhar(canvasId); desenharLinhaMultipla(est.ctx, est.linhaMultipla, null);
+        }
+        return;
+    }
     if (est.ferramenta === 'seleccionar' && est.aDesconhar && est.objectoSeleccionado) {
         const obj = est.objectoSeleccionado;
         if (simbolos.includes(obj.tipo)) { obj.x = pos.x - est.offsetMover.x; obj.y = pos.y - est.offsetMover.y; }
@@ -193,10 +241,25 @@ function aoMover(canvasId, e) {
 function aoSoltar(canvasId, e) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
+    if (est.ferramenta === 'caneta' && est.aDesconhar && est.linhaMultipla) {
+        if (est.linhaMultipla.pontos.length === 1) { const p = est.linhaMultipla.pontos[0]; est.linhaMultipla.pontos.push({ x: p.x + 0.25, y: p.y + 0.25 }); }
+        est.objectos.push({ ...est.linhaMultipla, pontos: est.linhaMultipla.pontos.map(p => ({ ...p })) });
+        est.linhaMultipla = null; est.aDesconhar = false; redesenhar(canvasId); return;
+    }
+    if (est.ferramenta === 'apagar' || est.apagarComPonteiro) { est.aDesconhar = false; return; }
     if (est.ferramenta === 'seleccionar') {
         est.aDesconhar = false;
         if (est.objectoSeleccionado) mostrarPainelTamanho(canvasId, est.objectoSeleccionado);
     }
+}
+
+function apagarNaPosicao(canvasId, pos, pointerType) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est) return;
+    const margem = pointerType === 'pen' || pointerType === 'touch' ? 20 : 14;
+    const totalAnterior = est.objectos.length;
+    est.objectos = est.objectos.filter(o => !estaNoObj(o, pos, margem));
+    if (est.objectos.length !== totalAnterior) redesenhar(canvasId);
 }
 
 function redesenhar(canvasId) {
@@ -240,7 +303,11 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
     if (posicaoCursor) todosPontos.push(posicaoCursor);
     if (todosPontos.length < 2) { ctx.restore(); return; }
     ctx.beginPath();
-    if (linha.tipo === 'seta_curva') {
+    if (linha.tipo === 'caneta') {
+        ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
+        for (let i=1; i<todosPontos.length-1; i++) { const mx=(todosPontos[i].x+todosPontos[i+1].x)/2, my=(todosPontos[i].y+todosPontos[i+1].y)/2; ctx.quadraticCurveTo(todosPontos[i].x, todosPontos[i].y, mx, my); }
+        ctx.lineTo(todosPontos[todosPontos.length-1].x, todosPontos[todosPontos.length-1].y);
+    } else if (linha.tipo === 'seta_curva') {
         ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
         for (let i = 0; i < todosPontos.length-1; i++) { const mx=(todosPontos[i].x+todosPontos[i+1].x)/2, my=(todosPontos[i].y+todosPontos[i+1].y)/2; ctx.quadraticCurveTo(todosPontos[i].x, todosPontos[i].y, mx, my); }
         ctx.lineTo(todosPontos[todosPontos.length-1].x, todosPontos[todosPontos.length-1].y);
@@ -262,22 +329,23 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
     if (linha.tipo === 'bloqueio') {
         const perpX=-Math.sin(ang)*10, perpY=Math.cos(ang)*10;
         ctx.beginPath(); ctx.moveTo(ultimo.x-perpX, ultimo.y-perpY); ctx.lineTo(ultimo.x+perpX, ultimo.y+perpY); ctx.lineWidth=(linha.largura||2)+1; ctx.stroke();
-    } else if (linha.tipo !== 'linha') {
+    } else if (linha.tipo !== 'linha' && linha.tipo !== 'caneta') {
         ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x-tp*Math.cos(ang-Math.PI/6), ultimo.y-tp*Math.sin(ang-Math.PI/6));
         ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x-tp*Math.cos(ang+Math.PI/6), ultimo.y-tp*Math.sin(ang+Math.PI/6)); ctx.stroke();
     }
     ctx.restore();
 }
 
-function estaNoObj(obj, pos) {
+function estaNoObj(obj, pos, margem = 0) {
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
-    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x-obj.x, pos.y-obj.y) < 18;
+    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x-obj.x, pos.y-obj.y) < 18 * (obj.tamanho || 1) + margem;
     if (!obj.pontos || obj.pontos.length < 2) return false;
     for (let i=0; i<obj.pontos.length-1; i++) {
         const p1=obj.pontos[i], p2=obj.pontos[i+1]; const dx=p2.x-p1.x, dy=p2.y-p1.y, len2=dx*dx+dy*dy;
-        if (len2===0) { if (Math.hypot(pos.x-p1.x, pos.y-p1.y)<10) return true; continue; }
+        const tolerancia=Math.max(10,((obj.largura||4)/2)+margem);
+        if (len2===0) { if (Math.hypot(pos.x-p1.x, pos.y-p1.y)<tolerancia) return true; continue; }
         const t=Math.max(0,Math.min(1,((pos.x-p1.x)*dx+(pos.y-p1.y)*dy)/len2));
-        if (Math.hypot(pos.x-(p1.x+t*dx), pos.y-(p1.y+t*dy))<10) return true;
+        if (Math.hypot(pos.x-(p1.x+t*dx), pos.y-(p1.y+t*dy))<tolerancia) return true;
     }
     return false;
 }
@@ -325,6 +393,7 @@ function fecharPainelTamanho(canvasId) {
 function definirFerramenta(canvasId, ferramenta) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
+    finalizarLinhaPendente(canvasId);
     est.ferramenta = ferramenta;
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
     est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'not-allowed' : 'crosshair';
@@ -334,8 +403,16 @@ function definirFerramenta(canvasId, ferramenta) {
             const activo = btn.dataset.ferramenta === ferramenta;
             btn.className = btn.className.replace(/bg-orange-500|text-white|bg-gray-100|text-gray-700/g, '').trim();
             btn.className += activo ? ' bg-orange-500 text-white' : ' bg-gray-100 text-gray-700';
+            btn.setAttribute('aria-pressed', activo ? 'true' : 'false');
         });
     }
+}
+
+function finalizarLinhaPendente(canvasId) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est || !est.linhaMultipla) return;
+    if (est.linhaMultipla.pontos.length >= 2) est.objectos.push({ ...est.linhaMultipla, pontos: est.linhaMultipla.pontos.map(p => ({ ...p })) });
+    est.linhaMultipla = null; est.aDesconhar = false; redesenhar(canvasId);
 }
 
 function limparTudo(canvasId) {
@@ -357,6 +434,7 @@ function desfazer(canvasId) {
 function guardarDesenhoBiblioteca(canvasId, exercicioId, tipo, dadosOverride) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
+    finalizarLinhaPendente(canvasId);
     const btn = document.getElementById('btn_guardar_' + canvasId);
     fetch(`/biblioteca/${exercicioId}/desenho`, {
         method: 'POST',
