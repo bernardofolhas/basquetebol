@@ -486,7 +486,7 @@
                             </dl>
                             {% endif %}
 
-                            <div class="training-exercise-workbench">
+                            <form method="POST" action="/treino/exercicios/{{ ex.id }}/notas" class="training-exercise-workbench" onsubmit="guardarNotasExercicio(event, this, {{ ex.id }})">
                                 <section class="training-exercise-visuals">
                                     <header>
                                         <h4>Quadros táticos</h4>
@@ -500,24 +500,19 @@
                                         {% endfor %}
                                     </div>
                                 </section>
-
-                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/notas" class="training-exercise-inline-form" onsubmit="guardarNotasExercicio(event, this, {{ ex.id }})">
-                                    <div class="training-exercise-content training-exercise-content-editable">
-                                        <label>
-                                            <span>Organização</span>
-                                            <textarea name="organizacao" rows="3" placeholder="Grupos, rotações, material e organização do exercício...">{{ ex.organizacao if ex.organizacao else "" }}</textarea>
-                                        </label>
-                                        <label>
-                                            <span>Coaching points</span>
-                                            <textarea name="coaching_points" rows="3" placeholder="Pontos-chave de intervenção do treinador...">{{ ex.coaching_points if ex.coaching_points else "" }}</textarea>
-                                        </label>
-                                    </div>
-                                    <div class="training-inline-save">
-                                        <span data-notes-status="{{ ex.id }}" aria-live="polite"></span>
-                                        <button type="submit" class="ds-button ds-button-primary ds-button-sm">Guardar conteúdo</button>
-                                    </div>
-                                </form>
-                            </div>
+                                <label class="training-exercise-note training-exercise-organization">
+                                    <span>Organização</span>
+                                    <textarea name="organizacao" rows="3" placeholder="Grupos, rotações, material e organização do exercício...">{{ ex.organizacao if ex.organizacao else "" }}</textarea>
+                                </label>
+                                <label class="training-exercise-note training-exercise-coaching">
+                                    <span>Coaching points</span>
+                                    <textarea name="coaching_points" rows="3" placeholder="Pontos-chave de intervenção do treinador...">{{ ex.coaching_points if ex.coaching_points else "" }}</textarea>
+                                </label>
+                                <div class="training-inline-save">
+                                    <span data-notes-status="{{ ex.id }}" aria-live="polite"></span>
+                                    <button type="submit" class="ds-button ds-button-primary ds-button-sm">Guardar conteúdo</button>
+                                </div>
+                            </form>
 
                             <dialog id="modal_exercicio_{{ ex.id }}" class="training-editor-dialog" aria-labelledby="titulo_modal_exercicio_{{ ex.id }}">
                                 <div class="training-editor-dialog-shell">

@@ -787,14 +787,18 @@ table tbody tr:hover { background:#fafbfd; }
 .training-exercise-content section+section { border-left:1px solid var(--border-soft); }
 .training-exercise-content p { margin-top:.4rem;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text-main);font-size:.82rem;line-height:1.55; }
 .training-exercise-card>details { margin:0!important;border-width:1px 0 0!important;border-radius:0!important; }
-.training-exercise-workbench { display:grid;grid-template-columns:minmax(12rem,16rem) minmax(0,1fr);border-top:1px solid var(--border-soft);background:var(--surface-card); }
-.training-exercise-inline-form { min-width:0;background:var(--surface-card); }
+.training-exercise-workbench { display:grid;grid-template-columns:minmax(12rem,16rem) minmax(18rem,1.65fr) minmax(13rem,1fr);align-items:stretch;border-top:1px solid var(--border-soft);background:var(--surface-card); }
+.training-exercise-note { display:flex;min-width:0;flex-direction:column;padding:1rem 1.15rem; }
+.training-exercise-note+.training-exercise-note { border-left:1px solid var(--border-soft); }
+.training-exercise-note span,.training-exercise-visuals h4 { display:block;color:var(--text-soft);font-size:.62rem;font-weight:800;letter-spacing:.075em;text-transform:uppercase; }
+.training-exercise-note textarea { width:100%;min-height:5.25rem;flex:1;margin-top:.5rem;resize:vertical;border:1px solid var(--border-soft);border-radius:.85rem;background:var(--surface-subtle);padding:.75rem;color:var(--text-main);font-size:.82rem;line-height:1.5;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease; }
+.training-exercise-note textarea:focus { border-color:var(--clube-primary);outline:0;background:#fff;box-shadow:0 0 0 3px var(--clube-primary-soft); }
 .training-exercise-content-editable label { display:block;min-width:0;padding:1rem 1.15rem; }
 .training-exercise-content-editable label+label { border-left:1px solid var(--border-soft); }
 .training-exercise-content-editable span,.training-exercise-visuals h4 { display:block;color:var(--text-soft);font-size:.62rem;font-weight:800;letter-spacing:.075em;text-transform:uppercase; }
 .training-exercise-content-editable textarea { width:100%;min-height:5.25rem;margin-top:.5rem;resize:vertical;border:1px solid var(--border-soft);border-radius:.85rem;background:var(--surface-subtle);padding:.75rem;color:var(--text-main);font-size:.82rem;line-height:1.5;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease; }
 .training-exercise-content-editable textarea:focus { border-color:var(--clube-primary);outline:0;background:#fff;box-shadow:0 0 0 3px var(--clube-primary-soft); }
-.training-inline-save { display:flex;align-items:center;justify-content:flex-end;gap:.75rem;padding:0 1.15rem 1rem; }
+.training-inline-save { grid-column:2/-1;display:flex;align-items:center;justify-content:flex-end;gap:.75rem;border-top:1px solid var(--border-soft);padding:.65rem 1.15rem; }
 .training-inline-save span { color:#15803d;font-size:.75rem;font-weight:700; }
 .training-exercise-visuals { min-width:0;border-right:1px solid var(--border-soft);padding:1rem;background:var(--surface-subtle); }
 .training-exercise-visuals>header { display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.65rem; }
@@ -854,6 +858,8 @@ table tbody tr:hover { background:#fafbfd; }
     .training-exercise-content-editable label+label { border-top:1px solid var(--border-soft);border-left:0; }
     .training-exercise-workbench { grid-template-columns:minmax(0,1fr); }
     .training-exercise-visuals { border-right:0;border-bottom:1px solid var(--border-soft); }
+    .training-exercise-note+.training-exercise-note { border-top:1px solid var(--border-soft);border-left:0; }
+    .training-inline-save { grid-column:1;border-top:1px solid var(--border-soft); }
     .training-exercise-visuals>header { align-items:center;flex-direction:row; }
     .training-drawing-dialog-actions { align-items:stretch;flex-direction:column; }
     .training-editor-dialog { width:calc(100vw - 1rem);max-height:94vh;border-radius:1rem; }
@@ -861,6 +867,14 @@ table tbody tr:hover { background:#fafbfd; }
     .training-drawing-dialog-body { padding:.85rem; }
     .training-toolbar-actions { align-items:stretch;flex-direction:column; }
     #training-add-panel input,#training-add-panel select,#training-add-panel textarea { font-size:16px; }
+}
+@media(min-width:641px) and (max-width:1100px) {
+    .training-exercise-workbench { grid-template-columns:minmax(11rem,14rem) minmax(0,1fr); }
+    .training-exercise-visuals { grid-column:1;grid-row:1/4; }
+    .training-exercise-organization { grid-column:2;grid-row:1; }
+    .training-exercise-coaching { grid-column:2;grid-row:2; }
+    .training-exercise-coaching { border-top:1px solid var(--border-soft);border-left:0!important; }
+    .training-inline-save { grid-column:2;grid-row:3; }
 }
 .ds-attendance-heading { display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1rem; }
 .ds-attendance-heading h1 { margin:.15rem 0;color:#182230;font-size:clamp(1.45rem,2.5vw,2rem);font-weight:850;letter-spacing:-.035em; }
