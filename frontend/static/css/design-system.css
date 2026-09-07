@@ -1024,7 +1024,7 @@ table tbody tr:hover { background:#fafbfd; }
 .ds-tactical-tool.is-active { border-color:var(--clube-primary);background:var(--clube-primary);color:var(--clube-on-primary);box-shadow:0 2px 6px color-mix(in srgb,var(--clube-primary) 25%,transparent); }
 .ds-tactical-tool small { max-width:100%;overflow:hidden;font-size:.5rem;font-weight:750;line-height:1.1;text-overflow:ellipsis;white-space:nowrap; }
 .ds-tactical-tool-danger { color:#b4232f; }
-.ds-tactical-symbol { display:grid;width:1.15rem;height:1.15rem;place-items:center;border:1.5px solid currentColor;border-radius:50%;font-size:.58rem;font-weight:850; }
+.ds-tactical-symbol { display:grid;width:1.35rem;height:1.35rem;place-items:center;border:2px solid currentColor;border-radius:50%;font-size:.7rem;font-weight:850; }
 .ds-tactical-symbol-defence { border-radius:.18rem;color:#ef4444; }
 .ds-tactical-symbol-coach { color:#475569; }
 .ds-tactical-ball { color:#e76f00; }

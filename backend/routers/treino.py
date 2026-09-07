@@ -65,10 +65,10 @@ router = APIRouter(prefix="/treino")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 TIPOS_CAMPO = {
-    1: ("meio", "Campo meio", "campo_meio.png"),
-    2: ("completo", "Campo completo", "campo_completo.png"),
-    3: ("meio", "Campo meio extra", "campo_meio.png"),
-    4: ("completo", "Campo completo extra", "campo_completo.png"),
+    1: ("meio", "Campo meio", "campo_meio.svg"),
+    2: ("completo", "Campo completo", "campo_completo.svg"),
+    3: ("meio", "Campo meio extra", "campo_meio.svg"),
+    4: ("completo", "Campo completo extra", "campo_completo.svg"),
 }
 
 

@@ -27,8 +27,8 @@
         <h4>Estilo da linha</h4>
         <div class="ds-tactical-style-row">
             {% for cor in ['#111827','#ffffff','#ef4444','#2563eb'] %}<button type="button" class="ds-tactical-colour{% if loop.first %} is-active{% endif %}" data-cor-linha="{{ cor }}" onclick="definirCorLinha('{{ canvas_id }}', '{{ cor }}')" style="--tool-colour:{{ cor }}" title="Cor da linha"></button>{% endfor %}
-            <button type="button" class="ds-tactical-width is-active" data-largura-linha="2" onclick="definirLarguraLinha('{{ canvas_id }}', 2)" title="Linha fina">Fina</button>
-            <button type="button" class="ds-tactical-width" data-largura-linha="4" onclick="definirLarguraLinha('{{ canvas_id }}', 4)" title="Linha grossa">Grossa</button>
+            <button type="button" class="ds-tactical-width is-active" data-largura-linha="4" onclick="definirLarguraLinha('{{ canvas_id }}', 4)" title="Linha normal">Normal</button>
+            <button type="button" class="ds-tactical-width" data-largura-linha="7" onclick="definirLarguraLinha('{{ canvas_id }}', 7)" title="Linha grossa">Grossa</button>
         </div>
     </section>
     <section class="ds-tactical-tool-group">

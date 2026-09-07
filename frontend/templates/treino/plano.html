@@ -16,7 +16,7 @@
         {% endif %}
     </div>
     <div class="ds-tactical-editor">
-        <div class="ds-tactical-stage relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}144 / 112{% else %}209 / 141{% endif %};">
+        <div class="ds-tactical-stage relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}700 / 520{% else %}940 / 500{% endif %};">
             <img src="/static/campos/{{ campo.imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
             <canvas id="{{ canvas_id }}" data-desenho="{{ campo.desenho|default('', true)|e }}" class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
         </div>
@@ -33,7 +33,7 @@
 
 {% macro campo_previsualizacao(ex_id, campo) %}
 <figure class="training-drawing-preview">
-    <div class="training-drawing-preview-stage" style="aspect-ratio: {% if campo.tipo == 'meio' %}144 / 112{% else %}209 / 141{% endif %};">
+    <div class="training-drawing-preview-stage" style="aspect-ratio: {% if campo.tipo == 'meio' %}700 / 520{% else %}940 / 500{% endif %};">
         <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}" class="training-drawing-court">
         <img src="{{ campo.desenho|default('', true)|e }}" alt="Desenho de {{ campo.label }}" class="training-drawing-overlay" data-drawing-preview="{{ ex_id }}-{{ campo.numero }}" {% if not campo.desenho %}hidden{% endif %}>
     </div>
@@ -735,7 +735,7 @@ function inicializarDesenho(canvasId) {
     };
     setTimeout(configurarCanvas, 100);
     const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 2, corLinha: '#333333' };
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033' };
     if (canvas.dataset.desenho) {
         const imagemGuardada = new Image();
         imagemGuardada.onload = () => {
@@ -922,21 +922,21 @@ function desenharSimbolo(ctx, obj) {
     ctx.save();
     const t = obj.tamanho || 1;
     if (obj.tipo === 'jogador_ataque') {
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, 14 * t, 0, Math.PI * 2); ctx.fillStyle = '#E25A1C'; ctx.fill(); ctx.strokeStyle = '#B34010'; ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(11 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y);
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, 22 * t, 0, Math.PI * 2); ctx.fillStyle = '#e35b19'; ctx.fill(); ctx.strokeStyle = '#9f3510'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(16 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y);
     } else if (obj.tipo === 'jogador_defesa') {
-        const h = 16 * t; ctx.beginPath(); ctx.moveTo(obj.x, obj.y - h); ctx.lineTo(obj.x + h * 0.9, obj.y + h * 0.7); ctx.lineTo(obj.x - h * 0.9, obj.y + h * 0.7); ctx.closePath();
-        ctx.fillStyle = '#888888'; ctx.fill(); ctx.strokeStyle = '#555555'; ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(10 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y + 2 * t);
+        const h = 25 * t; ctx.beginPath(); ctx.moveTo(obj.x, obj.y - h); ctx.lineTo(obj.x + h * 0.9, obj.y + h * 0.7); ctx.lineTo(obj.x - h * 0.9, obj.y + h * 0.7); ctx.closePath();
+        ctx.fillStyle = '#2563eb'; ctx.fill(); ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(15 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y + 3 * t);
     } else if (obj.tipo === 'cone') {
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, 10 * t, 0, Math.PI * 2); ctx.strokeStyle = '#333333'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, 14 * t, 0, Math.PI * 2); ctx.strokeStyle = '#f97316'; ctx.lineWidth = 3; ctx.stroke();
     } else if (obj.tipo === 'bola') {
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, 10 * t, 0, Math.PI * 2); ctx.fillStyle = '#E8731A'; ctx.fill(); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 1; ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(obj.x - 10 * t, obj.y); ctx.lineTo(obj.x + 10 * t, obj.y); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 0.8; ctx.stroke();
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, 14 * t, 0, Math.PI * 2); ctx.fillStyle = '#f97316'; ctx.fill(); ctx.strokeStyle = '#9a3412'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(obj.x - 14 * t, obj.y); ctx.lineTo(obj.x + 14 * t, obj.y); ctx.strokeStyle = '#9a3412'; ctx.lineWidth = 1.5; ctx.stroke();
     } else if (obj.tipo === 'coach') {
-        const r = 14 * t; ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#111111'; ctx.lineWidth = 2.5; ctx.stroke();
+        const r = 22 * t; ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#111111'; ctx.lineWidth = 4; ctx.stroke();
         ctx.beginPath(); ctx.arc(obj.x, obj.y, r * 0.75, 0, Math.PI * 2); ctx.strokeStyle = '#111111'; ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = '#111111'; ctx.font = `bold ${Math.round(12 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C', obj.x, obj.y);
+        ctx.fillStyle = '#111111'; ctx.font = `bold ${Math.round(17 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C', obj.x, obj.y);
     }
     ctx.restore();
 }
@@ -944,7 +944,7 @@ function desenharSimbolo(ctx, obj) {
 function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
     if (!linha.pontos || linha.pontos.length === 0) return;
     ctx.save();
-    ctx.strokeStyle = linha.cor || '#333333'; ctx.lineWidth = linha.largura || 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = linha.cor || '#172033'; ctx.lineWidth = linha.largura || 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.setLineDash(linha.tipo === 'seta_tracejada' ? [8, 4] : []);
     const todosPontos = [...linha.pontos];
     if (posicaoCursor) todosPontos.push(posicaoCursor);
@@ -967,11 +967,11 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
     }
     ctx.stroke();
     const ultimo = todosPontos[todosPontos.length - 1], penultimo = todosPontos[todosPontos.length - 2];
-    const ang = Math.atan2(ultimo.y - penultimo.y, ultimo.x - penultimo.x); const tp = 12;
+    const ang = Math.atan2(ultimo.y - penultimo.y, ultimo.x - penultimo.x); const tp = 19;
     ctx.setLineDash([]);
     if (linha.tipo === 'bloqueio') {
-        const perpX = -Math.sin(ang) * 10, perpY = Math.cos(ang) * 10;
-        ctx.beginPath(); ctx.moveTo(ultimo.x - perpX, ultimo.y - perpY); ctx.lineTo(ultimo.x + perpX, ultimo.y + perpY); ctx.lineWidth = (linha.largura || 2) + 1; ctx.stroke();
+        const perpX = -Math.sin(ang) * 15, perpY = Math.cos(ang) * 15;
+        ctx.beginPath(); ctx.moveTo(ultimo.x - perpX, ultimo.y - perpY); ctx.lineTo(ultimo.x + perpX, ultimo.y + perpY); ctx.lineWidth = (linha.largura || 5) + 2; ctx.stroke();
     } else if (linha.tipo !== 'linha') {
         ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x - tp * Math.cos(ang - Math.PI / 6), ultimo.y - tp * Math.sin(ang - Math.PI / 6));
         ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x - tp * Math.cos(ang + Math.PI / 6), ultimo.y - tp * Math.sin(ang + Math.PI / 6)); ctx.stroke();
@@ -981,7 +981,7 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
 
 function estaNoObj(obj, pos) {
     const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
-    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x - obj.x, pos.y - obj.y) < 18;
+    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x - obj.x, pos.y - obj.y) < 28 * (obj.tamanho || 1);
     if (!obj.pontos || obj.pontos.length < 2) return false;
     for (let i = 0; i < obj.pontos.length - 1; i++) {
         const p1 = obj.pontos[i], p2 = obj.pontos[i + 1]; const dx = p2.x - p1.x, dy = p2.y - p1.y, len2 = dx * dx + dy * dy;
@@ -994,8 +994,8 @@ function estaNoObj(obj, pos) {
 
 function desenharSeleccao(ctx, obj) {
     const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
-    ctx.save(); ctx.strokeStyle = '#3B82F6'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-    if (simbolos.includes(obj.tipo)) { ctx.beginPath(); ctx.arc(obj.x, obj.y, 20 * (obj.tamanho || 1), 0, Math.PI * 2); ctx.stroke(); }
+    ctx.save(); ctx.strokeStyle = '#0f766e'; ctx.lineWidth = 3; ctx.setLineDash([7, 5]);
+    if (simbolos.includes(obj.tipo)) { ctx.beginPath(); ctx.arc(obj.x, obj.y, 30 * (obj.tamanho || 1), 0, Math.PI * 2); ctx.stroke(); }
     else if (obj.pontos && obj.pontos.length >= 2) {
         ctx.beginPath(); ctx.moveTo(obj.pontos[0].x, obj.pontos[0].y); obj.pontos.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
         ctx.setLineDash([]); ctx.fillStyle = '#3B82F6'; obj.pontos.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); });
