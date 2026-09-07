@@ -8,7 +8,7 @@
 <div class="training-workspace" data-training-plan="{{ plano.id }}">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
-<div class="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+<div class="rounded-2xl border border-gray-200 bg-gray-50 p-3" data-editor-field="{{ campo.numero }}">
     <div class="mb-2 flex items-center justify-between">
         <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-500">{{ campo.label }}</p>
         {% if campo.desenho %}
@@ -32,7 +32,7 @@
 {% endmacro %}
 
 {% macro campo_previsualizacao(ex_id, campo) %}
-<figure class="training-drawing-preview">
+<figure class="training-drawing-preview" role="button" tabindex="0" onclick="abrirEditorDesenho({{ ex_id }}, {{ campo.numero }})" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); abrirEditorDesenho({{ ex_id }}, {{ campo.numero }}); }" aria-label="Editar {{ campo.label }}" title="Editar {{ campo.label }}">
     <div class="training-drawing-preview-stage" style="aspect-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %};">
         <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}" class="training-drawing-court">
         <img src="{{ campo.desenho|default('', true)|e }}" alt="Desenho de {{ campo.label }}" class="training-drawing-overlay" data-drawing-preview="{{ ex_id }}-{{ campo.numero }}" {% if not campo.desenho %}hidden{% endif %}>
@@ -490,7 +490,7 @@
                                 <section class="training-exercise-visuals">
                                     <header>
                                         <h4>Quadros táticos</h4>
-                                        <button type="button" onclick="abrirEditorDesenho({{ ex.id }})" class="training-drawing-edit" aria-label="Editar quadros táticos" title="Editar quadros táticos">&#9998;</button>
+                                        <button type="button" onclick="abrirEditorDesenho({{ ex.id }})" class="training-drawing-edit" aria-label="Acrescentar campo tático" title="Acrescentar campo tático">+</button>
                                     </header>
                                     <div class="training-drawing-preview-grid">
                                         {% for campo in ex.campos_ui %}
@@ -769,11 +769,16 @@ function togglePainelDesenhos(exercicioId, aberto) {
     });
 }
 
-function abrirEditorDesenho(exercicioId) {
+function abrirEditorDesenho(exercicioId, campoNumero = null) {
     const modal = document.getElementById(`modal_desenho_${exercicioId}`);
     if (!modal) return;
     modal.showModal();
-    requestAnimationFrame(() => togglePainelDesenhos(String(exercicioId), true));
+    requestAnimationFrame(() => {
+        togglePainelDesenhos(String(exercicioId), true);
+        if (campoNumero !== null) {
+            modal.querySelector(`[data-editor-field="${campoNumero}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }
+    });
 }
 
 function fecharEditorDesenho(exercicioId) {

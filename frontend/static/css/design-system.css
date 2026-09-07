@@ -802,10 +802,11 @@ table tbody tr:hover { background:#fafbfd; }
 .training-inline-save span { color:#15803d;font-size:.75rem;font-weight:700; }
 .training-exercise-visuals { min-width:0;border-right:1px solid var(--border-soft);padding:1rem;background:var(--surface-subtle); }
 .training-exercise-visuals>header { display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.65rem; }
-.training-drawing-edit { display:grid;width:1.85rem;height:1.85rem;flex:none;place-items:center;border:1px solid var(--border-strong);border-radius:.55rem;background:#fff;color:var(--clube-primary);font-size:.85rem;line-height:1;transition:border-color .18s ease,background .18s ease,transform .18s ease; }
+.training-drawing-edit { display:grid;width:1.75rem;height:1.75rem;flex:none;place-items:center;border:1px solid var(--border-strong);border-radius:.5rem;background:#fff;color:var(--clube-primary);font-size:1.1rem;font-weight:800;line-height:1;transition:border-color .18s ease,background .18s ease,transform .18s ease; }
 .training-drawing-edit:hover { border-color:var(--clube-primary);background:var(--clube-primary-soft);transform:translateY(-1px); }
 .training-drawing-preview-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem; }
-.training-drawing-preview { min-width:0;overflow:hidden;border:1px solid var(--border-soft);border-radius:.7rem;background:#fff; }
+.training-drawing-preview { min-width:0;overflow:hidden;border:1px solid var(--border-soft);border-radius:.7rem;background:#fff;cursor:pointer;transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+.training-drawing-preview:hover,.training-drawing-preview:focus-visible { border-color:var(--clube-primary);outline:0;box-shadow:0 0 0 3px var(--clube-primary-soft);transform:translateY(-1px); }
 .training-drawing-preview-stage { position:relative;overflow:hidden;background:#eef2f6; }
 .training-drawing-court,.training-drawing-overlay { position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain; }
 .training-drawing-overlay[hidden] { display:none; }

@@ -65,7 +65,7 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         for texto in (
             "Finalização em vantagem", "Hora", "18:15", "Duração", "20 min",
             "Tipo", "TIO", "RPE", "Organização", "Três filas na linha final.",
-            "Coaching points", "Atacar o cesto sem hesitar.", "Editar quadros táticos",
+            "Coaching points", "Atacar o cesto sem hesitar.", "Acrescentar campo tático",
         ):
             assert texto in pagina.text
         assert 'class="training-exercise-card"' in pagina.text
