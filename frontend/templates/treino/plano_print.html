@@ -69,10 +69,10 @@
         .content { padding: 0 0 8px; }
         .exercise-list, .block-section { margin-top: 7px; }
         .block-title { break-after: avoid; page-break-after: avoid; border-left: 3px solid var(--pdf-primary); background: var(--pdf-secondary); color: var(--pdf-on-secondary); padding: 5px 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; }
-        .exercise { margin-top: 5px; border: 1px solid #cfd7e2; border-radius: 2mm; break-inside: avoid; page-break-inside: avoid; }
+        .exercise { margin-top: 5px; border: 0.5px solid #dfe4eb; border-radius: 2mm; break-inside: avoid; page-break-inside: avoid; }
         .block-title + .exercise { margin-top: 0; border-top: 0; }
-        .exercise-head { display: grid; grid-template-columns: 15mm 18mm minmax(0, 1fr) 24mm 13mm; min-height: 14mm; overflow: hidden; background: #f8fafc; border-bottom: 1px solid #d7dde5; }
-        .exercise-head div { display: flex; min-width: 0; overflow: hidden; flex-direction: column; justify-content: center; border-right: 1px solid #d7dde5; padding: 2mm 2.2mm; }
+        .exercise-head { display: grid; grid-template-columns: 15mm 18mm minmax(0, 1fr) 24mm 13mm; min-height: 14mm; overflow: hidden; background: #f8fafc; border-bottom: 0.5px solid #dfe4eb; }
+        .exercise-head div { display: flex; min-width: 0; overflow: hidden; flex-direction: column; justify-content: center; border-right: 0.5px solid #dfe4eb; padding: 2mm 2.2mm; }
         .exercise-head div:last-child { border-right: 0; }
         .exercise-head label { display: block; flex: 0 0 auto; font-size: 8px; line-height: 1.05; color: #6b7280; text-transform: uppercase; margin-bottom: 1.2mm; letter-spacing: 0.08em; }
         .exercise-head strong { display: block; min-height: 3.2mm; font-size: 10px; line-height: 1.15; color: #111827; overflow-wrap: anywhere; }
@@ -80,13 +80,13 @@
         .exercise-body { display: grid; grid-template-columns: 1fr; }
         .exercise-body.two-texts { grid-template-columns: minmax(0, 64%) minmax(0, 36%); }
         .exercise-body.with-courts.one-text { grid-template-columns: minmax(0, 38%) minmax(0, 62%); }
-        .exercise-body.with-courts.two-texts { grid-template-columns: minmax(0, 36%) minmax(0, 40%) minmax(0, 24%); }
+        .exercise-body.with-courts.two-texts { grid-template-columns: minmax(0, 33%) minmax(0, 37%) minmax(0, 30%); }
         .exercise-body.with-courts.courts-only { grid-template-columns: minmax(0, 1fr); }
-        .exercise-cell { min-width: 0; border-right: 1px solid #d7dde5; padding: 7px; overflow-wrap: anywhere; }
+        .exercise-cell { min-width: 0; border-right: 0.5px solid #dfe4eb; padding: 7px; overflow-wrap: anywhere; }
         .exercise-cell:last-child { border-right: 0; }
         .exercise-cell h4 { font-size: 8px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px; }
         .exercise-cell p { white-space: pre-line; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
-        .exercise-coaching { padding-top: 7px; padding-bottom: 7px; }
+        .exercise-organization, .exercise-coaching { display: flex; flex-direction: column; justify-content: center; }
         .courts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items:start; gap: 5px; }
         .courts-grid.court-count-1 { grid-template-columns: minmax(0, 1fr); }
         .court-card { min-width: 0; break-inside: avoid; page-break-inside: avoid; }
