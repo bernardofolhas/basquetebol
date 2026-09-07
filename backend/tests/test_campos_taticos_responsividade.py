@@ -90,6 +90,9 @@ def test_templates_expoem_navegacao_e_acoes_responsivas_sem_textos_internos():
     assert "ex.campos_pdf" in plano_pdf
     assert "identidade.nome_oficial" in plano_pdf
     assert "{% if plano and plano.reflexao %}" in plano_pdf
+    assert "height: 25mm" not in plano_pdf
+    assert ".court img { display: block; width: 100%; height: auto;" in plano_pdf
+    assert "Ficha de treino" not in plano_pdf
     assert "imagemBase" in playbook
     assert "est.posicaoCursor = pos" in playbook
     assert "est.imagemBase = null" in playbook

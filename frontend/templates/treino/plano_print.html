@@ -9,7 +9,7 @@
         <div class="exercise-rpe"><label>RPE</label><strong>{{ ex.rpe if ex.rpe is not none else "-" }}</strong></div>
     </div>
     {% if ex.campos_pdf or ex.organizacao or ex.coaching_points %}
-    <div class="exercise-body{% if ex.campos_pdf %} with-courts{% endif %}{% if ex.organizacao and ex.coaching_points %} two-texts{% elif ex.organizacao or ex.coaching_points %} one-text{% endif %}">
+        <div class="exercise-body{% if ex.campos_pdf %} with-courts{% endif %}{% if ex.organizacao and ex.coaching_points %} two-texts{% elif ex.organizacao or ex.coaching_points %} one-text{% endif %}">
         {% if ex.campos_pdf %}
         <section class="exercise-cell exercise-courts">
             <h4>Quadros táticos</h4>
@@ -42,10 +42,9 @@
         .toolbar { margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; padding: 12px; text-align: center; }
         .btn-print { border: none; border-radius: 8px; background: #ea580c; color: #fff; padding: 10px 18px; font-size: 14px; cursor: pointer; }
         .sheet { width: 100%; max-width: 192mm; margin: 0 auto; background: #fff; }
-        .sheet-header { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(58mm, .8fr); gap: 12px; padding: 10px 14px 10px 12px; background: var(--pdf-primary); color: var(--pdf-on-primary); overflow: hidden; }
-        .sheet-header small { display: block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.88; }
-        .sheet-header h1 { margin-top: 4px; font-size: 18px; line-height: 1.1; overflow-wrap: anywhere; }
-        .sheet-header p { margin-top: 3px; font-size: 10px; opacity: 0.95; overflow-wrap: anywhere; }
+        .sheet-header { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(58mm, .8fr); gap: 12px; padding: 10px 14px 10px 12px; background: var(--pdf-primary); color: var(--pdf-on-primary); }
+        .sheet-header h1 { margin-top: 2px; font-size: 18px; line-height: 1.1; overflow-wrap: anywhere; }
+        .sheet-header p { margin-top: 4px; font-size: 9px; opacity: 0.95; overflow-wrap: anywhere; }
         .header-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-self: end; min-width: 0; padding-right: 4px; }
         .header-stat { min-width: 0; min-height: 35px; border: 1px solid rgba(255,255,255,0.35); border-radius: 7px; padding: 4px 6px; background: rgba(255,255,255,0.12); text-align: right; }
         .sheet-header .header-stat small { font-size: 8px; line-height: 1; letter-spacing: 0.08em; white-space: nowrap; }
@@ -70,7 +69,7 @@
         .content { padding: 0 0 8px; }
         .exercise-list, .block-section { margin-top: 7px; }
         .block-title { break-after: avoid; page-break-after: avoid; border-left: 3px solid var(--pdf-primary); background: var(--pdf-secondary); color: var(--pdf-on-secondary); padding: 5px 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; }
-        .exercise { margin-top: 5px; overflow: hidden; border: 1px solid #cfd7e2; break-inside: avoid; page-break-inside: avoid; }
+        .exercise { margin-top: 5px; border: 1px solid #cfd7e2; border-radius: 2mm; break-inside: avoid; page-break-inside: avoid; }
         .block-title + .exercise { margin-top: 0; border-top: 0; }
         .exercise-head { display: grid; grid-template-columns: 15mm 18mm minmax(0, 1fr) 24mm 13mm; background: #f8fafc; border-bottom: 1px solid #d7dde5; }
         .exercise-head div { min-width: 0; border-right: 1px solid #d7dde5; padding: 5px 7px; }
@@ -79,17 +78,18 @@
         .exercise-head strong { display: block; font-size: 10px; color: #111827; overflow-wrap: anywhere; }
         .exercise-head div:not(.exercise-name) label, .exercise-head div:not(.exercise-name) strong { white-space: nowrap; }
         .exercise-body { display: grid; grid-template-columns: 1fr; }
-        .exercise-body.two-texts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .exercise-body.with-courts.one-text { grid-template-columns: minmax(0, 48%) minmax(0, 52%); }
-        .exercise-body.with-courts.two-texts { grid-template-columns: minmax(0, 46%) minmax(0, 27%) minmax(0, 27%); }
-        .exercise-cell { min-width: 0; border-right: 1px solid #d7dde5; padding: 7px; }
+        .exercise-body.two-texts { grid-template-columns: minmax(0, 64%) minmax(0, 36%); }
+        .exercise-body.with-courts.one-text { grid-template-columns: minmax(0, 40%) minmax(0, 60%); }
+        .exercise-body.with-courts.two-texts { grid-template-columns: minmax(0, 38%) minmax(0, 42%) minmax(0, 20%); }
+        .exercise-cell { min-width: 0; border-right: 1px solid #d7dde5; padding: 7px; overflow-wrap: anywhere; }
         .exercise-cell:last-child { border-right: 0; }
         .exercise-cell h4 { font-size: 8px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px; }
         .exercise-cell p { white-space: pre-line; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
-        .courts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
-        .court-card h5 { margin-bottom: 2px; color: #64748b; font-size: 7px; text-transform: uppercase; }
-        .court { position: relative; border: 1px solid #d1d5db; background: #fff; overflow: hidden; height: 25mm; }
-        .court img { display: block; width: 100%; height: 100%; object-fit: contain; }
+        .courts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items:start; gap: 4px; }
+        .court-card { min-width: 0; break-inside: avoid; page-break-inside: avoid; }
+        .court-card h5 { margin-bottom: 2px; color: #64748b; font-size: 7px; text-transform: uppercase; overflow-wrap: anywhere; }
+        .court { position: relative; border: 1px solid #d1d5db; background: #fff; padding: 1px; }
+        .court img { display: block; width: 100%; height: auto; max-width: 100%; }
 
         .reflection { margin-top: 16px; border: 1px solid #d1d5db; min-height: 90px; padding: 12px; }
         .reflection h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 8px; }
@@ -124,11 +124,10 @@
         <div>
             <div class="club-mark">
                 {% if identidade.logo_principal %}<img src="{{ identidade.logo_principal }}" alt="Logotipo">{% endif %}
-                <span>{{ identidade.nome_oficial|default('Clube de Basquetebol') }}</span>
+                <span>Plano de treino</span>
             </div>
-            <small>Ficha de treino</small>
             <h1>{% if sessao.numero_treino %}Treino {{ sessao.numero_treino }}{% else %}Plano de treino{% endif %}</h1>
-            <p>{{ equipa.nome }}</p>
+            <p>{{ sessao.data|data_pt }}{% if sessao.local %} · {{ sessao.local }}{% endif %}</p>
         </div>
         <div class="header-stats">
             <div class="header-stat">
