@@ -486,22 +486,38 @@
                             </dl>
                             {% endif %}
 
-                            <form method="POST" action="/treino/exercicios/{{ ex.id }}/notas" class="training-exercise-inline-form" onsubmit="guardarNotasExercicio(event, this, {{ ex.id }})">
-                                <div class="training-exercise-content training-exercise-content-editable">
-                                    <label>
-                                        <span>Organização</span>
-                                        <textarea name="organizacao" rows="3" placeholder="Grupos, rotações, material e organização do exercício...">{{ ex.organizacao if ex.organizacao else "" }}</textarea>
-                                    </label>
-                                    <label>
-                                        <span>Coaching points</span>
-                                        <textarea name="coaching_points" rows="3" placeholder="Pontos-chave de intervenção do treinador...">{{ ex.coaching_points if ex.coaching_points else "" }}</textarea>
-                                    </label>
-                                </div>
-                                <div class="training-inline-save">
-                                    <span data-notes-status="{{ ex.id }}" aria-live="polite"></span>
-                                    <button type="submit" class="ds-button ds-button-primary ds-button-sm">Guardar conteúdo</button>
-                                </div>
-                            </form>
+                            <div class="training-exercise-workbench">
+                                <section class="training-exercise-visuals">
+                                    <header>
+                                        <h4>Quadros táticos</h4>
+                                        <button type="button" onclick="abrirEditorDesenho({{ ex.id }})" class="training-drawing-edit" aria-label="Editar quadros táticos" title="Editar quadros táticos">&#9998;</button>
+                                    </header>
+                                    <div class="training-drawing-preview-grid">
+                                        {% for campo in ex.campos_ui %}
+                                        {{ campo_previsualizacao(ex.id, campo) }}
+                                        {% else %}
+                                        <div class="training-drawing-empty">Sem quadros</div>
+                                        {% endfor %}
+                                    </div>
+                                </section>
+
+                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/notas" class="training-exercise-inline-form" onsubmit="guardarNotasExercicio(event, this, {{ ex.id }})">
+                                    <div class="training-exercise-content training-exercise-content-editable">
+                                        <label>
+                                            <span>Organização</span>
+                                            <textarea name="organizacao" rows="3" placeholder="Grupos, rotações, material e organização do exercício...">{{ ex.organizacao if ex.organizacao else "" }}</textarea>
+                                        </label>
+                                        <label>
+                                            <span>Coaching points</span>
+                                            <textarea name="coaching_points" rows="3" placeholder="Pontos-chave de intervenção do treinador...">{{ ex.coaching_points if ex.coaching_points else "" }}</textarea>
+                                        </label>
+                                    </div>
+                                    <div class="training-inline-save">
+                                        <span data-notes-status="{{ ex.id }}" aria-live="polite"></span>
+                                        <button type="submit" class="ds-button ds-button-primary ds-button-sm">Guardar conteúdo</button>
+                                    </div>
+                                </form>
+                            </div>
 
                             <dialog id="modal_exercicio_{{ ex.id }}" class="training-editor-dialog" aria-labelledby="titulo_modal_exercicio_{{ ex.id }}">
                                 <div class="training-editor-dialog-shell">
@@ -545,20 +561,6 @@
                                     </form>
                                 </div>
                             </dialog>
-
-                            <section class="training-exercise-visuals">
-                                <header>
-                                    <div><h4>Desenhos táticos</h4><p>Visualização direta dos campos usados neste exercício.</p></div>
-                                    <button type="button" onclick="abrirEditorDesenho({{ ex.id }})" class="ds-button ds-button-secondary ds-button-sm">Editar desenho</button>
-                                </header>
-                                <div class="training-drawing-preview-grid">
-                                    {% for campo in ex.campos_ui %}
-                                    {{ campo_previsualizacao(ex.id, campo) }}
-                                    {% else %}
-                                    <div class="training-drawing-empty">Ainda não existem campos neste exercício. Usa <b>Editar desenho</b> para acrescentar um.</div>
-                                    {% endfor %}
-                                </div>
-                            </section>
 
                             <dialog id="modal_desenho_{{ ex.id }}" class="training-editor-dialog training-drawing-dialog" data-drawing-editor data-exercicio-id="{{ ex.id }}" aria-labelledby="titulo_modal_desenho_{{ ex.id }}">
                                 <div class="training-editor-dialog-shell">
