@@ -162,14 +162,18 @@ def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador) -> dic
             setattr(exercicio, "campos_pdf", campos_pdf)
             exercicios_por_bloco[bloco].append(exercicio)
 
+    usa_blocos = bool(plano and plano.blocos)
+    resumo_blocos = _construir_resumo_blocos(plano)
     return {
         "utilizador": utilizador,
         "sessao": sessao,
         "equipa": equipa,
         "plano": plano,
         "exercicios_por_bloco": exercicios_por_bloco,
-        "resumo_blocos": _construir_resumo_blocos(plano),
-        "blocos_ui": ([{"key": f"d{bloco.id}", "id": bloco.id, "nome": bloco.nome, "tipo": bloco.tipo, "legado": False} for bloco in plano.blocos] if plano else []) + [{"key": letra, "id": None, "nome": f"Bloco {letra}", "tipo": "Legado", "legado": True} for letra in ["A", "B", "C", "D"] if letra in exercicios_por_bloco],
+        "resumo_blocos": [item for item in resumo_blocos if item["bloco_id"] is not None] if usa_blocos else [],
+        "blocos_ui": ([{"key": f"d{bloco.id}", "id": bloco.id, "nome": bloco.nome, "tipo": bloco.tipo, "legado": False} for bloco in plano.blocos] if plano else []) + [{"key": letra, "id": None, "nome": "Exercícios sem bloco", "tipo": None, "legado": True} for letra in ["A", "B", "C", "D"] if letra in exercicios_por_bloco],
+        "exercicios_lista": sorted(exercicios, key=lambda ex: (ex.ordem or 0, ex.id or 0)),
+        "usa_blocos": usa_blocos,
         "total_exercicios": len(exercicios),
         "volume_planeado": sum(ex.minutos or 0 for ex in exercicios),
         "rpe_geral": sessao.intensidade_rpe,

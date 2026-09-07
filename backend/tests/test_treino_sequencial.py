@@ -72,3 +72,27 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()
+
+
+def test_pdf_sem_modulo_de_blocos_nao_mostra_blocos_tecnicos(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={"nome": "Aquecimento", "minutos": "10"},
+            follow_redirects=False,
+        )
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}/print")
+        assert pagina.status_code == 200
+        assert "Aquecimento" in pagina.text
+        assert '<div class="block-summary">' not in pagina.text
+        assert '<div class="block-title">' not in pagina.text
+        assert "Bloco A" not in pagina.text
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
