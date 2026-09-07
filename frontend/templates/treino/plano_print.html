@@ -42,7 +42,7 @@
         .toolbar { margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; padding: 12px; text-align: center; }
         .btn-print { border: none; border-radius: 8px; background: #ea580c; color: #fff; padding: 10px 18px; font-size: 14px; cursor: pointer; }
         .sheet { width: 100%; max-width: 192mm; margin: 0 auto; background: #fff; }
-        .sheet-header { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(58mm, .8fr); gap: 12px; padding: 10px 14px 10px 12px; background: var(--pdf-primary); color: var(--pdf-on-primary); }
+        .sheet-header { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(58mm, .75fr); gap: 12px; padding: 10px 14px 10px 12px; background: var(--pdf-primary); color: var(--pdf-on-primary); }
         .sheet-header h1 { margin-top: 2px; font-size: 18px; line-height: 1.1; overflow-wrap: anywhere; }
         .sheet-header p { margin-top: 4px; font-size: 9px; opacity: 0.95; overflow-wrap: anywhere; }
         .header-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-self: end; min-width: 0; padding-right: 4px; }
@@ -79,17 +79,17 @@
         .exercise-head div:not(.exercise-name) label, .exercise-head div:not(.exercise-name) strong { white-space: nowrap; }
         .exercise-body { display: grid; grid-template-columns: 1fr; }
         .exercise-body.two-texts { grid-template-columns: minmax(0, 64%) minmax(0, 36%); }
-        .exercise-body.with-courts.one-text { grid-template-columns: minmax(0, 40%) minmax(0, 60%); }
-        .exercise-body.with-courts.two-texts { grid-template-columns: minmax(0, 38%) minmax(0, 42%) minmax(0, 20%); }
+        .exercise-body.with-courts.one-text { grid-template-columns: minmax(0, 52%) minmax(0, 48%); }
+        .exercise-body.with-courts.two-texts { grid-template-columns: minmax(0, 46%) minmax(0, 39%) minmax(0, 15%); }
         .exercise-cell { min-width: 0; border-right: 1px solid #d7dde5; padding: 7px; overflow-wrap: anywhere; }
         .exercise-cell:last-child { border-right: 0; }
         .exercise-cell h4 { font-size: 8px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px; }
         .exercise-cell p { white-space: pre-line; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
-        .courts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items:start; gap: 4px; }
+        .courts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items:start; gap: 5px; }
         .court-card { min-width: 0; break-inside: avoid; page-break-inside: avoid; }
         .court-card h5 { margin-bottom: 2px; color: #64748b; font-size: 7px; text-transform: uppercase; overflow-wrap: anywhere; }
-        .court { position: relative; border: 1px solid #d1d5db; background: #fff; padding: 1px; }
-        .court img { display: block; width: 100%; height: auto; max-width: 100%; }
+        .court { position: relative; border: 1px solid #cbd5e1; background: #fff; padding: 2px; overflow: hidden; }
+        .court img { display: block; width: 100%; height: auto; max-width: 100%; max-height: 62mm; object-fit: contain; object-position: center; }
 
         .reflection { margin-top: 16px; border: 1px solid #d1d5db; min-height: 90px; padding: 12px; }
         .reflection h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 8px; }
@@ -115,9 +115,7 @@
     <a href="/treino/sessoes/{{ sessao.id }}" style="margin-left: 15px; color: #666; font-size: 12px;">← Voltar ao plano</a>
 </div>
 
-<div class="footer">
-    {{ nome_treinador }} · {{ identidade.nome_oficial|default('Clube de Basquetebol') }}
-</div>
+<div class="footer">{{ nome_treinador }}</div>
 
 <div class="sheet">
     <div class="sheet-header">
