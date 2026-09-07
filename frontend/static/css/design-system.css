@@ -774,6 +774,34 @@ table tbody tr:hover { background:#fafbfd; }
     .ds-user-menu-dropdown { position:fixed;top:calc(var(--topbar-height) + .55rem)!important;right:.65rem!important;left:.65rem!important;z-index:110!important;width:auto!important; }
 }
 
+.training-workspace [hidden] { display:none!important; }
+.training-workspace .ds-team-hero { padding:1rem 1.2rem;background:#fff; }
+.training-workspace .ds-team-hero h1 { font-size:1.4rem; }
+.training-workspace .ds-team-meta { margin-top:.5rem; }
+.training-guidance { border:1px solid var(--border-soft);border-radius:.75rem;background:#fff;margin-bottom:.75rem; }
+.training-guidance>summary { cursor:pointer;padding:.7rem 1rem;font-size:.8rem;font-weight:650;color:var(--text-main); }
+.training-guidance>summary span { margin-left:.6rem;color:var(--text-muted);font-weight:400; }
+.training-toolbar-actions { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem; }
+.training-toolbar-actions label { display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:var(--text-muted); }
+.training-toolbar-actions input { accent-color:var(--clube-primary); }
+.training-duration,.training-empty { margin-top:.75rem;font-size:.8rem;color:var(--text-muted); }
+.training-workspace:not(.training-with-blocks) [data-training-group] { border:0;border-radius:0;box-shadow:none;background:transparent; }
+.training-workspace:not(.training-with-blocks) .training-group-body { border:0;padding:0; }
+.training-session-heading { padding:.8rem 1.2rem;border-bottom:1px solid var(--border-soft);background:#f8fafc;color:var(--text-main); }
+.training-session-heading h2 { margin:0;font-size:1rem; }
+.training-session-heading p { color:var(--text-muted);margin:.2rem 0; }
+.training-session-heading>div>div>p:first-child,.training-session-heading>div>div>p:last-child { display:none; }
+.training-session-heading .grid { display:flex;flex-wrap:wrap;gap:1rem; }
+.training-session-heading .grid>div { padding:0;background:transparent; }
+.training-session-heading .grid p { font-size:.75rem;display:inline!important;letter-spacing:normal; }
+.training-session-data>form { padding:1rem 1.2rem; }
+.training-session-data>form>div:first-child { display:none; }
+@media(max-width:640px) {
+    .training-exercise-toolbar,#training-add-panel { padding:1rem; }
+    .training-workspace .ds-team-hero { padding:1rem; }
+    .training-toolbar-actions { align-items:stretch;flex-direction:column; }
+    #training-add-panel input,#training-add-panel select,#training-add-panel textarea { font-size:16px; }
+}
 .ds-attendance-heading { display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1rem; }
 .ds-attendance-heading h1 { margin:.15rem 0;color:#182230;font-size:clamp(1.45rem,2.5vw,2rem);font-weight:850;letter-spacing:-.035em; }
 .ds-attendance-heading>div>p:last-child { color:#667085;font-size:.82rem; }

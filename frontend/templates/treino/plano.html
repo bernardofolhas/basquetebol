@@ -5,6 +5,7 @@
 {% block titulo %}Plano de Treino — {{ sessao.data|data_pt }}{% endblock %}
 
 {% block conteudo %}
+<div class="training-workspace" data-training-plan="{{ plano.id }}">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
 <div class="rounded-2xl border border-gray-200 bg-gray-50 p-3">
@@ -76,7 +77,8 @@
     </form>
 {% endcall %}
 
-<section class="mb-6 overflow-hidden rounded-[24px] border border-amber-200 bg-white shadow-sm" aria-label="Conteúdos sugeridos pelo microciclo">
+<details class="training-guidance" aria-label="Conteúdos sugeridos pelo microciclo">
+    <summary>Conteúdos previstos pelo microciclo <span>{{ conteudos_previstos.total_minutos }} min</span></summary>
     <div class="flex flex-col gap-3 border-b border-amber-100 bg-amber-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <p class="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">Orientação do microciclo</p>
@@ -129,9 +131,9 @@
         </div>
     </details>
     {% endif %}
-</section>
+</details>
 
-<nav class="ds-workspace-tabs" data-workspace-tabs="treino" data-workspace-default="{% if importacao_ativa and not modo_edicao_importacao %}dados-importados{% else %}dados{% endif %}" aria-label="Áreas do plano de treino">
+<nav class="ds-workspace-tabs" data-workspace-tabs="treino" data-workspace-always-default="true" data-workspace-default="{% if importacao_ativa and not modo_edicao_importacao %}dados-importados{% else %}exercicios{% endif %}" aria-label="Áreas do plano de treino">
     <div class="ds-workspace-tabs-list" role="tablist">
         {% if importacao_ativa and not modo_edicao_importacao %}
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="dados-importados">Dados e setores</button>
@@ -263,20 +265,20 @@
 {% else %}
 <div>
     <div class="contents">
-        <div data-workspace-panel="treino:dados" role="tabpanel" class="overflow-hidden rounded-[28px] border border-orange-100 bg-white shadow-sm">
-            <div class="border-b border-orange-100 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 px-6 py-5 text-white">
+        <div data-workspace-panel="treino:dados" role="tabpanel" class="training-session-data overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
+            <div class="training-session-heading">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.35em] text-orange-100">Ficha de treino</p>
                         <h2 class="mt-2 text-3xl font-bold">
-                            {{ equipa.nome }}
+                            Dados do treino
                         </h2>
                         <p class="mt-2 text-sm text-orange-50">
                             {{ sessao.data|data_pt }}{% if sessao.hora_inicio or sessao.hora_fim %} · {{ sessao.hora_inicio if sessao.hora_inicio else "?" }}{% if sessao.hora_fim %} - {{ sessao.hora_fim }}{% endif %}{% endif %}
                         </p>
                     </div>
                     <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                        <div class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
+                        <div data-training-block-only hidden class="rounded-2xl bg-white/20 px-4 py-3 backdrop-blur">
                             <p class="text-[11px] uppercase tracking-[0.18em] text-orange-100">Blocos</p>
                             <p class="mt-2 text-2xl font-bold">{{ resumo_blocos | length }}</p>
                         </div>
@@ -354,7 +356,7 @@
                     <textarea name="objectivos" rows="3" placeholder="O que queres garantir nesta sessão?" class="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.objectivos if plano.objectivos else "" }}</textarea>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div data-training-block-only hidden class="grid grid-cols-2 gap-3 md:grid-cols-4">
                     {% for item in resumo_blocos %}
                     <a href="#bloco-{{ item.bloco }}" class="rounded-2xl border border-gray-200 bg-gray-50 p-4 transition hover:border-orange-300 hover:bg-orange-50">
                         <div class="flex items-center justify-between gap-3">
@@ -380,17 +382,24 @@
             </form>
         </div>
 
-        <div data-workspace-panel="treino:exercicios" role="tabpanel" class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+        <div data-workspace-panel="treino:exercicios" role="tabpanel" class="training-exercise-toolbar rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+            <div class="training-toolbar-actions">
+                <button type="button" class="ds-button ds-button-primary" aria-controls="training-add-panel" aria-expanded="false" data-training-add><span aria-hidden="true">+</span> Adicionar exercício</button>
+                <label><input type="checkbox" data-training-block-mode> Planear por blocos</label>
+            </div>
+            <div data-training-block-only hidden>
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h2 class="text-xl font-semibold text-gray-800">Blocos do treino</h2><p class="mt-1 text-sm text-gray-500">Cria apenas os blocos necessários.</p></div><form method="POST" action="/treino/planos/{{ plano.id }}/blocos" class="flex flex-wrap gap-2"><input name="nome" required placeholder="Ex: Aquecimento" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><input name="tipo" placeholder="Tipo opcional" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><button class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white">Criar bloco</button></form></div>
-            <div class="mt-4 flex flex-wrap gap-2 text-sm"><span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Previsto: {{ duracao_prevista ~ ' min' if duracao_prevista is not none else 'por definir' }}</span><span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Exercícios: {{ volume_planeado }} min</span>{% if diferenca_duracao is not none %}<span class="rounded-full px-3 py-1 font-semibold {% if diferenca_duracao == 0 %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-800{% endif %}">{% if diferenca_duracao == 0 %}Duração coerente{% elif diferenca_duracao > 0 %}+{{ diferenca_duracao }} min acima{% else %}{{ diferenca_duracao|abs }} min por preencher{% endif %}</span>{% endif %}</div>
-            {% if not blocos_ui %}<div class="mt-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500">O treino está vazio. Cria o primeiro bloco para começar.</div>{% endif %}
+            </div>
+            <p class="training-duration">{{ total_exercicios }} exercício(s) · {{ volume_planeado }}{% if duracao_prevista is not none %}/{{ duracao_prevista }}{% endif %} min planeados</p>
+            {% if not total_exercicios %}<p class="training-empty">Adiciona o primeiro exercício para começar.</p>{% endif %}
         </div>
 
-        <div data-workspace-panel="treino:exercicios" role="tabpanel" class="mt-6 rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+        <div data-workspace-panel="treino:exercicios" role="tabpanel">
+        <section id="training-add-panel" hidden class="mt-6 rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h2 class="text-xl font-semibold text-gray-800">Adicionar exercício</h2>
-                    <p class="mt-1 text-sm text-gray-500">Um único formulário para alimentares qualquer bloco sem repetir campos.</p>
+                    <p class="mt-1 text-sm text-gray-500">Define o conteúdo, a duração e os pontos de intervenção.</p>
                 </div>
                 <button type="button" onclick="abrirBiblioteca('form_adicionar_exercicio')" class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100">
                     📖 Usar biblioteca
@@ -400,10 +409,10 @@
             <form id="form_adicionar_exercicio" method="POST" action="/treino/planos/{{ plano.id }}/exercicios" class="mt-5 space-y-4">
                 <input type="hidden" name="biblioteca_id" id="biblioteca_id_form_adicionar_exercicio" value="">
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <div>
+                    <div data-training-block-only hidden>
                         <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
-                        <select name="bloco_id" required class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                            <option value="">Selecionar bloco</option>{% for bloco in blocos_ui if not bloco.legado %}<option value="{{ bloco.id }}">{{ bloco.nome }}</option>{% endfor %}
+                        <select name="bloco_id" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                            <option value="">Sem bloco</option>{% for bloco in blocos_ui if not bloco.legado %}<option value="{{ bloco.id }}">{{ bloco.nome }}</option>{% endfor %}
                         </select>
                     </div>
                     <div>
@@ -444,18 +453,20 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end">
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="ds-button ds-button-secondary" data-training-cancel>Cancelar</button>
                     <button type="submit" class="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600">+ Adicionar exercício</button>
                 </div>
             </form>
+        </section>
         </div>
 
         <div data-workspace-panel="treino:exercicios" role="tabpanel" class="mt-6 space-y-4">
             {% for bloco_ui in blocos_ui %}
             {% set bloco_letra = bloco_ui.key %}
             {% set resumo_minutos = exercicios_por_bloco[bloco_letra]|map(attribute='minutos')|select|sum %}
-            <details id="bloco-{{ bloco_letra }}" class="overflow-hidden rounded-[28px] border border-gray-100 bg-white shadow-sm" {% if exercicios_por_bloco[bloco_letra] or bloco_letra == "A" %}open{% endif %}>
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5">
+            <details id="bloco-{{ bloco_letra }}" data-training-group class="overflow-hidden rounded-[28px] border border-gray-100 bg-white shadow-sm" open>
+                <summary data-training-block-only hidden class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5">
                     <div class="flex flex-wrap items-center gap-3">
                         <span class="rounded-full bg-orange-100 px-3 py-1 text-sm font-bold text-orange-700">{{ bloco_ui.nome }}</span>
                         <span class="text-sm text-gray-500">{{ exercicios_por_bloco[bloco_letra] | length }} exercício(s)</span>
@@ -464,8 +475,10 @@
                     <span class="text-sm text-gray-400">Abrir / fechar</span>
                 </summary>
 
-                <div class="border-t border-gray-100 px-6 py-6">
+                <div class="training-group-body border-t border-gray-100 px-6 py-6">
+                    <div data-training-block-only hidden>
                     {% if not bloco_ui.legado %}<div class="mb-4 flex flex-wrap gap-3"><form method="POST" action="/treino/blocos/{{ bloco_ui.id }}/editar" class="flex flex-wrap gap-2"><input name="nome" value="{{ bloco_ui.nome }}" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><input name="tipo" value="{{ bloco_ui.tipo or '' }}" placeholder="Tipo" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><input type="hidden" name="ordem" value="{{ loop.index }}"><button class="text-xs font-semibold text-blue-700">Guardar</button></form><form method="POST" action="/treino/blocos/{{ bloco_ui.id }}/duplicar"><button class="text-xs font-semibold text-violet-700">Duplicar</button></form><form method="POST" action="/treino/blocos/{{ bloco_ui.id }}/apagar" onsubmit="return confirm('Apagar este bloco vazio?')"><button class="text-xs font-semibold text-red-700">Apagar</button></form></div>{% endif %}
+                    </div>
                     {% if exercicios_por_bloco[bloco_letra] %}
                     <div class="space-y-5">
                         {% for ex in exercicios_por_bloco[bloco_letra] %}
@@ -473,7 +486,7 @@
                             <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <span class="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gray-500 ring-1 ring-gray-200">{{ bloco_letra }}{{ loop.index }}</span>
+                                        <span data-training-exercise-number class="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gray-500 ring-1 ring-gray-200">Exercício {{ loop.index }}</span>
                                         {% if ex.categoria %}
                                         <span class="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700">{{ ex.categoria }}</span>
                                         {% endif %}
@@ -488,6 +501,8 @@
                                         {% endif %}
                                     </div>
                                     <h3 class="mt-3 text-lg font-semibold text-gray-900">{{ ex.nome if ex.nome else "Exercício sem nome" }}</h3>
+                                    {% if ex.organizacao %}<p class="mt-2 whitespace-pre-wrap text-sm text-gray-600">{{ ex.organizacao }}</p>{% endif %}
+                                    {% if ex.coaching_points %}<p class="mt-2 whitespace-pre-wrap text-sm text-gray-600"><strong>Coaching points:</strong> {{ ex.coaching_points }}</p>{% endif %}
                                 </div>
                                 <div class="flex flex-wrap gap-2">
                                     <form method="POST" action="/treino/exercicios/{{ ex.id }}/duplicar">
@@ -504,9 +519,10 @@
                                 <div class="border-t border-gray-100 px-4 py-4">
                             <form id="form_exercicio_{{ ex.id }}" method="POST" action="/treino/exercicios/{{ ex.id }}/atualizar" class="space-y-4">
                                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-                                    <div>
+                                    <div data-training-block-only hidden>
                                         <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
                                         <select name="bloco_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                            <option value="" {% if not ex.bloco_id %}selected{% endif %}>Sem bloco</option>
                                             {% for bloco in blocos_ui if not bloco.legado %}<option value="{{ bloco.id }}" {% if ex.bloco_id == bloco.id %}selected{% endif %}>{{ bloco.nome }}</option>{% endfor %}
                                         </select>
                                     </div>
@@ -581,7 +597,7 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-400">
+                    <div data-training-block-only hidden class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-400">
                         Ainda não tens exercícios neste bloco.
                     </div>
                     {% endif %}
@@ -658,8 +674,41 @@
     </aside>
 </div>
 {% endif %}
+</div>
 
 <script>
+(function () {
+    const root = document.querySelector('[data-training-plan]');
+    const toggle = root.querySelector('[data-training-block-mode]');
+    if (!toggle) return;
+    const storageKey = 'training-block-mode:' + root.dataset.trainingPlan;
+    try { toggle.checked = localStorage.getItem(storageKey) === 'true'; } catch (_) {}
+    function applyMode() {
+        root.classList.toggle('training-with-blocks', toggle.checked);
+        root.querySelectorAll('[data-training-block-only]').forEach(el => { el.hidden = !toggle.checked; });
+        root.querySelectorAll('[data-training-group]').forEach(el => { el.open = true; });
+        const select = document.querySelector('#form_adicionar_exercicio select[name="bloco_id"]');
+        select.disabled = !toggle.checked;
+        try { localStorage.setItem(storageKey, String(toggle.checked)); } catch (_) {}
+    }
+    toggle.addEventListener('change', applyMode);
+    applyMode();
+    root.querySelectorAll('[data-training-exercise-number]').forEach((el, index) => {
+        el.textContent = 'Exercício ' + (index + 1);
+    });
+    const panel = document.getElementById('training-add-panel');
+    const add = root.querySelector('[data-training-add]');
+    add.addEventListener('click', () => {
+        panel.hidden = false;
+        add.setAttribute('aria-expanded', 'true');
+        panel.querySelector('input[name="nome"]').focus({preventScroll: true});
+    });
+    root.querySelector('[data-training-cancel]').addEventListener('click', () => {
+        panel.hidden = true;
+        add.setAttribute('aria-expanded', 'false');
+        add.focus({preventScroll: true});
+    });
+})();
 document.querySelectorAll('form').forEach(function(formulario) {
     var inicio = formulario.querySelector('input[name="hora_inicio"]');
     var fim = formulario.querySelector('input[name="hora_fim"]');
