@@ -21,6 +21,7 @@
   <link rel="apple-touch-icon" href="/static/img/favicon-plataforma.svg">
   {% endif %}
   <link rel="stylesheet" href="/static/css/design-system.css?v=20260903-workflow-navigation">
+  <link rel="stylesheet" href="/static/css/sidebar.css?v=20260907">
   {% block estilos_extra %}{% endblock %}
   <style>:root{--clube-primary:{{ '#334155' if modo_plataforma else identidade.cor_principal|default('#f97316') }};--clube-secondary:{{ '#0f172a' if modo_plataforma else identidade.cor_secundaria|default('#1f2937') }};--clube-accent:{{ '#64748b' if modo_plataforma else identidade.cor_destaque|default('#0ea5e9') }};--clube-primary-light:{{ '#f1f5f9' if modo_plataforma else identidade.cor_principal_clara|default('#fff7ed') }};--clube-primary-dark:{{ '#1e293b' if modo_plataforma else identidade.cor_principal_escura|default('#c2410c') }};--clube-primary-hover:{{ '#475569' if modo_plataforma else identidade.cor_principal_hover|default('#ea580c') }};--clube-primary-surface:{{ '#f8fafc' if modo_plataforma else identidade.cor_principal_superficie|default('#fff7ed') }};--clube-primary-border:{{ '#cbd5e1' if modo_plataforma else identidade.cor_borda_marca|default('#fed7aa') }};--clube-on-primary:{{ '#fff' if modo_plataforma else identidade.texto_sobre_principal|default('#fff') }};--clube-on-secondary:{{ '#fff' if modo_plataforma else identidade.texto_sobre_secundaria|default('#fff') }};--clube-on-accent:{{ '#fff' if modo_plataforma else identidade.texto_sobre_destaque|default('#111827') }};--clube-header-text:{{ '#fff' if modo_plataforma else identidade.texto_cabecalho|default(identidade.cor_secundaria)|default('#fff') }}}</style>
   <meta name="csrf-token" content="{{ request.session.get('_csrf', '') }}">
@@ -59,9 +60,9 @@
       var menu=document.getElementById("menu-mobile"),navigation=document.getElementById("header-navigation"),overlay=document.getElementById("header-overlay");
       document.querySelectorAll("a[target], form[target]").forEach(function(element){element.removeAttribute("target")});
       document.querySelectorAll(".overflow-x-auto").forEach(function(wrapper){if(wrapper.querySelector("table"))wrapper.classList.add("ds-table-scroll")});
-      function closeMenu(){navigation.classList.remove("is-open");overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}
+      function closeMenu(){if(!navigation)return;navigation.classList.remove("is-open");overlay.classList.add("hidden");if(menu)menu.setAttribute("aria-expanded","false")}
       function openMenu(){navigation.classList.add("is-open");overlay.classList.remove("hidden");if(menu)menu.setAttribute("aria-expanded","true")}
-      if(menu)menu.addEventListener("click",function(){navigation.classList.contains("is-open")?closeMenu():openMenu()});if(overlay)overlay.addEventListener("click",closeMenu);navigation.querySelectorAll("a").forEach(function(link){link.addEventListener("click",closeMenu)});
+      if(menu)menu.addEventListener("click",function(){navigation.classList.contains("is-open")?closeMenu():openMenu()});if(overlay)overlay.addEventListener("click",closeMenu);if(navigation)navigation.querySelectorAll("a").forEach(function(link){link.addEventListener("click",closeMenu)});
       document.querySelectorAll(".ds-menu").forEach(function(menuDetails){menuDetails.addEventListener("toggle",function(){if(menuDetails.open)document.querySelectorAll(".ds-menu[open]").forEach(function(other){if(other!==menuDetails)other.removeAttribute("open")})})});
       document.querySelectorAll(".ds-primary-menu").forEach(function(menuDetails){
         var timer;menuDetails.addEventListener("mouseenter",function(){clearTimeout(timer)});menuDetails.addEventListener("mouseleave",function(){if(window.matchMedia("(min-width: 1280px)").matches)timer=setTimeout(function(){menuDetails.open=false},140)});
