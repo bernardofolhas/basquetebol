@@ -2,7 +2,7 @@
 # MODELO DE PLANO DE TREINO
 # Baseado no formato do documento Word de referência:
 # Cabeçalho + Blocos (A, B, C, D) + Exercícios por bloco
-# Cada exercício tem: hora, minutos, dois campos de desenho,
+# Cada exercício tem: hora, minutos, campos de desenho,
 # organização e coaching points
 # ─────────────────────────────────────────────────────────────
 
@@ -129,7 +129,10 @@ class ExercicioPlano(Base):
     # Campos de desenho extra (opcionais)
     desenho_3 = Column(Text, nullable=True)  # Campo meio extra
     desenho_4 = Column(Text, nullable=True)  # Campo completo extra
-    # Lista ordenada das posições visíveis (1..4). Permite um exercício sem campos.
+    # Os primeiros quatro campos mantêm as colunas legadas. Os seguintes ficam
+    # neste mapa extensível, sem impor um limite ao número de quadros.
+    desenhos_campos = Column(Text, nullable=False, default="{}", server_default="{}")
+    # Lista ordenada das posições visíveis. Permite um exercício sem campos.
     campos_ativos = Column(String, nullable=False, default="1,2", server_default="1,2")
 
     # Organização do exercício

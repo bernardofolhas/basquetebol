@@ -257,6 +257,19 @@ def actualizar_estrutura_campos_desenho() -> None:
                     "WHEN desenho_4 IS NOT NULL THEN '1,2,4' ELSE '1,2' END"
                 ))
             logger.info("Campos táticos ativos adicionados aos exercícios.")
+        if "desenhos_campos" not in colunas:
+            with engine.begin() as ligacao:
+                if dialecto == "postgresql":
+                    ligacao.execute(text(
+                        "ALTER TABLE exercicios_plano ADD COLUMN IF NOT EXISTS "
+                        "desenhos_campos TEXT NOT NULL DEFAULT '{}'"
+                    ))
+                else:
+                    ligacao.execute(text(
+                        "ALTER TABLE exercicios_plano ADD COLUMN "
+                        "desenhos_campos TEXT NOT NULL DEFAULT '{}'"
+                    ))
+            logger.info("Armazenamento extensível de campos táticos adicionado aos exercícios.")
 
     inspector = inspect(engine)
     if inspector.has_table("biblioteca_exercicios"):

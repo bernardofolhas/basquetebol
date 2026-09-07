@@ -1,4 +1,5 @@
 from datetime import date
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,7 +17,14 @@ from models.planeamento_clube import (
 from models.treinador import Treinador
 from models.treino import ExercicioPlano
 from models.utilizador import PerfilEnum, Utilizador
-from routers.treino import _campos_exercicio, _contexto_impressao_plano, _definir_slots_ativos, _slots_ativos
+from routers.treino import (
+    _campos_exercicio,
+    _contexto_impressao_plano,
+    _definir_desenho_campo,
+    _definir_slots_ativos,
+    _proximo_numero_campo,
+    _slots_ativos,
+)
 from services.planeamento_integrado_service import _item_evento
 
 
@@ -34,18 +42,35 @@ def test_exercicio_pode_ficar_sem_campos_e_recuperar_um_campo():
     assert _campos_exercicio(exercicio)[0]["tipo"] == "completo"
 
 
-def test_campos_mantem_ordem_e_desenhos_independentes():
+def test_proximo_campo_continua_depois_de_duas_utilizacoes_do_mesmo_tipo():
+    assert _proximo_numero_campo("meio", [1, 2, 3, 4]) == 5
+    assert _proximo_numero_campo("completo", [1, 2, 3, 4, 5, 6]) == 8
+
+
+def test_desenho_de_um_campo_adicional_pode_ser_guardado_e_removido():
+    exercicio = ExercicioPlano(campos_ativos="1,2,3,4,5")
+
+    _definir_desenho_campo(exercicio, 5, "desenho-editavel-5")
+    assert _campos_exercicio(exercicio)[-1]["desenho"] == "desenho-editavel-5"
+
+    _definir_desenho_campo(exercicio, 5, None)
+    assert _campos_exercicio(exercicio)[-1]["desenho"] is None
+
+
+def test_campos_mantem_ordem_e_desenhos_independentes_sem_limite_de_dois_por_tipo():
     exercicio = ExercicioPlano(
-        campos_ativos="1,2,3,4",
+        campos_ativos="1,2,3,4,5,6",
         desenho_1="meio-1",
         desenho_2="completo-1",
         desenho_3="meio-2",
         desenho_4="completo-2",
+        desenhos_campos=json.dumps({"5": "meio-3", "6": "completo-3"}),
     )
 
     campos = _campos_exercicio(exercicio)
-    assert [campo["numero"] for campo in campos] == [1, 2, 3, 4]
-    assert [campo["desenho"] for campo in campos] == ["meio-1", "completo-1", "meio-2", "completo-2"]
+    assert [campo["numero"] for campo in campos] == [1, 2, 3, 4, 5, 6]
+    assert [campo["desenho"] for campo in campos] == ["meio-1", "completo-1", "meio-2", "completo-2", "meio-3", "completo-3"]
+    assert [campo["tipo"] for campo in campos] == ["meio", "completo", "meio", "completo", "meio", "completo"]
     assert all(campo["estado_desenho"] is None for campo in campos)
 
 
@@ -54,7 +79,7 @@ def test_contexto_pdf_prepara_todos_os_campos_ativos():
         bloco="A",
         ordem=1,
         minutos=10,
-        campos_ativos="1,2,3,4",
+        campos_ativos="1,2,3,4,5,6",
     )
     plano = SimpleNamespace(exercicios=[exercicio], blocos=[])
     sessao = SimpleNamespace(intensidade_rpe=6)
@@ -68,7 +93,7 @@ def test_contexto_pdf_prepara_todos_os_campos_ativos():
         SimpleNamespace(nome="Treinador de teste", treinador=None),
     )
 
-    assert len(exercicio.campos_pdf) == 4
+    assert len(exercicio.campos_pdf) == 6
     assert all(campo["imagem_composta"].startswith("data:image/png;base64,") for campo in exercicio.campos_pdf)
     assert contexto["total_exercicios"] == 1
     assert contexto["nome_treinador"] == "Treinador de teste"

@@ -65,34 +65,84 @@ from services.sessao_workflow import (
 router = APIRouter(prefix="/treino")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-TIPOS_CAMPO = {
-    1: ("meio", "Campo meio", "campo_meio.png?v=20260907-official-1"),
-    2: ("completo", "Campo completo", "campo_completo.png?v=20260907-official-1"),
-    3: ("meio", "Campo meio extra", "campo_meio.png?v=20260907-official-1"),
-    4: ("completo", "Campo completo extra", "campo_completo.png?v=20260907-official-1"),
+IMAGENS_CAMPO = {
+    "meio": "campo_meio.png?v=20260907-official-1",
+    "completo": "campo_completo.png?v=20260907-official-1",
 }
+
+
+def _configuracao_campo(numero: int) -> tuple[str, str, str]:
+    tipo = "meio" if numero % 2 else "completo"
+    indice_tipo = (numero + 1) // 2 if tipo == "meio" else numero // 2
+    nome_tipo = "Campo meio" if tipo == "meio" else "Campo completo"
+    label = nome_tipo if indice_tipo == 1 else f"{nome_tipo} {indice_tipo}"
+    return tipo, label, IMAGENS_CAMPO[tipo]
+
+
+def _proximo_numero_campo(tipo: str, slots: list[int]) -> int:
+    numero = 1 if tipo == "meio" else 2
+    while numero in slots:
+        numero += 2
+    return numero
+
+
+def _mapa_desenhos(exercicio: ExercicioPlano) -> dict[str, str]:
+    try:
+        dados = json.loads(getattr(exercicio, "desenhos_campos", None) or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return dados if isinstance(dados, dict) else {}
+
+
+def _obter_desenho_campo(exercicio: ExercicioPlano, numero: int) -> str | None:
+    desenho = _mapa_desenhos(exercicio).get(str(numero))
+    if desenho is None and numero <= 4:
+        desenho = getattr(exercicio, f"desenho_{numero}", None)
+    return desenho
+
+
+def _definir_desenho_campo(exercicio: ExercicioPlano, numero: int, desenho: str | None) -> None:
+    desenhos = _mapa_desenhos(exercicio)
+    if numero <= 4:
+        setattr(exercicio, f"desenho_{numero}", desenho)
+        desenhos.pop(str(numero), None)
+    elif desenho is None:
+        desenhos.pop(str(numero), None)
+    else:
+        desenhos[str(numero)] = desenho
+    exercicio.desenhos_campos = json.dumps(desenhos, ensure_ascii=False, separators=(",", ":"))
 
 
 def _slots_ativos(exercicio: ExercicioPlano) -> list[int]:
     valor = exercicio.campos_ativos
     if valor is None:
-        return [1, 2] + [numero for numero in (3, 4) if getattr(exercicio, f"desenho_{numero}", None)]
-    return [int(item) for item in valor.split(",") if item.isdigit() and int(item) in TIPOS_CAMPO]
+        adicionais = [int(numero) for numero in _mapa_desenhos(exercicio) if numero.isdigit() and int(numero) > 2]
+        return [1, 2] + [numero for numero in (3, 4) if getattr(exercicio, f"desenho_{numero}", None)] + sorted(numero for numero in adicionais if numero > 4)
+    slots = []
+    for item in valor.split(","):
+        if item.isdigit() and int(item) > 0 and int(item) not in slots:
+            slots.append(int(item))
+    return slots
 
 
 def _definir_slots_ativos(exercicio: ExercicioPlano, slots: list[int]) -> None:
-    exercicio.campos_ativos = ",".join(str(numero) for numero in TIPOS_CAMPO if numero in slots)
+    normalizados = []
+    for numero in slots:
+        if numero > 0 and numero not in normalizados:
+            normalizados.append(numero)
+    exercicio.campos_ativos = ",".join(str(numero) for numero in normalizados)
 
 
 def _campos_exercicio(exercicio: ExercicioPlano) -> list[dict]:
     campos = []
     for numero in _slots_ativos(exercicio):
-        desenho, estado_desenho = decompor_desenho_editavel(getattr(exercicio, f"desenho_{numero}"))
+        tipo, label, imagem = _configuracao_campo(numero)
+        desenho, estado_desenho = decompor_desenho_editavel(_obter_desenho_campo(exercicio, numero))
         campos.append({
             "numero": numero,
-            "tipo": TIPOS_CAMPO[numero][0],
-            "label": TIPOS_CAMPO[numero][1],
-            "imagem": TIPOS_CAMPO[numero][2],
+            "tipo": tipo,
+            "label": label,
+            "imagem": imagem,
             "desenho": desenho,
             "estado_desenho": estado_desenho,
         })
@@ -1160,7 +1210,7 @@ async def duplicar_bloco(bloco_id: int, request: Request, db: Session = Depends(
     copia = BlocoTreino(plano_id=bloco.plano_id, nome=f"{bloco.nome} (cópia)", tipo=bloco.tipo, ordem=len(bloco.plano.blocos) + 1)
     db.add(copia); db.flush()
     for ex in bloco.exercicios:
-        db.add(ExercicioPlano(plano_id=ex.plano_id, bloco_id=copia.id, ordem=ex.ordem, hora=ex.hora, minutos=ex.minutos, rpe=ex.rpe, nome=ex.nome, categoria=ex.categoria, desenho_1=ex.desenho_1, desenho_2=ex.desenho_2, desenho_3=ex.desenho_3, desenho_4=ex.desenho_4, campos_ativos=ex.campos_ativos, organizacao=ex.organizacao, coaching_points=ex.coaching_points))
+        db.add(ExercicioPlano(plano_id=ex.plano_id, bloco_id=copia.id, ordem=ex.ordem, hora=ex.hora, minutos=ex.minutos, rpe=ex.rpe, nome=ex.nome, categoria=ex.categoria, desenho_1=ex.desenho_1, desenho_2=ex.desenho_2, desenho_3=ex.desenho_3, desenho_4=ex.desenho_4, desenhos_campos=ex.desenhos_campos, campos_ativos=ex.campos_ativos, organizacao=ex.organizacao, coaching_points=ex.coaching_points))
     db.flush(); sincronizar_minutos_categorias(bloco.plano, db)
     db.commit(); set_flash(request, "Bloco e exercícios duplicados.")
     return RedirectResponse(url=f"/treino/sessoes/{bloco.plano.sessao_id}", status_code=303)
@@ -1436,6 +1486,7 @@ async def duplicar_exercicio(exercicio_id: int, request: Request, db: Session = 
         desenho_2=exercicio.desenho_2,
         desenho_3=exercicio.desenho_3,
         desenho_4=exercicio.desenho_4,
+        desenhos_campos=exercicio.desenhos_campos,
         campos_ativos=exercicio.campos_ativos,
         organizacao=exercicio.organizacao,
         coaching_points=exercicio.coaching_points,
@@ -1579,7 +1630,10 @@ async def guardar_desenho(exercicio_id: int, request: Request, db: Session = Dep
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
 
     dados = await request.json()
-    numero = dados.get("numero")
+    try:
+        numero = int(dados.get("numero"))
+    except (TypeError, ValueError):
+        numero = 0
     desenho_guardado = empacotar_desenho_editavel(dados.get("dados"), dados.get("estado"))
 
     exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
@@ -1587,13 +1641,13 @@ async def guardar_desenho(exercicio_id: int, request: Request, db: Session = Dep
     if not exercicio:
         return JSONResponse({"sucesso": False, "erro": "Exercício não encontrado"})
 
-    if numero not in TIPOS_CAMPO:
+    if numero <= 0:
         return JSONResponse({"sucesso": False, "erro": "Campo inválido"}, status_code=422)
 
     if not desenho_guardado:
         return JSONResponse({"sucesso": False, "erro": "O desenho enviado não é válido."}, status_code=400)
 
-    setattr(exercicio, f"desenho_{numero}", desenho_guardado)
+    _definir_desenho_campo(exercicio, numero, desenho_guardado)
     slots = _slots_ativos(exercicio)
     if numero not in slots:
         slots.append(numero)
@@ -1616,17 +1670,16 @@ async def adicionar_campo_exercicio(
     exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
     if not exercicio:
         return RedirectResponse(url="/equipas", status_code=303)
-    candidatos = [1, 3] if tipo == "meio" else [2, 4] if tipo == "completo" else []
+    if tipo not in IMAGENS_CAMPO:
+        set_flash(request, "Tipo de campo inválido.", "error")
+        return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}", status_code=303)
     slots = _slots_ativos(exercicio)
-    disponivel = next((numero for numero in candidatos if numero not in slots), None)
-    if disponivel is None:
-        set_flash(request, "Já atingiste o limite de dois campos deste tipo.", "error")
-    else:
-        slots.append(disponivel)
-        _definir_slots_ativos(exercicio, slots)
-        _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
-        db.commit()
-        set_flash(request, "Campo acrescentado ao exercício.")
+    disponivel = _proximo_numero_campo(tipo, slots)
+    slots.append(disponivel)
+    _definir_slots_ativos(exercicio, slots)
+    _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+    db.commit()
+    set_flash(request, "Campo acrescentado ao exercício.")
     return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}", status_code=303)
 
 
@@ -1640,10 +1693,10 @@ async def apagar_campo_exercicio(
 ):
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
     exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
-    if not exercicio or numero not in TIPOS_CAMPO:
+    if not exercicio or numero <= 0:
         return RedirectResponse(url="/equipas", status_code=303)
     _definir_slots_ativos(exercicio, [slot for slot in _slots_ativos(exercicio) if slot != numero])
-    setattr(exercicio, f"desenho_{numero}", None)
+    _definir_desenho_campo(exercicio, numero, None)
     _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
     db.commit()
     set_flash(request, "Campo removido sem afetar os restantes.")
