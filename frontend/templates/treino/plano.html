@@ -724,24 +724,25 @@ function inicializarDesenho(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const configurarCanvas = () => {
-        const imgEl = canvas.parentElement.querySelector('img');
-        if (imgEl && imgEl.offsetWidth > 0) {
-            canvas.width = imgEl.offsetWidth;
-            canvas.height = imgEl.offsetHeight;
-        } else {
-            canvas.width = 400;
-            canvas.height = 300;
-        }
+        const area = canvas.parentElement.getBoundingClientRect();
+        const largura = Math.max(1, Math.round(area.width || 400));
+        const altura = Math.max(1, Math.round(area.height || 300));
+        if (canvas.width === largura && canvas.height === altura) return;
+        canvas.width = largura;
+        canvas.height = altura;
+        redesenhar(canvasId);
     };
-    setTimeout(configurarCanvas, 100);
     const ctx = canvas.getContext('2d');
     CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, contadores: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033' };
+    requestAnimationFrame(configurarCanvas);
+    setTimeout(configurarCanvas, 120);
     if (canvas.dataset.desenho) {
         const imagemGuardada = new Image();
         imagemGuardada.onload = () => {
             const estado = CANVAS_ESTADO[canvasId];
             if (!estado) return;
             estado.imagemFundo = imagemGuardada;
+            configurarCanvas();
             redesenhar(canvasId);
         };
         imagemGuardada.src = canvas.dataset.desenho;
@@ -920,6 +921,9 @@ function redesenhar(canvasId) {
     if (!est) return;
     const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
     est.ctx.clearRect(0, 0, est.canvas.width, est.canvas.height);
+    if (est.imagemFundo) {
+        est.ctx.drawImage(est.imagemFundo, 0, 0, est.canvas.width, est.canvas.height);
+    }
     est.objectos.forEach(obj => { if (simbolos.includes(obj.tipo)) desenharSimbolo(est.ctx, obj); else desenharLinhaMultipla(est.ctx, obj, null); });
 }
 

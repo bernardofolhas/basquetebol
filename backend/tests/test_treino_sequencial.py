@@ -101,6 +101,7 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         assert 'class="training-exercise-card"' in pagina.text
         assert 'data-drawing-preview=' in pagina.text
         assert 'data-drawing-editor' in pagina.text
+        assert "est.ctx.drawImage(est.imagemFundo" in pagina.text
         assert 'action="/treino/exercicios/' in pagina.text
         assert "/notas" in pagina.text
         assert "Editar dados do exercício" not in pagina.text
