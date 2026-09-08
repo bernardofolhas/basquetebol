@@ -21,6 +21,8 @@
   const data = JSON.parse(document.querySelector("#pbs-studio-data")?.textContent || "{}");
   const movementTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "seta_curva", "bloqueio", "linha"]);
   const markerTypes = new Set(["jogador_ataque", "jogador_defesa", "bola", "cone", "coach"]);
+  const straightLineTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "bloqueio", "linha"]);
+  const playerMovementTypes = new Set(["seta", "seta_zigzag", "seta_curva"]);
 
   let scenes = (data.passos || []).map(normalizeScene).sort((a, b) => a.ordem - b.ordem);
   let activeId = scenes[0]?.id || null;
@@ -41,6 +43,19 @@
 
   function uid() {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function nextPlayerNumber(scene = activeScene()) {
+    const used = (scene?.objects || [])
+      .filter((object) => object.tipo?.startsWith("jogador_"))
+      .map((object) => Number(object.numero))
+      .filter(Number.isFinite);
+    return Math.min(99, Math.max(0, ...used) + 1);
+  }
+
+  function updatePlayerNumber(value = nextPlayerNumber()) {
+    const input = document.querySelector("[data-player-number]");
+    if (input) input.value = String(value);
   }
 
   function normalizeScene(raw) {
@@ -65,6 +80,7 @@
         object.largura = Number(object.largura || 1) * sx;
         object.altura = Number(object.altura || 1) * sy;
       }
+      cleanDrawnLine(object);
       return object;
     }) : [];
     return {
@@ -216,6 +232,58 @@
     return output;
   }
 
+  function fitCurve(points) {
+    if (!points?.length) return [];
+    if (points.length < 3) return [points[0], points.at(-1)];
+    const start = points[0];
+    const end = points.at(-1);
+    const segmentLengths = [];
+    let totalLength = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      const length = Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+      segmentLengths.push(length);
+      totalLength += length;
+    }
+    if (totalLength < 2) return [start, end];
+
+    let travelled = 0;
+    let numeratorX = 0;
+    let numeratorY = 0;
+    let denominator = 0;
+    for (let index = 1; index < points.length - 1; index += 1) {
+      travelled += segmentLengths[index - 1];
+      const t = travelled / totalLength;
+      const weight = 2 * (1 - t) * t;
+      const baseX = ((1 - t) ** 2) * start.x + (t ** 2) * end.x;
+      const baseY = ((1 - t) ** 2) * start.y + (t ** 2) * end.y;
+      numeratorX += weight * (points[index].x - baseX);
+      numeratorY += weight * (points[index].y - baseY);
+      denominator += weight * weight;
+    }
+    const fallback = points[Math.floor(points.length / 2)];
+    const control = denominator > 0
+      ? { x: numeratorX / denominator, y: numeratorY / denominator }
+      : fallback;
+    const cleaned = [];
+    for (let step = 0; step <= 24; step += 1) {
+      const t = step / 24;
+      const inverse = 1 - t;
+      cleaned.push({
+        x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
+        y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y,
+      });
+    }
+    return cleaned;
+  }
+
+  function cleanDrawnLine(object) {
+    if (!object?.pontos?.length) return;
+    const start = object.pontos[0];
+    const end = object.pontos.at(-1);
+    if (straightLineTypes.has(object.tipo)) object.pontos = [start, end];
+    else if (object.tipo === "seta_curva") object.pontos = fitCurve(object.pontos);
+  }
+
   function drawLine(target, object, alpha = 1) {
     let points = object.pontos || [];
     if (points.length < 2) return;
@@ -224,7 +292,7 @@
     target.lineWidth = Number(object.largura) || 6; target.lineCap = "round"; target.lineJoin = "round";
     target.setLineDash(object.tipo === "seta_tracejada" ? [15, 12] : []);
     target.beginPath(); target.moveTo(points[0].x, points[0].y);
-    if (object.tipo === "seta_curva" || object.tipo === "caneta") {
+    if (object.tipo === "caneta") {
       for (let i = 1; i < points.length - 1; i += 1) target.quadraticCurveTo(points[i].x, points[i].y, (points[i].x + points[i + 1].x) / 2, (points[i].y + points[i + 1].y) / 2);
       target.lineTo(points.at(-1).x, points.at(-1).y);
     } else points.slice(1).forEach((point) => target.lineTo(point.x, point.y));
@@ -363,8 +431,17 @@
 
   async function addScene() {
     try {
+      const previous = activeScene();
+      if (previous && !imported) await saveScene(previous, true);
       const payload = await api(`/playbook/setplays/${setplayId}/passos/novo`, { method: "POST", body: "{}" });
-      const scene = normalizeScene(payload.passo); scenes.push(scene); activeId = scene.id; renderScenes(); activateScene(scene.id); toast("Nova cena adicionada.");
+      const scene = normalizeScene(payload.passo);
+      if (previous && !imported) {
+        scene.courtType = previous.courtType;
+        scene.objects = continuationObjects(previous);
+      }
+      scenes.push(scene); activeId = scene.id; renderScenes(); activateScene(scene.id);
+      if (scene.objects.length) await saveScene(scene, true);
+      toast(previous && !imported ? "Nova cena criada a partir da posição final." : "Nova cena adicionada.");
     } catch (error) { toast(error.message); }
   }
 
@@ -396,7 +473,7 @@
       const image = document.querySelector("[data-imported-image]"); const empty = document.querySelector("[data-imported-empty]");
       const src = scene?.imagemCoach || scene?.desenho || ""; image.src = src; image.hidden = !src; empty.hidden = Boolean(src);
       setupImportedForms(scene);
-    } else { syncCourt(scene); render(); convertLegacyScene(scene); }
+    } else { syncCourt(scene); render(); convertLegacyScene(scene); updatePlayerNumber(nextPlayerNumber(scene)); }
     renderScenes(); renderTimeline();
   }
 
@@ -446,6 +523,7 @@
     tool = next; selectedId = null; gesture = null;
     root.classList.toggle("pbs-tool-select", next === "selecionar");
     document.querySelectorAll("[data-tool]").forEach((button) => button.classList.toggle("is-active", button.dataset.tool === next));
+    if (next.startsWith("jogador_")) updatePlayerNumber(nextPlayerNumber());
     render();
   }
 
@@ -455,8 +533,14 @@
 
   function addMarker(point) {
     const scene = activeScene(); if (!scene) return;
-    snapshot(scene); scene.objects.push({ id: uid(), tipo: tool, x: point.x, y: point.y, tamanho: 1, numero: tool.startsWith("jogador_") ? playerNumber() : null });
-    selectedId = scene.objects.at(-1).id; setTool("selecionar"); saveScene(scene); renderTimeline(); render();
+    const isPlayer = tool.startsWith("jogador_");
+    const insertedTool = tool;
+    const insertedNumber = isPlayer ? playerNumber() : null;
+    snapshot(scene); scene.objects.push({ id: uid(), tipo: tool, x: point.x, y: point.y, tamanho: 1, numero: insertedNumber });
+    if (isPlayer) updatePlayerNumber(Math.min(99, insertedNumber + 1));
+    selectedId = scene.objects.at(-1).id;
+    setTool(isPlayer ? insertedTool : "selecionar");
+    saveScene(scene); renderTimeline(); render();
   }
 
   function eraseAt(point) {
@@ -508,7 +592,9 @@
     if (tool === "borracha") { eraseAt(point); return; }
     if (gesture.drawing) {
       const points = gesture.object.pontos; const last = points.at(-1);
-      if (tool === "caneta" || Math.hypot(point.x - last.x, point.y - last.y) > 8) points.push(point);
+      if (straightLineTypes.has(gesture.object.tipo)) {
+        if (points.length === 1) points.push(point); else points[1] = point;
+      } else if (tool === "caneta" || Math.hypot(point.x - last.x, point.y - last.y) > 8) points.push(point);
     } else if (gesture.object) {
       const dx = point.x - gesture.start.x; const dy = point.y - gesture.start.y; const object = gesture.object; const original = gesture.original;
       if (Number.isFinite(original.x)) { object.x = original.x + dx; object.y = original.y + dy; }
@@ -520,7 +606,17 @@
   function pointerUp(event) {
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     const scene = activeScene(); const wasDrawing = gesture.drawing; const object = gesture.object; gesture = null;
-    if (wasDrawing && object?.pontos?.length < 2) scene.objects.splice(scene.objects.indexOf(object), 1);
+    if (wasDrawing && object && event.type !== "pointercancel") {
+      const point = pointFromEvent(event);
+      if (straightLineTypes.has(object.tipo)) {
+        if (object.pontos.length === 1) object.pontos.push(point); else object.pontos[1] = point;
+      } else if (Math.hypot(point.x - object.pontos.at(-1).x, point.y - object.pontos.at(-1).y) > 2) object.pontos.push(point);
+      cleanDrawnLine(object);
+    }
+    if (wasDrawing && object?.pontos?.length >= 2) {
+      const start = object.pontos[0]; const end = object.pontos.at(-1);
+      if (Math.hypot(end.x - start.x, end.y - start.y) < 2) scene.objects.splice(scene.objects.indexOf(object), 1);
+    } else if (wasDrawing && object) scene.objects.splice(scene.objects.indexOf(object), 1);
     render(); renderTimeline(); saveScene(scene);
   }
 
@@ -607,6 +703,37 @@
       } else groups.push({ key: object.id, actions: [object] });
     });
     return groups;
+  }
+
+  function nearestMarker(objects, start, predicate) {
+    const candidates = objects.filter(predicate).sort((a, b) => (
+      Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y)
+    ));
+    const nearest = candidates[0];
+    return nearest && Math.hypot(nearest.x - start.x, nearest.y - start.y) < 110 ? nearest : null;
+  }
+
+  function continuationObjects(scene) {
+    const markers = scene.objects
+      .filter((object) => markerTypes.has(object.tipo))
+      .map((object) => ({ ...clone(object), id: uid() }));
+    actionPlan(scene).forEach((group) => {
+      const changes = [];
+      group.actions.forEach((action) => {
+        const start = action.pontos?.[0];
+        const end = action.pontos?.at(-1);
+        if (!start || !end) return;
+        let actor = null;
+        if (playerMovementTypes.has(action.tipo)) {
+          actor = nearestMarker(markers, start, (object) => object.tipo?.startsWith("jogador_"));
+        } else if (action.tipo === "seta_tracejada") {
+          actor = nearestMarker(markers, start, (object) => object.tipo === "bola");
+        }
+        if (actor) changes.push({ actor, end });
+      });
+      changes.forEach(({ actor, end }) => { actor.x = end.x; actor.y = end.y; });
+    });
+    return markers;
   }
 
   function pointAlong(points, progress) {
