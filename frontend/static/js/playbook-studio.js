@@ -340,7 +340,15 @@
     if (object.tipo === "bloqueio") {
       target.beginPath(); target.moveTo(end.x - Math.sin(angle) * 18, end.y + Math.cos(angle) * 18); target.lineTo(end.x + Math.sin(angle) * 18, end.y - Math.cos(angle) * 18); target.stroke();
     } else if (!["linha", "caneta"].includes(object.tipo)) {
-      target.beginPath(); target.moveTo(end.x, end.y); target.lineTo(end.x - 22 * Math.cos(angle - .5), end.y - 22 * Math.sin(angle - .5)); target.lineTo(end.x - 22 * Math.cos(angle + .5), end.y - 22 * Math.sin(angle + .5)); target.closePath(); target.fill();
+      const length = 22;
+      const baseX = end.x - Math.cos(angle) * length;
+      const baseY = end.y - Math.sin(angle) * length;
+      const halfWidth = 8;
+      target.beginPath();
+      target.moveTo(end.x, end.y);
+      target.lineTo(baseX - Math.sin(angle) * halfWidth, baseY + Math.cos(angle) * halfWidth);
+      target.lineTo(baseX + Math.sin(angle) * halfWidth, baseY - Math.cos(angle) * halfWidth);
+      target.closePath(); target.fill();
     }
     target.restore();
   }
@@ -368,7 +376,10 @@
   function render(target = ctx, objects = activeScene()?.objects || [], selection = true) {
     if (!target) return;
     target.clearRect(0, 0, target.canvas.width, target.canvas.height);
-    objects.forEach((object) => drawObject(target, object));
+    const orderedObjects = target === previewCtx
+      ? [...objects.filter((object) => !markerTypes.has(object.tipo)), ...objects.filter((object) => markerTypes.has(object.tipo))]
+      : objects;
+    orderedObjects.forEach((object) => drawObject(target, object));
     if (selection && target === ctx) drawSelection(target, objects.find((object) => object.id === selectedId));
   }
 
