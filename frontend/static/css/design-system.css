@@ -773,9 +773,6 @@ table tbody tr:hover { background:#fafbfd; }
 .training-exercise-fields input { min-width:0; }
 @media(max-width:640px) { .training-exercise-load { grid-template-columns:minmax(0,1fr); } }
 .training-exercise-card { overflow:hidden;border:1px solid var(--border-soft);border-radius:var(--radius-card);background:var(--surface-card);box-shadow:var(--shadow-card);transition:border-color .18s ease,box-shadow .18s ease,opacity .18s ease; }
-.training-exercise-card[draggable="true"] .training-exercise-card-head { cursor:grab; }
-.training-exercise-card[draggable="true"] .training-exercise-card-head:active { cursor:grabbing; }
-.training-exercise-card[draggable="true"] .training-exercise-card-head :is(button,a,input,textarea,select) { cursor:auto; }
 .training-exercise-card.is-reordering { border-color:var(--clube-primary);box-shadow:0 12px 30px rgb(15 23 42 / .16);opacity:.82; }
 .training-exercise-list.is-drag-target { border-radius:var(--radius-card);box-shadow:inset 0 0 0 2px var(--clube-primary-soft); }
 .training-exercise-card-head { display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1rem 1.15rem; }
