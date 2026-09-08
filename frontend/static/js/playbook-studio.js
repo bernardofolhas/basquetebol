@@ -338,6 +338,7 @@
   }
 
   function drawObject(target, object, alpha = 1) {
+    if (object.hidden) return;
     if (markerTypes.has(object.tipo)) drawMarker(target, object, alpha);
     else if (window.TacticalLegacy?.eRecorte(object)) {
       target.save(); target.globalAlpha = alpha; window.TacticalLegacy.desenharRecorte(target, object, render); target.restore();
@@ -781,7 +782,12 @@
   }
 
   function animatedObjects(scene, groupIndex, progress) {
-    const objects = clone(scene.objects); const groups = actionPlan(scene); const group = groups[groupIndex]; if (!group) return objects;
+    const objects = clone(scene.objects); const groups = actionPlan(scene); const group = groups[groupIndex];
+    const activeIds = new Set(group?.actions.map((action) => action.id) || []);
+    objects.forEach((object) => {
+      if (movementTypes.has(object.tipo)) object.hidden = !activeIds.has(object.id) || progress > 0.02;
+    });
+    if (!group) return objects;
     group.actions.forEach((action) => {
       const copy = objects.find((object) => object.id === action.id); if (copy) copy.previewProgress = progress;
       const start = action.pontos[0];
