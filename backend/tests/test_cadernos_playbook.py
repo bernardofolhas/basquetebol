@@ -131,6 +131,7 @@ def test_interface_playbook_tem_biblioteca_cadernos_e_editor_unificado():
     assert "reordenar" in caderno
     assert "/pdf" in caderno
     assert "grupo.jogadas" in caderno_pdf
-    assert "data-editor-step" in detalhe
-    assert "pb-frame-thumb" in detalhe
-    assert "data-player-play" in detalhe
+    assert "data-playbook-studio" in detalhe
+    assert "data-scenes-list" in detalhe
+    assert "data-preview-canvas" in detalhe
+    assert "data-group-selected" in detalhe

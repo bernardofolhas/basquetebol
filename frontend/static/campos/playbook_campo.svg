@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 920" role="img" aria-label="Meio campo de basquetebol">
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f1d19a"/>
+      <stop offset="0.48" stop-color="#dca966"/>
+      <stop offset="1" stop-color="#edc581"/>
+    </linearGradient>
+    <pattern id="planks" width="130" height="92" patternUnits="userSpaceOnUse">
+      <rect width="130" height="92" fill="url(#wood)"/>
+      <path d="M0 91.5H130M129.5 0V92" stroke="#b87839" stroke-opacity=".2"/>
+      <path d="M0 8C32 3 83 13 130 6M0 47C46 39 74 53 130 45" fill="none" stroke="#fff" stroke-opacity=".09"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-opacity=".15"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="764" height="904" rx="10" fill="url(#planks)" stroke="#2c2218" stroke-width="8" filter="url(#shadow)"/>
+  <path d="M20 20H760V900H20Z" fill="none" stroke="#fffdf7" stroke-width="6"/>
+  <path d="M20 900H760" stroke="#fffdf7" stroke-width="6"/>
+  <path d="M260 20V292H520V20" fill="#d77b35" fill-opacity=".76" stroke="#fffdf7" stroke-width="6"/>
+  <path d="M260 292A130 130 0 0 0 520 292" fill="none" stroke="#fffdf7" stroke-width="6"/>
+  <path d="M260 292A130 130 0 0 1 520 292" fill="none" stroke="#fffdf7" stroke-width="6" stroke-dasharray="13 12" opacity=".85"/>
+  <path d="M310 20V110H470V20" fill="none" stroke="#fffdf7" stroke-width="6"/>
+  <path d="M325 110A65 65 0 0 0 455 110" fill="none" stroke="#fffdf7" stroke-width="6"/>
+  <path d="M345 83H435" stroke="#fffdf7" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="390" cy="105" r="12" fill="none" stroke="#fffdf7" stroke-width="5"/>
+  <path d="M74 20V205A334 334 0 0 0 706 205V20" fill="none" stroke="#fffdf7" stroke-width="6"/>
+  <path d="M20 900A370 370 0 0 1 760 900" fill="none" stroke="#fffdf7" stroke-width="6"/>
+</svg>

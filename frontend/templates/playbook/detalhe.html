@@ -1,756 +1,207 @@
-{% extends "base.html" %}
-{% from "partials/equipa_contexto.html" import equipa_contexto %}
-{% from "partials/tactical_toolbar.html" import tactical_toolbar %}
-{% block titulo %}{{ setplay.nome }} — Playbook{% endblock %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  {% set identidade = request.state.identidade_clube|default({}, true) %}
+  <title>{{ setplay.nome }} | Playbook Studio</title>
+  <meta name="theme-color" content="#11100e">
+  <meta name="csrf-token" content="{{ request.session.get('_csrf', '') }}">
+  {% if identidade.logo_principal %}
+  <link rel="icon" href="{{ identidade.logo_principal }}">
+  <link rel="apple-touch-icon" href="{{ identidade.logo_principal }}">
+  {% else %}
+  <link rel="icon" href="/static/img/favicon-plataforma.svg">
+  {% endif %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/playbook-studio.css?v=20260908-1">
+  <script defer src="/static/js/tactical-legacy.js?v=20260907-1"></script>
+  <script defer src="/static/js/playbook-studio.js?v=20260908-1"></script>
+</head>
+<body>
+  <div class="pbs-app" data-playbook-studio data-setplay-id="{{ setplay.id }}" data-equipa-id="{{ equipa.id }}" data-imported="{{ 'true' if setplay.origem == 'ebp' else 'false' }}">
+    <header class="pbs-topbar">
+      <div class="pbs-topbar-start">
+        <a class="pbs-icon-button pbs-back" href="/playbook/equipas/{{ equipa.id }}" aria-label="Voltar ao Playbook" title="Voltar ao Playbook">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </a>
+        {% if identidade.logo_principal %}<img class="pbs-club-mark" src="{{ identidade.logo_principal }}" alt="">{% endif %}
+        <button type="button" class="pbs-play-title" data-open-details>
+          <strong data-play-title>{{ setplay.nome }}</strong>
+          <span>{{ setplay.categoria or 'Sem categoria' }}</span>
+        </button>
+      </div>
 
-{% block conteudo %}
-<script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
-{% set apenas_imagem_ebp = setplay.origem == 'ebp' %}
+      {% if setplay.origem != 'ebp' %}
+      <div class="pbs-toolbar" role="toolbar" aria-label="Ferramentas de desenho">
+        <button type="button" class="pbs-tool is-active" data-tool="selecionar" title="Selecionar e mover (V)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 14 9-7 2-3 7Z"/></svg><span>Selecionar</span>
+        </button>
+        <span class="pbs-toolbar-rule"></span>
+        <button type="button" class="pbs-tool" data-tool="jogador_ataque" title="Atacante (A)"><i class="pbs-player-symbol">1</i><span>Atacante</span></button>
+        <button type="button" class="pbs-tool" data-tool="jogador_defesa" title="Defensor (D)"><i class="pbs-player-symbol pbs-player-symbol-defense">1</i><span>Defensor</span></button>
+        <button type="button" class="pbs-tool" data-tool="bola" title="Bola"><i class="pbs-ball-symbol"></i><span>Bola</span></button>
+        <span class="pbs-toolbar-rule"></span>
+        <button type="button" class="pbs-tool" data-tool="seta" title="Movimento (M)"><b>→</b><span>Movimento</span></button>
+        <button type="button" class="pbs-tool" data-tool="seta_tracejada" title="Passe (P)"><b>⇢</b><span>Passe</span></button>
+        <button type="button" class="pbs-tool" data-tool="seta_zigzag" title="Drible (G)"><b>≋</b><span>Drible</span></button>
+        <button type="button" class="pbs-tool" data-tool="bloqueio" title="Bloqueio"><b>⊣</b><span>Bloqueio</span></button>
+        <button type="button" class="pbs-tool" data-tool="caneta" title="Desenho livre"><b>✎</b><span>Caneta</span></button>
+        <button type="button" class="pbs-tool" data-tool="borracha" title="Borracha (E)"><b>⌫</b><span>Borracha</span></button>
+      </div>
+      {% endif %}
 
-<!-- ── CABEÇALHO ─────────────────────────────────────────────────── -->
-{% call equipa_contexto(
-    equipa,
-    setplay.nome,
-    (setplay.descricao if setplay.descricao else "Editor detalhado do setplay.") ~ " · " ~ passos|length ~ " passo(s)",
-    "playbook",
-    "/playbook/equipas/" ~ equipa.id,
-    "Voltar ao Playbook"
-) %}
-    {% if setplay.categoria %}
-    <span class="pb-play-category pb-detail-category">{{ setplay.categoria }}</span>
-    {% endif %}
-    <a href="/playbook/setplays/{{ setplay.id }}/pdf"
-       class="ds-button ds-button-secondary">Exportar PDF</a>
-    <button onclick="document.getElementById('modal-editar').classList.remove('hidden')"
-            class="ds-button ds-button-secondary">Editar informação</button>
-    <form method="POST" action="/playbook/setplays/{{ setplay.id }}/eliminar" class="inline"
-          onsubmit="return confirm('Eliminar «{{ setplay.nome }}»?')">
-        <button type="submit" class="ds-button ds-button-danger">Eliminar</button>
+      <div class="pbs-topbar-actions">
+        <span class="pbs-save-state" data-save-state><i></i>Guardado</span>
+        <a class="pbs-button pbs-button-quiet" href="/playbook/setplays/{{ setplay.id }}/pdf">Exportar</a>
+        <button type="button" class="pbs-button pbs-button-dark" data-open-preview>Pré-visualizar</button>
+        <button type="button" class="pbs-icon-button" data-share title="Copiar ligação" aria-label="Copiar ligação">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.5-4.4M8.2 13.2l7.5 4.4"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="pbs-workspace">
+      <aside class="pbs-scenes-panel" aria-label="Cenas da jogada">
+        <div class="pbs-panel-heading">
+          <span>Cenas</span>
+          <button type="button" class="pbs-round-add" data-add-scene aria-label="Adicionar cena" title="Adicionar cena">+</button>
+        </div>
+        <div class="pbs-scenes" data-scenes-list></div>
+        <div class="pbs-scenes-empty" data-scenes-empty>
+          <span>Começa a jogada</span>
+          <button type="button" data-add-scene>Adicionar primeira cena</button>
+        </div>
+      </aside>
+
+      <main class="pbs-stage-shell">
+        <div class="pbs-stage-meta">
+          <span data-scene-label>Cena 1</span>
+          {% if setplay.origem != 'ebp' %}
+          <div class="pbs-stage-options">
+            <label>Número <input type="number" min="0" max="99" value="1" inputmode="numeric" data-player-number></label>
+            <button type="button" data-undo title="Desfazer">↶</button>
+            <button type="button" data-redo title="Refazer">↷</button>
+            <button type="button" data-clear title="Limpar cena">Limpar</button>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="pbs-stage" data-stage>
+          {% if setplay.origem == 'ebp' %}
+          <div class="pbs-imported-stage">
+            <img data-imported-image alt="Imagem original do passo importado.">
+            <p data-imported-empty>Esta cena importada ainda não tem imagem.</p>
+          </div>
+          {% else %}
+          <div class="pbs-court-wrap" data-court-wrap>
+            <img class="pbs-court" src="/static/campos/playbook_campo.svg" alt="Campo de basquetebol">
+            <canvas id="pbs-board" width="780" height="920" aria-label="Área de desenho tático"></canvas>
+          </div>
+          {% endif %}
+        </div>
+
+        <footer class="pbs-stage-footer">
+          <span><kbd>V</kbd> selecionar</span><span><kbd>A</kbd> atacante</span><span><kbd>D</kbd> defesa</span><span><kbd>M</kbd> movimento</span>
+          <span class="pbs-stage-tip">Arrasta jogadores e linhas para os ajustar.</span>
+        </footer>
+      </main>
+
+      <aside class="pbs-inspector" data-inspector>
+        <div class="pbs-tabs" role="tablist">
+          <button type="button" class="is-active" data-panel-tab="timeline">Sequência</button>
+          <button type="button" data-panel-tab="instructions">Instruções</button>
+        </div>
+
+        <section class="pbs-panel-view is-active" data-panel="timeline">
+          <div class="pbs-inspector-intro">
+            <strong>Ações da cena</strong>
+            <span>Define o que acontece e o que ocorre ao mesmo tempo.</span>
+          </div>
+          <div class="pbs-timeline" data-timeline></div>
+          <div class="pbs-timeline-empty" data-timeline-empty>
+            <b>A cena ainda está parada</b>
+            <span>Adiciona movimentos, passes ou dribles ao campo.</span>
+          </div>
+          <button type="button" class="pbs-group-action" data-group-selected disabled>Agrupar ações selecionadas</button>
+        </section>
+
+        <section class="pbs-panel-view" data-panel="instructions">
+          <label class="pbs-notes-label" for="scene-notes">Instruções desta cena</label>
+          <textarea id="scene-notes" data-scene-notes rows="12" placeholder="Ex.: 1 passa para 2 e corta para o cesto..."></textarea>
+          <p>As instruções são guardadas automaticamente.</p>
+          {% if setplay.origem == 'ebp' %}
+          <div class="pbs-imported-tools">
+            <strong>Imagem original do passo importado.</strong>
+            <form method="post" enctype="multipart/form-data" data-image-form>
+              <input type="file" name="imagem" accept="image/png,image/jpeg,image/webp">
+              <button type="submit">Substituir imagem</button>
+            </form>
+            <form method="post" data-delete-image-form data-endpoint-suffix="/imagem/eliminar">
+              <button type="submit">Remover imagem</button>
+            </form>
+          </div>
+          {% endif %}
+        </section>
+      </aside>
+    </div>
+
+    <div class="pbs-mobile-bar">
+      <button type="button" data-mobile-scenes>Cenas</button>
+      {% if setplay.origem != 'ebp' %}<button type="button" data-mobile-tools>Ferramentas</button>{% endif %}
+      <button type="button" data-mobile-inspector>Sequência</button>
+      <button type="button" data-open-preview>Ver jogada</button>
+    </div>
+  </div>
+
+  <dialog class="pbs-dialog pbs-preview-dialog" data-preview-dialog>
+    <div class="pbs-preview-head">
+      <div><span>Pré-visualização</span><strong>{{ setplay.nome }}</strong></div>
+      <button type="button" class="pbs-icon-button" data-close-preview aria-label="Fechar">×</button>
+    </div>
+    <div class="pbs-preview-content">
+      <div class="pbs-preview-court">
+        <img src="/static/campos/playbook_campo.svg" alt="">
+        <canvas width="780" height="920" data-preview-canvas></canvas>
+        <img data-preview-imported alt="">
+      </div>
+      <div class="pbs-preview-instructions">
+        <span data-preview-scene>Cena 1</span>
+        <p data-preview-notes>Sem instruções.</p>
+      </div>
+    </div>
+    <div class="pbs-preview-controls">
+      <button type="button" data-preview-restart title="Recomeçar">↺</button>
+      <button type="button" class="pbs-preview-play" data-preview-play>▶</button>
+      <input type="range" min="0" max="1000" value="0" data-preview-progress aria-label="Progresso da animação">
+      <span data-preview-time>0:00</span>
+      <select data-preview-speed aria-label="Velocidade"><option value="0.7">0,7x</option><option value="1" selected>1x</option><option value="1.4">1,4x</option></select>
+    </div>
+  </dialog>
+
+  <dialog class="pbs-dialog pbs-details-dialog" data-details-dialog>
+    <form method="dialog" class="pbs-details-form" data-details-form>
+      <div class="pbs-dialog-title"><div><span>Informação da jogada</span><h2>Editar detalhes</h2></div><button value="cancel" aria-label="Fechar">×</button></div>
+      <label>Título<input name="nome" required value="{{ setplay.nome }}"></label>
+      <label>Categoria<select name="categoria"><option value="">Sem categoria</option>{% for categoria in categorias %}<option value="{{ categoria }}" {% if setplay.categoria == categoria %}selected{% endif %}>{{ categoria }}</option>{% endfor %}</select></label>
+      <label>Descrição<textarea name="descricao" rows="4">{{ setplay.descricao or '' }}</textarea></label>
+      <div class="pbs-dialog-actions"><button value="cancel">Cancelar</button><button type="submit" value="default">Guardar</button></div>
     </form>
-{% endcall %}
+  </dialog>
 
-<section class="pb-studio-shell{% if not passos %} is-empty{% endif %}">
-{% if passos %}
-<section class="ds-playbook-player" data-playbook-player aria-label="Animação da jogada">
-    <div class="ds-playbook-player-head">
-        <div><p class="ds-kicker">Editor tático</p><h2>Construção da jogada</h2><p>Seleciona um passo para desenhar ou reproduz a sequência completa.</p></div>
-        <div class="ds-playbook-player-controls">
-            <button type="button" data-player-prev aria-label="Passo anterior">←</button>
-            <button type="button" class="ds-playbook-play" data-player-play>Reproduzir</button>
-            <button type="button" data-player-next aria-label="Passo seguinte">→</button>
-        </div>
-    </div>
-    <div class="ds-playbook-player-body">
-        <nav class="ds-playbook-frames" aria-label="Passos da jogada">
-            {% for passo in passos %}
-            <button type="button" data-playbook-frame="{{ passo.id }}" data-frame-index="{{ loop.index0 }}" data-frame-src="{{ (passo.imagem_coach or passo.desenho_imagem or '')|e }}" data-frame-imported="{{ 'true' if passo.imagem_coach else 'false' }}" data-frame-note="{{ (passo.observacao or '')|e }}" class="{% if loop.first %}is-active{% endif %}">
-                <span class="pb-frame-thumb"><img src="/static/campos/campo_meio.png?v=20260907-official-1" alt="">{% if passo.imagem_coach or passo.desenho_imagem %}<img src="{{ passo.imagem_coach or passo.desenho_imagem }}" alt="">{% endif %}</span>
-                <span>Passo {{ loop.index }}</span><small>{{ passo.observacao or ('Sem visual guardado' if not passo.imagem_coach and not passo.desenho else 'Visual tático') }}</small>
-            </button>
-            {% endfor %}
-        </nav>
-        <div class="ds-playbook-player-stage">
-            <img class="ds-playbook-player-court" src="/static/campos/campo_meio.png?v=20260907-official-1" alt="Campo de basquetebol">
-            <img class="ds-playbook-player-frame" data-player-image alt="Visual do passo atual">
-            <div class="ds-playbook-player-empty" data-player-empty>Este passo ainda não tem desenho ou imagem.</div>
-            <div class="ds-playbook-player-caption"><strong data-player-label>Passo 1</strong><span data-player-note></span></div>
-        </div>
-    </div>
-</section>
-{% endif %}
+  <div class="pbs-toast" role="status" aria-live="polite" data-toast></div>
 
-<!-- ── PASSOS ────────────────────────────────────────────────────── -->
-{% if passos %}
-<div class="pb-studio-editors" data-playbook-editors>
-{% for passo in passos %}
-<div class="pb-editor-step" id="passo-{{ passo.id }}" data-editor-step="{{ passo.id }}"{% if not loop.first %} hidden{% endif %}>
-
-    <!-- Header do passo -->
-    <div class="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-100">
-        <div class="flex items-center gap-2">
-            <span class="pb-step-number">Passo {{ loop.index }}</span>
-        </div>
-        <div class="flex items-center gap-1">
-            {% if not loop.first %}
-            <form method="POST" action="/playbook/passos/{{ passo.id }}/mover/cima" class="inline">
-                <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-500 px-2 py-1 rounded text-xs" title="Mover para cima">▲</button>
-            </form>
-            {% endif %}
-            {% if not loop.last %}
-            <form method="POST" action="/playbook/passos/{{ passo.id }}/mover/baixo" class="inline">
-                <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-500 px-2 py-1 rounded text-xs" title="Mover para baixo">▼</button>
-            </form>
-            {% endif %}
-            <form method="POST" action="/playbook/passos/{{ passo.id }}/eliminar" class="inline"
-                  onsubmit="return confirm('Eliminar Passo {{ loop.index }}?')">
-                <button type="submit" class="bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 px-2 py-1 rounded text-xs" aria-label="Eliminar passo">×</button>
-            </form>
-        </div>
-    </div>
-
-    <div class="pb-step-layout">
-
-        <!-- CANVAS MEIO-CAMPO -->
-        <div class="p-4 border-b lg:border-b-0 lg:border-r border-gray-100 ds-playbook-visual{% if apenas_imagem_ebp %} ds-playbook-ebp{% endif %}">
-            {% if not apenas_imagem_ebp %}
-            <div class="ds-visual-switch" role="group" aria-label="Visual do passo {{ loop.index }}">
-                <button type="button" class="is-active" data-visual-trigger="desenho" onclick="mostrarModoPasso({{ passo.id }}, 'desenho')">Desenho tático</button>
-                <button type="button" data-visual-trigger="imagem" onclick="mostrarModoPasso({{ passo.id }}, 'imagem')">Imagem{% if passo.imagem_coach %}<span class="ds-visual-ready">Pronta</span>{% endif %}</button>
-            </div>
-
-            <div id="modo_desenho_{{ passo.id }}" data-visual-panel="desenho">
-            <div class="ds-tactical-editor">
-                <div class="ds-tactical-stage relative select-none">
-                    <img src="/static/campos/campo_meio.png?v=20260907-official-1" class="w-full rounded-lg border border-gray-200" alt="Meio campo" id="img_campo_{{ passo.id }}">
-                    <canvas id="canvas_{{ passo.id }}" data-desenho="{{ passo.desenho_imagem|default('', true)|e }}"{% if passo.desenho_estado %} data-estado="{{ passo.desenho_estado|tojson|forceescape }}"{% endif %} class="absolute top-0 left-0 w-full h-full" style="cursor:crosshair;touch-action:none"></canvas>
-                    {% if passo.desenho_imagem %}<img id="overlay_{{ passo.id }}" src="{{ passo.desenho_imagem }}" class="absolute top-0 left-0 w-full h-full pointer-events-none hidden" alt="">{% endif %}
-                </div>
-                {{ tactical_toolbar('canvas_' ~ passo.id, 'toolbar_canvas_' ~ passo.id) }}
-            </div>
-
-            <!-- Botão guardar -->
-            <div class="flex items-center gap-2 mt-2">
-                <button onclick="guardarDesenhoPasso('canvas_{{ passo.id }}', {{ passo.id }})"
-                        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition"
-                        id="btn_guardar_{{ passo.id }}">
-                    Guardar desenho
-                </button>
-                {% if passo.desenho %}
-                <span class="text-xs text-green-600 font-medium">✓ Desenho guardado</span>
-                {% endif %}
-            </div>
-            </div>
-            {% endif %}
-
-            <div id="modo_imagem_{{ passo.id }}" data-visual-panel="imagem"{% if not apenas_imagem_ebp %} class="hidden"{% endif %}>
-                {% if passo.imagem_coach %}
-                <div class="ds-coach-image-preview">
-                    <img src="{{ passo.imagem_coach }}" alt="Imagem do treinador para o passo {{ loop.index }}">
-                    <span>{{ 'Imagem original do passo importado.' if apenas_imagem_ebp else 'Esta imagem será usada no PDF deste passo.' }}</span>
-                </div>
-                {% else %}
-                <div class="ds-upload-empty">
-                    <strong>Acrescentar uma imagem do treinador</strong>
-                    <span>Fotografia de quadro, esquema, documento ou imagem preparada. PNG ou JPEG, até 8 MB.</span>
-                </div>
-                {% endif %}
-                <form method="POST" action="/playbook/passos/{{ passo.id }}/imagem" enctype="multipart/form-data" class="ds-coach-image-form">
-                    <label for="imagem_passo_{{ passo.id }}">{{ 'Substituir imagem' if passo.imagem_coach else 'Selecionar imagem' }}</label>
-                    <input id="imagem_passo_{{ passo.id }}" type="file" name="imagem" accept="image/png,image/jpeg" required>
-                    <button type="submit" class="ds-button ds-button-primary">Guardar imagem</button>
-                </form>
-                {% if passo.imagem_coach %}
-                <form method="POST" action="/playbook/passos/{{ passo.id }}/imagem/eliminar" onsubmit="return confirm('{{ 'Remover a imagem importada deste passo?' if apenas_imagem_ebp else 'Remover a imagem deste passo? O desenho tático será preservado.' }}')">
-                    <button type="submit" class="ds-button ds-button-danger mt-2">Remover imagem</button>
-                </form>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- OBSERVAÇÃO -->
-        <div class="p-4 flex flex-col">
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Observação / Descrição do passo</label>
-            <form method="POST" action="/playbook/passos/{{ passo.id }}/observacao" class="flex flex-col flex-1">
-                <textarea name="observacao" rows="8"
-                          placeholder="Descreve o movimento, a posição dos jogadores, o objetivo tático deste passo..."
-                          class="flex-1 w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none">{{ passo.observacao or '' }}</textarea>
-                <button type="submit"
-                        class="mt-3 self-end bg-orange-500 hover:bg-orange-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition">
-                    Guardar nota
-                </button>
-            </form>
-        </div>
-
-    </div>
-</div>
-{% endfor %}
-</div>
-{% else %}
-<div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-10 text-center mb-6">
-    <p class="text-gray-400">Ainda não há passos. Clica em "+ Adicionar Passo" para começar.</p>
-</div>
-{% endif %}
-
-<!-- Botão adicionar passo -->
-<form method="POST" action="/playbook/setplays/{{ setplay.id }}/passos/novo">
-    <button type="submit" class="pb-add-step ds-button ds-button-primary">
-        + Adicionar Passo {{ passos | length + 1 }}
-    </button>
-</form>
-</section>
-
-
-<!-- ── MODAL EDITAR SETPLAY ─────────────────────────────────────── -->
-<div id="modal-editar" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="font-semibold text-gray-800">Editar Setplay</h3>
-            <button onclick="document.getElementById('modal-editar').classList.add('hidden')"
-                    class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-        </div>
-        <form method="POST" action="/playbook/setplays/{{ setplay.id }}/editar" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                <input type="text" name="nome" required value="{{ setplay.nome }}"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                <select name="categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-                    <option value="">— Sem categoria —</option>
-                    {% for cat in categorias %}
-                    <option value="{{ cat }}" {% if setplay.categoria == cat %}selected{% endif %}>{{ cat }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                <textarea name="descricao" rows="3"
-                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">{{ setplay.descricao or '' }}</textarea>
-            </div>
-            <div class="flex gap-3 pt-2">
-                <button type="submit"
-                        class="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-medium transition">
-                    Guardar
-                </button>
-                <button type="button" onclick="document.getElementById('modal-editar').classList.add('hidden')"
-                        class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-medium transition">
-                    Cancelar
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-
-<!-- ── DRAWING ENGINE (same as plano.html) ──────────────────────── -->
-<script>
-const CANVAS_ESTADO = {};
-
-function mostrarModoPasso(passoId, modo) {
-    const raiz = document.getElementById('passo-' + passoId);
-    if (!raiz) return;
-    raiz.querySelectorAll('[data-visual-panel]').forEach(painel => painel.classList.toggle('hidden', painel.dataset.visualPanel !== modo));
-    raiz.querySelectorAll('[data-visual-trigger]').forEach(botao => botao.classList.toggle('is-active', botao.dataset.visualTrigger === modo));
-    if (modo === 'desenho') {
-        const canvasId = 'canvas_' + passoId;
-        const canvas = document.getElementById(canvasId);
-        if (canvas && CANVAS_ESTADO[canvasId]) {
-            const imagem = document.getElementById('img_campo_' + passoId);
-            if (imagem && imagem.offsetWidth && canvas.width !== imagem.offsetWidth) {
-                canvas.width = imagem.offsetWidth;
-                canvas.height = imagem.offsetHeight;
-                redesenhar(canvasId);
-            }
-        }
-    }
-}
-
-function inicializarDesenho(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemBase: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, gestoCaneta: null, ultimoToqueCaneta: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033' };
-    const configurarCanvas = () => {
-        const imgEl = canvas.parentElement.querySelector('img');
-        if (imgEl && imgEl.offsetWidth > 0) { canvas.width = imgEl.offsetWidth; canvas.height = imgEl.offsetHeight; }
-        else { canvas.width = 400; canvas.height = 300; }
-        const passoId = canvasId.replace('canvas_', '');
-        const overlay = document.getElementById('overlay_' + passoId);
-        if (canvas.dataset.estado) restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
-        else if (overlay) {
-            const carregar = () => { converterImagemLegada(canvasId, overlay); redesenhar(canvasId); };
-            if (overlay.complete) carregar(); else overlay.addEventListener('load', carregar, { once: true });
-        } else redesenhar(canvasId);
-    };
-    setTimeout(configurarCanvas, 100);
-    ligarEventosDesenho(canvasId);
-}
-
-function ligarEventosDesenho(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    if (window.PointerEvent) {
-        canvas.addEventListener('pointerdown', (e) => {
-            const est = CANVAS_ESTADO[canvasId];
-            if (!est || est.pointerActivo !== null || (e.pointerType === 'touch' && !e.isPrimary)) return;
-            e.preventDefault();
-            if (tentarAlternarFerramentaApplePencil(canvasId, e)) return;
-            est.pointerActivo = e.pointerId;
-            est.apagarComPonteiro = e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) === 32);
-            try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-            aoPremir(canvasId, e);
-        }, { passive: false });
-        canvas.addEventListener('pointermove', (e) => {
-            const est = CANVAS_ESTADO[canvasId];
-            if (!est || (est.pointerActivo !== null && est.pointerActivo !== e.pointerId)) return;
-            if (est.pointerActivo !== null) e.preventDefault();
-            atualizarGestoApplePencil(est, e);
-            aoMover(canvasId, e);
-        }, { passive: false });
-        const terminar = (e) => {
-            const est = CANVAS_ESTADO[canvasId];
-            if (!est || est.pointerActivo !== e.pointerId) return;
-            e.preventDefault();
-            aoSoltar(canvasId, e);
-            registarFimGestoApplePencil(est, e);
-            try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
-            est.pointerActivo = null;
-            est.apagarComPonteiro = false;
-        };
-        canvas.addEventListener('pointerup', terminar, { passive: false });
-        canvas.addEventListener('pointercancel', terminar, { passive: false });
-        return;
-    }
-    canvas.addEventListener('mousedown', (e) => aoPremir(canvasId, e));
-    canvas.addEventListener('mousemove', (e) => aoMover(canvasId, e));
-    canvas.addEventListener('mouseup', (e) => aoSoltar(canvasId, e));
-    canvas.addEventListener('mouseleave', (e) => aoSoltar(canvasId, e));
-    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); aoPremir(canvasId, simularMouse(e)); }, { passive: false });
-    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); aoMover(canvasId, simularMouse(e)); }, { passive: false });
-    canvas.addEventListener('touchend', (e) => { e.preventDefault(); aoSoltar(canvasId, simularMouse(e)); }, { passive: false });
-}
-
-function simularMouse(e) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY, button: 0 }; }
-function obterPos(canvas, e) { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; }
-
-function clonarObjectosDesenho(objectos) {
-    return objectos.map(obj => ({ ...obj, pontos: Array.isArray(obj.pontos) ? obj.pontos.map(ponto => ({ ...ponto })) : obj.pontos }));
-}
-
-function tentarAlternarFerramentaApplePencil(canvasId, evento) {
-    const est = CANVAS_ESTADO[canvasId];
-    if (!est || evento.pointerType !== 'pen' || evento.button !== 0 || !['caneta', 'apagar'].includes(est.ferramenta)) return false;
-    const anterior = est.ultimoToqueCaneta;
-    const agora = performance.now();
-    if (anterior && agora - anterior.tempo <= 380 && Math.hypot(evento.clientX - anterior.x, evento.clientY - anterior.y) <= 36) {
-        est.objectos = clonarObjectosDesenho(anterior.objectosAntes);
-        est.ultimoToqueCaneta = null;
-        est.gestoCaneta = null;
-        definirFerramenta(canvasId, est.ferramenta === 'apagar' ? 'caneta' : 'apagar');
-        redesenhar(canvasId);
-        return true;
-    }
-    est.gestoCaneta = { inicio: agora, x: evento.clientX, y: evento.clientY, distancia: 0, objectosAntes: clonarObjectosDesenho(est.objectos) };
-    return false;
-}
-
-function atualizarGestoApplePencil(est, evento) {
-    if (!est?.gestoCaneta || evento.pointerType !== 'pen') return;
-    est.gestoCaneta.distancia = Math.max(est.gestoCaneta.distancia, Math.hypot(evento.clientX - est.gestoCaneta.x, evento.clientY - est.gestoCaneta.y));
-}
-
-function registarFimGestoApplePencil(est, evento) {
-    if (!est?.gestoCaneta || evento.pointerType !== 'pen') return;
-    const gesto = est.gestoCaneta;
-    const curto = performance.now() - gesto.inicio <= 220 && gesto.distancia <= 8;
-    est.ultimoToqueCaneta = curto ? { tempo: performance.now(), x: evento.clientX, y: evento.clientY, objectosAntes: gesto.objectosAntes } : null;
-    est.gestoCaneta = null;
-}
-
-function converterImagemLegada(canvasId, imagem, manterObjectos = false) {
-    const est = CANVAS_ESTADO[canvasId];
-    if (!est) return;
-    if (!window.TacticalLegacy) { est.imagemBase = imagem; return; }
-    const recortes = window.TacticalLegacy.decomporImagem(imagem, est.canvas.width, est.canvas.height);
-    est.objectos = manterObjectos ? [...recortes, ...est.objectos] : recortes;
-    est.imagemBase = null;
-}
-
-function eObjectoMovel(obj) {
-    return ['jogador_ataque','jogador_defesa','cone','bola','coach'].includes(obj.tipo)
-        || Boolean(window.TacticalLegacy?.eRecorte(obj));
-}
-
-function restaurarEstadoDesenho(canvasId, estadoSerializado) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    try {
-        const guardado = JSON.parse(estadoSerializado);
-        const larguraOrigem = Math.max(1, Number(guardado.largura) || est.canvas.width);
-        const alturaOrigem = Math.max(1, Number(guardado.altura) || est.canvas.height);
-        const escalaX = est.canvas.width / larguraOrigem, escalaY = est.canvas.height / alturaOrigem;
-        est.objectos = Array.isArray(guardado.objectos) ? guardado.objectos.map((original) => {
-            const obj = JSON.parse(JSON.stringify(original));
-            if (Number.isFinite(Number(obj.x))) obj.x = Number(obj.x) * escalaX;
-            if (Number.isFinite(Number(obj.y))) obj.y = Number(obj.y) * escalaY;
-            if (Array.isArray(obj.pontos)) obj.pontos = obj.pontos.map(p => ({ x: Number(p.x) * escalaX, y: Number(p.y) * escalaY }));
-            if (window.TacticalLegacy?.eRecorte(obj)) {
-                obj.largura = Number(obj.largura) * escalaX;
-                obj.altura = Number(obj.altura) * escalaY;
-            } else if (Number.isFinite(Number(obj.largura))) obj.largura = Number(obj.largura) * ((escalaX + escalaY) / 2);
-            return obj;
-        }) : [];
-        const maiorAtaque = Math.max(0, ...est.objectos.filter(o => o.tipo === 'jogador_ataque').map(o => Number(o.numero) || 0));
-        const maiorDefesa = Math.max(0, ...est.objectos.filter(o => o.tipo === 'jogador_defesa').map(o => Number(o.numero) || 0));
-        est.contadores = { ataque: Number(guardado.contadores?.ataque) || maiorAtaque + 1, defesa: Number(guardado.contadores?.defesa) || maiorDefesa + 1 };
-        est.numerosSelecionados = { ataque: Number(guardado.numerosSelecionados?.ataque) || est.contadores.ataque, defesa: Number(guardado.numerosSelecionados?.defesa) || est.contadores.defesa };
-        est.larguraLinha = Number(guardado.larguraLinha) || est.larguraLinha;
-        est.corLinha = guardado.corLinha || est.corLinha;
-        if (guardado.fundoLegado) {
-            const fundo = new Image();
-            fundo.onload = () => { converterImagemLegada(canvasId, fundo, true); redesenhar(canvasId); };
-            fundo.src = guardado.fundoLegado;
-        }
-        redesenhar(canvasId); sincronizarNumeroJogador(canvasId);
-    } catch (_) { est.objectos = []; redesenhar(canvasId); }
-}
-
-function estadoDesenhoParaGuardar(est) {
-    return { largura: est.canvas.width, altura: est.canvas.height, objectos: est.objectos, contadores: est.contadores, numerosSelecionados: est.numerosSelecionados, larguraLinha: est.larguraLinha, corLinha: est.corLinha, fundoLegado: est.imagemBase?.src || null };
-}
-
-function aoPremir(canvasId, e) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    const pos = obterPos(est.canvas, e);
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
-    if (e.button === 2) { e.preventDefault(); if (est.linhaMultipla) { if (est.linhaMultipla.pontos.length >= 2) est.objectos.push({...est.linhaMultipla}); est.linhaMultipla = null; redesenhar(canvasId); } return; }
-    if (est.ferramenta === 'apagar' || est.apagarComPonteiro) { est.aDesconhar = true; apagarNaPosicao(canvasId, pos, e.pointerType); return; }
-    if (est.ferramenta === 'seleccionar') {
-        est.objectoSeleccionado = null;
-        for (let i = est.objectos.length - 1; i >= 0; i--) { if (estaNoObj(est.objectos[i], pos)) { est.objectoSeleccionado = est.objectos[i]; if (eObjectoMovel(est.objectos[i])) est.offsetMover = { x: pos.x - est.objectos[i].x, y: pos.y - est.objectos[i].y }; else est.offsetMover = { x: pos.x - est.objectos[i].pontos[0].x, y: pos.y - est.objectos[i].pontos[0].y }; est.aDesconhar = true; break; } }
-        redesenhar(canvasId); if (est.objectoSeleccionado) desenharSeleccao(est.ctx, est.objectoSeleccionado); return;
-    }
-    if (simbolos.includes(est.ferramenta)) {
-        let numero = null;
-        if (est.ferramenta === 'jogador_ataque' || est.ferramenta === 'jogador_defesa') {
-            const lado = est.ferramenta === 'jogador_ataque' ? 'ataque' : 'defesa';
-            numero = est.numerosSelecionados[lado]; est.contadores[lado] = Math.max(est.contadores[lado], numero + 1); est.numerosSelecionados[lado] = Math.min(99, numero + 1);
-        }
-        est.objectos.push({ tipo: est.ferramenta, x: pos.x, y: pos.y, tamanho: 1, numero }); redesenhar(canvasId); sincronizarNumeroJogador(canvasId); return;
-    }
-    if (est.ferramenta === 'caneta') {
-        est.aDesconhar = true;
-        est.linhaMultipla = { tipo: 'caneta', pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 };
-        est.posicaoCursor = pos;
-        redesenhar(canvasId);
-        return;
-    }
-    if (!est.linhaMultipla) { est.linhaMultipla = { tipo: est.ferramenta, pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 }; est.posicaoCursor = pos; }
-    else est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
-    redesenhar(canvasId); if (est.posicaoCursor) desenharLinhaMultipla(est.ctx, est.linhaMultipla, est.posicaoCursor);
-}
-
-function aoMover(canvasId, e) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    const pos = obterPos(est.canvas, e); const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
-    est.posicaoCursor = pos;
-    if (est.aDesconhar && (est.ferramenta === 'apagar' || est.apagarComPonteiro)) {
-        const eventos = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [e];
-        (eventos.length ? eventos : [e]).forEach(evento => apagarNaPosicao(canvasId, obterPos(est.canvas, evento), e.pointerType));
-        return;
-    }
-    if (est.ferramenta === 'caneta' && est.aDesconhar && est.linhaMultipla) {
-        const ultimo = est.linhaMultipla.pontos[est.linhaMultipla.pontos.length - 1];
-        if (Math.hypot(pos.x - ultimo.x, pos.y - ultimo.y) >= 1.25) {
-            est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
-            redesenhar(canvasId); desenharLinhaMultipla(est.ctx, est.linhaMultipla, null);
-        }
-        return;
-    }
-    if (est.ferramenta === 'seleccionar' && est.aDesconhar && est.objectoSeleccionado) {
-        const obj = est.objectoSeleccionado;
-        if (eObjectoMovel(obj)) { obj.x = pos.x - est.offsetMover.x; obj.y = pos.y - est.offsetMover.y; }
-        else if (obj.pontos) { const dx = pos.x - est.offsetMover.x - obj.pontos[0].x, dy = pos.y - est.offsetMover.y - obj.pontos[0].y; obj.pontos.forEach(p => { p.x += dx; p.y += dy; }); est.offsetMover.x = pos.x - obj.pontos[0].x; est.offsetMover.y = pos.y - obj.pontos[0].y; }
-        redesenhar(canvasId); desenharSeleccao(est.ctx, est.objectoSeleccionado); return;
-    }
-    if (est.linhaMultipla) { redesenhar(canvasId); desenharLinhaMultipla(est.ctx, est.linhaMultipla, pos); }
-}
-
-function aoSoltar(canvasId, e) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    if (est.ferramenta === 'caneta' && est.aDesconhar && est.linhaMultipla) {
-        if (est.linhaMultipla.pontos.length === 1) { const p = est.linhaMultipla.pontos[0]; est.linhaMultipla.pontos.push({ x: p.x + 0.25, y: p.y + 0.25 }); }
-        est.objectos.push({ ...est.linhaMultipla, pontos: est.linhaMultipla.pontos.map(p => ({ ...p })) });
-        est.linhaMultipla = null; est.aDesconhar = false; redesenhar(canvasId); return;
-    }
-    if (est.ferramenta === 'apagar' || est.apagarComPonteiro) { est.aDesconhar = false; return; }
-    if (est.ferramenta === 'seleccionar') { est.aDesconhar = false; if (est.objectoSeleccionado) mostrarPainelTamanho(canvasId, est.objectoSeleccionado); }
-}
-
-function recortarTracoLivre(objecto, pos, raio) {
-    const pontos = objecto.pontos || [];
-    if (pontos.length < 2) return [];
-    const amostras = [pontos[0]];
-    for (let indice = 1; indice < pontos.length; indice++) {
-        const inicio = pontos[indice - 1], fim = pontos[indice];
-        const passos = Math.max(1, Math.ceil(Math.hypot(fim.x - inicio.x, fim.y - inicio.y) / 3));
-        for (let passo = 1; passo <= passos; passo++) {
-            const proporcao = passo / passos;
-            amostras.push({ x: inicio.x + (fim.x - inicio.x) * proporcao, y: inicio.y + (fim.y - inicio.y) * proporcao });
-        }
-    }
-    const fragmentos = [];
-    let actual = [];
-    const guardarFragmento = () => { if (actual.length >= 2) fragmentos.push({ ...objecto, pontos: actual }); actual = []; };
-    amostras.forEach(ponto => {
-        if (Math.hypot(ponto.x - pos.x, ponto.y - pos.y) <= raio + (Number(objecto.largura) || 2) / 2) guardarFragmento();
-        else actual.push(ponto);
-    });
-    guardarFragmento();
-    return fragmentos;
-}
-
-function apagarNaPosicao(canvasId, pos, pointerType) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    const margem = pointerType === 'pen' ? 11 : pointerType === 'touch' ? 20 : 14;
-    let alterado = false;
-    const seguintes = [];
-    est.objectos.forEach(objecto => {
-        if (!estaNoObj(objecto, pos, margem)) { seguintes.push(objecto); return; }
-        alterado = true;
-        if (objecto.tipo === 'caneta') seguintes.push(...recortarTracoLivre(objecto, pos, margem));
-    });
-    if (alterado) { est.objectos = seguintes; redesenhar(canvasId); }
-}
-
-function redesenhar(canvasId) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
-    est.ctx.clearRect(0, 0, est.canvas.width, est.canvas.height);
-    if (est.imagemBase) est.ctx.drawImage(est.imagemBase, 0, 0, est.canvas.width, est.canvas.height);
-    est.objectos.forEach(obj => {
-        if (simbolos.includes(obj.tipo)) desenharSimbolo(est.ctx, obj);
-        else if (window.TacticalLegacy?.eRecorte(obj)) window.TacticalLegacy.desenharRecorte(est.ctx, obj, () => redesenhar(canvasId));
-        else desenharLinhaMultipla(est.ctx, obj, null);
-    });
-}
-
-function desenharSimbolo(ctx, obj) {
-    ctx.save(); const t = obj.tamanho || 1;
-    if (obj.tipo === 'jogador_ataque') { ctx.beginPath(); ctx.arc(obj.x, obj.y, 14*t, 0, Math.PI*2); ctx.fillStyle = '#E25A1C'; ctx.fill(); ctx.strokeStyle = '#B34010'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(11*t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y); }
-    else if (obj.tipo === 'jogador_defesa') { const h = 16*t; ctx.beginPath(); ctx.moveTo(obj.x, obj.y-h); ctx.lineTo(obj.x+h*0.9, obj.y+h*0.7); ctx.lineTo(obj.x-h*0.9, obj.y+h*0.7); ctx.closePath(); ctx.fillStyle = '#888888'; ctx.fill(); ctx.strokeStyle = '#555555'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(10*t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y+2*t); }
-    else if (obj.tipo === 'cone') { ctx.beginPath(); ctx.arc(obj.x, obj.y, 10*t, 0, Math.PI*2); ctx.strokeStyle = '#333333'; ctx.lineWidth = 2; ctx.stroke(); }
-    else if (obj.tipo === 'bola') { ctx.beginPath(); ctx.arc(obj.x, obj.y, 10*t, 0, Math.PI*2); ctx.fillStyle = '#E8731A'; ctx.fill(); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 1; ctx.stroke(); ctx.beginPath(); ctx.moveTo(obj.x-10*t, obj.y); ctx.lineTo(obj.x+10*t, obj.y); ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 0.8; ctx.stroke(); }
-    else if (obj.tipo === 'coach') { const r = 14*t; ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI*2); ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#111111'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.beginPath(); ctx.arc(obj.x, obj.y, r*0.75, 0, Math.PI*2); ctx.strokeStyle = '#111111'; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = '#111111'; ctx.font = `bold ${Math.round(12*t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C', obj.x, obj.y); }
-    ctx.restore();
-}
-
-function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
-    if (!linha.pontos || linha.pontos.length === 0) return;
-    ctx.save(); ctx.strokeStyle = linha.cor || '#333333'; ctx.lineWidth = linha.largura || 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.setLineDash(linha.tipo === 'seta_tracejada' ? [8, 4] : []);
-    const todosPontos = [...linha.pontos]; if (posicaoCursor) todosPontos.push(posicaoCursor);
-    if (todosPontos.length < 2) { ctx.restore(); return; }
-    ctx.beginPath();
-    if (linha.tipo === 'caneta') { ctx.moveTo(todosPontos[0].x, todosPontos[0].y); for (let i = 1; i < todosPontos.length-1; i++) { const mx=(todosPontos[i].x+todosPontos[i+1].x)/2, my=(todosPontos[i].y+todosPontos[i+1].y)/2; ctx.quadraticCurveTo(todosPontos[i].x, todosPontos[i].y, mx, my); } ctx.lineTo(todosPontos[todosPontos.length-1].x, todosPontos[todosPontos.length-1].y); }
-    else if (linha.tipo === 'seta_curva') { ctx.moveTo(todosPontos[0].x, todosPontos[0].y); for (let i = 0; i < todosPontos.length-1; i++) { const mx=(todosPontos[i].x+todosPontos[i+1].x)/2, my=(todosPontos[i].y+todosPontos[i+1].y)/2; ctx.quadraticCurveTo(todosPontos[i].x, todosPontos[i].y, mx, my); } ctx.lineTo(todosPontos[todosPontos.length-1].x, todosPontos[todosPontos.length-1].y); }
-    else if (linha.tipo === 'seta_zigzag') { ctx.moveTo(todosPontos[0].x, todosPontos[0].y); for (let i = 0; i < todosPontos.length-1; i++) { const p1=todosPontos[i], p2=todosPontos[i+1]; const ang=Math.atan2(p2.y-p1.y, p2.x-p1.x); const dist=Math.hypot(p2.x-p1.x, p2.y-p1.y); const n=Math.max(1,Math.floor(dist/15)); const stepX=(p2.x-p1.x)/(n*2), stepY=(p2.y-p1.y)/(n*2); const perpX=-Math.sin(ang)*6, perpY=Math.cos(ang)*6; for (let j=0; j<n; j++) { ctx.lineTo(p1.x+stepX*(j*2+1)+(j%2===0?perpX:-perpX), p1.y+stepY*(j*2+1)+(j%2===0?perpY:-perpY)); ctx.lineTo(p1.x+stepX*(j*2+2), p1.y+stepY*(j*2+2)); } } }
-    else { ctx.moveTo(todosPontos[0].x, todosPontos[0].y); for (let i=1; i<todosPontos.length; i++) ctx.lineTo(todosPontos[i].x, todosPontos[i].y); }
-    ctx.stroke();
-    const ultimo=todosPontos[todosPontos.length-1], penultimo=todosPontos[todosPontos.length-2];
-    const ang=Math.atan2(ultimo.y-penultimo.y, ultimo.x-penultimo.x); const tp=12;
-    ctx.setLineDash([]);
-    if (linha.tipo === 'bloqueio') { const perpX=-Math.sin(ang)*10, perpY=Math.cos(ang)*10; ctx.beginPath(); ctx.moveTo(ultimo.x-perpX, ultimo.y-perpY); ctx.lineTo(ultimo.x+perpX, ultimo.y+perpY); ctx.lineWidth=(linha.largura||2)+1; ctx.stroke(); }
-    else if (linha.tipo !== 'linha' && linha.tipo !== 'caneta') { ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x-tp*Math.cos(ang-Math.PI/6), ultimo.y-tp*Math.sin(ang-Math.PI/6)); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(ultimo.x-tp*Math.cos(ang+Math.PI/6), ultimo.y-tp*Math.sin(ang+Math.PI/6)); ctx.stroke(); }
-    ctx.restore();
-}
-
-function estaNoObj(obj, pos, margem = 0) {
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
-    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x-obj.x, pos.y-obj.y) < 18 * (obj.tamanho || 1) + margem;
-    if (window.TacticalLegacy?.eRecorte(obj)) return window.TacticalLegacy.contemPonto(obj, pos);
-    if (!obj.pontos || obj.pontos.length < 2) return false;
-    for (let i=0; i<obj.pontos.length-1; i++) { const p1=obj.pontos[i], p2=obj.pontos[i+1]; const dx=p2.x-p1.x, dy=p2.y-p1.y, len2=dx*dx+dy*dy; const tolerancia=Math.max(10,((obj.largura||4)/2)+margem); if (len2===0) { if (Math.hypot(pos.x-p1.x, pos.y-p1.y)<tolerancia) return true; continue; } const t=Math.max(0,Math.min(1,((pos.x-p1.x)*dx+(pos.y-p1.y)*dy)/len2)); if (Math.hypot(pos.x-(p1.x+t*dx), pos.y-(p1.y+t*dy))<tolerancia) return true; }
-    return false;
-}
-
-function desenharSeleccao(ctx, obj) {
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
-    ctx.save(); ctx.strokeStyle = '#3B82F6'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-    if (simbolos.includes(obj.tipo)) { ctx.beginPath(); ctx.arc(obj.x, obj.y, 20*(obj.tamanho||1), 0, Math.PI*2); ctx.stroke(); }
-    else if (window.TacticalLegacy?.eRecorte(obj)) window.TacticalLegacy.desenharSeleccao(ctx, obj);
-    else if (obj.pontos && obj.pontos.length >= 2) { ctx.beginPath(); ctx.moveTo(obj.pontos[0].x, obj.pontos[0].y); obj.pontos.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#3B82F6'; obj.pontos.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill(); }); }
-    ctx.restore();
-}
-
-function mostrarPainelTamanho(canvasId, obj) {
-    const painelAnterior = document.getElementById('painel_tamanho_' + canvasId); if (painelAnterior) painelAnterior.remove();
-    const canvas = document.getElementById(canvasId); const container = canvas.closest('.relative').parentElement;
-    const painel = document.createElement('div'); painel.id = 'painel_tamanho_' + canvasId;
-    painel.className = 'flex items-center gap-2 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs';
-    painel.innerHTML = `<span class="text-blue-600 font-medium">Tamanho:</span><button onclick="ajustarTamanho('${canvasId}', -0.2)" class="bg-white border border-blue-300 text-blue-600 px-2 py-1 rounded hover:bg-blue-50 font-bold">−</button><span id="valor_tamanho_${canvasId}" class="text-blue-700 font-medium w-8 text-center">${Math.round((obj.tamanho||1)*100)}%</span><button onclick="ajustarTamanho('${canvasId}', 0.2)" class="bg-white border border-blue-300 text-blue-600 px-2 py-1 rounded hover:bg-blue-50 font-bold">+</button><button onclick="fecharPainelTamanho('${canvasId}')" class="ml-2 text-gray-400 hover:text-gray-600">✕</button>`;
-    container.appendChild(painel);
-}
-
-function ajustarTamanho(canvasId, delta) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est || !est.objectoSeleccionado) return;
-    const obj = est.objectoSeleccionado; obj.tamanho = Math.max(0.3, Math.min(3, (obj.tamanho||1) + delta));
-    const valorEl = document.getElementById('valor_tamanho_' + canvasId); if (valorEl) valorEl.textContent = Math.round(obj.tamanho*100) + '%';
-    redesenhar(canvasId); desenharSeleccao(est.ctx, obj);
-}
-
-function fecharPainelTamanho(canvasId) {
-    const est = CANVAS_ESTADO[canvasId]; if (est) { est.objectoSeleccionado = null; redesenhar(canvasId); }
-    const painel = document.getElementById('painel_tamanho_' + canvasId); if (painel) painel.remove();
-}
-
-function definirFerramenta(canvasId, ferramenta) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    finalizarLinhaPendente(canvasId);
-    est.ferramenta = ferramenta;
-    const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
-    est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'cell' : 'crosshair';
-    const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
-    if (toolbar) toolbar.querySelectorAll('button[data-ferramenta]').forEach(btn => {
-        const activo = btn.dataset.ferramenta === ferramenta;
-        btn.classList.toggle('is-active', activo);
-        btn.setAttribute('aria-pressed', activo ? 'true' : 'false');
-    });
-    sincronizarNumeroJogador(canvasId);
-}
-
-function finalizarLinhaPendente(canvasId) {
-    const est = CANVAS_ESTADO[canvasId];
-    if (!est || !est.linhaMultipla) return;
-    if (est.linhaMultipla.pontos.length >= 2) est.objectos.push({ ...est.linhaMultipla, pontos: est.linhaMultipla.pontos.map(p => ({ ...p })) });
-    est.linhaMultipla = null; est.aDesconhar = false; redesenhar(canvasId);
-}
-
-function definirNumeroJogador(canvasId, valor) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    const lado = est.ferramenta === 'jogador_defesa' ? 'defesa' : 'ataque';
-    est.numerosSelecionados[lado] = Math.max(0, Math.min(99, Number.parseInt(valor, 10) || 0));
-    est.contadores[lado] = Math.max(est.contadores[lado], est.numerosSelecionados[lado] + 1);
-    sincronizarNumeroJogador(canvasId);
-}
-
-function sincronizarNumeroJogador(canvasId) {
-    const est = CANVAS_ESTADO[canvasId];
-    const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
-    if (!est || !toolbar) return;
-    const lado = est.ferramenta === 'jogador_defesa' ? 'defesa' : 'ataque';
-    const input = toolbar.querySelector('[data-numero-jogador]'); if (input) input.value = est.numerosSelecionados[lado];
-    [['jogador_ataque', 'ataque'], ['jogador_defesa', 'defesa']].forEach(([ferramenta, chave]) => {
-        const simbolo = toolbar.querySelector(`[data-ferramenta="${ferramenta}"] .ds-tactical-symbol`); if (simbolo) simbolo.textContent = est.numerosSelecionados[chave];
-    });
-}
-
-function definirCorLinha(canvasId, cor) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    est.corLinha = cor;
-    const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
-    if (toolbar) toolbar.querySelectorAll('[data-cor-linha]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.corLinha === cor));
-}
-
-function definirLarguraLinha(canvasId, largura) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    est.larguraLinha = largura;
-    const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
-    if (toolbar) toolbar.querySelectorAll('[data-largura-linha]').forEach(btn => btn.classList.toggle('is-active', Number(btn.dataset.larguraLinha) === largura));
-}
-
-function limparTudo(canvasId) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    est.objectos = []; est.imagemBase = null; est.linhaMultipla = null; est.contadores = { ataque: 1, defesa: 1 }; est.numerosSelecionados = { ataque: 1, defesa: 1 }; redesenhar(canvasId); sincronizarNumeroJogador(canvasId);
-}
-
-function desfazer(canvasId) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est || est.objectos.length === 0) return;
-    const u = est.objectos.pop();
-    if (u.tipo === 'jogador_ataque' && est.contadores.ataque > 1) est.contadores.ataque--;
-    if (u.tipo === 'jogador_defesa' && est.contadores.defesa > 1) est.contadores.defesa--;
-    redesenhar(canvasId);
-}
-
-async function guardarDesenhoPasso(canvasId, passoId) {
-    const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    finalizarLinhaPendente(canvasId);
-    const btn = document.getElementById('btn_guardar_' + passoId);
-    if (window.TacticalLegacy) await window.TacticalLegacy.aguardarRecortes(est.objectos);
-    est.objectoSeleccionado = null;
-    redesenhar(canvasId);
-    const desenho = est.canvas.toDataURL('image/png');
-    const estadoEditavel = estadoDesenhoParaGuardar(est);
-    fetch(`/playbook/passos/${passoId}/desenho`, {
-        method: 'POST',
-        body: JSON.stringify({ dados: desenho, estado: estadoEditavel }),
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '' }
-    }).then(r => r.json()).then(data => {
-        if (data.sucesso && btn) {
-            const frameButton = document.querySelector(`[data-playbook-frame="${passoId}"]`);
-            if (frameButton) frameButton.dataset.frameSrc = desenho;
-            est.canvas.dataset.desenho = desenho;
-            est.canvas.dataset.estado = JSON.stringify(estadoEditavel);
-            btn.textContent = 'Guardado'; btn.classList.add('bg-green-500'); btn.classList.remove('bg-orange-500');
-            setTimeout(() => { btn.textContent = 'Guardar desenho'; btn.classList.remove('bg-green-500'); btn.classList.add('bg-orange-500'); }, 2500);
-        }
-    });
-}
-
-// Inicializar todos os canvas ao carregar a página
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('canvas[id^="canvas_"]').forEach(c => {
-        inicializarDesenho(c.id);
-        setTimeout(() => definirFerramenta(c.id, 'jogador_ataque'), 200);
-    });
-
-    document.querySelectorAll('[data-playbook-player]').forEach(inicializarAnimacaoPlaybook);
-});
-
-function inicializarAnimacaoPlaybook(player) {
-    const botoes = Array.from(player.querySelectorAll('[data-playbook-frame]'));
-    const imagem = player.querySelector('[data-player-image]');
-    const vazio = player.querySelector('[data-player-empty]');
-    const etiqueta = player.querySelector('[data-player-label]');
-    const nota = player.querySelector('[data-player-note]');
-    const botaoPlay = player.querySelector('[data-player-play]');
-    let indice = 0;
-    let temporizador = null;
-
-    function mostrar(novoIndice) {
-        indice = (novoIndice + botoes.length) % botoes.length;
-        const botao = botoes[indice];
-        const origem = botao.dataset.frameSrc || '';
-        botoes.forEach((item, i) => item.classList.toggle('is-active', i === indice));
-        document.querySelectorAll('[data-editor-step]').forEach(editor => {
-            const ativo = editor.dataset.editorStep === botao.dataset.playbookFrame;
-            editor.hidden = !ativo;
-            if (ativo) {
-                const canvas = editor.querySelector('canvas[id^="canvas_"]');
-                if (canvas && CANVAS_ESTADO[canvas.id]) {
-                    window.setTimeout(() => {
-                        const campo = canvas.parentElement.querySelector('img');
-                        if (campo?.offsetWidth && (canvas.width !== campo.offsetWidth || canvas.height !== campo.offsetHeight)) {
-                            canvas.width = campo.offsetWidth;
-                            canvas.height = campo.offsetHeight;
-                        }
-                        redesenhar(canvas.id);
-                    }, 80);
-                }
-            }
-        });
-        etiqueta.textContent = `Passo ${indice + 1}`;
-        nota.textContent = botao.dataset.frameNote || '';
-        imagem.classList.remove('is-visible');
-        window.setTimeout(() => {
-            imagem.src = origem;
-            imagem.classList.toggle('is-imported', botao.dataset.frameImported === 'true');
-            imagem.classList.toggle('is-visible', Boolean(origem));
-            vazio.hidden = Boolean(origem);
-        }, 90);
-    }
-
-    function parar() {
-        if (temporizador) window.clearInterval(temporizador);
-        temporizador = null;
-        botaoPlay.textContent = 'Reproduzir';
-        botaoPlay.setAttribute('aria-pressed', 'false');
-    }
-
-    function reproduzir() {
-        if (temporizador) { parar(); return; }
-        botaoPlay.textContent = 'Pausar';
-        botaoPlay.setAttribute('aria-pressed', 'true');
-        temporizador = window.setInterval(() => mostrar(indice + 1), 1800);
-    }
-
-    botoes.forEach((botao, i) => botao.addEventListener('click', () => { parar(); mostrar(i); }));
-    player.querySelector('[data-player-prev]').addEventListener('click', () => { parar(); mostrar(indice - 1); });
-    player.querySelector('[data-player-next]').addEventListener('click', () => { parar(); mostrar(indice + 1); });
-    botaoPlay.addEventListener('click', reproduzir);
-    mostrar(0);
-}
-</script>
-
-{% endblock %}
+  <script id="pbs-studio-data" type="application/json">{{ {
+    'setplay': {
+      'id': setplay.id,
+      'nome': setplay.nome,
+      'categoria': setplay.categoria or '',
+      'descricao': setplay.descricao or '',
+      'origem': setplay.origem
+    },
+    'passos': passos_studio
+  }|tojson }}</script>
+</body>
+</html>

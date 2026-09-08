@@ -150,6 +150,7 @@ def test_interface_mantem_desenho_manual_e_isola_importacoes_ebp():
     assert 'accept=".ebp,application/octet-stream"' in lista
     assert "setplay.origem == 'ebp'" in detalhe
     assert "Imagem original do passo importado." in detalhe
-    assert "Desenho tático" in detalhe
+    assert "data-playbook-studio" in detalhe
+    assert "playbook-studio.js" in detalhe
     assert 'name="imagem"' in detalhe
     assert "/imagem/eliminar" in detalhe

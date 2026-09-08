@@ -44,6 +44,25 @@ def _redirect_playbook(url: str) -> RedirectResponse:
     )
 
 
+def _pedido_json(request: Request) -> bool:
+    return (
+        "application/json" in request.headers.get("accept", "")
+        or request.headers.get("x-requested-with") == "XMLHttpRequest"
+    )
+
+
+def _serializar_passo(passo: PassoSetPlay) -> dict:
+    desenho_imagem, desenho_estado = decompor_desenho_editavel(passo.desenho)
+    return {
+        "id": passo.id,
+        "ordem": passo.ordem,
+        "observacao": passo.observacao or "",
+        "desenho": desenho_imagem,
+        "estado": desenho_estado,
+        "imagemCoach": passo.imagem_coach,
+    }
+
+
 def _verificar_acesso_playbook(utilizador, equipa_id: int | None, db: Session) -> None:
     if not equipa_id or not verificar_acesso_equipa(utilizador, equipa_id, db):
         raise AcessoNegado("/equipas")
@@ -461,6 +480,7 @@ def detalhe_setplay(setplay_id: int, request: Request, db: Session = Depends(get
         "playbook": setplay.playbook,
         "equipa": setplay.playbook.equipa,
         "passos": setplay.passos,
+        "passos_studio": [_serializar_passo(passo) for passo in setplay.passos],
         "categorias": categorias,
     })
 
@@ -482,6 +502,37 @@ async def editar_setplay(setplay_id: int, request: Request, db: Session = Depend
         db.commit()
         set_flash(request, "Setplay atualizado.")
     return RedirectResponse(url=f"/playbook/setplays/{setplay_id}", status_code=303)
+
+
+@router.post("/setplays/{setplay_id}/editar-json")
+async def editar_setplay_json(
+    setplay_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _equipa_id_por_setplay(db, setplay_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    setplay = db.query(SetPlay).filter(SetPlay.id == setplay_id).first()
+    if not setplay:
+        return JSONResponse({"sucesso": False, "erro": "Jogada não encontrada."}, status_code=404)
+    dados = await request.json()
+    nome = str(dados.get("nome") or "").strip()
+    if not nome:
+        return JSONResponse({"sucesso": False, "erro": "O título é obrigatório."}, status_code=422)
+    setplay.nome = nome
+    setplay.categoria = str(dados.get("categoria") or "").strip() or None
+    setplay.descricao = str(dados.get("descricao") or "").strip() or None
+    db.commit()
+    return JSONResponse({
+        "sucesso": True,
+        "setplay": {
+            "id": setplay.id,
+            "nome": setplay.nome,
+            "categoria": setplay.categoria or "",
+            "descricao": setplay.descricao or "",
+        },
+    })
 
 
 # ── ELIMINAR SETPLAY ───────────────────────────────────────────────────────────
@@ -513,7 +564,71 @@ async def adicionar_passo(setplay_id: int, request: Request, db: Session = Depen
         passo = PassoSetPlay(setplay_id=setplay_id, ordem=ordem)
         db.add(passo)
         db.commit()
+        db.refresh(passo)
+        if _pedido_json(request):
+            return JSONResponse({"sucesso": True, "passo": _serializar_passo(passo)})
+    elif _pedido_json(request):
+        return JSONResponse({"sucesso": False, "erro": "Jogada não encontrada."}, status_code=404)
     return RedirectResponse(url=f"/playbook/setplays/{setplay_id}", status_code=303)
+
+
+@router.post("/passos/{passo_id}/duplicar")
+async def duplicar_passo(
+    passo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _equipa_id_por_passo(db, passo_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    passo = db.query(PassoSetPlay).filter(PassoSetPlay.id == passo_id).first()
+    if not passo:
+        if _pedido_json(request):
+            return JSONResponse({"sucesso": False, "erro": "Cena não encontrada."}, status_code=404)
+        return RedirectResponse(url="/equipas", status_code=303)
+
+    seguintes = (
+        db.query(PassoSetPlay)
+        .filter(PassoSetPlay.setplay_id == passo.setplay_id, PassoSetPlay.ordem > passo.ordem)
+        .order_by(PassoSetPlay.ordem.desc())
+        .all()
+    )
+    for seguinte in seguintes:
+        seguinte.ordem += 1
+    copia = PassoSetPlay(
+        setplay_id=passo.setplay_id,
+        ordem=passo.ordem + 1,
+        observacao=passo.observacao,
+        desenho=passo.desenho,
+        imagem_coach=passo.imagem_coach,
+    )
+    db.add(copia)
+    db.commit()
+    db.refresh(copia)
+    if _pedido_json(request):
+        return JSONResponse({"sucesso": True, "passo": _serializar_passo(copia)})
+    return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}", status_code=303)
+
+
+@router.post("/setplays/{setplay_id}/passos/reordenar")
+async def reordenar_passos_setplay(
+    setplay_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _equipa_id_por_setplay(db, setplay_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    passos = db.query(PassoSetPlay).filter(PassoSetPlay.setplay_id == setplay_id).all()
+    dados = await request.json()
+    ids = [int(item) for item in (dados.get("passo_ids") or [])]
+    mapa = {passo.id: passo for passo in passos}
+    if len(ids) != len(set(ids)) or set(ids) != set(mapa):
+        return JSONResponse({"sucesso": False, "erro": "A sequência recebida está incompleta."}, status_code=422)
+    for ordem, passo_id in enumerate(ids):
+        mapa[passo_id].ordem = ordem
+    db.commit()
+    return JSONResponse({"sucesso": True})
 
 
 # ── ELIMINAR PASSO ─────────────────────────────────────────────────────────────
@@ -534,8 +649,12 @@ async def eliminar_passo(passo_id: int, request: Request, db: Session = Depends(
         for i, p in enumerate(restantes):
             p.ordem = i
         db.commit()
+        if _pedido_json(request):
+            return JSONResponse({"sucesso": True, "passo_ids": [p.id for p in restantes]})
         set_flash(request, "Passo eliminado.")
         return RedirectResponse(url=f"/playbook/setplays/{setplay_id}", status_code=303)
+    if _pedido_json(request):
+        return JSONResponse({"sucesso": False, "erro": "Cena não encontrada."}, status_code=404)
     return RedirectResponse(url="/equipas", status_code=303)
 
 
@@ -551,6 +670,24 @@ async def guardar_observacao_passo(passo_id: int, request: Request, db: Session 
         passo.observacao = observacao or None
         db.commit()
     return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}", status_code=303)
+
+
+@router.post("/passos/{passo_id}/observacao-json")
+async def guardar_observacao_passo_json(
+    passo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _equipa_id_por_passo(db, passo_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    passo = db.query(PassoSetPlay).filter(PassoSetPlay.id == passo_id).first()
+    if not passo:
+        return JSONResponse({"sucesso": False, "erro": "Cena não encontrada."}, status_code=404)
+    dados = await request.json()
+    passo.observacao = str(dados.get("observacao") or "").strip() or None
+    db.commit()
+    return JSONResponse({"sucesso": True, "observacao": passo.observacao or ""})
 
 
 # ── GUARDAR DESENHO DO PASSO (AJAX JSON) ──────────────────────────────────────

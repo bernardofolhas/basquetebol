@@ -105,6 +105,7 @@ def test_templates_expoem_navegacao_e_acoes_responsivas_sem_textos_internos():
     calendario = (ROOT / "frontend/templates/calendario_partilhavel_pdf.html").read_text(encoding="utf-8")
     plano_pdf = (ROOT / "frontend/templates/treino/plano_print.html").read_text(encoding="utf-8")
     playbook = (ROOT / "frontend/templates/playbook/detalhe.html").read_text(encoding="utf-8")
+    playbook_studio = (ROOT / "frontend/static/js/playbook-studio.js").read_text(encoding="utf-8")
     playbook_pdf = (ROOT / "frontend/templates/playbook/pdf.html").read_text(encoding="utf-8")
 
     for nivel in ("Plano anual", "Macrociclos", "Mesociclos", "Microciclos", "Planos de treino"):
@@ -119,9 +120,9 @@ def test_templates_expoem_navegacao_e_acoes_responsivas_sem_textos_internos():
     assert "height: 25mm" not in plano_pdf
     assert ".court img { display: block; width: 100%; height: auto;" in plano_pdf
     assert "Ficha de treino" not in plano_pdf
-    assert "imagemBase" in playbook
-    assert "est.posicaoCursor = pos" in playbook
-    assert "est.imagemBase = null" in playbook
+    assert "playbook-studio.css" in playbook
+    assert "pointFromEvent" in playbook_studio
+    assert "@media (max-width: 620px)" in (ROOT / "frontend/static/css/playbook-studio.css").read_text(encoding="utf-8")
     assert "passo.imagem_composta_pdf" in playbook_pdf
     assert 'src="/static/campos/campo_meio.png"' not in playbook_pdf
 

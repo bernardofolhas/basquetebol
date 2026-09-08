@@ -44,7 +44,9 @@ def test_playbook_expoe_imagem_e_desenho_em_cada_passo():
 
     assert hasattr(PassoSetPlay, "imagem_coach")
     assert hasattr(SetPlay, "origem")
-    assert "Desenho tático" in template
+    assert "Playbook Studio" in template
+    assert 'data-playbook-studio' in template
+    assert 'playbook-studio.js' in template
     assert 'name="imagem"' in template
     assert "/imagem/eliminar" in template
     assert "passo.imagem_composta_pdf" in pdf
@@ -54,6 +56,7 @@ def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
     toolbar = (ROOT / "frontend/templates/partials/tactical_toolbar.html").read_text(encoding="utf-8")
     playbook = (ROOT / "frontend/templates/playbook/detalhe.html").read_text(encoding="utf-8")
     treino = (ROOT / "frontend/templates/treino/plano.html").read_text(encoding="utf-8")
+    studio = (ROOT / "frontend/static/js/playbook-studio.js").read_text(encoding="utf-8")
     compatibilidade = (ROOT / "frontend/static/js/tactical-legacy.js").read_text(encoding="utf-8")
 
     for grupo in ("Jogadores", "Equipamento", "Movimentos", "Estilo da linha", "Edição"):
@@ -64,16 +67,18 @@ def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
     assert "Caneta livre" in toolbar
     assert "('seta_curva','⌒','Curva')" in toolbar
     assert "tactical_toolbar" in treino
-    assert "tactical_toolbar" in playbook
-    assert "data-playbook-player" in playbook
-    assert "inicializarAnimacaoPlaybook" in playbook
-    assert "data-player-play" in playbook
+    assert "data-playbook-studio" in playbook
+    assert 'data-tool="jogador_ataque"' in playbook
+    assert "data-preview-canvas" in playbook
+    assert "renderPreview" in studio
+    assert "actionPlan" in studio
+    assert "data-group-selected" in playbook
     assert "data-numero-jogador" in toolbar
     assert ">X</span><small>Defesa" not in toolbar
     assert "estadoDesenhoParaGuardar" in treino
-    assert "estadoDesenhoParaGuardar" in playbook
+    assert "stateFor" in studio
     assert "sincronizarNumeroJogador" in treino
-    assert "sincronizarNumeroJogador" in playbook
+    assert "playerNumber" in studio
     assert "tactical-legacy.js" in treino
     assert "tactical-legacy.js" in playbook
     assert 'TIPO_RECORTE = "recorte_legado"' in compatibilidade
@@ -81,17 +86,18 @@ def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
     assert "contemPonto" in compatibilidade
     assert "converterImagemLegada(canvasId, imagemGuardada)" in treino
     assert "TacticalLegacy.contemPonto" in treino
-    assert "TacticalLegacy.contemPonto" in playbook
+    assert "TacticalLegacy.contemPonto" in studio
     assert "await window.TacticalLegacy.aguardarRecortes" in treino
-    assert "await window.TacticalLegacy.aguardarRecortes" in playbook
+    assert "await window.TacticalLegacy?.aguardarRecortes" in studio
 
 
 def test_editor_tatico_suporta_apple_pencil_e_borracha_continua():
     treino = (ROOT / "frontend/templates/treino/plano.html").read_text(encoding="utf-8")
     playbook = (ROOT / "frontend/templates/playbook/detalhe.html").read_text(encoding="utf-8")
     biblioteca = (ROOT / "frontend/templates/biblioteca/detalhe.html").read_text(encoding="utf-8")
+    studio = (ROOT / "frontend/static/js/playbook-studio.js").read_text(encoding="utf-8")
 
-    for template in (treino, playbook, biblioteca):
+    for template in (treino, biblioteca):
         assert "pointerdown" in template
         assert "setPointerCapture" in template
         assert "pointercancel" in template
@@ -105,6 +111,17 @@ def test_editor_tatico_suporta_apple_pencil_e_borracha_continua():
         assert "est.ferramenta === 'caneta'" in template
         assert "linha.tipo === 'caneta'" in template
         assert "finalizarLinhaPendente(canvasId)" in template
+
+    assert 'addEventListener("pointerdown"' in studio
+    assert "setPointerCapture" in studio
+    assert 'addEventListener("pointercancel"' in studio
+    assert 'event.pointerType === "pen"' in studio
+    assert "pencilTap" in studio
+    assert "function eraseAt" in studio
+    assert 'object.tipo === "caneta"' in studio
+    assert 'tool === "caneta"' in studio
+    assert 'data-tool="caneta"' in playbook
+    assert 'data-tool="borracha"' in playbook
 
     toolbar = (ROOT / "frontend/templates/partials/tactical_toolbar.html").read_text(encoding="utf-8")
     assert "Borracha: apagar apenas a zona percorrida" in toolbar
@@ -162,6 +179,67 @@ def test_administrador_adiciona_e_remove_imagem_do_passo(client_admin):
         assert resposta.status_code == 303
         db.expire_all()
         assert db.query(PassoSetPlay).filter(PassoSetPlay.id == passo_id).one().imagem_coach is None
+    finally:
+        if playbook_id:
+            playbook = db.query(Playbook).filter(Playbook.id == playbook_id).first()
+            if playbook:
+                db.delete(playbook)
+                db.commit()
+        db.close()
+
+
+def test_studio_gera_e_reordena_cenas_sem_recarregar(client_admin):
+    db = SessionLocal()
+    playbook_id = None
+    try:
+        administrador = db.query(Utilizador).filter(Utilizador.username == "admin").first()
+        if not administrador or not administrador.clube_id:
+            pytest.skip("Conta administrativa de teste sem clube.")
+        equipa = db.query(Equipa).filter(Equipa.clube_id == administrador.clube_id).first()
+        if not equipa:
+            pytest.skip("Clube de teste sem equipa.")
+
+        playbook = Playbook(clube_id=administrador.clube_id, equipa_id=equipa.id, nome="Playbook Studio teste")
+        db.add(playbook)
+        db.flush()
+        playbook_id = playbook.id
+        setplay = SetPlay(clube_id=administrador.clube_id, playbook_id=playbook.id, nome="Jogada Studio")
+        db.add(setplay)
+        db.flush()
+        primeiro = PassoSetPlay(clube_id=administrador.clube_id, setplay_id=setplay.id, ordem=0)
+        db.add(primeiro)
+        db.commit()
+
+        detalhe = client_admin.get(f"/playbook/setplays/{setplay.id}")
+        assert detalhe.status_code == 200
+        assert "Playbook Studio" in detalhe.text
+        assert 'data-scenes-list' in detalhe.text
+
+        novo = client_admin.post(
+            f"/playbook/setplays/{setplay.id}/passos/novo",
+            json={},
+            headers={"Accept": "application/json", "X-Requested-With": "XMLHttpRequest"},
+        )
+        assert novo.status_code == 200
+        segundo_id = novo.json()["passo"]["id"]
+
+        nota = client_admin.post(f"/playbook/passos/{segundo_id}/observacao-json", json={"observacao": "Corte e passe"})
+        assert nota.json() == {"sucesso": True, "observacao": "Corte e passe"}
+
+        duplicado = client_admin.post(
+            f"/playbook/passos/{segundo_id}/duplicar",
+            json={},
+            headers={"Accept": "application/json", "X-Requested-With": "XMLHttpRequest"},
+        )
+        assert duplicado.status_code == 200
+        terceiro_id = duplicado.json()["passo"]["id"]
+
+        ordem = [terceiro_id, primeiro.id, segundo_id]
+        resposta = client_admin.post(f"/playbook/setplays/{setplay.id}/passos/reordenar", json={"passo_ids": ordem})
+        assert resposta.json() == {"sucesso": True}
+        db.expire_all()
+        guardados = db.query(PassoSetPlay).filter(PassoSetPlay.setplay_id == setplay.id).order_by(PassoSetPlay.ordem).all()
+        assert [passo.id for passo in guardados] == ordem
     finally:
         if playbook_id:
             playbook = db.query(Playbook).filter(Playbook.id == playbook_id).first()
