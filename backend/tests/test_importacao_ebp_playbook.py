@@ -110,7 +110,7 @@ def test_administrador_importa_ebp_com_imagem_independente_por_passo(client_admi
         assert len(passos) == 2
         assert all(passo.imagem_coach for passo in passos)
         assert [passo.observacao for passo in passos] == ["Primeiro movimento", "Segundo movimento"]
-        assert resposta.headers["location"] == f"/playbook/setplays/{setplay.id}"
+        assert resposta.headers["location"] == f"/playbook/studio/setplays/{setplay.id}"
 
         detalhe = client_admin.get(f"/playbook/setplays/{setplay.id}")
         assert detalhe.status_code == 200
@@ -125,7 +125,7 @@ def test_administrador_importa_ebp_com_imagem_independente_por_passo(client_admi
             follow_redirects=False,
         )
         assert repetida.status_code == 303
-        assert repetida.headers["location"] == f"/playbook/setplays/{setplay.id}"
+        assert repetida.headers["location"] == f"/playbook/studio/setplays/{setplay.id}"
         total = (
             db.query(SetPlay)
             .join(Playbook)

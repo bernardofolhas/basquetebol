@@ -210,10 +210,17 @@ def test_studio_gera_e_reordena_cenas_sem_recarregar(client_admin):
         db.add(primeiro)
         db.commit()
 
-        detalhe = client_admin.get(f"/playbook/setplays/{setplay.id}")
+        legado = client_admin.get(f"/playbook/setplays/{setplay.id}", follow_redirects=False)
+        assert legado.status_code == 303
+        assert legado.headers["location"] == f"/playbook/studio/setplays/{setplay.id}"
+
+        detalhe = client_admin.get(f"/playbook/studio/setplays/{setplay.id}")
         assert detalhe.status_code == 200
         assert "Playbook Studio" in detalhe.text
         assert 'data-scenes-list' in detalhe.text
+        assert "/static/campos/campo_meio.png" in detalhe.text
+        assert 'data-court-type="meio"' in detalhe.text
+        assert 'data-court-type="completo"' in detalhe.text
 
         novo = client_admin.post(
             f"/playbook/setplays/{setplay.id}/passos/novo",

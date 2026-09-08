@@ -94,6 +94,20 @@ def _preparar_preview_setplay(setplay: SetPlay) -> None:
     setplay.preview_imagem = (primeiro.imagem_coach if primeiro else None) or desenho
 
 
+def _imagem_passo_para_pdf(passo: PassoSetPlay) -> str | None:
+    desenho_imagem, estado = decompor_desenho_editavel(passo.desenho)
+    tipo = estado.get("campoTipo") if isinstance(estado, dict) else None
+    if tipo not in {"meio", "completo"} and isinstance(estado, dict):
+        try:
+            largura = float(estado.get("largura") or 0)
+            altura = float(estado.get("altura") or 0)
+        except (TypeError, ValueError):
+            largura = altura = 0
+        tipo = "completo" if largura and altura > largura else "meio"
+    caminho = STATIC_DIR / "campos" / ("campo_completo.png" if tipo == "completo" else "campo_meio.png")
+    return passo.imagem_coach or compor_desenho_sobre_campo(caminho, desenho_imagem)
+
+
 def _normalizar_ordem_caderno(caderno: CadernoPlaybook, ignorar_id: int | None = None) -> None:
     grupos = [None] + [secao.id for secao in sorted(caderno.secoes, key=lambda item: (item.ordem, item.id))]
     for secao_id in grupos:
@@ -380,7 +394,7 @@ async def criar_setplay(equipa_id: int, request: Request, db: Session = Depends(
     db.commit()
     db.refresh(setplay)
     set_flash(request, f"Setplay '{nome}' criado.")
-    return _redirect_playbook(f"/playbook/setplays/{setplay.id}")
+    return _redirect_playbook(f"/playbook/studio/setplays/{setplay.id}")
 
 
 @router.post("/equipas/{equipa_id}/setplays/importar-ebp")
@@ -456,13 +470,21 @@ async def importar_setplay_ebp(
     db.commit()
     acao = "atualizada" if atualizacao else "importada"
     set_flash(request, f"'{jogada.nome}' {acao} com {len(imagens)} passos editáveis.")
-    return _redirect_playbook(f"/playbook/setplays/{setplay.id}")
+    return _redirect_playbook(f"/playbook/studio/setplays/{setplay.id}")
 
 
 # ── DETALHE / EDITOR DE SETPLAY ───────────────────────────────────────────────
 @router.get("/setplays/{setplay_id}", response_class=HTMLResponse)
 def detalhe_setplay(setplay_id: int, request: Request, db: Session = Depends(get_db),
                     utilizador=Depends(exigir_autenticacao)):
+    equipa_id = _equipa_id_por_setplay(db, setplay_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    return _redirect_playbook(f"/playbook/studio/setplays/{setplay_id}")
+
+
+@router.get("/studio/setplays/{setplay_id}", response_class=HTMLResponse)
+def studio_setplay(setplay_id: int, request: Request, db: Session = Depends(get_db),
+                   utilizador=Depends(exigir_autenticacao)):
     equipa_id = _equipa_id_por_setplay(db, setplay_id)
     _verificar_acesso_playbook(utilizador, equipa_id, db)
 
@@ -501,7 +523,7 @@ async def editar_setplay(setplay_id: int, request: Request, db: Session = Depend
         setplay.descricao = descricao or None
         db.commit()
         set_flash(request, "Setplay atualizado.")
-    return RedirectResponse(url=f"/playbook/setplays/{setplay_id}", status_code=303)
+    return RedirectResponse(url=f"/playbook/studio/setplays/{setplay_id}", status_code=303)
 
 
 @router.post("/setplays/{setplay_id}/editar-json")
@@ -569,7 +591,7 @@ async def adicionar_passo(setplay_id: int, request: Request, db: Session = Depen
             return JSONResponse({"sucesso": True, "passo": _serializar_passo(passo)})
     elif _pedido_json(request):
         return JSONResponse({"sucesso": False, "erro": "Jogada não encontrada."}, status_code=404)
-    return RedirectResponse(url=f"/playbook/setplays/{setplay_id}", status_code=303)
+    return RedirectResponse(url=f"/playbook/studio/setplays/{setplay_id}", status_code=303)
 
 
 @router.post("/passos/{passo_id}/duplicar")
@@ -607,7 +629,7 @@ async def duplicar_passo(
     db.refresh(copia)
     if _pedido_json(request):
         return JSONResponse({"sucesso": True, "passo": _serializar_passo(copia)})
-    return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}", status_code=303)
+    return RedirectResponse(url=f"/playbook/studio/setplays/{passo.setplay_id}", status_code=303)
 
 
 @router.post("/setplays/{setplay_id}/passos/reordenar")
@@ -652,7 +674,7 @@ async def eliminar_passo(passo_id: int, request: Request, db: Session = Depends(
         if _pedido_json(request):
             return JSONResponse({"sucesso": True, "passo_ids": [p.id for p in restantes]})
         set_flash(request, "Passo eliminado.")
-        return RedirectResponse(url=f"/playbook/setplays/{setplay_id}", status_code=303)
+        return RedirectResponse(url=f"/playbook/studio/setplays/{setplay_id}", status_code=303)
     if _pedido_json(request):
         return JSONResponse({"sucesso": False, "erro": "Cena não encontrada."}, status_code=404)
     return RedirectResponse(url="/equipas", status_code=303)
@@ -669,7 +691,7 @@ async def guardar_observacao_passo(passo_id: int, request: Request, db: Session 
     if passo:
         passo.observacao = observacao or None
         db.commit()
-    return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}", status_code=303)
+    return RedirectResponse(url=f"/playbook/studio/setplays/{passo.setplay_id}", status_code=303)
 
 
 @router.post("/passos/{passo_id}/observacao-json")
@@ -731,7 +753,7 @@ async def guardar_imagem_passo(
         set_flash(request, "Imagem adicionada ao passo.")
     except ValueError as erro:
         set_flash(request, str(erro), tipo="error")
-    return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}#passo-{passo.id}", status_code=303)
+    return RedirectResponse(url=f"/playbook/studio/setplays/{passo.setplay_id}", status_code=303)
 
 
 @router.post("/passos/{passo_id}/imagem/eliminar")
@@ -749,7 +771,7 @@ async def eliminar_imagem_passo(
     passo.imagem_coach = None
     db.commit()
     set_flash(request, "Imagem removida. O desenho tático mantém-se disponível.")
-    return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}#passo-{passo.id}", status_code=303)
+    return RedirectResponse(url=f"/playbook/studio/setplays/{passo.setplay_id}", status_code=303)
 
 
 # ── MOVER PASSO PARA CIMA/BAIXO ───────────────────────────────────────────────
@@ -768,14 +790,14 @@ async def mover_passo(passo_id: int, direcao: str, request: Request,
 
     idx = next((i for i, p in enumerate(passos) if p.id == passo_id), None)
     if idx is None:
-        return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}", status_code=303)
+        return RedirectResponse(url=f"/playbook/studio/setplays/{passo.setplay_id}", status_code=303)
 
     swap_idx = idx - 1 if direcao == "cima" else idx + 1
     if 0 <= swap_idx < len(passos):
         passos[idx].ordem, passos[swap_idx].ordem = passos[swap_idx].ordem, passos[idx].ordem
         db.commit()
 
-    return RedirectResponse(url=f"/playbook/setplays/{passo.setplay_id}", status_code=303)
+    return RedirectResponse(url=f"/playbook/studio/setplays/{passo.setplay_id}", status_code=303)
 
 
 # ── EXPORTAR SETPLAY EM PDF ────────────────────────────────────────────────────
@@ -792,11 +814,9 @@ def exportar_pdf_caderno(
     if not caderno:
         return RedirectResponse(url="/equipas")
 
-    caminho_campo = STATIC_DIR / "campos" / "campo_meio.png"
     for entrada in caderno.jogadas:
         for passo in entrada.setplay.passos:
-            desenho_imagem, _ = decompor_desenho_editavel(passo.desenho)
-            passo.imagem_composta_pdf = passo.imagem_coach or compor_desenho_sobre_campo(caminho_campo, desenho_imagem)
+            passo.imagem_composta_pdf = _imagem_passo_para_pdf(passo)
 
     grupos = [{"nome": "Sem secção", "jogadas": [entrada for entrada in caderno.jogadas if entrada.secao_id is None]}]
     grupos.extend({"nome": secao.nome, "jogadas": list(secao.jogadas)} for secao in caderno.secoes)
@@ -821,10 +841,8 @@ def exportar_pdf_setplay(setplay_id: int, request: Request, db: Session = Depend
     if not setplay:
         return RedirectResponse(url="/equipas")
 
-    caminho_campo = STATIC_DIR / "campos" / "campo_meio.png"
     for passo in setplay.passos:
-        desenho_imagem, _ = decompor_desenho_editavel(passo.desenho)
-        passo.imagem_composta_pdf = passo.imagem_coach or compor_desenho_sobre_campo(caminho_campo, desenho_imagem)
+        passo.imagem_composta_pdf = _imagem_passo_para_pdf(passo)
 
     pdf_bytes = renderizar_pdf(request, "playbook/pdf.html", {
         "setplay": setplay,

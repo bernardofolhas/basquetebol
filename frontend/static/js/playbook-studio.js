@@ -4,8 +4,10 @@
   const root = document.querySelector("[data-playbook-studio]");
   if (!root) return;
 
-  const W = 780;
-  const H = 920;
+  const COURTS = {
+    meio: { width: 702, height: 622, src: "/static/campos/campo_meio.png?v=20260908-madeira-1" },
+    completo: { width: 697, height: 1222, src: "/static/campos/campo_completo.png?v=20260908-madeira-1" },
+  };
   const imported = root.dataset.imported === "true";
   const setplayId = Number(root.dataset.setplayId);
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || "";
@@ -43,8 +45,14 @@
 
   function normalizeScene(raw) {
     const saved = raw.estado && typeof raw.estado === "object" ? raw.estado : {};
-    const sx = W / Math.max(1, Number(saved.largura) || W);
-    const sy = H / Math.max(1, Number(saved.altura) || H);
+    const savedWidth = Number(saved.largura) || 0;
+    const savedHeight = Number(saved.altura) || 0;
+    const courtType = ["meio", "completo"].includes(saved.campoTipo)
+      ? saved.campoTipo
+      : (savedWidth && savedHeight && savedHeight > savedWidth ? "completo" : "meio");
+    const court = COURTS[courtType];
+    const sx = court.width / Math.max(1, savedWidth || court.width);
+    const sy = court.height / Math.max(1, savedHeight || court.height);
     const objects = Array.isArray(saved.objectos) ? saved.objectos.map((item) => {
       const object = clone(item);
       object.id = object.id || uid();
@@ -65,6 +73,7 @@
       observacao: raw.observacao || "",
       desenho: raw.desenho || null,
       imagemCoach: raw.imagemCoach || null,
+      courtType,
       objects,
       undo: [],
       redo: [],
@@ -74,6 +83,23 @@
 
   function activeScene() {
     return scenes.find((scene) => scene.id === activeId) || null;
+  }
+
+  function dimensions(scene = activeScene()) {
+    return COURTS[scene?.courtType] || COURTS.meio;
+  }
+
+  function fitStageCourt(wrap, court) {
+    const stage = document.querySelector("[data-stage]");
+    if (!stage || !wrap) return;
+    const style = window.getComputedStyle(stage);
+    const horizontalPadding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    const verticalPadding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const availableWidth = Math.max(1, stage.clientWidth - horizontalPadding);
+    const availableHeight = Math.max(1, stage.clientHeight - verticalPadding);
+    const scale = Math.min(availableWidth / court.width, availableHeight / court.height);
+    wrap.style.width = `${Math.floor(court.width * scale)}px`;
+    wrap.style.height = `${Math.floor(court.height * scale)}px`;
   }
 
   function setStatus(label, state = "") {
@@ -116,9 +142,10 @@
 
   function pointFromEvent(event) {
     const rect = canvas.getBoundingClientRect();
+    const court = dimensions();
     return {
-      x: Math.max(0, Math.min(W, (event.clientX - rect.left) * W / rect.width)),
-      y: Math.max(0, Math.min(H, (event.clientY - rect.top) * H / rect.height)),
+      x: Math.max(0, Math.min(court.width, (event.clientX - rect.left) * court.width / rect.width)),
+      y: Math.max(0, Math.min(court.height, (event.clientY - rect.top) * court.height / rect.height)),
     };
   }
 
@@ -232,13 +259,14 @@
 
   function render(target = ctx, objects = activeScene()?.objects || [], selection = true) {
     if (!target) return;
-    target.clearRect(0, 0, W, H);
+    target.clearRect(0, 0, target.canvas.width, target.canvas.height);
     objects.forEach((object) => drawObject(target, object));
     if (selection && target === ctx) drawSelection(target, objects.find((object) => object.id === selectedId));
   }
 
   function stateFor(scene) {
-    return { largura: W, altura: H, objectos: scene.objects, versaoStudio: 1 };
+    const court = dimensions(scene);
+    return { largura: court.width, altura: court.height, campoTipo: scene.courtType, objectos: scene.objects, versaoStudio: 3 };
   }
 
   async function saveScene(scene = activeScene(), immediate = false) {
@@ -248,7 +276,8 @@
       setStatus("A guardar…", "saving");
       try {
         await window.TacticalLegacy?.aguardarRecortes(scene.objects);
-        const output = document.createElement("canvas"); output.width = W; output.height = H;
+        const court = dimensions(scene);
+        const output = document.createElement("canvas"); output.width = court.width; output.height = court.height;
         render(output.getContext("2d"), scene.objects, false);
         const image = output.toDataURL("image/png");
         await api(`/playbook/passos/${scene.id}/desenho`, { method: "POST", body: JSON.stringify({ dados: image, estado: stateFor(scene) }) });
@@ -263,7 +292,8 @@
     scene.converted = true;
     const image = new Image();
     image.onload = () => {
-      scene.objects = window.TacticalLegacy.decomporImagem(image, W, H).map((object) => ({ ...object, id: uid() }));
+      const court = dimensions(scene);
+      scene.objects = window.TacticalLegacy.decomporImagem(image, court.width, court.height).map((object) => ({ ...object, id: uid() }));
       render(); renderScenes();
     };
     image.src = scene.desenho;
@@ -275,11 +305,14 @@
       image.alt = ""; image.src = scene.imagemCoach || scene.desenho || "";
       holder.append(image); return;
     }
-    const thumb = document.createElement("canvas"); thumb.width = W; thumb.height = H; holder.append(thumb);
+    const court = dimensions(scene);
+    holder.style.aspectRatio = `${court.width} / ${court.height}`;
+    const base = document.createElement("img"); base.alt = ""; base.src = court.src; holder.append(base);
+    const thumb = document.createElement("canvas"); thumb.width = court.width; thumb.height = court.height; holder.append(thumb);
     const thumbCtx = thumb.getContext("2d");
     if (scene.objects.length) scene.objects.forEach((object) => drawObject(thumbCtx, object));
     else if (scene.desenho) {
-      const image = new Image(); image.onload = () => thumbCtx.drawImage(image, 0, 0, W, H); image.src = scene.desenho;
+      const image = new Image(); image.onload = () => thumbCtx.drawImage(image, 0, 0, court.width, court.height); image.src = scene.desenho;
     }
   }
 
@@ -363,8 +396,50 @@
       const image = document.querySelector("[data-imported-image]"); const empty = document.querySelector("[data-imported-empty]");
       const src = scene?.imagemCoach || scene?.desenho || ""; image.src = src; image.hidden = !src; empty.hidden = Boolean(src);
       setupImportedForms(scene);
-    } else { render(); convertLegacyScene(scene); }
+    } else { syncCourt(scene); render(); convertLegacyScene(scene); }
     renderScenes(); renderTimeline();
+  }
+
+  function syncCourt(scene = activeScene()) {
+    if (!scene || !canvas) return;
+    const court = dimensions(scene); const wrap = document.querySelector("[data-court-wrap]");
+    if (canvas.width !== court.width) canvas.width = court.width;
+    if (canvas.height !== court.height) canvas.height = court.height;
+    document.querySelector("[data-court-image]").src = court.src;
+    wrap.style.aspectRatio = `${court.width} / ${court.height}`;
+    fitStageCourt(wrap, court);
+    document.querySelectorAll("[data-court-type]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.courtType === scene.courtType);
+    });
+  }
+
+  function switchCourt(nextType) {
+    const scene = activeScene();
+    if (!scene || !COURTS[nextType] || scene.courtType === nextType) return;
+    const previous = dimensions(scene);
+    const next = COURTS[nextType];
+    snapshot(scene);
+    const sx = next.width / previous.width;
+    const sy = next.height / previous.height;
+    scene.objects.forEach((object) => {
+      if (Number.isFinite(Number(object.x))) {
+        object.x = Number(object.x) * sx;
+        object.y = Number(object.y) * sy;
+      }
+      if (Array.isArray(object.pontos)) {
+        object.pontos = object.pontos.map((point) => ({ x: Number(point.x) * sx, y: Number(point.y) * sy }));
+      }
+      if (window.TacticalLegacy?.eRecorte(object)) {
+        object.largura = Number(object.largura || 1) * sx;
+        object.altura = Number(object.altura || 1) * sy;
+      }
+    });
+    scene.courtType = nextType;
+    syncCourt(scene);
+    render();
+    renderScenes();
+    saveScene(scene);
+    toast(nextType === "completo" ? "Campo inteiro aplicado." : "Meio-campo aplicado.");
   }
 
   function setTool(next) {
@@ -575,7 +650,13 @@
     document.querySelector("[data-preview-notes]").textContent = scene?.observacao || "Sem instruções.";
     const importedImage = document.querySelector("[data-preview-imported]");
     if (imported) { importedImage.src = scene?.imagemCoach || scene?.desenho || ""; importedImage.hidden = !importedImage.src; previewCanvas.hidden = true; }
-    else { importedImage.hidden = true; previewCanvas.hidden = false; render(previewCtx, scene ? animatedObjects(scene, groupIndex, local) : [], false); }
+    else {
+      importedImage.hidden = true; previewCanvas.hidden = false;
+      const court = dimensions(scene); const wrap = document.querySelector(".pbs-preview-court");
+      previewCanvas.width = court.width; previewCanvas.height = court.height; wrap.style.aspectRatio = `${court.width} / ${court.height}`;
+      document.querySelector("[data-preview-court-image]").src = court.src;
+      render(previewCtx, scene ? animatedObjects(scene, groupIndex, local) : [], false);
+    }
     document.querySelector("[data-preview-progress]").value = Math.round(progress * 1000);
     document.querySelector("[data-preview-time]").textContent = `0:${String(Math.round(duration * progress / 1000)).padStart(2, "0")}`;
   }
@@ -622,6 +703,7 @@
   function bindEvents() {
     document.querySelectorAll("[data-add-scene]").forEach((button) => button.addEventListener("click", addScene));
     document.querySelectorAll("[data-tool]").forEach((button) => button.addEventListener("click", () => setTool(button.dataset.tool)));
+    document.querySelectorAll("[data-court-type]").forEach((button) => button.addEventListener("click", () => switchCourt(button.dataset.courtType)));
     canvas?.addEventListener("pointerdown", pointerDown, { passive: false }); canvas?.addEventListener("pointermove", pointerMove, { passive: false });
     canvas?.addEventListener("pointerup", pointerUp, { passive: false }); canvas?.addEventListener("pointercancel", pointerUp, { passive: false });
     canvas?.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -656,6 +738,13 @@
     bindEvents(); renderScenes();
     if (!scenes.length && !imported) await addScene(); else activateScene(activeId);
     setTool("selecionar");
+    const stage = document.querySelector("[data-stage]");
+    if (stage && window.ResizeObserver) {
+      new ResizeObserver(() => {
+        const scene = activeScene();
+        if (scene && !imported) fitStageCourt(document.querySelector("[data-court-wrap]"), dimensions(scene));
+      }).observe(stage);
+    }
   }
 
   init();

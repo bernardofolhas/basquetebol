@@ -55,8 +55,8 @@
         <div class="pb-play-grid" data-pb-play-grid>
             {% for setplay in setplays %}
             <article class="pb-play-card" data-play-name="{{ setplay.nome|lower|e }}" data-play-category="{{ setplay.categoria or 'sem_categoria' }}">
-                <a class="pb-play-preview" href="/playbook/setplays/{{ setplay.id }}" aria-label="Abrir {{ setplay.nome }}">
-                    <img class="pb-play-court" src="/static/campos/campo_meio.png?v=20260907-official-1" alt="">
+                <a class="pb-play-preview" href="/playbook/studio/setplays/{{ setplay.id }}" aria-label="Abrir {{ setplay.nome }}">
+                    <img class="pb-play-court" src="/static/campos/campo_meio.png?v=20260908-madeira-1" alt="">
                     {% if setplay.preview_imagem %}<img class="pb-play-drawing" src="{{ setplay.preview_imagem }}" alt="Pré-visualização de {{ setplay.nome }}">{% endif %}
                     {% if not setplay.preview_imagem %}<span class="pb-play-empty">Começar a desenhar</span>{% endif %}
                     <span class="pb-play-steps">{{ setplay.passos|length }} passo{% if setplay.passos|length != 1 %}s{% endif %}</span>
@@ -64,12 +64,12 @@
                 <div class="pb-play-card-body">
                     <div>
                         <span class="pb-play-category">{{ setplay.categoria or 'Sem categoria' }}</span>
-                        <h3><a href="/playbook/setplays/{{ setplay.id }}">{{ setplay.nome }}</a></h3>
+                        <h3><a href="/playbook/studio/setplays/{{ setplay.id }}">{{ setplay.nome }}</a></h3>
                         {% if setplay.descricao %}<p>{{ setplay.descricao }}</p>{% endif %}
                     </div>
                     <div class="pb-card-actions">
                         <a class="ds-button ds-button-secondary" href="/playbook/setplays/{{ setplay.id }}/pdf">PDF</a>
-                        <a class="ds-button ds-button-primary" href="/playbook/setplays/{{ setplay.id }}">Abrir editor</a>
+                        <a class="ds-button ds-button-primary" href="/playbook/studio/setplays/{{ setplay.id }}">Abrir estúdio</a>
                         <form method="POST" action="/playbook/setplays/{{ setplay.id }}/eliminar" onsubmit="return confirm('Eliminar «{{ setplay.nome }}» da biblioteca?')">
                             <button type="submit" class="pb-icon-button pb-icon-danger" title="Eliminar jogada" aria-label="Eliminar {{ setplay.nome }}">×</button>
                         </form>

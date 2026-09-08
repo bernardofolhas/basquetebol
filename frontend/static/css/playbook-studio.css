@@ -107,7 +107,7 @@ button { color: inherit; }
 .pbs-scene.is-drop-before::before { top: -5px; }
 .pbs-scene.is-drop-after::after { bottom: -5px; }
 .pbs-scene-number { padding-top: 5px; color: #8a887e; font: 700 14px/1 "Barlow Condensed", sans-serif; }
-.pbs-scene-preview { position: relative; aspect-ratio: 780 / 920; overflow: hidden; border: 1px solid #c9c7bd; border-radius: 4px; background: #dfb36f url('/static/campos/playbook_campo.svg') center/cover no-repeat; }
+.pbs-scene-preview { position: relative; aspect-ratio: 702 / 622; overflow: hidden; border: 1px solid #c9c7bd; border-radius: 4px; background: #ead9c5; }
 .pbs-scene-preview canvas, .pbs-scene-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .pbs-scene-actions { position: absolute; top: 8px; right: 8px; display: none; gap: 3px; }
 .pbs-scene:hover .pbs-scene-actions, .pbs-scene:focus-within .pbs-scene-actions { display: flex; }
@@ -121,13 +121,16 @@ button { color: inherit; }
 .pbs-stage-meta { z-index: 3; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid #d8d6ce; background: rgba(248,247,243,.9); }
 .pbs-stage-meta > span { color: #69675f; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .pbs-stage-options { display: flex; align-items: center; gap: 5px; }
+.pbs-court-switch { display: inline-flex; gap: 2px; margin-right: 7px; padding: 2px; border: 1px solid #cfcdc5; border-radius: 9px; background: #ebe9e2; }
+.pbs-stage-options .pbs-court-switch button { border-color: transparent; background: transparent; }
+.pbs-stage-options .pbs-court-switch button.is-active { border-color: #171713; color: #fff; background: #171713; box-shadow: 0 2px 6px #0002; }
 .pbs-stage-options label { display: flex; align-items: center; gap: 6px; margin-right: 5px; color: var(--pbs-muted); font-size: 10px; }
 .pbs-stage-options input { width: 48px; height: 28px; border: 1px solid #cbc9bf; border-radius: 7px; text-align: center; font-weight: 700; background: #fff; }
 .pbs-stage-options button { height: 28px; min-width: 30px; padding: 0 8px; border: 1px solid #cfcdc5; border-radius: 7px; background: #fff; font-size: 11px; cursor: pointer; }
 .pbs-stage-options button:hover { border-color: #99978d; }
 .pbs-stage { position: relative; min-height: 0; overflow: auto; display: grid; place-items: center; padding: 18px; background-color: #e5e4df; background-image: radial-gradient(#c7c4bb 1px, transparent 1px); background-size: 18px 18px; }
-.pbs-court-wrap, .pbs-preview-court { position: relative; isolation: isolate; aspect-ratio: 780 / 920; }
-.pbs-court-wrap { height: min(100%, 920px); max-width: 100%; border-radius: 8px; box-shadow: 0 18px 45px rgba(45, 36, 21, .22); touch-action: none; user-select: none; }
+.pbs-court-wrap, .pbs-preview-court { position: relative; isolation: isolate; aspect-ratio: 702 / 622; }
+.pbs-court-wrap { width: min(100%, 1100px); max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 18px 45px rgba(45, 36, 21, .22); touch-action: none; user-select: none; }
 .pbs-court, #pbs-board { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pbs-court { display: block; }
 #pbs-board { z-index: 2; touch-action: none; cursor: crosshair; }
@@ -248,6 +251,8 @@ button { color: inherit; }
   .pbs-scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
   .pbs-scene { margin: 0; }
   .pbs-stage-options label { display: none; }
+  .pbs-court-switch { margin-right: 2px; }
+  .pbs-stage-options .pbs-court-switch button { padding-inline: 6px; font-size: 9px; }
   .pbs-stage-meta { padding-inline: 10px; }
   .pbs-preview-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border-radius: 0; }
   .pbs-preview-controls { grid-template-columns: 32px 38px minmax(0,1fr) 36px; padding-inline: 12px; }

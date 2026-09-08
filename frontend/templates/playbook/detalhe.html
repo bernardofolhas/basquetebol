@@ -16,9 +16,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/playbook-studio.css?v=20260908-1">
+  <link rel="stylesheet" href="/static/css/playbook-studio.css?v=20260908-2">
   <script defer src="/static/js/tactical-legacy.js?v=20260907-1"></script>
-  <script defer src="/static/js/playbook-studio.js?v=20260908-1"></script>
+  <script defer src="/static/js/playbook-studio.js?v=20260908-2"></script>
 </head>
 <body>
   <div class="pbs-app" data-playbook-studio data-setplay-id="{{ setplay.id }}" data-equipa-id="{{ equipa.id }}" data-imported="{{ 'true' if setplay.origem == 'ebp' else 'false' }}">
@@ -81,6 +81,10 @@
           <span data-scene-label>Cena 1</span>
           {% if setplay.origem != 'ebp' %}
           <div class="pbs-stage-options">
+            <div class="pbs-court-switch" role="group" aria-label="Tipo de campo">
+              <button type="button" class="is-active" data-court-type="meio">Meio-campo</button>
+              <button type="button" data-court-type="completo">Campo inteiro</button>
+            </div>
             <label>Número <input type="number" min="0" max="99" value="1" inputmode="numeric" data-player-number></label>
             <button type="button" data-undo title="Desfazer">↶</button>
             <button type="button" data-redo title="Refazer">↷</button>
@@ -97,8 +101,8 @@
           </div>
           {% else %}
           <div class="pbs-court-wrap" data-court-wrap>
-            <img class="pbs-court" src="/static/campos/playbook_campo.svg" alt="Campo de basquetebol">
-            <canvas id="pbs-board" width="780" height="920" aria-label="Área de desenho tático"></canvas>
+            <img class="pbs-court" data-court-image src="/static/campos/campo_meio.png?v=20260908-madeira-1" alt="Campo de basquetebol">
+            <canvas id="pbs-board" width="702" height="622" aria-label="Área de desenho tático"></canvas>
           </div>
           {% endif %}
         </div>
@@ -163,8 +167,8 @@
     </div>
     <div class="pbs-preview-content">
       <div class="pbs-preview-court">
-        <img src="/static/campos/playbook_campo.svg" alt="">
-        <canvas width="780" height="920" data-preview-canvas></canvas>
+        <img data-preview-court-image src="/static/campos/campo_meio.png?v=20260908-madeira-1" alt="">
+        <canvas width="702" height="622" data-preview-canvas></canvas>
         <img data-preview-imported alt="">
       </div>
       <div class="pbs-preview-instructions">

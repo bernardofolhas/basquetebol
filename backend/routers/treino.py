@@ -66,8 +66,8 @@ router = APIRouter(prefix="/treino")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 IMAGENS_CAMPO = {
-    "meio": "campo_meio.png?v=20260907-official-1",
-    "completo": "campo_completo.png?v=20260907-official-1",
+    "meio": "campo_meio.png?v=20260908-madeira-1",
+    "completo": "campo_completo.png?v=20260908-madeira-1",
 }
 
 
