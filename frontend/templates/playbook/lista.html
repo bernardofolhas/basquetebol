@@ -3,176 +3,209 @@
 {% block titulo %}Playbook — {{ equipa.nome }}{% endblock %}
 
 {% block conteudo %}
-
 {{ equipa_contexto(
     equipa,
     "Playbook",
-    "Jogadas, setplays e esquemas táticos organizados para a equipa.",
+    "Desenha jogadas na biblioteca e reúne-as em cadernos para cada momento do jogo.",
     "playbook",
     "/equipas/" ~ equipa.id,
     "Voltar à equipa"
 ) }}
 
-<!-- Formulário criar setplay -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
-    <h2 class="font-semibold text-gray-700 mb-4">Novo Setplay</h2>
-    <form method="POST" action="/playbook/equipas/{{ equipa.id }}/setplays/novo"
-          class="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div class="md:col-span-2">
-            <label class="block text-xs text-gray-500 mb-1">Nome *</label>
-            <input type="text" name="nome" required placeholder="Ex: 1-4 Flat, Horns, Box..."
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-500 mb-1">Categoria</label>
-            <select name="categoria" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                <option value="">— Seleciona —</option>
-                {% for cat in categorias %}
-                <option value="{{ cat }}">{{ cat }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="flex items-end">
-            <button type="submit"
-                    class="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                + Criar Setplay
+<section class="pb-hub" data-playbook-hub>
+    <header class="pb-hub-toolbar">
+        <div class="pb-tabs" role="tablist" aria-label="Áreas do playbook">
+            <button type="button" class="is-active" data-pb-tab="biblioteca" role="tab" aria-selected="true">
+                Biblioteca <span>{{ setplays|length }}</span>
+            </button>
+            <button type="button" data-pb-tab="cadernos" role="tab" aria-selected="false">
+                Cadernos de jogo <span>{{ cadernos|length }}</span>
             </button>
         </div>
-    </form>
-</div>
-
-<details class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-    <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-semibold text-gray-700 hover:bg-gray-50">
-        <span>Importar ficheiro EBP</span>
-        <span class="text-xs font-normal text-gray-400">Cria uma jogada com uma imagem editável por passo</span>
-    </summary>
-    <form method="POST" action="/playbook/equipas/{{ equipa.id }}/setplays/importar-ebp"
-          enctype="multipart/form-data" class="grid grid-cols-1 gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4 md:grid-cols-4">
-        <div class="md:col-span-2">
-            <label class="mb-1 block text-xs text-gray-500" for="ficheiro-ebp">Ficheiro .EBP</label>
-            <input id="ficheiro-ebp" type="file" name="ficheiro" accept=".ebp,application/octet-stream" required
-                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+        <div class="pb-hub-actions">
+            <button type="button" class="ds-button ds-button-secondary" data-dialog-open="pb-import-dialog">Importar EBP</button>
+            <button type="button" class="ds-button ds-button-secondary" data-dialog-open="pb-book-dialog">Novo caderno</button>
+            <button type="button" class="ds-button ds-button-primary" data-dialog-open="pb-play-dialog">+ Nova jogada</button>
         </div>
-        <div>
-            <label class="mb-1 block text-xs text-gray-500" for="categoria-ebp">Categoria</label>
-            <select id="categoria-ebp" name="categoria" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
-                <option value="">Outro</option>
-                {% for cat in categorias %}
-                <option value="{{ cat }}">{{ cat }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="flex items-end">
-            <button type="submit" class="ds-button ds-button-primary w-full">Importar jogada</button>
-        </div>
-        <p class="text-xs leading-5 text-gray-500 md:col-span-4">
-            Cada sequência do ficheiro passa a ser um passo independente. Depois podes escrever a descrição, substituir ou eliminar qualquer imagem.
-        </p>
-    </form>
-</details>
+    </header>
 
-<!-- Lista de setplays por categoria -->
-{% if setplays %}
-{% set cats_presentes = setplays | map(attribute='categoria') | unique | list %}
-
-<!-- Filtro por categoria -->
-<div class="flex flex-wrap gap-2 mb-4">
-    <button onclick="filtrarCategoria('todas')"
-            class="filtro-btn bg-orange-500 text-white text-xs font-medium px-3 py-1.5 rounded-full" data-cat="todas">
-        Todos ({{ setplays | length }})
-    </button>
-    {% for cat in categorias %}
-    {% set count = setplays | selectattr('categoria', 'equalto', cat) | list | length %}
-    {% if count > 0 %}
-    <button onclick="filtrarCategoria('{{ cat }}')"
-            class="filtro-btn bg-gray-100 text-gray-600 hover:bg-orange-100 text-xs font-medium px-3 py-1.5 rounded-full" data-cat="{{ cat }}">
-        {{ cat }} ({{ count }})
-    </button>
-    {% endif %}
-    {% endfor %}
-    {% if setplays | selectattr('categoria', 'none') | list | length > 0 %}
-    <button onclick="filtrarCategoria('sem_categoria')"
-            class="filtro-btn bg-gray-100 text-gray-600 hover:bg-orange-100 text-xs font-medium px-3 py-1.5 rounded-full" data-cat="sem_categoria">
-        Sem categoria ({{ setplays | selectattr('categoria', 'none') | list | length }})
-    </button>
-    {% endif %}
-</div>
-
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="grid-setplays">
-    {% for setplay in setplays %}
-    <div class="setplay-card bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition overflow-hidden"
-         data-cat="{{ setplay.categoria or 'sem_categoria' }}">
-        <!-- Preview do primeiro passo -->
-        {% if setplay.passos and (setplay.passos[0].imagem_coach or setplay.passos[0].desenho) %}
-        <div class="relative bg-gray-50 h-40 overflow-hidden">
-            {% if setplay.passos[0].imagem_coach %}
-            <img src="{{ setplay.passos[0].imagem_coach }}" class="absolute inset-0 w-full h-full object-contain">
-            {% else %}
-            <img src="/static/campos/campo_meio.png?v=20260907-official-1" class="absolute inset-0 w-full h-full object-cover opacity-60">
-            <img src="{{ setplay.passos[0].desenho }}" class="absolute inset-0 w-full h-full object-cover">
-            {% endif %}
-            <div class="absolute top-2 right-2">
-                <span class="bg-black bg-opacity-50 text-white text-xs px-2 py-0.5 rounded-full">
-                    {{ setplay.passos | length }} passo(s)
-                </span>
+    <div data-pb-panel="biblioteca">
+        <div class="pb-section-heading">
+            <div>
+                <p class="ds-kicker">Biblioteca da equipa</p>
+                <h2>Todas as jogadas</h2>
+                <p>Cada jogada fica disponível para reutilizar em qualquer caderno.</p>
             </div>
+            <label class="pb-search">
+                <span aria-hidden="true">⌕</span>
+                <input type="search" placeholder="Pesquisar jogada" data-pb-search autocomplete="off">
+            </label>
         </div>
-        {% else %}
-        <div class="h-40 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center">
-            <span class="text-5xl opacity-30">📋</span>
-        </div>
-        {% endif %}
 
-        <div class="p-4">
-            <div class="flex items-start justify-between gap-2">
-                <div>
-                    <h3 class="font-semibold text-gray-800">{{ setplay.nome }}</h3>
-                    {% if setplay.categoria %}
-                    <span class="inline-block mt-1 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{{ setplay.categoria }}</span>
-                    {% endif %}
-                    {% if setplay.descricao %}
-                    <p class="text-xs text-gray-400 mt-1 line-clamp-2">{{ setplay.descricao }}</p>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="flex items-center gap-2 mt-3">
-                <a href="/playbook/setplays/{{ setplay.id }}"
-                   class="flex-1 text-center bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition">
-                    Abrir / Editar →
+        <div class="pb-filter-row" aria-label="Filtrar por categoria">
+            <button type="button" class="is-active" data-category="todas">Todas</button>
+            {% for cat in categorias %}
+            {% set total_categoria = setplays|selectattr('categoria', 'equalto', cat)|list|length %}
+            {% if total_categoria %}<button type="button" data-category="{{ cat }}">{{ cat }} <span>{{ total_categoria }}</span></button>{% endif %}
+            {% endfor %}
+            {% set total_sem_categoria = setplays|selectattr('categoria', 'none')|list|length %}
+            {% if total_sem_categoria %}<button type="button" data-category="sem_categoria">Sem categoria <span>{{ total_sem_categoria }}</span></button>{% endif %}
+        </div>
+
+        <div class="pb-play-grid" data-pb-play-grid>
+            {% for setplay in setplays %}
+            <article class="pb-play-card" data-play-name="{{ setplay.nome|lower|e }}" data-play-category="{{ setplay.categoria or 'sem_categoria' }}">
+                <a class="pb-play-preview" href="/playbook/setplays/{{ setplay.id }}" aria-label="Abrir {{ setplay.nome }}">
+                    <img class="pb-play-court" src="/static/campos/campo_meio.png?v=20260907-official-1" alt="">
+                    {% if setplay.preview_imagem %}<img class="pb-play-drawing" src="{{ setplay.preview_imagem }}" alt="Pré-visualização de {{ setplay.nome }}">{% endif %}
+                    {% if not setplay.preview_imagem %}<span class="pb-play-empty">Começar a desenhar</span>{% endif %}
+                    <span class="pb-play-steps">{{ setplay.passos|length }} passo{% if setplay.passos|length != 1 %}s{% endif %}</span>
                 </a>
-                <a href="/playbook/setplays/{{ setplay.id }}/pdf"
-                   class="bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-700 text-xs px-3 py-1.5 rounded-lg transition">📄</a>
-                <form method="POST" action="/playbook/setplays/{{ setplay.id }}/eliminar" class="inline"
-                      onsubmit="return confirm('Eliminar «{{ setplay.nome }}»?')">
-                    <button type="submit" class="bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 text-xs px-3 py-1.5 rounded-lg transition">🗑️</button>
-                </form>
+                <div class="pb-play-card-body">
+                    <div>
+                        <span class="pb-play-category">{{ setplay.categoria or 'Sem categoria' }}</span>
+                        <h3><a href="/playbook/setplays/{{ setplay.id }}">{{ setplay.nome }}</a></h3>
+                        {% if setplay.descricao %}<p>{{ setplay.descricao }}</p>{% endif %}
+                    </div>
+                    <div class="pb-card-actions">
+                        <a class="ds-button ds-button-secondary" href="/playbook/setplays/{{ setplay.id }}/pdf">PDF</a>
+                        <a class="ds-button ds-button-primary" href="/playbook/setplays/{{ setplay.id }}">Abrir editor</a>
+                        <form method="POST" action="/playbook/setplays/{{ setplay.id }}/eliminar" onsubmit="return confirm('Eliminar «{{ setplay.nome }}» da biblioteca?')">
+                            <button type="submit" class="pb-icon-button pb-icon-danger" title="Eliminar jogada" aria-label="Eliminar {{ setplay.nome }}">×</button>
+                        </form>
+                    </div>
+                </div>
+            </article>
+            {% else %}
+            <div class="pb-empty-state">
+                <strong>A biblioteca ainda está vazia.</strong>
+                <span>Cria a primeira jogada e constrói a sequência passo a passo.</span>
+                <button type="button" class="ds-button ds-button-primary" data-dialog-open="pb-play-dialog">+ Criar primeira jogada</button>
             </div>
+            {% endfor %}
+        </div>
+        <p class="pb-no-results" data-pb-no-results hidden>Nenhuma jogada corresponde a esta pesquisa.</p>
+    </div>
+
+    <div data-pb-panel="cadernos" hidden>
+        <div class="pb-section-heading">
+            <div>
+                <p class="ds-kicker">Organização</p>
+                <h2>Cadernos de jogo</h2>
+                <p>Agrupa jogadas por adversário, fase da época ou princípio de jogo, sem as duplicar.</p>
+            </div>
+            <button type="button" class="ds-button ds-button-primary" data-dialog-open="pb-book-dialog">+ Criar caderno</button>
+        </div>
+        <div class="pb-book-grid">
+            {% for caderno in cadernos %}
+            <a class="pb-book-card" href="/playbook/cadernos/{{ caderno.id }}">
+                <span class="pb-book-mark" aria-hidden="true"></span>
+                <div>
+                    <span class="pb-play-category">Caderno de jogo</span>
+                    <h3>{{ caderno.nome }}</h3>
+                    <p>{{ caderno.descricao or 'Organiza as jogadas em secções e altera a ordem por arrastamento.' }}</p>
+                </div>
+                <footer>
+                    <span>{{ caderno.jogadas|length }} jogada{% if caderno.jogadas|length != 1 %}s{% endif %}</span>
+                    <span>{{ caderno.secoes|length }} {{ 'secção' if caderno.secoes|length == 1 else 'secções' }}</span>
+                    <strong>Abrir →</strong>
+                </footer>
+            </a>
+            {% else %}
+            <div class="pb-empty-state">
+                <strong>Ainda não existem cadernos.</strong>
+                <span>Cria um caderno e escolhe as jogadas que queres apresentar em conjunto.</span>
+                <button type="button" class="ds-button ds-button-primary" data-dialog-open="pb-book-dialog">+ Criar primeiro caderno</button>
+            </div>
+            {% endfor %}
         </div>
     </div>
-    {% endfor %}
-</div>
+</section>
 
-{% else %}
-<div class="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 p-12 text-center">
-    <span class="text-5xl">📋</span>
-    <p class="text-gray-500 mt-4">Ainda não há setplays criados.</p>
-    <p class="text-gray-400 text-sm mt-1">Usa o formulário acima para adicionar o primeiro.</p>
-</div>
-{% endif %}
+<dialog class="pb-dialog" id="pb-play-dialog">
+    <form method="POST" action="/playbook/equipas/{{ equipa.id }}/setplays/novo">
+        <div class="pb-dialog-head"><div><p class="ds-kicker">Biblioteca</p><h2>Nova jogada</h2></div><button type="button" data-dialog-close aria-label="Fechar">×</button></div>
+        <div class="pb-dialog-body">
+            <label>Nome da jogada<input type="text" name="nome" required placeholder="Ex.: Horns lateral"></label>
+            <label>Categoria<select name="categoria"><option value="">Sem categoria</option>{% for cat in categorias %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}</select></label>
+            <label>Descrição<textarea name="descricao" rows="3" placeholder="Objetivo ou contexto da jogada"></textarea></label>
+        </div>
+        <footer><button type="button" class="ds-button ds-button-secondary" data-dialog-close>Cancelar</button><button type="submit" class="ds-button ds-button-primary">Criar e desenhar</button></footer>
+    </form>
+</dialog>
+
+<dialog class="pb-dialog" id="pb-book-dialog">
+    <form method="POST" action="/playbook/equipas/{{ equipa.id }}/cadernos/novo">
+        <div class="pb-dialog-head"><div><p class="ds-kicker">Organização</p><h2>Novo caderno</h2></div><button type="button" data-dialog-close aria-label="Fechar">×</button></div>
+        <div class="pb-dialog-body">
+            <label>Nome do caderno<input type="text" name="nome" required placeholder="Ex.: Ataque organizado"></label>
+            <label>Descrição<textarea name="descricao" rows="3" placeholder="Finalidade deste caderno"></textarea></label>
+        </div>
+        <footer><button type="button" class="ds-button ds-button-secondary" data-dialog-close>Cancelar</button><button type="submit" class="ds-button ds-button-primary">Criar caderno</button></footer>
+    </form>
+</dialog>
+
+<dialog class="pb-dialog" id="pb-import-dialog">
+    <form method="POST" action="/playbook/equipas/{{ equipa.id }}/setplays/importar-ebp" enctype="multipart/form-data">
+        <div class="pb-dialog-head"><div><p class="ds-kicker">Importação</p><h2>Importar ficheiro EBP</h2></div><button type="button" data-dialog-close aria-label="Fechar">×</button></div>
+        <div class="pb-dialog-body">
+            <label>Ficheiro .EBP<input type="file" name="ficheiro" accept=".ebp,application/octet-stream" required></label>
+            <label>Categoria<select name="categoria"><option value="">Outro</option>{% for cat in categorias %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}</select></label>
+            <p class="pb-dialog-note">Cada sequência importada fica como um passo independente e pode ser complementada no editor.</p>
+        </div>
+        <footer><button type="button" class="ds-button ds-button-secondary" data-dialog-close>Cancelar</button><button type="submit" class="ds-button ds-button-primary">Importar jogada</button></footer>
+    </form>
+</dialog>
 
 <script>
-function filtrarCategoria(cat) {
-    document.querySelectorAll('.filtro-btn').forEach(btn => {
-        btn.className = btn.className.replace('bg-orange-500 text-white', 'bg-gray-100 text-gray-600');
-    });
-    const btn = document.querySelector(`.filtro-btn[data-cat="${cat}"]`);
-    if (btn) btn.className = btn.className.replace('bg-gray-100 text-gray-600', 'bg-orange-500 text-white');
+document.addEventListener('DOMContentLoaded', () => {
+    const raiz = document.querySelector('[data-playbook-hub]');
+    if (!raiz) return;
+    const abas = [...raiz.querySelectorAll('[data-pb-tab]')];
+    const paineis = [...raiz.querySelectorAll('[data-pb-panel]')];
+    const ativar = nome => {
+        abas.forEach(botao => {
+            const ativo = botao.dataset.pbTab === nome;
+            botao.classList.toggle('is-active', ativo);
+            botao.setAttribute('aria-selected', String(ativo));
+        });
+        paineis.forEach(painel => painel.hidden = painel.dataset.pbPanel !== nome);
+        history.replaceState(null, '', nome === 'cadernos' ? '#cadernos' : location.pathname + location.search);
+    };
+    abas.forEach(botao => botao.addEventListener('click', () => ativar(botao.dataset.pbTab)));
+    if (location.hash === '#cadernos') ativar('cadernos');
 
-    document.querySelectorAll('.setplay-card').forEach(card => {
-        if (cat === 'todas') { card.style.display = ''; return; }
-        card.style.display = card.dataset.cat === cat ? '' : 'none';
+    let categoria = 'todas';
+    let pesquisa = '';
+    const cartões = [...raiz.querySelectorAll('[data-play-name]')];
+    const aplicarFiltros = () => {
+        let visiveis = 0;
+        cartões.forEach(cartão => {
+            const corresponde = (categoria === 'todas' || cartão.dataset.playCategory === categoria)
+                && cartão.dataset.playName.includes(pesquisa);
+            cartão.hidden = !corresponde;
+            if (corresponde) visiveis += 1;
+        });
+        const vazio = raiz.querySelector('[data-pb-no-results]');
+        if (vazio) vazio.hidden = visiveis > 0 || cartões.length === 0;
+    };
+    raiz.querySelectorAll('[data-category]').forEach(botao => botao.addEventListener('click', () => {
+        categoria = botao.dataset.category;
+        raiz.querySelectorAll('[data-category]').forEach(item => item.classList.toggle('is-active', item === botao));
+        aplicarFiltros();
+    }));
+    raiz.querySelector('[data-pb-search]')?.addEventListener('input', evento => {
+        pesquisa = evento.target.value.trim().toLocaleLowerCase('pt-PT');
+        aplicarFiltros();
     });
-}
+
+    document.querySelectorAll('[data-dialog-open]').forEach(botao => botao.addEventListener('click', () => {
+        document.getElementById(botao.dataset.dialogOpen)?.showModal();
+    }));
+    document.querySelectorAll('[data-dialog-close]').forEach(botao => botao.addEventListener('click', () => botao.closest('dialog')?.close()));
+    document.querySelectorAll('.pb-dialog').forEach(dialogo => dialogo.addEventListener('click', evento => {
+        if (evento.target === dialogo) dialogo.close();
+    }));
+});
 </script>
-
 {% endblock %}

@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+{% block titulo %}{{ caderno.nome }} — Playbook{% endblock %}
+
+{% block conteudo %}
+{{ equipa_contexto(
+    equipa,
+    caderno.nome,
+    caderno.descricao or "Caderno de jogadas da equipa.",
+    "playbook",
+    "/playbook/equipas/" ~ equipa.id ~ "#cadernos",
+    "Voltar aos cadernos"
+) }}
+
+<section class="pb-book-workspace" data-book-workspace data-reorder-url="/playbook/cadernos/{{ caderno.id }}/reordenar">
+    <header class="pb-book-toolbar">
+        <div>
+            <p class="ds-kicker">Construção do caderno</p>
+            <h2>{{ caderno.jogadas|length }} jogada{% if caderno.jogadas|length != 1 %}s{% endif %} em {{ caderno.secoes|length }} {{ 'secção' if caderno.secoes|length == 1 else 'secções' }}</h2>
+            <p>Arrasta os cartões para alterar a ordem ou colocá-los noutra secção.</p>
+        </div>
+        <div class="pb-hub-actions">
+            <span class="pb-save-state" data-book-status aria-live="polite">Ordem guardada</span>
+            <a class="ds-button ds-button-secondary" href="/playbook/cadernos/{{ caderno.id }}/pdf">Exportar PDF</a>
+            <button type="button" class="ds-button ds-button-secondary" data-dialog-open="pb-edit-book-dialog">Editar caderno</button>
+            <button type="button" class="ds-button ds-button-secondary" data-dialog-open="pb-section-dialog">+ Secção</button>
+            <button type="button" class="ds-button ds-button-primary" data-dialog-open="pb-add-plays-dialog">+ Adicionar jogadas</button>
+        </div>
+    </header>
+
+    <div class="pb-book-groups">
+        <section class="pb-book-group" data-book-group data-section-id="">
+            <header><div><span class="pb-section-index">00</span><h3>Sem secção</h3></div><span>{{ sem_secao|length }}</span></header>
+            <div class="pb-book-dropzone" data-book-dropzone>
+                {% for entrada in sem_secao %}
+                    {% include "playbook/_cartao_caderno.html" %}
+                {% endfor %}
+                <p class="pb-drop-empty" data-drop-empty>Larga aqui uma jogada ainda sem secção.</p>
+            </div>
+        </section>
+
+        {% for secao in secoes %}
+        <section class="pb-book-group" data-book-group data-section-id="{{ secao.id }}">
+            <header>
+                <div><span class="pb-section-index">{{ '%02d'|format(loop.index) }}</span><h3>{{ secao.nome }}</h3></div>
+                <div class="pb-section-actions">
+                    <span>{{ secao.jogadas|length }}</span>
+                    <form method="POST" action="/playbook/cadernos/secoes/{{ secao.id }}/eliminar" onsubmit="return confirm('Eliminar esta secção? As jogadas passam para Sem secção.')">
+                        <button type="submit" class="pb-icon-button pb-icon-danger" title="Eliminar secção" aria-label="Eliminar secção {{ secao.nome }}">×</button>
+                    </form>
+                </div>
+            </header>
+            <div class="pb-book-dropzone" data-book-dropzone>
+                {% for entrada in secao.jogadas %}
+                    {% include "playbook/_cartao_caderno.html" %}
+                {% endfor %}
+                <p class="pb-drop-empty" data-drop-empty>Larga jogadas nesta secção.</p>
+            </div>
+        </section>
+        {% endfor %}
+    </div>
+
+    <footer class="pb-book-footer">
+        <p>Eliminar o caderno não elimina nenhuma jogada da biblioteca.</p>
+        <form method="POST" action="/playbook/cadernos/{{ caderno.id }}/eliminar" onsubmit="return confirm('Eliminar o caderno «{{ caderno.nome }}»? As jogadas originais serão preservadas.')">
+            <button type="submit" class="ds-button ds-button-danger">Eliminar caderno</button>
+        </form>
+    </footer>
+</section>
+
+<dialog class="pb-dialog pb-dialog-wide" id="pb-add-plays-dialog">
+    <form method="POST" action="/playbook/cadernos/{{ caderno.id }}/jogadas/adicionar">
+        <div class="pb-dialog-head"><div><p class="ds-kicker">Biblioteca</p><h2>Adicionar jogadas</h2></div><button type="button" data-dialog-close aria-label="Fechar">×</button></div>
+        <div class="pb-dialog-body">
+            <div class="pb-dialog-filterbar">
+                <label class="pb-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="Pesquisar na biblioteca" data-book-search autocomplete="off"></label>
+                <label class="pb-compact-field">Adicionar a<select name="secao_id"><option value="">Sem secção</option>{% for secao in secoes %}<option value="{{ secao.id }}">{{ secao.nome }}</option>{% endfor %}</select></label>
+            </div>
+            {% set ids_no_caderno = caderno.jogadas|map(attribute='setplay_id')|list %}
+            <div class="pb-select-list" data-book-select-list>
+                {% for setplay in setplays if setplay.id not in ids_no_caderno %}
+                <label class="pb-select-play" data-select-play data-name="{{ setplay.nome|lower|e }}">
+                    <input type="checkbox" name="setplay_ids" value="{{ setplay.id }}">
+                    <span class="pb-select-thumb">
+                        <img src="/static/campos/campo_meio.png?v=20260907-official-1" alt="">
+                        {% if setplay.preview_imagem %}<img src="{{ setplay.preview_imagem }}" alt="">{% endif %}
+                    </span>
+                    <span><strong>{{ setplay.nome }}</strong><small>{{ setplay.categoria or 'Sem categoria' }} · {{ setplay.passos|length }} passo{% if setplay.passos|length != 1 %}s{% endif %}</small></span>
+                </label>
+                {% else %}
+                <div class="pb-empty-state pb-empty-compact"><strong>Todas as jogadas já pertencem a este caderno.</strong><span>Podes criar outras na biblioteca.</span></div>
+                {% endfor %}
+            </div>
+        </div>
+        <footer><span data-selected-count>0 jogadas selecionadas</span><button type="button" class="ds-button ds-button-secondary" data-dialog-close>Cancelar</button><button type="submit" class="ds-button ds-button-primary">Adicionar ao caderno</button></footer>
+    </form>
+</dialog>
+
+<dialog class="pb-dialog" id="pb-section-dialog">
+    <form method="POST" action="/playbook/cadernos/{{ caderno.id }}/secoes/novo">
+        <div class="pb-dialog-head"><div><p class="ds-kicker">Organização</p><h2>Nova secção</h2></div><button type="button" data-dialog-close aria-label="Fechar">×</button></div>
+        <div class="pb-dialog-body"><label>Nome da secção<input type="text" name="nome" required placeholder="Ex.: Saídas de fundo"></label></div>
+        <footer><button type="button" class="ds-button ds-button-secondary" data-dialog-close>Cancelar</button><button type="submit" class="ds-button ds-button-primary">Criar secção</button></footer>
+    </form>
+</dialog>
+
+<dialog class="pb-dialog" id="pb-edit-book-dialog">
+    <form method="POST" action="/playbook/cadernos/{{ caderno.id }}/editar">
+        <div class="pb-dialog-head"><div><p class="ds-kicker">Caderno</p><h2>Editar informação</h2></div><button type="button" data-dialog-close aria-label="Fechar">×</button></div>
+        <div class="pb-dialog-body"><label>Nome<input type="text" name="nome" value="{{ caderno.nome }}" required></label><label>Descrição<textarea name="descricao" rows="3">{{ caderno.descricao or '' }}</textarea></label></div>
+        <footer><button type="button" class="ds-button ds-button-secondary" data-dialog-close>Cancelar</button><button type="submit" class="ds-button ds-button-primary">Guardar</button></footer>
+    </form>
+</dialog>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const workspace = document.querySelector('[data-book-workspace]');
+    if (!workspace) return;
+    let arrastado = null;
+    let aGuardar = false;
+    let guardarPendente = false;
+    const estado = workspace.querySelector('[data-book-status]');
+    const atualizarVazios = () => workspace.querySelectorAll('[data-book-dropzone]').forEach(zona => {
+        zona.querySelector('[data-drop-empty]').hidden = Boolean(zona.querySelector('[data-book-entry]'));
+        const total = zona.querySelectorAll('[data-book-entry]').length;
+        const contador = zona.closest('[data-book-group]')?.querySelector('header > span, .pb-section-actions > span');
+        if (contador) contador.textContent = total;
+    });
+    const cartãoDepois = (zona, y) => [...zona.querySelectorAll('[data-book-entry]:not(.is-dragging)')].reduce((melhor, cartão) => {
+        const caixa = cartão.getBoundingClientRect();
+        const deslocamento = y - caixa.top - caixa.height / 2;
+        return deslocamento < 0 && deslocamento > melhor.deslocamento ? { deslocamento, cartão } : melhor;
+    }, { deslocamento: Number.NEGATIVE_INFINITY, cartão: null }).cartão;
+    const guardarOrdem = async () => {
+        if (aGuardar) { guardarPendente = true; return; }
+        aGuardar = true;
+        estado.textContent = 'A guardar…';
+        estado.classList.add('is-saving');
+        const grupos = [...workspace.querySelectorAll('[data-book-group]')].map(grupo => ({
+            secao_id: grupo.dataset.sectionId || null,
+            jogada_ids: [...grupo.querySelectorAll('[data-book-entry]')].map(cartão => Number(cartão.dataset.bookEntry)),
+        }));
+        try {
+            const resposta = await fetch(workspace.dataset.reorderUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ grupos }),
+            });
+            if (!resposta.ok) throw new Error('Não foi possível guardar');
+            estado.textContent = 'Ordem guardada';
+        } catch (erro) {
+            estado.textContent = 'Erro ao guardar. Volta a tentar.';
+            estado.classList.add('is-error');
+        } finally {
+            aGuardar = false;
+            estado.classList.remove('is-saving');
+            if (guardarPendente) {
+                guardarPendente = false;
+                guardarOrdem();
+            }
+        }
+    };
+    workspace.querySelectorAll('[data-book-entry]').forEach(cartão => {
+        cartão.addEventListener('dragstart', evento => {
+            arrastado = cartão;
+            cartão.classList.add('is-dragging');
+            evento.dataTransfer.effectAllowed = 'move';
+            evento.dataTransfer.setData('text/plain', cartão.dataset.bookEntry);
+        });
+        cartão.addEventListener('dragend', () => {
+            cartão.classList.remove('is-dragging');
+            workspace.querySelectorAll('[data-book-dropzone]').forEach(zona => zona.classList.remove('is-over'));
+            arrastado = null;
+            atualizarVazios();
+            guardarOrdem();
+        });
+        const pega = cartão.querySelector('.pb-drag-handle');
+        pega?.addEventListener('pointerdown', evento => {
+            if (evento.pointerType === 'mouse') return;
+            evento.preventDefault();
+            arrastado = cartão;
+            cartão.classList.add('is-dragging');
+            try { pega.setPointerCapture(evento.pointerId); } catch (_) {}
+        });
+        pega?.addEventListener('pointermove', evento => {
+            if (!arrastado || evento.pointerType === 'mouse') return;
+            evento.preventDefault();
+            pega.style.pointerEvents = 'none';
+            const alvo = document.elementFromPoint(evento.clientX, evento.clientY);
+            pega.style.pointerEvents = '';
+            const zona = alvo?.closest('[data-book-dropzone]');
+            if (!zona) return;
+            workspace.querySelectorAll('[data-book-dropzone]').forEach(item => item.classList.toggle('is-over', item === zona));
+            zona.insertBefore(arrastado, cartãoDepois(zona, evento.clientY));
+        });
+        const terminarToque = evento => {
+            if (!arrastado || evento.pointerType === 'mouse') return;
+            cartão.classList.remove('is-dragging');
+            workspace.querySelectorAll('[data-book-dropzone]').forEach(zona => zona.classList.remove('is-over'));
+            try { pega.releasePointerCapture(evento.pointerId); } catch (_) {}
+            arrastado = null;
+            atualizarVazios();
+            guardarOrdem();
+        };
+        pega?.addEventListener('pointerup', terminarToque);
+        pega?.addEventListener('pointercancel', terminarToque);
+    });
+    workspace.querySelectorAll('[data-book-dropzone]').forEach(zona => {
+        zona.addEventListener('dragover', evento => {
+            evento.preventDefault();
+            if (!arrastado) return;
+            zona.classList.add('is-over');
+            const seguinte = cartãoDepois(zona, evento.clientY);
+            zona.insertBefore(arrastado, seguinte);
+        });
+        zona.addEventListener('dragleave', evento => {
+            if (!zona.contains(evento.relatedTarget)) zona.classList.remove('is-over');
+        });
+        zona.addEventListener('drop', evento => { evento.preventDefault(); zona.classList.remove('is-over'); });
+    });
+    atualizarVazios();
+
+    document.querySelectorAll('[data-dialog-open]').forEach(botao => botao.addEventListener('click', () => document.getElementById(botao.dataset.dialogOpen)?.showModal()));
+    document.querySelectorAll('[data-dialog-close]').forEach(botao => botao.addEventListener('click', () => botao.closest('dialog')?.close()));
+    document.querySelectorAll('.pb-dialog').forEach(dialogo => dialogo.addEventListener('click', evento => { if (evento.target === dialogo) dialogo.close(); }));
+    const pesquisa = document.querySelector('[data-book-search]');
+    pesquisa?.addEventListener('input', () => document.querySelectorAll('[data-select-play]').forEach(item => item.hidden = !item.dataset.name.includes(pesquisa.value.trim().toLocaleLowerCase('pt-PT'))));
+    document.querySelectorAll('[data-select-play] input').forEach(caixa => caixa.addEventListener('change', () => {
+        const total = document.querySelectorAll('[data-select-play] input:checked').length;
+        const contador = document.querySelector('[data-selected-count]');
+        if (contador) contador.textContent = `${total} jogada${total === 1 ? '' : 's'} selecionada${total === 1 ? '' : 's'}`;
+    }));
+});
+</script>
+{% endblock %}

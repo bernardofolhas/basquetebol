@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -9,7 +9,14 @@ from auth_deps import AcessoNegado, exigir_autenticacao
 from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
-from models.playbook import Playbook, PassoSetPlay, SetPlay
+from models.playbook import (
+    CadernoPlaybook,
+    JogadaCadernoPlaybook,
+    PassoSetPlay,
+    Playbook,
+    SecaoCadernoPlaybook,
+    SetPlay,
+)
 from services.desenho_service import (
     compor_desenho_sobre_campo,
     decompor_desenho_editavel,
@@ -22,10 +29,19 @@ from services.importacao_ebp_service import (
     renderizar_sequencia_ebp,
 )
 from paths import STATIC_DIR, TEMPLATES_DIR
-from services.pdf_service import renderizar_pdf
+from services.pdf_service import content_disposition_pdf, renderizar_pdf
 
 router = APIRouter(prefix="/playbook")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def _redirect_playbook(url: str) -> RedirectResponse:
+    """Mantém destinos editoriais intencionais apesar do retorno global à origem."""
+    return RedirectResponse(
+        url=url,
+        status_code=303,
+        headers={"x-context-redirect-locked": "1"},
+    )
 
 
 def _verificar_acesso_playbook(utilizador, equipa_id: int | None, db: Session) -> None:
@@ -48,6 +64,31 @@ def _equipa_id_por_passo(db: Session, passo_id: int) -> int | None:
     return _equipa_id_por_setplay(db, p.setplay_id) if p else None
 
 
+def _equipa_id_por_caderno(db: Session, caderno_id: int) -> int | None:
+    caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
+    return caderno.equipa_id if caderno else None
+
+
+def _preparar_preview_setplay(setplay: SetPlay) -> None:
+    primeiro = setplay.passos[0] if setplay.passos else None
+    desenho = decompor_desenho_editavel(primeiro.desenho)[0] if primeiro and primeiro.desenho else None
+    setplay.preview_imagem = (primeiro.imagem_coach if primeiro else None) or desenho
+
+
+def _normalizar_ordem_caderno(caderno: CadernoPlaybook, ignorar_id: int | None = None) -> None:
+    grupos = [None] + [secao.id for secao in sorted(caderno.secoes, key=lambda item: (item.ordem, item.id))]
+    for secao_id in grupos:
+        entradas = sorted(
+            [
+                entrada for entrada in caderno.jogadas
+                if entrada.secao_id == secao_id and entrada.id != ignorar_id
+            ],
+            key=lambda item: (item.ordem, item.id),
+        )
+        for ordem, entrada in enumerate(entradas):
+            entrada.ordem = ordem
+
+
 # ── PLAYBOOK DE UMA EQUIPA ────────────────────────────────────────────────────
 @router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
 def playbook_equipa(equipa_id: int, request: Request, db: Session = Depends(get_db),
@@ -65,13 +106,240 @@ def playbook_equipa(equipa_id: int, request: Request, db: Session = Depends(get_
         db.refresh(playbook)
 
     categorias = ["Ataque", "Defesa", "Transição Ofensiva", "Transição Defensiva", "Zona", "Bola Parada", "Outro"]
+    for setplay in playbook.setplays:
+        _preparar_preview_setplay(setplay)
+    cadernos = (
+        db.query(CadernoPlaybook)
+        .filter(CadernoPlaybook.equipa_id == equipa_id)
+        .order_by(CadernoPlaybook.ordem, CadernoPlaybook.id)
+        .all()
+    )
     return templates.TemplateResponse(request, "playbook/lista.html", {
         "utilizador": utilizador,
         "equipa": equipa,
         "playbook": playbook,
         "setplays": playbook.setplays,
+        "cadernos": cadernos,
         "categorias": categorias,
     })
+
+
+@router.post("/equipas/{equipa_id}/cadernos/novo")
+async def criar_caderno_playbook(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    nome: str = Form(...),
+    descricao: str = Form(""),
+):
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    total = db.query(CadernoPlaybook).filter(CadernoPlaybook.equipa_id == equipa_id).count()
+    caderno = CadernoPlaybook(
+        equipa_id=equipa_id,
+        nome=nome.strip() or "Novo playbook",
+        descricao=descricao.strip() or None,
+        ordem=total,
+    )
+    db.add(caderno)
+    db.commit()
+    db.refresh(caderno)
+    set_flash(request, f"Playbook '{caderno.nome}' criado.")
+    return _redirect_playbook(f"/playbook/cadernos/{caderno.id}")
+
+
+@router.get("/cadernos/{caderno_id}", response_class=HTMLResponse)
+def detalhe_caderno_playbook(
+    caderno_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _equipa_id_por_caderno(db, caderno_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
+    if not caderno:
+        return RedirectResponse(url="/equipas", status_code=303)
+    biblioteca = db.query(Playbook).filter(Playbook.equipa_id == caderno.equipa_id).first()
+    setplays = list(biblioteca.setplays) if biblioteca else []
+    for setplay in setplays:
+        _preparar_preview_setplay(setplay)
+    for entrada in caderno.jogadas:
+        _preparar_preview_setplay(entrada.setplay)
+    sem_secao = sorted(
+        [entrada for entrada in caderno.jogadas if entrada.secao_id is None],
+        key=lambda item: (item.ordem, item.id),
+    )
+    return templates.TemplateResponse(request, "playbook/caderno.html", {
+        "utilizador": utilizador,
+        "equipa": caderno.equipa,
+        "caderno": caderno,
+        "secoes": sorted(caderno.secoes, key=lambda item: (item.ordem, item.id)),
+        "sem_secao": sem_secao,
+        "setplays": setplays,
+    })
+
+
+@router.post("/cadernos/{caderno_id}/editar")
+async def editar_caderno_playbook(
+    caderno_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    nome: str = Form(...),
+    descricao: str = Form(""),
+):
+    equipa_id = _equipa_id_por_caderno(db, caderno_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
+    if caderno:
+        caderno.nome = nome.strip() or caderno.nome
+        caderno.descricao = descricao.strip() or None
+        db.commit()
+    return RedirectResponse(url=f"/playbook/cadernos/{caderno_id}", status_code=303)
+
+
+@router.post("/cadernos/{caderno_id}/secoes/novo")
+async def criar_secao_caderno(
+    caderno_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    nome: str = Form(...),
+):
+    equipa_id = _equipa_id_por_caderno(db, caderno_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
+    if caderno:
+        db.add(SecaoCadernoPlaybook(caderno_id=caderno.id, nome=nome.strip() or "Nova secção", ordem=len(caderno.secoes)))
+        db.commit()
+    return RedirectResponse(url=f"/playbook/cadernos/{caderno_id}", status_code=303)
+
+
+@router.post("/cadernos/{caderno_id}/jogadas/adicionar")
+async def adicionar_jogadas_caderno(
+    caderno_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    setplay_ids: list[int] = Form(default=[]),
+    secao_id: int | None = Form(default=None),
+):
+    equipa_id = _equipa_id_por_caderno(db, caderno_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
+    if not caderno:
+        return RedirectResponse(url="/equipas", status_code=303)
+    if secao_id and not any(secao.id == secao_id for secao in caderno.secoes):
+        secao_id = None
+    ids_existentes = {entrada.setplay_id for entrada in caderno.jogadas}
+    validos = (
+        db.query(SetPlay)
+        .join(Playbook)
+        .filter(SetPlay.id.in_(setplay_ids), Playbook.equipa_id == caderno.equipa_id)
+        .all()
+        if setplay_ids else []
+    )
+    ordem = len([entrada for entrada in caderno.jogadas if entrada.secao_id == secao_id])
+    for setplay in validos:
+        if setplay.id in ids_existentes:
+            continue
+        db.add(JogadaCadernoPlaybook(caderno_id=caderno.id, secao_id=secao_id, setplay_id=setplay.id, ordem=ordem))
+        ordem += 1
+    db.commit()
+    return RedirectResponse(url=f"/playbook/cadernos/{caderno_id}", status_code=303)
+
+
+@router.post("/cadernos/{caderno_id}/reordenar")
+async def reordenar_jogadas_caderno(
+    caderno_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _equipa_id_por_caderno(db, caderno_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
+    if not caderno:
+        return JSONResponse({"sucesso": False, "erro": "Playbook não encontrado."}, status_code=404)
+    dados = await request.json()
+    grupos = dados.get("grupos") or []
+    ids_recebidos = [int(item) for grupo in grupos for item in (grupo.get("jogada_ids") or [])]
+    entradas = {entrada.id: entrada for entrada in caderno.jogadas}
+    if len(ids_recebidos) != len(set(ids_recebidos)) or set(ids_recebidos) != set(entradas):
+        return JSONResponse({"sucesso": False, "erro": "A sequência recebida está incompleta."}, status_code=422)
+    secoes_validas = {secao.id for secao in caderno.secoes}
+    for grupo in grupos:
+        secao_id = grupo.get("secao_id")
+        secao_id = int(secao_id) if secao_id not in (None, "") else None
+        if secao_id is not None and secao_id not in secoes_validas:
+            return JSONResponse({"sucesso": False, "erro": "Secção inválida."}, status_code=422)
+        for ordem, entrada_id in enumerate(grupo.get("jogada_ids") or []):
+            entrada = entradas[int(entrada_id)]
+            entrada.secao_id = secao_id
+            entrada.ordem = ordem
+    db.commit()
+    return JSONResponse({"sucesso": True})
+
+
+@router.post("/cadernos/jogadas/{entrada_id}/eliminar")
+async def eliminar_jogada_caderno(
+    entrada_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    entrada = db.query(JogadaCadernoPlaybook).filter(JogadaCadernoPlaybook.id == entrada_id).first()
+    equipa_id = _equipa_id_por_caderno(db, entrada.caderno_id) if entrada else None
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    if not entrada:
+        return RedirectResponse(url="/equipas", status_code=303)
+    caderno = entrada.caderno
+    caderno_id = caderno.id
+    db.delete(entrada)
+    db.flush()
+    _normalizar_ordem_caderno(caderno, ignorar_id=entrada_id)
+    db.commit()
+    return RedirectResponse(url=f"/playbook/cadernos/{caderno_id}", status_code=303)
+
+
+@router.post("/cadernos/secoes/{secao_id}/eliminar")
+async def eliminar_secao_caderno(
+    secao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    secao = db.query(SecaoCadernoPlaybook).filter(SecaoCadernoPlaybook.id == secao_id).first()
+    equipa_id = _equipa_id_por_caderno(db, secao.caderno_id) if secao else None
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    if not secao:
+        return RedirectResponse(url="/equipas", status_code=303)
+    caderno = secao.caderno
+    caderno_id = caderno.id
+    for entrada in list(secao.jogadas):
+        entrada.secao_id = None
+    db.delete(secao)
+    db.flush()
+    _normalizar_ordem_caderno(caderno)
+    db.commit()
+    return RedirectResponse(url=f"/playbook/cadernos/{caderno_id}", status_code=303)
+
+
+@router.post("/cadernos/{caderno_id}/eliminar")
+async def eliminar_caderno_playbook(
+    caderno_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _equipa_id_por_caderno(db, caderno_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
+    if caderno:
+        db.delete(caderno)
+        db.commit()
+    return _redirect_playbook(f"/playbook/equipas/{equipa_id}#cadernos")
 
 
 # ── CRIAR SETPLAY ────────────────────────────────────────────────────────────
@@ -93,7 +361,7 @@ async def criar_setplay(equipa_id: int, request: Request, db: Session = Depends(
     db.commit()
     db.refresh(setplay)
     set_flash(request, f"Setplay '{nome}' criado.")
-    return RedirectResponse(url=f"/playbook/setplays/{setplay.id}", status_code=303)
+    return _redirect_playbook(f"/playbook/setplays/{setplay.id}")
 
 
 @router.post("/equipas/{equipa_id}/setplays/importar-ebp")
@@ -169,7 +437,7 @@ async def importar_setplay_ebp(
     db.commit()
     acao = "atualizada" if atualizacao else "importada"
     set_flash(request, f"'{jogada.nome}' {acao} com {len(imagens)} passos editáveis.")
-    return RedirectResponse(url=f"/playbook/setplays/{setplay.id}", status_code=303)
+    return _redirect_playbook(f"/playbook/setplays/{setplay.id}")
 
 
 # ── DETALHE / EDITOR DE SETPLAY ───────────────────────────────────────────────
@@ -229,7 +497,7 @@ async def eliminar_setplay(setplay_id: int, request: Request, db: Session = Depe
         db.delete(setplay)
         db.commit()
         set_flash(request, "Setplay eliminado.")
-        return RedirectResponse(url=f"/playbook/equipas/{equipa_id_redirect}", status_code=303)
+        return _redirect_playbook(f"/playbook/equipas/{equipa_id_redirect}")
     return RedirectResponse(url="/equipas", status_code=303)
 
 
@@ -374,6 +642,39 @@ async def mover_passo(passo_id: int, direcao: str, request: Request,
 
 
 # ── EXPORTAR SETPLAY EM PDF ────────────────────────────────────────────────────
+@router.get("/cadernos/{caderno_id}/pdf")
+def exportar_pdf_caderno(
+    caderno_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    equipa_id = _equipa_id_por_caderno(db, caderno_id)
+    _verificar_acesso_playbook(utilizador, equipa_id, db)
+    caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
+    if not caderno:
+        return RedirectResponse(url="/equipas")
+
+    caminho_campo = STATIC_DIR / "campos" / "campo_meio.png"
+    for entrada in caderno.jogadas:
+        for passo in entrada.setplay.passos:
+            desenho_imagem, _ = decompor_desenho_editavel(passo.desenho)
+            passo.imagem_composta_pdf = passo.imagem_coach or compor_desenho_sobre_campo(caminho_campo, desenho_imagem)
+
+    grupos = [{"nome": "Sem secção", "jogadas": [entrada for entrada in caderno.jogadas if entrada.secao_id is None]}]
+    grupos.extend({"nome": secao.nome, "jogadas": list(secao.jogadas)} for secao in caderno.secoes)
+    pdf_bytes = renderizar_pdf(request, "playbook/caderno_pdf.html", {
+        "caderno": caderno,
+        "equipa": caderno.equipa,
+        "grupos": [grupo for grupo in grupos if grupo["jogadas"]],
+    })
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": content_disposition_pdf(f"Playbook {caderno.nome}")},
+    )
+
+
 @router.get("/setplays/{setplay_id}/pdf")
 def exportar_pdf_setplay(setplay_id: int, request: Request, db: Session = Depends(get_db),
                          utilizador=Depends(exigir_autenticacao)):
@@ -393,6 +694,5 @@ def exportar_pdf_setplay(setplay_id: int, request: Request, db: Session = Depend
         "equipa": setplay.playbook.equipa,
         "passos": setplay.passos,
     })
-    nome = f"setplay_{setplay.nome}_{setplay.playbook.equipa.nome}.pdf".replace(" ", "_")
     return Response(content=pdf_bytes, media_type="application/pdf",
-                    headers={"Content-Disposition": f"attachment; filename={nome}"})
+                    headers={"Content-Disposition": content_disposition_pdf(f"Jogada {setplay.nome}")})

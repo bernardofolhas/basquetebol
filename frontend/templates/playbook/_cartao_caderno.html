@@ -1,0 +1,12 @@
+<article class="pb-book-entry" draggable="true" data-book-entry="{{ entrada.id }}">
+    <button type="button" class="pb-drag-handle" title="Arrastar jogada" aria-label="Arrastar {{ entrada.setplay.nome }}">⠿</button>
+    <a class="pb-entry-preview" href="/playbook/setplays/{{ entrada.setplay.id }}">
+        <img src="/static/campos/campo_meio.png?v=20260907-official-1" alt="">
+        {% if entrada.setplay.preview_imagem %}<img src="{{ entrada.setplay.preview_imagem }}" alt="Pré-visualização de {{ entrada.setplay.nome }}">{% endif %}
+    </a>
+    <div class="pb-entry-content"><span>{{ entrada.setplay.categoria or 'Sem categoria' }}</span><h4><a href="/playbook/setplays/{{ entrada.setplay.id }}">{{ entrada.setplay.nome }}</a></h4><small>{{ entrada.setplay.passos|length }} passo{% if entrada.setplay.passos|length != 1 %}s{% endif %}</small></div>
+    <div class="pb-entry-actions">
+        <a class="pb-icon-button" href="/playbook/setplays/{{ entrada.setplay.id }}" title="Abrir editor" aria-label="Abrir {{ entrada.setplay.nome }}">→</a>
+        <form method="POST" action="/playbook/cadernos/jogadas/{{ entrada.id }}/eliminar" onsubmit="return confirm('Retirar esta jogada do caderno? A original continuará na biblioteca.')"><button type="submit" class="pb-icon-button pb-icon-danger" title="Retirar do caderno" aria-label="Retirar {{ entrada.setplay.nome }}">×</button></form>
+    </div>
+</article>

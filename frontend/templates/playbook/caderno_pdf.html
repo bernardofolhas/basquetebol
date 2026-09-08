@@ -1,0 +1,51 @@
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ caderno.nome }} — {{ equipa.nome }}</title>
+    <style>
+        * { box-sizing:border-box;margin:0;padding:0; }
+        @page { size:A4 landscape;margin:11mm 10mm 12mm; }
+        body { color:#172033;background:#fff;font-family:Arial,sans-serif;font-size:9px; }
+        .intro { margin:0 0 8px;border-left:3px solid var(--pdf-primary);background:#f6f8fb;padding:6px 9px;color:#526076;line-height:1.4; }
+        .section-title { display:flex;align-items:center;gap:6px;margin:9px 0 5px;border-bottom:1px solid #d8e0e9;padding-bottom:4px;color:#273449;font-size:11px; }
+        .section-title span { display:inline-grid;width:18px;height:18px;place-items:center;border-radius:4px;background:var(--pdf-primary);color:#fff;font-size:7px; }
+        .play { margin-bottom:8px;break-inside:avoid;border:1px solid #d8e0e9;border-radius:6px;overflow:hidden; }
+        .play-head { display:flex;align-items:center;justify-content:space-between;background:#f4f6f9;padding:5px 7px; }
+        .play-head h2 { font-size:10px; }.play-head small { color:#69778a;font-size:7px;font-weight:bold;text-transform:uppercase; }
+        .description { border-top:1px solid #e4e8ee;padding:5px 7px;color:#5f6d80;line-height:1.35; }
+        .steps { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:6px; }
+        .step { display:grid;grid-template-columns:58% minmax(0,1fr);min-height:112px;break-inside:avoid;border:1px solid #e0e5ec;border-radius:4px;overflow:hidden; }
+        .visual { display:grid;place-items:center;border-right:1px solid #e0e5ec;background:#f2f5f8;padding:4px; }
+        .visual img { display:block;width:100%;height:104px;object-fit:contain; }
+        .note { padding:6px; }.note b { display:block;margin-bottom:4px;color:var(--pdf-primary);font-size:7px;letter-spacing:.08em;text-transform:uppercase; }.note p { white-space:pre-wrap;line-height:1.4; }
+        .empty { display:grid;min-height:45mm;place-items:center;border:1px dashed #cbd5e1;border-radius:6px;color:#8290a4; }
+    </style>
+    {{ estilo_pdf() }}
+</head>
+<body>
+{{ cabecalho_pdf(caderno.nome, equipa.nome ~ ' · ' ~ caderno.jogadas|length ~ ' jogada(s)', 'Playbook · ' ~ data_exportacao) }}
+{% if caderno.descricao %}<div class="intro">{{ caderno.descricao }}</div>{% endif %}
+
+{% for grupo in grupos %}
+<h2 class="section-title"><span>{{ '%02d'|format(loop.index) }}</span>{{ grupo.nome }}</h2>
+{% for entrada in grupo.jogadas %}
+<article class="play">
+    <header class="play-head"><h2>{{ entrada.setplay.nome }}</h2><small>{{ entrada.setplay.categoria or 'Sem categoria' }} · {{ entrada.setplay.passos|length }} passo(s)</small></header>
+    {% if entrada.setplay.descricao %}<p class="description">{{ entrada.setplay.descricao }}</p>{% endif %}
+    <div class="steps">
+        {% for passo in entrada.setplay.passos %}
+        <section class="step">
+            <div class="visual"><img src="{{ passo.imagem_composta_pdf }}" alt="Passo {{ loop.index }}"></div>
+            <div class="note"><b>Passo {{ loop.index }}</b><p>{{ passo.observacao or 'Sem observação.' }}</p></div>
+        </section>
+        {% else %}<div class="empty">Jogada ainda sem passos.</div>{% endfor %}
+    </div>
+</article>
+{% endfor %}
+{% else %}<div class="empty">Este caderno ainda não tem jogadas.</div>{% endfor %}
+
+{{ rodape_pdf(equipa.nome ~ ' · Playbook · ' ~ caderno.nome) }}
+</body>
+</html>
