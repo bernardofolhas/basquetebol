@@ -248,7 +248,7 @@ function inicializarDesenho(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemBase: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033' };
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemBase: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, gestoCaneta: null, ultimoToqueCaneta: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033' };
     const configurarCanvas = () => {
         const imgEl = canvas.parentElement.querySelector('img');
         if (imgEl && imgEl.offsetWidth > 0) { canvas.width = imgEl.offsetWidth; canvas.height = imgEl.offsetHeight; }
@@ -274,6 +274,7 @@ function ligarEventosDesenho(canvasId) {
             const est = CANVAS_ESTADO[canvasId];
             if (!est || est.pointerActivo !== null || (e.pointerType === 'touch' && !e.isPrimary)) return;
             e.preventDefault();
+            if (tentarAlternarFerramentaApplePencil(canvasId, e)) return;
             est.pointerActivo = e.pointerId;
             est.apagarComPonteiro = e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) === 32);
             try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -283,6 +284,7 @@ function ligarEventosDesenho(canvasId) {
             const est = CANVAS_ESTADO[canvasId];
             if (!est || (est.pointerActivo !== null && est.pointerActivo !== e.pointerId)) return;
             if (est.pointerActivo !== null) e.preventDefault();
+            atualizarGestoApplePencil(est, e);
             aoMover(canvasId, e);
         }, { passive: false });
         const terminar = (e) => {
@@ -290,6 +292,7 @@ function ligarEventosDesenho(canvasId) {
             if (!est || est.pointerActivo !== e.pointerId) return;
             e.preventDefault();
             aoSoltar(canvasId, e);
+            registarFimGestoApplePencil(est, e);
             try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
             est.pointerActivo = null;
             est.apagarComPonteiro = false;
@@ -309,6 +312,40 @@ function ligarEventosDesenho(canvasId) {
 
 function simularMouse(e) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY, button: 0 }; }
 function obterPos(canvas, e) { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; }
+
+function clonarObjectosDesenho(objectos) {
+    return objectos.map(obj => ({ ...obj, pontos: Array.isArray(obj.pontos) ? obj.pontos.map(ponto => ({ ...ponto })) : obj.pontos }));
+}
+
+function tentarAlternarFerramentaApplePencil(canvasId, evento) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est || evento.pointerType !== 'pen' || evento.button !== 0 || !['caneta', 'apagar'].includes(est.ferramenta)) return false;
+    const anterior = est.ultimoToqueCaneta;
+    const agora = performance.now();
+    if (anterior && agora - anterior.tempo <= 380 && Math.hypot(evento.clientX - anterior.x, evento.clientY - anterior.y) <= 36) {
+        est.objectos = clonarObjectosDesenho(anterior.objectosAntes);
+        est.ultimoToqueCaneta = null;
+        est.gestoCaneta = null;
+        definirFerramenta(canvasId, est.ferramenta === 'apagar' ? 'caneta' : 'apagar');
+        redesenhar(canvasId);
+        return true;
+    }
+    est.gestoCaneta = { inicio: agora, x: evento.clientX, y: evento.clientY, distancia: 0, objectosAntes: clonarObjectosDesenho(est.objectos) };
+    return false;
+}
+
+function atualizarGestoApplePencil(est, evento) {
+    if (!est?.gestoCaneta || evento.pointerType !== 'pen') return;
+    est.gestoCaneta.distancia = Math.max(est.gestoCaneta.distancia, Math.hypot(evento.clientX - est.gestoCaneta.x, evento.clientY - est.gestoCaneta.y));
+}
+
+function registarFimGestoApplePencil(est, evento) {
+    if (!est?.gestoCaneta || evento.pointerType !== 'pen') return;
+    const gesto = est.gestoCaneta;
+    const curto = performance.now() - gesto.inicio <= 220 && gesto.distancia <= 8;
+    est.ultimoToqueCaneta = curto ? { tempo: performance.now(), x: evento.clientX, y: evento.clientY, objectosAntes: gesto.objectosAntes } : null;
+    est.gestoCaneta = null;
+}
 
 function converterImagemLegada(canvasId, imagem, manterObjectos = false) {
     const est = CANVAS_ESTADO[canvasId];
@@ -396,7 +433,11 @@ function aoMover(canvasId, e) {
     const est = CANVAS_ESTADO[canvasId]; if (!est) return;
     const pos = obterPos(est.canvas, e); const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
     est.posicaoCursor = pos;
-    if (est.aDesconhar && (est.ferramenta === 'apagar' || est.apagarComPonteiro)) { apagarNaPosicao(canvasId, pos, e.pointerType); return; }
+    if (est.aDesconhar && (est.ferramenta === 'apagar' || est.apagarComPonteiro)) {
+        const eventos = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [e];
+        (eventos.length ? eventos : [e]).forEach(evento => apagarNaPosicao(canvasId, obterPos(est.canvas, evento), e.pointerType));
+        return;
+    }
     if (est.ferramenta === 'caneta' && est.aDesconhar && est.linhaMultipla) {
         const ultimo = est.linhaMultipla.pontos[est.linhaMultipla.pontos.length - 1];
         if (Math.hypot(pos.x - ultimo.x, pos.y - ultimo.y) >= 1.25) {
@@ -425,12 +466,40 @@ function aoSoltar(canvasId, e) {
     if (est.ferramenta === 'seleccionar') { est.aDesconhar = false; if (est.objectoSeleccionado) mostrarPainelTamanho(canvasId, est.objectoSeleccionado); }
 }
 
+function recortarTracoLivre(objecto, pos, raio) {
+    const pontos = objecto.pontos || [];
+    if (pontos.length < 2) return [];
+    const amostras = [pontos[0]];
+    for (let indice = 1; indice < pontos.length; indice++) {
+        const inicio = pontos[indice - 1], fim = pontos[indice];
+        const passos = Math.max(1, Math.ceil(Math.hypot(fim.x - inicio.x, fim.y - inicio.y) / 3));
+        for (let passo = 1; passo <= passos; passo++) {
+            const proporcao = passo / passos;
+            amostras.push({ x: inicio.x + (fim.x - inicio.x) * proporcao, y: inicio.y + (fim.y - inicio.y) * proporcao });
+        }
+    }
+    const fragmentos = [];
+    let actual = [];
+    const guardarFragmento = () => { if (actual.length >= 2) fragmentos.push({ ...objecto, pontos: actual }); actual = []; };
+    amostras.forEach(ponto => {
+        if (Math.hypot(ponto.x - pos.x, ponto.y - pos.y) <= raio + (Number(objecto.largura) || 2) / 2) guardarFragmento();
+        else actual.push(ponto);
+    });
+    guardarFragmento();
+    return fragmentos;
+}
+
 function apagarNaPosicao(canvasId, pos, pointerType) {
     const est = CANVAS_ESTADO[canvasId]; if (!est) return;
-    const margem = pointerType === 'pen' || pointerType === 'touch' ? 20 : 14;
-    const totalAnterior = est.objectos.length;
-    est.objectos = est.objectos.filter(o => !estaNoObj(o, pos, margem));
-    if (est.objectos.length !== totalAnterior) redesenhar(canvasId);
+    const margem = pointerType === 'pen' ? 11 : pointerType === 'touch' ? 20 : 14;
+    let alterado = false;
+    const seguintes = [];
+    est.objectos.forEach(objecto => {
+        if (!estaNoObj(objecto, pos, margem)) { seguintes.push(objecto); return; }
+        alterado = true;
+        if (objecto.tipo === 'caneta') seguintes.push(...recortarTracoLivre(objecto, pos, margem));
+    });
+    if (alterado) { est.objectos = seguintes; redesenhar(canvasId); }
 }
 
 function redesenhar(canvasId) {
@@ -519,7 +588,7 @@ function definirFerramenta(canvasId, ferramenta) {
     finalizarLinhaPendente(canvasId);
     est.ferramenta = ferramenta;
     const simbolos = ['jogador_ataque','jogador_defesa','cone','bola','coach'];
-    est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'not-allowed' : 'crosshair';
+    est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'cell' : 'crosshair';
     const toolbar = document.getElementById('toolbar_canvas_' + canvasId.replace('canvas_', ''));
     if (toolbar) toolbar.querySelectorAll('button[data-ferramenta]').forEach(btn => {
         const activo = btn.dataset.ferramenta === ferramenta;

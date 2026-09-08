@@ -41,7 +41,7 @@
         <div class="ds-tactical-tool-grid">
             <button type="button" class="ds-tactical-tool" data-ferramenta="seleccionar" onclick="definirFerramenta('{{ canvas_id }}', 'seleccionar')" title="Selecionar e mover"><span>↖</span><small>Mover</small></button>
             <button type="button" class="ds-tactical-tool" onclick="desfazer('{{ canvas_id }}')" title="Desfazer"><span>↶</span><small>Desfazer</small></button>
-            <button type="button" class="ds-tactical-tool" data-ferramenta="apagar" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')" title="Apagar um elemento"><span>×</span><small>Apagar</small></button>
+            <button type="button" class="ds-tactical-tool" data-ferramenta="apagar" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')" title="Borracha: apagar apenas a zona percorrida"><span>×</span><small>Borracha</small></button>
             <button type="button" class="ds-tactical-tool ds-tactical-tool-danger" onclick="limparTudo('{{ canvas_id }}')" title="Limpar o desenho"><span>□</span><small>Limpar</small></button>
         </div>
     </section>

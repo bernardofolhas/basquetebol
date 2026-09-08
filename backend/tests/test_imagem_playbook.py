@@ -96,10 +96,19 @@ def test_editor_tatico_suporta_apple_pencil_e_borracha_continua():
         assert "setPointerCapture" in template
         assert "pointercancel" in template
         assert "pointerType === 'pen'" in template
+        assert "tentarAlternarFerramentaApplePencil" in template
+        assert "registarFimGestoApplePencil" in template
         assert "function apagarNaPosicao" in template
+        assert "function recortarTracoLivre" in template
+        assert "getCoalescedEvents" in template
+        assert "objecto.tipo === 'caneta'" in template
         assert "est.ferramenta === 'caneta'" in template
         assert "linha.tipo === 'caneta'" in template
         assert "finalizarLinhaPendente(canvasId)" in template
+
+    toolbar = (ROOT / "frontend/templates/partials/tactical_toolbar.html").read_text(encoding="utf-8")
+    assert "Borracha: apagar apenas a zona percorrida" in toolbar
+    assert "<small>Borracha</small>" in toolbar
 
 
 def test_administrador_adiciona_e_remove_imagem_do_passo(client_admin):

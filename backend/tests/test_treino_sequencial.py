@@ -146,6 +146,9 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         assert 'class="training-exercise-card"' in pagina.text
         assert 'data-training-exercise-drag' in pagina.text
         assert 'data-training-reorder-url=' in pagina.text
+        assert "cartao.getBoundingClientRect()" in pagina.text
+        assert "atualizarHorasNoEcra()" in pagina.text
+        assert "getCoalescedEvents" in pagina.text
         assert 'data-drawing-preview=' in pagina.text
         assert '<figcaption>' not in pagina.text
         assert 'data-drawing-editor' in pagina.text
