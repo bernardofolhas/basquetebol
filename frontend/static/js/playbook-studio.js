@@ -21,7 +21,8 @@
   const data = JSON.parse(document.querySelector("#pbs-studio-data")?.textContent || "{}");
   const movementTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "seta_curva", "bloqueio", "linha"]);
   const markerTypes = new Set(["jogador_ataque", "jogador_defesa", "bola", "cone", "coach"]);
-  const straightLineTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "bloqueio", "linha"]);
+  const straightLineTypes = new Set(["linha"]);
+  const curvedMovementTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "bloqueio"]);
   const playerMovementTypes = new Set(["seta", "seta_zigzag", "seta_curva"]);
 
   let scenes = (data.passos || []).map(normalizeScene).sort((a, b) => a.ordem - b.ordem);
@@ -310,15 +311,22 @@
     if (!object?.pontos?.length) return;
     const start = object.pontos[0];
     const end = object.pontos.at(-1);
-    if (straightLineTypes.has(object.tipo)) object.pontos = [start, end];
-    else if (object.tipo === "seta_curva") object.pontos = fitCurve(object.pontos);
-    else if (object.tipo === "caneta") object.pontos = smoothFreehand(object.pontos);
+    if (object.tipo === "caneta") object.pontos = smoothFreehand(object.pontos);
+    else if (object.tipo === "seta_curva") {
+      object.pontos = fitCurve(object.pontos);
+      object.curva = true;
+    } else if (curvedMovementTypes.has(object.tipo)) {
+      const length = Math.hypot(end.x - start.x, end.y - start.y);
+      const deviation = object.pontos.slice(1, -1).reduce((max, point) => Math.max(max, distanceToSegment(point, start, end)), 0);
+      object.curva = object.pontos.length > 2 && deviation > Math.max(8, length * .07);
+      object.pontos = object.curva ? fitCurve(object.pontos) : [start, end];
+    } else if (straightLineTypes.has(object.tipo)) object.pontos = [start, end];
   }
 
   function drawLine(target, object, alpha = 1) {
     let points = object.pontos || [];
     if (points.length < 2) return;
-    if (object.tipo === "seta_zigzag") points = zigzagPoints(points);
+    if (object.tipo === "seta_zigzag" && !object.curva) points = zigzagPoints(points);
     target.save(); target.globalAlpha = alpha; target.strokeStyle = object.cor || "#202936"; target.fillStyle = object.cor || "#202936";
     target.lineWidth = Number(object.largura) || 6; target.lineCap = "round"; target.lineJoin = "round";
     target.setLineDash(object.tipo === "seta_tracejada" ? [15, 12] : []);
@@ -626,7 +634,7 @@
       const points = gesture.object.pontos; const last = points.at(-1);
       if (straightLineTypes.has(gesture.object.tipo)) {
         if (points.length === 1) points.push(point); else points[1] = point;
-      } else if (tool === "caneta" || Math.hypot(point.x - last.x, point.y - last.y) > 8) points.push(point);
+      } else if (tool === "caneta" || curvedMovementTypes.has(gesture.object.tipo) || Math.hypot(point.x - last.x, point.y - last.y) > 8) points.push(point);
     } else if (gesture.object) {
       const dx = point.x - gesture.start.x; const dy = point.y - gesture.start.y; const object = gesture.object; const original = gesture.original;
       if (Number.isFinite(original.x)) { object.x = original.x + dx; object.y = original.y + dy; }
