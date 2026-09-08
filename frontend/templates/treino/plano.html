@@ -852,6 +852,7 @@
             cartao,
             pega,
             pointerId: evento.pointerId,
+            pointerType: evento.pointerType,
             inicioY: evento.clientY,
             ativo: false,
             anterior: capturarEstado(),
@@ -899,6 +900,62 @@
     window.addEventListener('pointerup', evento => terminarArrastoPonteiro(evento));
     window.addEventListener('pointercancel', evento => terminarArrastoPonteiro(evento, true));
     window.addEventListener('blur', cancelarArrastoAoSair);
+
+    // Fallback para navegadores que perdem eventos de ponteiro ao mover o rato ou a caneta.
+    root.addEventListener('mousedown', evento => {
+        const pega = evento.target.closest('[data-training-exercise-drag]');
+        if (!pega || !root.contains(pega)) return;
+        iniciarArrastoPonteiro({
+            pointerType: 'mouse',
+            pointerId: 'mouse-fallback',
+            clientX: evento.clientX,
+            clientY: evento.clientY,
+            button: evento.button,
+            preventDefault: () => evento.preventDefault(),
+        }, pega.closest('[data-training-exercise-id]'), pega);
+    });
+    window.addEventListener('mousemove', evento => {
+        if (!arrasto || arrasto.pointerType !== 'mouse') return;
+        moverArrastoPonteiro({
+            pointerId: arrasto.pointerId,
+            clientX: evento.clientX,
+            clientY: evento.clientY,
+            preventDefault: () => evento.preventDefault(),
+        });
+    }, {passive: false});
+    window.addEventListener('mouseup', evento => {
+        if (!arrasto || arrasto.pointerType !== 'mouse') return;
+        terminarArrastoPonteiro({pointerId: arrasto.pointerId, clientX: evento.clientX, clientY: evento.clientY});
+    });
+    root.addEventListener('touchstart', evento => {
+        const pega = evento.target.closest('[data-training-exercise-drag]');
+        const toque = evento.touches[0];
+        if (!pega || !toque || !root.contains(pega)) return;
+        iniciarArrastoPonteiro({
+            pointerType: 'touch',
+            pointerId: 'touch-fallback',
+            clientX: toque.clientX,
+            clientY: toque.clientY,
+            button: 0,
+            preventDefault: () => evento.preventDefault(),
+        }, pega.closest('[data-training-exercise-id]'), pega);
+    }, {passive: false});
+    window.addEventListener('touchmove', evento => {
+        if (!arrasto || arrasto.pointerType !== 'touch' || !evento.touches[0]) return;
+        const toque = evento.touches[0];
+        moverArrastoPonteiro({
+            pointerId: arrasto.pointerId,
+            clientX: toque.clientX,
+            clientY: toque.clientY,
+            preventDefault: () => evento.preventDefault(),
+        });
+    }, {passive: false});
+    window.addEventListener('touchend', () => {
+        if (arrasto?.pointerType === 'touch') terminarArrastoPonteiro({pointerId: arrasto.pointerId});
+    });
+    window.addEventListener('touchcancel', () => {
+        if (arrasto?.pointerType === 'touch') terminarArrastoPonteiro({pointerId: arrasto.pointerId}, true);
+    });
 
     root.querySelectorAll('[data-training-exercise-drag]').forEach(pega => {
         pega.setAttribute('aria-grabbed', 'false');
