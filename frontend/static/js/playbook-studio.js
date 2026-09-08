@@ -276,12 +276,43 @@
     return cleaned;
   }
 
+  function smoothFreehand(points) {
+    const cleaned = points.filter((point, index) => index === 0 || Math.hypot(point.x - points[index - 1].x, point.y - points[index - 1].y) > 3);
+    if (cleaned.length < 4) return cleaned;
+    const start = cleaned[0];
+    const end = cleaned.at(-1);
+    const pathLength = cleaned.slice(1).reduce((total, point, index) => total + Math.hypot(point.x - cleaned[index].x, point.y - cleaned[index].y), 0);
+    const centre = cleaned.reduce((sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }), { x: 0, y: 0 });
+    centre.x /= cleaned.length;
+    centre.y /= cleaned.length;
+    const radii = cleaned.map((point) => Math.hypot(point.x - centre.x, point.y - centre.y));
+    const radius = radii.reduce((total, value) => total + value, 0) / radii.length;
+    const radiusError = radii.reduce((total, value) => total + Math.abs(value - radius), 0) / radii.length;
+    const isCircle = pathLength > 80 && radius > 12 && Math.hypot(end.x - start.x, end.y - start.y) < Math.max(30, radius * .55) && radiusError / radius < .24;
+    if (isCircle) {
+      const firstAngle = Math.atan2(start.y - centre.y, start.x - centre.x);
+      return Array.from({ length: 37 }, (_, index) => {
+        const angle = firstAngle + (Math.PI * 2 * index) / 36;
+        return { x: centre.x + radius * Math.cos(angle), y: centre.y + radius * Math.sin(angle) };
+      });
+    }
+    const smoothed = [cleaned[0]];
+    for (let index = 1; index < cleaned.length; index += 1) {
+      const previous = cleaned[index - 1];
+      const current = cleaned[index];
+      smoothed.push({ x: previous.x * .25 + current.x * .75, y: previous.y * .25 + current.y * .75 });
+    }
+    smoothed[smoothed.length - 1] = cleaned.at(-1);
+    return smoothed;
+  }
+
   function cleanDrawnLine(object) {
     if (!object?.pontos?.length) return;
     const start = object.pontos[0];
     const end = object.pontos.at(-1);
     if (straightLineTypes.has(object.tipo)) object.pontos = [start, end];
     else if (object.tipo === "seta_curva") object.pontos = fitCurve(object.pontos);
+    else if (object.tipo === "caneta") object.pontos = smoothFreehand(object.pontos);
   }
 
   function drawLine(target, object, alpha = 1) {
