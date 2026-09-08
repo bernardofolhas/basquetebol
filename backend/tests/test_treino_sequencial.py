@@ -148,6 +148,8 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         assert "function posicionarCartao" in pagina.text
         assert "window.addEventListener('pointermove'" in pagina.text
         assert "window.addEventListener('pointerup'" in pagina.text
+        assert "Cartão selecionado" in pagina.text
+        assert "colocarCartaoSelecionadoAntesDe" in pagina.text
         assert 'data-training-reorder-url=' in pagina.text
         assert "cartao.getBoundingClientRect()" in pagina.text
         assert "atualizarHorasNoEcra()" in pagina.text

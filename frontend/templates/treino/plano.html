@@ -695,6 +695,7 @@
     const obterCartoes = () => Array.from(root.querySelectorAll('[data-training-exercise-id]'));
     const obterListas = () => Array.from(root.querySelectorAll('[data-training-exercise-list]'));
     let aGuardarOrdem = false;
+    let cartaoSelecionado = null;
 
     function definirEstado(mensagem, tipo = '') {
         if (!status) return;
@@ -829,6 +830,35 @@
         obterListas().forEach(lista => lista.classList.toggle('is-drag-target', ativo));
     }
 
+    function selecionarCartaoParaReordenar(cartao) {
+        if (cartaoSelecionado && cartaoSelecionado !== cartao) {
+            cartaoSelecionado.classList.remove('is-reorder-selected');
+        }
+        cartaoSelecionado = cartao;
+        cartao.classList.add('is-reorder-selected');
+        cartao.querySelector('[data-training-exercise-drag]')?.setAttribute('aria-pressed', 'true');
+        definirEstado('Cartão selecionado. Clique noutro cartão para o colocar nessa posição.');
+    }
+
+    function limparCartaoSelecionado() {
+        if (!cartaoSelecionado) return;
+        cartaoSelecionado.classList.remove('is-reorder-selected');
+        cartaoSelecionado.querySelector('[data-training-exercise-drag]')?.setAttribute('aria-pressed', 'false');
+        cartaoSelecionado = null;
+    }
+
+    function colocarCartaoSelecionadoAntesDe(alvo) {
+        if (!cartaoSelecionado || !alvo || cartaoSelecionado === alvo) return;
+        const lista = alvo.closest('[data-training-exercise-list]');
+        if (!lista) return;
+        const anterior = capturarEstado();
+        lista.insertBefore(cartaoSelecionado, alvo);
+        limparCartaoSelecionado();
+        renumerarExercicios();
+        atualizarHorasNoEcra();
+        guardarNovaOrdem(anterior);
+    }
+
     function concluirArrasto(estado, cancelar = false) {
         if (!estado) return;
         atualizarEstadoVisualDoArrasto(estado, false);
@@ -838,7 +868,11 @@
         }
         const ordemAnterior = estado.idsOriginais.join(',');
         const ordemAtual = obterCartoes().map(cartao => cartao.dataset.trainingExerciseId).join(',');
-        if (!estado.ativo || ordemAnterior === ordemAtual) return;
+        if (!estado.ativo) {
+            if (!cancelar) selecionarCartaoParaReordenar(estado.cartao);
+            return;
+        }
+        if (ordemAnterior === ordemAtual) return;
         renumerarExercicios();
         atualizarHorasNoEcra();
         guardarNovaOrdem(estado.anterior);
@@ -895,6 +929,13 @@
         const pega = evento.target.closest('[data-training-exercise-drag]');
         if (!pega || !root.contains(pega)) return;
         iniciarArrastoPonteiro(evento, pega.closest('[data-training-exercise-id]'), pega);
+    }, {capture: true});
+    root.addEventListener('click', evento => {
+        const alvo = evento.target.closest('[data-training-exercise-id]');
+        if (!cartaoSelecionado || !alvo || !root.contains(alvo)) return;
+        if (evento.target.closest('[data-training-exercise-drag], button, a, input, textarea, select, option, form')) return;
+        evento.preventDefault();
+        colocarCartaoSelecionadoAntesDe(alvo);
     });
     window.addEventListener('pointermove', moverArrastoPonteiro, {passive: false});
     window.addEventListener('pointerup', evento => terminarArrastoPonteiro(evento));
@@ -913,7 +954,7 @@
             button: evento.button,
             preventDefault: () => evento.preventDefault(),
         }, pega.closest('[data-training-exercise-id]'), pega);
-    });
+    }, {capture: true});
     window.addEventListener('mousemove', evento => {
         if (!arrasto || arrasto.pointerType !== 'mouse') return;
         moverArrastoPonteiro({
@@ -939,7 +980,7 @@
             button: 0,
             preventDefault: () => evento.preventDefault(),
         }, pega.closest('[data-training-exercise-id]'), pega);
-    }, {passive: false});
+    }, {capture: true, passive: false});
     window.addEventListener('touchmove', evento => {
         if (!arrasto || arrasto.pointerType !== 'touch' || !evento.touches[0]) return;
         const toque = evento.touches[0];
@@ -959,6 +1000,7 @@
 
     root.querySelectorAll('[data-training-exercise-drag]').forEach(pega => {
         pega.setAttribute('aria-grabbed', 'false');
+        pega.setAttribute('aria-pressed', 'false');
         pega.addEventListener('keydown', evento => {
             if (aGuardarOrdem || !['ArrowUp', 'ArrowDown'].includes(evento.key)) return;
             const cartao = pega.closest('[data-training-exercise-id]');
