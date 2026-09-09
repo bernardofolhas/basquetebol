@@ -40,3 +40,21 @@ def test_sidebar_nao_enumera_registos_mas_preserva_caixa_de_entrada(perfil):
     assert '/notificacoes/9/ler' in dialog
     assert '/notificacoes/ler-todas' in dialog
     assert '/notificacoes/limpar-lidas' in dialog
+
+
+def test_sidebar_sem_equipa_da_acesso_direto_a_planeamento_e_analise():
+    templates = Path(__file__).resolve().parents[2] / 'frontend' / 'templates'
+    env = Environment(loader=FileSystemLoader(templates), autoescape=True)
+    env.filters['data_pt'] = str
+    html = env.get_template('partials/navbar_global.html').render(
+        request=SimpleNamespace(state=SimpleNamespace(navegacao={
+            'equipas': [{'id': 7, 'nome': 'Sub-18'}],
+        }), session={}),
+        perfil='treinador', p='/dashboard', modo_plataforma=False,
+        identidade={'nome_curto': 'Clube'}, equipa_contexto_id=None,
+        equipa_contexto_nome=None, utilizador={'nome': 'Treinador'},
+    )
+    assert '/planeamento/equipas/7/anuais' in html
+    assert '/analise/equipas/7' in html
+    assert 'Ações rápidas' not in html
+    assert 'Escolhe a equipa que queres analisar.' in html

@@ -4,7 +4,7 @@
         <div>
             <p class="ds-section-label">Centro de ação</p>
             <h2 class="mt-2 text-xl font-bold text-gray-900">O que precisa de atenção</h2>
-            <p class="mt-1 text-sm text-gray-500">Ações prioritárias e agenda operacional sem sair do dashboard.</p>
+            <p class="mt-1 text-sm text-gray-500">Abre uma tarefa para a resolver ou consulta os próximos compromissos.</p>
         </div>
         <a href="/calendario" class="ds-button ds-button-secondary">Abrir calendário</a>
     </div>
@@ -17,7 +17,7 @@
 
     <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
         <div>
-            <div class="mb-3 flex items-center justify-between"><h3 class="font-semibold text-gray-800">Tarefas pendentes</h3><span class="text-xs text-gray-400">Até {{ agenda_proxima[-1].data if agenda_proxima else '—' }}</span></div>
+            <div class="mb-3 flex items-center justify-between"><h3 class="font-semibold text-gray-800">Tarefas pendentes</h3><span class="text-xs text-gray-400">{{ tarefas|length }} por resolver</span></div>
             {% if tarefas %}
             <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {% for tarefa in tarefas[:5] %}

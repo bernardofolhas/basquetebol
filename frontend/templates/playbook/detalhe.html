@@ -16,9 +16,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/playbook-studio.css?v=20260908-2">
+  <link rel="stylesheet" href="/static/css/playbook-studio.css?v=20260909-2">
   <script defer src="/static/js/tactical-legacy.js?v=20260907-1"></script>
-  <script defer src="/static/js/playbook-studio.js?v=20260909-1"></script>
+  <script defer src="/static/js/playbook-studio.js?v=20260909-2"></script>
 </head>
 <body>
   <div class="pbs-app" data-playbook-studio data-setplay-id="{{ setplay.id }}" data-equipa-id="{{ equipa.id }}" data-imported="{{ 'true' if setplay.origem == 'ebp' else 'false' }}">
@@ -55,9 +55,10 @@
       {% endif %}
 
       <div class="pbs-topbar-actions">
-        <span class="pbs-save-state" data-save-state><i></i>Guardado</span>
-        <a class="pbs-button pbs-button-quiet" href="/playbook/setplays/{{ setplay.id }}/pdf">Exportar</a>
-        <button type="button" class="pbs-button pbs-button-dark" data-open-preview>Pré-visualizar</button>
+        <span class="pbs-save-state" data-save-state role="status" aria-live="polite"><i></i>Guardado</span>
+        <button type="button" class="pbs-button pbs-save-retry" data-retry-save>Voltar a guardar</button>
+        <a class="pbs-button pbs-button-quiet" href="/playbook/setplays/{{ setplay.id }}/pdf">Exportar PDF</a>
+        <button type="button" class="pbs-button pbs-button-dark" data-open-preview>Ver animação</button>
         <button type="button" class="pbs-icon-button" data-share title="Copiar ligação" aria-label="Copiar ligação">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.5-4.4M8.2 13.2l7.5 4.4"/></svg>
         </button>
@@ -167,10 +168,12 @@
       <button type="button" class="pbs-icon-button" data-close-preview aria-label="Fechar">×</button>
     </div>
     <div class="pbs-preview-content">
+      <div class="pbs-preview-stage">
       <div class="pbs-preview-court">
         <img data-preview-court-image src="/static/campos/campo_meio.png?v=20260908-madeira-1" alt="">
         <canvas width="702" height="622" data-preview-canvas></canvas>
         <img data-preview-imported alt="">
+      </div>
       </div>
       <div class="pbs-preview-instructions">
         <span data-preview-scene>Cena 1</span>
@@ -178,11 +181,11 @@
       </div>
     </div>
     <div class="pbs-preview-controls">
-      <button type="button" data-preview-restart title="Recomeçar">↺</button>
-      <button type="button" class="pbs-preview-play" data-preview-play>▶</button>
+      <button type="button" data-preview-restart title="Recomeçar" aria-label="Recomeçar animação">↺</button>
+      <button type="button" class="pbs-preview-play" data-preview-play aria-label="Reproduzir animação">▶</button>
       <input type="range" min="0" max="1000" value="0" data-preview-progress aria-label="Progresso da animação">
       <span data-preview-time>0:00</span>
-      <select data-preview-speed aria-label="Velocidade"><option value="0.7">0,7x</option><option value="1" selected>1x</option><option value="1.4">1,4x</option></select>
+      <select data-preview-speed aria-label="Velocidade da animação"><option value="0.75">0,75×</option><option value="1">1×</option><option value="1.25" selected>1,25×</option><option value="1.5">1,5×</option><option value="2">2×</option></select>
     </div>
   </dialog>
 

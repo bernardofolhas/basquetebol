@@ -22,10 +22,16 @@
         </div>
         <div class="ds-action-bar shrink-0">
             <a href="/assiduidade/equipas/{{ item.equipa.id }}/registar" class="ds-button ds-button-secondary ds-button-sm">Presenças</a>
-            <a href="/exportacoes/equipas/{{ item.equipa.id }}/dados" class="ds-button ds-button-secondary ds-button-sm">Backup</a>
             <a href="/equipas/{{ item.equipa.id }}/resumo" class="ds-button ds-button-primary">Abrir equipa</a>
         </div>
     </div>
+
+    <nav class="ds-team-workflow" aria-label="Trabalho da equipa {{ item.equipa.nome }}">
+        <a href="/treino/equipas/{{ item.equipa.id }}/planos"><small>Planeamento</small><strong>Preparar treino</strong><span>Sessões e exercícios</span></a>
+        <a href="/playbook/equipas/{{ item.equipa.id }}"><small>Planeamento</small><strong>Playbook Studio</strong><span>Jogadas e animações</span></a>
+        <a href="/jogos/equipas/{{ item.equipa.id }}"><small>Ação</small><strong>Competição</strong><span>Jogos e convocatórias</span></a>
+        <a href="/analise/equipas/{{ item.equipa.id }}"><small>Análise</small><strong>Avaliar evolução</strong><span>Técnica, física e psicológica</span></a>
+    </nav>
 
     <!-- Cards de resumo -->
     <div class="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
@@ -76,6 +82,9 @@
             <a href="/equipas/{{ item.equipa.id }}/plantel" class="ds-quiet-link mt-3 block">Abrir plantel</a>
         </div>
 
+    </div>
+    <div class="px-4 pb-4 text-right">
+        <a href="/exportacoes/equipas/{{ item.equipa.id }}/dados" class="ds-quiet-link text-xs">Exportar dados da equipa</a>
     </div>
 
 </section>

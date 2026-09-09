@@ -24,19 +24,28 @@
   const straightLineTypes = new Set(["linha"]);
   const curvedMovementTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "bloqueio", "lancamento"]);
   const playerMovementTypes = new Set(["seta", "seta_zigzag", "seta_curva", "bloqueio"]);
-  const PREVIEW_READ_MS = 1400;
-  const PREVIEW_MOVE_MS = 1500;
+  const PREVIEW_READ_MS = 700;
+  const PREVIEW_MOVE_MS = 850;
+  const pathMetrics = new WeakMap();
 
   let scenes = (data.passos || []).map(normalizeScene).sort((a, b) => a.ordem - b.ordem);
   let activeId = scenes[0]?.id || null;
   let tool = "selecionar";
   let selectedId = null;
   let gesture = null;
-  let saveTimer = null;
-  let notesTimer = null;
+  const saveTimers = new Map();
+  const saveQueues = new Map();
+  const unsavedScenes = new Set();
+  const notesTimers = new Map();
+  const notesQueues = new Map();
+  const unsavedNotes = new Set();
+  const failedSaves = new Set();
   let draggedSceneId = null;
   let previewFrame = 0;
-  let previewStarted = 0;
+  let previewLastTime = null;
+  let previewElapsed = 0;
+  let previewPlan = null;
+  let previewSceneId = null;
   let previewPlaying = false;
   let pencilTap = { time: 0, x: 0, y: 0 };
 
@@ -127,6 +136,12 @@
     saveState.lastChild.textContent = label;
   }
 
+  function refreshSaveStatus() {
+    if (failedSaves.size) setStatus("Não guardado", "error");
+    else if (unsavedScenes.size || unsavedNotes.size) setStatus("A guardar…", "saving");
+    else setStatus("Guardado");
+  }
+
   function toast(message) {
     const el = document.querySelector("[data-toast]");
     if (!el) return;
@@ -147,7 +162,10 @@
         ...(options.headers || {}),
       },
     });
-    const payload = await response.json().catch(() => ({}));
+    let payload;
+    try { payload = await response.json(); }
+    catch (_) { throw new Error("Resposta inválida. Verifica a ligação e se a sessão continua ativa antes de voltar a guardar."); }
+    if (!payload || typeof payload !== "object" || response.redirected) throw new Error("Não foi possível confirmar a gravação. Verifica a tua sessão.");
     if (!response.ok || payload.sucesso === false) throw new Error(payload.erro || "Não foi possível guardar.");
     return payload;
   }
@@ -432,9 +450,7 @@
   function render(target = ctx, objects = activeScene()?.objects || [], selection = true) {
     if (!target) return;
     target.clearRect(0, 0, target.canvas.width, target.canvas.height);
-    const orderedObjects = target === previewCtx
-      ? [...objects.filter((object) => !markerTypes.has(object.tipo)), ...objects.filter((object) => markerTypes.has(object.tipo))]
-      : objects;
+    const orderedObjects = [...objects.filter((object) => !markerTypes.has(object.tipo)), ...objects.filter((object) => markerTypes.has(object.tipo))];
     orderedObjects.forEach((object) => drawObject(target, object));
     if (selection && target === ctx) drawSelection(target, objects.find((object) => object.id === selectedId));
   }
@@ -446,20 +462,36 @@
 
   async function saveScene(scene = activeScene(), immediate = false) {
     if (!scene || imported || !canvas) return;
-    clearTimeout(saveTimer);
+    clearTimeout(saveTimers.get(scene.id));
+    saveTimers.delete(scene.id);
+    unsavedScenes.add(scene.id);
+    failedSaves.delete(`drawing:${scene.id}`); refreshSaveStatus();
+    const revision = (scene.saveRevision || 0) + 1;
+    scene.saveRevision = revision;
+    const savedScene = { ...scene, objects: clone(scene.objects) };
     const run = async () => {
-      setStatus("A guardar…", "saving");
       try {
-        await window.TacticalLegacy?.aguardarRecortes(scene.objects);
-        const court = dimensions(scene);
+        await window.TacticalLegacy?.aguardarRecortes(savedScene.objects);
+        const court = dimensions(savedScene);
         const output = document.createElement("canvas"); output.width = court.width; output.height = court.height;
-        render(output.getContext("2d"), scene.objects, false);
+        render(output.getContext("2d"), savedScene.objects, false);
         const image = output.toDataURL("image/png");
-        await api(`/playbook/passos/${scene.id}/desenho`, { method: "POST", body: JSON.stringify({ dados: image, estado: stateFor(scene) }) });
-        scene.desenho = image; setStatus("Guardado"); renderScenes();
-      } catch (error) { setStatus("Erro ao guardar", "error"); toast(error.message); }
+        await api(`/playbook/passos/${scene.id}/desenho`, { method: "POST", body: JSON.stringify({ dados: image, estado: stateFor(savedScene) }) });
+        if (scene.saveRevision === revision) { scene.desenho = image; unsavedScenes.delete(scene.id); }
+        failedSaves.delete(`drawing:${scene.id}`); refreshSaveStatus(); renderScenes();
+        return true;
+      } catch (error) { failedSaves.add(`drawing:${scene.id}`); refreshSaveStatus(); toast(error.message); return false; }
     };
-    if (immediate) await run(); else saveTimer = setTimeout(run, 500);
+    const enqueue = () => {
+      saveTimers.delete(scene.id);
+      const pending = (saveQueues.get(scene.id) || Promise.resolve()).then(run);
+      saveQueues.set(scene.id, pending);
+      pending.finally(() => { if (saveQueues.get(scene.id) === pending) saveQueues.delete(scene.id); });
+      return pending;
+    };
+    if (immediate) {
+      if (!await enqueue()) throw new Error("Guarda a cena antes de continuar.");
+    } else saveTimers.set(scene.id, setTimeout(enqueue, 350));
   }
 
   async function convertLegacyScene(scene) {
@@ -485,7 +517,7 @@
     const base = document.createElement("img"); base.alt = ""; base.src = court.src; holder.append(base);
     const thumb = document.createElement("canvas"); thumb.width = court.width; thumb.height = court.height; holder.append(thumb);
     const thumbCtx = thumb.getContext("2d");
-    if (scene.objects.length) scene.objects.forEach((object) => drawObject(thumbCtx, object));
+    if (scene.objects.length) render(thumbCtx, scene.objects, false);
     else if (scene.desenho) {
       const image = new Image(); image.onload = () => thumbCtx.drawImage(image, 0, 0, court.width, court.height); image.src = scene.desenho;
     }
@@ -564,14 +596,20 @@
   async function deleteScene(scene) {
     if (!window.confirm("Eliminar esta cena?")) return;
     try {
+      clearTimeout(saveTimers.get(scene.id)); saveTimers.delete(scene.id);
+      clearTimeout(notesTimers.get(scene.id)); notesTimers.delete(scene.id);
+      await Promise.all([saveQueues.get(scene.id), notesQueues.get(scene.id)]);
       await api(`/playbook/passos/${scene.id}/eliminar`, { method: "POST", body: "{}" });
+      unsavedScenes.delete(scene.id); unsavedNotes.delete(scene.id);
+      failedSaves.delete(`drawing:${scene.id}`); failedSaves.delete(`notes:${scene.id}`); refreshSaveStatus();
       const index = scenes.indexOf(scene); scenes.splice(index, 1);
       if (activeId === scene.id) activeId = scenes[Math.min(index, scenes.length - 1)]?.id || null;
       renderScenes(); activateScene(activeId); toast("Cena eliminada.");
-    } catch (error) { toast(error.message); }
+    } catch (error) { if (unsavedScenes.has(scene.id)) saveScene(scene); if (unsavedNotes.has(scene.id)) saveNotes(scene, scene.observacao); toast(error.message); }
   }
 
   function activateScene(id) {
+    if (activeId !== id && notes) saveNotes(activeScene(), notes.value, true);
     activeId = id; selectedId = null; gesture = null;
     const scene = activeScene();
     document.querySelector("[data-scene-label]").textContent = scene ? `Cena ${scenes.indexOf(scene) + 1}` : "Sem cenas";
@@ -785,11 +823,28 @@
     renderTimeline(); saveScene(scene); toast("Ações agrupadas no mesmo momento.");
   }
 
-  async function saveNotes() {
-    const scene = activeScene(); if (!scene || notes.value === scene.observacao) return;
-    scene.observacao = notes.value; setStatus("A guardar…", "saving");
-    try { await api(`/playbook/passos/${scene.id}/observacao-json`, { method: "POST", body: JSON.stringify({ observacao: scene.observacao }) }); setStatus("Guardado"); }
-    catch (error) { setStatus("Erro ao guardar", "error"); toast(error.message); }
+  async function saveNotes(scene = activeScene(), value = notes?.value, immediate = false) {
+    if (!scene || value === undefined || (value === scene.observacao && !unsavedNotes.has(scene.id))) return;
+    clearTimeout(notesTimers.get(scene.id)); notesTimers.delete(scene.id);
+    scene.observacao = value;
+    const revision = scene.notesRevision = (scene.notesRevision || 0) + 1;
+    unsavedNotes.add(scene.id); failedSaves.delete(`notes:${scene.id}`); refreshSaveStatus();
+    const run = async () => {
+      try {
+        await api(`/playbook/passos/${scene.id}/observacao-json`, { method: "POST", body: JSON.stringify({ observacao: value }) });
+        if (scene.notesRevision === revision) unsavedNotes.delete(scene.id);
+        failedSaves.delete(`notes:${scene.id}`); refreshSaveStatus();
+      } catch (error) { failedSaves.add(`notes:${scene.id}`); refreshSaveStatus(); toast(error.message); }
+    };
+    const enqueue = () => {
+      notesTimers.delete(scene.id);
+      const pending = (notesQueues.get(scene.id) || Promise.resolve()).then(run);
+      notesQueues.set(scene.id, pending);
+      pending.finally(() => { if (notesQueues.get(scene.id) === pending) notesQueues.delete(scene.id); });
+      return pending;
+    };
+    if (immediate) await enqueue();
+    else notesTimers.set(scene.id, setTimeout(enqueue, 550));
   }
 
   function setupImportedForms(scene) {
@@ -853,11 +908,13 @@
   function pointAlong(points, progress) {
     if (!points?.length) return null;
     if (points.length === 1) return points[0];
-    const lengths = []; let total = 0;
-    for (let index = 1; index < points.length; index += 1) { const length = Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y); lengths.push(length); total += length; }
+    // Only immutable paths compiled for playback are cached.
+    const cached = pathMetrics.get(points);
+    const lengths = cached?.lengths || []; let total = cached?.total || 0;
+    if (!cached) for (let index = 1; index < points.length; index += 1) { const length = Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y); lengths.push(length); total += length; }
     let wanted = total * progress;
     for (let index = 0; index < lengths.length; index += 1) {
-      if (wanted <= lengths[index]) { const ratio = wanted / Math.max(1, lengths[index]); return { x: points[index].x + (points[index + 1].x - points[index].x) * ratio, y: points[index].y + (points[index + 1].y - points[index].y) * ratio }; }
+      if (wanted <= lengths[index]) { const ratio = lengths[index] ? wanted / lengths[index] : 0; return { x: points[index].x + (points[index + 1].x - points[index].x) * ratio, y: points[index].y + (points[index + 1].y - points[index].y) * ratio }; }
       wanted -= lengths[index];
     }
     return points.at(-1);
@@ -879,21 +936,49 @@
   }
 
   function previewDuration() {
-    return scenes.reduce((total, scene) => total + scenePreviewDuration(scene), 0);
+    return previewPlan ? previewPlan.reduce((sum, item) => sum + item.duration, 0) : scenes.reduce((total, scene) => total + scenePreviewDuration(scene), 0);
+  }
+
+  function preparePreview() {
+    previewPlan = scenes.map(scene => {
+      const groups = actionPlan(scene).map(group => clone(group));
+      let positions = clone(scene.objects);
+      const steps = groups.map(group => {
+        group.actions.forEach(action => {
+          const lengths = action.pontos.slice(1).map((point, i) => Math.hypot(point.x - action.pontos[i].x, point.y - action.pontos[i].y));
+          pathMetrics.set(action.pontos, { lengths, total: lengths.reduce((a, b) => a + b, 0) });
+        });
+        const start = clone(positions);
+        const output = clone(start);
+        output.forEach(object => { if (movementTypes.has(object.tipo) || object.tipo === "caneta") object.hidden = true; });
+        applyMovementGroup(positions, group, 1);
+        return { group, start, output };
+      });
+      return { scene, steps, duration: scenePreviewDuration(scene) };
+    });
   }
 
   function previewAt(progress) {
     let remaining = Math.max(0, Math.min(1, progress)) * previewDuration();
     for (let index = 0; index < scenes.length; index += 1) {
       const scene = scenes[index];
-      const duration = scenePreviewDuration(scene);
+      const duration = previewPlan?.[index]?.duration ?? scenePreviewDuration(scene);
       if (remaining < duration || index === scenes.length - 1) {
-        const count = actionPlan(scene).length;
+        const count = previewPlan?.[index]?.steps.length ?? actionPlan(scene).length;
         const reading = imported || remaining < PREVIEW_READ_MS || count === 0;
         const elapsed = Math.max(0, remaining - PREVIEW_READ_MS);
         const groupIndex = Math.min(count - 1, Math.floor(elapsed / PREVIEW_MOVE_MS));
         const local = Math.min(1, (elapsed - groupIndex * PREVIEW_MOVE_MS) / PREVIEW_MOVE_MS);
-        return { scene, index, reading, objects: reading ? scene.objects : animatedObjects(scene, groupIndex, local) };
+        let objects = scene.objects;
+        if (!reading) {
+          const step = previewPlan?.[index]?.steps[groupIndex];
+          if (step) {
+            step.output.forEach((object, i) => { if (markerTypes.has(object.tipo)) { object.x = step.start[i].x; object.y = step.start[i].y; } });
+            applyMovementGroup(step.output, step.group, local * local * (3 - 2 * local));
+            objects = step.output;
+          } else objects = animatedObjects(scene, groupIndex, local);
+        }
+        return { scene, index, reading, objects };
       }
       remaining -= duration;
     }
@@ -906,12 +991,21 @@
     document.querySelector("[data-preview-scene]").textContent = `Cena ${index + 1} de ${scenes.length} · ${reading ? "Desenho" : "Movimento"}`;
     document.querySelector("[data-preview-notes]").textContent = scene?.observacao || "Sem instruções.";
     const importedImage = document.querySelector("[data-preview-imported]");
-    if (imported) { importedImage.src = scene?.imagemCoach || scene?.desenho || ""; importedImage.hidden = !importedImage.src; previewCanvas.hidden = true; }
+    if (imported) {
+      const src = scene?.imagemCoach || scene?.desenho || "";
+      if (previewSceneId !== scene?.id) { previewSceneId = scene?.id; importedImage.src = src; fitPreviewCourt(); }
+      importedImage.hidden = !src; previewCanvas.hidden = true;
+      document.querySelector("[data-preview-court-image]").hidden = true;
+    }
     else {
       importedImage.hidden = true; previewCanvas.hidden = false;
       const court = dimensions(scene); const wrap = document.querySelector(".pbs-preview-court");
-      previewCanvas.width = court.width; previewCanvas.height = court.height; wrap.style.aspectRatio = `${court.width} / ${court.height}`;
-      document.querySelector("[data-preview-court-image]").src = court.src;
+      if (previewSceneId !== scene?.id) {
+        previewSceneId = scene?.id;
+        previewCanvas.width = court.width; previewCanvas.height = court.height; wrap.style.aspectRatio = `${court.width} / ${court.height}`;
+        document.querySelector("[data-preview-court-image]").src = court.src;
+        fitPreviewCourt();
+      }
       render(previewCtx, objects, false);
     }
     document.querySelector("[data-preview-progress]").value = Math.round(progress * 1000);
@@ -921,26 +1015,48 @@
 
   function previewTick(time) {
     if (!previewPlaying) return;
-    if (!previewStarted) previewStarted = time;
     const speed = Number(document.querySelector("[data-preview-speed]").value) || 1;
-    const progress = Math.min(1, (time - previewStarted) * speed / Math.max(1, previewDuration())); renderPreview(progress);
-    if (progress >= 1) { previewPlaying = false; document.querySelector("[data-preview-play]").textContent = "▶"; return; }
+    if (previewLastTime !== null) previewElapsed += Math.max(0, time - previewLastTime) * speed;
+    previewLastTime = time;
+    const progress = Math.min(1, previewElapsed / Math.max(1, previewDuration())); renderPreview(progress);
+    if (progress >= 1) { pausePreview(); return; }
     previewFrame = requestAnimationFrame(previewTick);
   }
 
   function togglePreview() {
-    previewPlaying = !previewPlaying; const button = document.querySelector("[data-preview-play]"); button.textContent = previewPlaying ? "Ⅱ" : "▶";
-    if (previewPlaying) { const progress = Number(document.querySelector("[data-preview-progress]").value) / 1000; previewStarted = performance.now() - previewDuration() * progress / (Number(document.querySelector("[data-preview-speed]").value) || 1); previewFrame = requestAnimationFrame(previewTick); }
-    else cancelAnimationFrame(previewFrame);
+    if (previewPlaying) { pausePreview(); return; }
+    if (previewElapsed >= previewDuration()) previewElapsed = 0;
+    previewPlaying = true; previewLastTime = null;
+    const button = document.querySelector("[data-preview-play]"); button.textContent = "Ⅱ"; button.setAttribute("aria-label", "Pausar animação");
+    cancelAnimationFrame(previewFrame); previewFrame = requestAnimationFrame(previewTick);
+  }
+
+  function pausePreview() {
+    previewPlaying = false; previewLastTime = null; cancelAnimationFrame(previewFrame);
+    const button = document.querySelector("[data-preview-play]"); button.textContent = "▶"; button.setAttribute("aria-label", "Reproduzir animação");
+  }
+
+  function seekPreview(progress) {
+    pausePreview(); previewElapsed = progress * previewDuration(); renderPreview(progress);
+  }
+
+  function fitPreviewCourt() {
+    const stage = document.querySelector(".pbs-preview-stage");
+    const wrap = document.querySelector(".pbs-preview-court");
+    if (!stage || !wrap) return;
+    const court = dimensions(scenes.find(scene => scene.id === previewSceneId));
+    const scale = Math.max(0, Math.min((stage.clientWidth - 24) / court.width, (stage.clientHeight - 24) / court.height));
+    wrap.style.width = `${court.width * scale}px`; wrap.style.height = `${court.height * scale}px`;
   }
 
   function openPreview() {
     if (!scenes.length) { toast("Adiciona uma cena antes de pré-visualizar."); return; }
-    previewPlaying = false; previewStarted = 0; renderPreview(0); document.querySelector("[data-preview-dialog]").showModal();
+    pausePreview(); previewElapsed = 0; previewSceneId = null; preparePreview();
+    document.querySelector("[data-preview-dialog]").showModal(); renderPreview(0); togglePreview();
   }
 
   function closePreview() {
-    previewPlaying = false; cancelAnimationFrame(previewFrame); document.querySelector("[data-preview-dialog]").close();
+    pausePreview(); document.querySelector("[data-preview-dialog]").close();
   }
 
   async function saveDetails(event) {
@@ -967,15 +1083,23 @@
     canvas?.addEventListener("contextmenu", (event) => event.preventDefault());
     document.querySelector("[data-undo]")?.addEventListener("click", undo); document.querySelector("[data-redo]")?.addEventListener("click", redo); document.querySelector("[data-clear]")?.addEventListener("click", clearScene);
     document.querySelector("[data-group-selected]")?.addEventListener("click", groupSelected);
-    notes?.addEventListener("input", () => { clearTimeout(notesTimer); notesTimer = setTimeout(saveNotes, 550); }); notes?.addEventListener("blur", saveNotes);
+    notes?.addEventListener("input", () => saveNotes()); notes?.addEventListener("blur", () => saveNotes(activeScene(), notes.value, true));
     document.querySelectorAll("[data-panel-tab]").forEach((button) => button.addEventListener("click", () => {
       document.querySelectorAll("[data-panel-tab]").forEach((item) => item.classList.toggle("is-active", item === button));
       document.querySelectorAll("[data-panel]").forEach((panel) => panel.classList.toggle("is-active", panel.dataset.panel === button.dataset.panelTab));
     }));
     document.querySelectorAll("[data-open-preview]").forEach((button) => button.addEventListener("click", openPreview)); document.querySelector("[data-close-preview]")?.addEventListener("click", closePreview);
     document.querySelector("[data-preview-play]")?.addEventListener("click", togglePreview);
-    document.querySelector("[data-preview-restart]")?.addEventListener("click", () => { previewPlaying = false; previewStarted = 0; document.querySelector("[data-preview-play]").textContent = "▶"; renderPreview(0); });
-    document.querySelector("[data-preview-progress]")?.addEventListener("input", (event) => { previewPlaying = false; document.querySelector("[data-preview-play]").textContent = "▶"; renderPreview(Number(event.target.value) / 1000); });
+    document.querySelector("[data-preview-restart]")?.addEventListener("click", () => { seekPreview(0); togglePreview(); });
+    document.querySelector("[data-preview-progress]")?.addEventListener("input", event => seekPreview(Number(event.target.value) / 1000));
+    document.querySelector("[data-preview-dialog]")?.addEventListener("close", pausePreview);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) pausePreview(); });
+    window.addEventListener("resize", fitPreviewCourt);
+    window.addEventListener("beforeunload", event => { if (unsavedScenes.size || unsavedNotes.size) { event.preventDefault(); event.returnValue = ""; } });
+    document.querySelector("[data-retry-save]")?.addEventListener("click", async () => {
+      for (const scene of scenes.filter(scene => unsavedScenes.has(scene.id))) { try { await saveScene(scene, true); } catch (error) { toast(error.message); } }
+      for (const scene of scenes.filter(scene => unsavedNotes.has(scene.id))) await saveNotes(scene, scene.observacao, true);
+    });
     document.querySelector("[data-open-details]")?.addEventListener("click", () => document.querySelector("[data-details-dialog]").showModal());
     document.querySelector("[data-details-form]")?.addEventListener("submit", saveDetails);
     document.querySelector("[data-share]")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(location.href); toast("Ligação copiada."); } catch (_) { toast("Não foi possível copiar a ligação."); } });
@@ -983,6 +1107,7 @@
     document.querySelector("[data-mobile-tools]")?.addEventListener("click", () => closeMobilePanels(document.querySelector(".pbs-toolbar")));
     document.querySelector("[data-mobile-inspector]")?.addEventListener("click", () => closeMobilePanels(document.querySelector(".pbs-inspector")));
     document.addEventListener("keydown", (event) => {
+      if (document.querySelector("dialog[open]")) return;
       if (event.target.matches("input,textarea,select")) return;
       const shortcuts = { v: "selecionar", a: "jogador_ataque", d: "jogador_defesa", m: "seta", p: "seta_tracejada", g: "seta_zigzag", l: "lancamento", e: "borracha" };
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redo() : undo(); }

@@ -1267,6 +1267,23 @@ table tbody tr:hover { background:#fafbfd; }
     .pb-dialog footer { flex-wrap:wrap; }.pb-dialog footer>span { width:100%; }
 }
 
+/* Team workflow: explicit destinations, with the club colour reserved for accents. */
+.ds-team-workflow { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;padding:1rem;border-bottom:1px solid var(--border-soft);background:var(--surface-muted); }
+.ds-team-workflow a { display:flex;flex-direction:column;gap:.25rem;min-width:0;padding:1rem;border:1px solid var(--border-soft);border-radius:.7rem;background:var(--surface-card);color:var(--text-main);text-decoration:none; }
+.ds-team-workflow a:hover { border-color:var(--clube-primary);background:var(--clube-primary-surface); }
+.ds-team-workflow a:focus-visible { outline:2px solid var(--clube-primary);outline-offset:3px; }
+.ds-team-workflow small { color:var(--clube-primary-dark);font-size:.65rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase; }
+.ds-team-workflow strong { font-size:.95rem;line-height:1.5; }
+.ds-team-workflow span { color:var(--text-muted);font-size:.75rem;line-height:1.5;overflow-wrap:anywhere; }
+@media(max-width:1150px) { .ds-team-workflow { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:640px) {
+    .ds-page-header,.ds-panel-header { flex-wrap:wrap;gap:1rem; }
+    .ds-page-header>.ds-action-bar,.ds-panel-header>.ds-action-bar { flex-wrap:wrap;max-width:100%; }
+    .ds-team-workflow { gap:.5rem;padding:.75rem; }
+    .ds-team-workflow a { padding:.75rem; }
+    .ds-team-workflow strong { font-size:.85rem; }
+}
+
 /* Playbook: estúdio de uma jogada, inspirado num fluxo de edição por cenas. */
 .pb-detail-category { display:inline-flex;align-items:center;border-radius:999px;background:var(--clube-primary-surface);padding:.48rem .7rem; }
 .pb-studio-shell { display:grid;grid-template-columns:10.5rem minmax(0,1fr);grid-template-rows:auto auto;overflow:hidden;border:1px solid var(--border-soft);border-radius:1rem;background:#fff;box-shadow:var(--shadow-card); }

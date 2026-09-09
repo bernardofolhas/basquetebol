@@ -4,13 +4,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function studio() {
+function studio(options = {}) {
   const source = fs.readFileSync(path.join(__dirname, '../static/js/playbook-studio.js'), 'utf8');
-  const sandbox = { document: { querySelector: selector => selector === '[data-playbook-studio]' ? { dataset: {} } : null }, window: {} };
+  const sandbox = { document: { querySelector: selector => selector === '[data-playbook-studio]' ? { dataset: {} } : null }, window: {}, ...options };
   vm.runInNewContext(source.replace('  init();', `
     globalThis.api = { drawLine, cleanDrawnLine, normalizeScene, stateFor, continuationObjects,
-      animatedObjects, previewAt, previewDuration, zigzagPoints, pointAlong,
-      setScenes(value) { scenes = value; } };
+      animatedObjects, previewAt, previewDuration, zigzagPoints, pointAlong, preparePreview,
+      togglePreview, pausePreview, seekPreview, previewTick, saveScene, saveNotes,
+      times: { read: PREVIEW_READ_MS, move: PREVIEW_MOVE_MS },
+      playback() { return { playing: previewPlaying, elapsed: previewElapsed }; },
+      pending() { return { timers: saveTimers.size, queues: saveQueues.size, unsaved: Array.from(unsavedScenes) }; },
+      setScenes(value) { scenes = value; previewPlan = null; activeId = value[0]?.id; } };
   `), sandbox);
   return sandbox.api;
 }
@@ -32,6 +36,109 @@ const marker = (id, x, y, tipo = 'jogador_ataque') => ({ id, tipo, x, y });
 const action = (id, tipo, pontos) => ({ id, tipo, pontos });
 const scene = (id, objects) => ({ id, objects, courtType: 'meio', ordem: id });
 const coordinates = point => ({ x: point.x, y: point.y });
+
+function environment() {
+  const nodes = new Map(), timers = new Map(), frames = new Map(), requests = [];
+  let serial = 0;
+  function node() {
+    const classes = new Set();
+    const el = { dataset: {}, style: {}, clientWidth: 800, clientHeight: 500, width: 702, height: 622,
+      value: '1', lastChild: {}, append() {}, setAttribute() {}, toggleAttribute() {}, addEventListener() {},
+      toDataURL: () => 'data:image/png;base64,test',
+      classList: { toggle(c, active) { active ? classes.add(c) : classes.delete(c); }, contains: c => classes.has(c), add: c => classes.add(c), remove: c => classes.delete(c) }
+    };
+    const ctx = new Proxy({ canvas: el }, { get: (target, key) => key in target ? target[key] : () => {} });
+    el.getContext = () => ctx;
+    return el;
+  }
+  const document = {
+    querySelector(selector) {
+      if (selector === '#pbs-studio-data') return { textContent: '{}' };
+      if (selector === 'meta[name="csrf-token"]') return null;
+      if (!nodes.has(selector)) nodes.set(selector, node());
+      return nodes.get(selector);
+    }, createElement: node
+  };
+  const options = { document, window: {}, FormData: class {}, Image: class {},
+    setTimeout(fn) { const id = ++serial; timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id),
+    requestAnimationFrame(fn) { const id = ++serial; frames.set(id, fn); return id; }, cancelAnimationFrame: id => frames.delete(id),
+    async fetch(url, options) { requests.push({ url, payload: JSON.parse(options.body) }); return { ok: true, json: async () => ({}) }; }
+  };
+  return { options, nodes, frames, requests,
+    async flush() { const pending = [...timers.values()]; timers.clear(); await Promise.all(pending.map(fn => fn())); },
+    frame(time) { const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(time)); }
+  };
+}
+
+test('playback changes speed without jumping, resumes without wall-clock drift and schedules one frame', () => {
+  const env = environment(), api = studio(env.options);
+  api.setScenes([scene(1, [marker('p', 0, 0), action('a', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }])])]);
+  api.preparePreview(); api.togglePreview();
+  env.frame(0); env.frame(1000);
+  assert.equal(api.playback().elapsed, 1000);
+  env.nodes.get('[data-preview-speed]').value = '2';
+  env.frame(1100);
+  assert.equal(api.playback().elapsed, 1200);
+  api.pausePreview(); assert.equal(env.frames.size, 0);
+  api.togglePreview(); env.frame(9000);
+  assert.equal(api.playback().elapsed, 1200);
+  api.seekPreview(0); api.togglePreview();
+  assert.equal(env.frames.size, 1);
+  env.frame(10000); env.frame(12000);
+  assert.equal(api.playback().playing, false);
+  assert.equal(env.frames.size, 0);
+});
+
+test('autosave keeps pending drawings from different scenes and snapshots the latest edit', async () => {
+  const env = environment(), api = studio(env.options);
+  const a = scene(1, []), b = scene(2, []); api.setScenes([a, b]);
+  await api.saveScene(a); await api.saveScene(b);
+  a.objects.push(marker('p', 10, 20)); await api.saveScene(a);
+  assert.equal(api.pending().timers, 2);
+  await env.flush();
+  assert.equal(env.requests.length, 2);
+  assert.equal(env.requests.find(r => r.url.includes('/1/')).payload.estado.objectos[0].x, 10);
+  assert.equal(api.pending().unsaved.length, 0);
+});
+
+test('notes retain their original scene and a drawing success cannot hide a failed save', async () => {
+  const env = environment();
+  const fetch = env.options.fetch;
+  env.options.fetch = async (url, options) => {
+    if (url.includes('/1/observacao')) throw new Error('offline');
+    return fetch(url, options);
+  };
+  const api = studio(env.options), a = scene(1, []), b = scene(2, []);
+  api.setScenes([a, b]);
+  await api.saveNotes(a, 'Instrucoes da primeira'); await api.saveNotes(b, 'Instrucoes da segunda');
+  await env.flush(); await api.saveScene(b, true);
+  assert.equal(env.requests.find(r => r.url.includes('/2/observacao')).payload.observacao, 'Instrucoes da segunda');
+  assert.equal(env.nodes.get('[data-save-state]').classList.contains('is-error'), true);
+  env.options.fetch = fetch;
+});
+
+test('an HTML login response never reports a drawing as saved', async () => {
+  const env = environment();
+  env.options.fetch = async () => ({ ok: true, redirected: true, json: async () => { throw new Error('HTML'); } });
+  const api = studio(env.options), a = scene(1, []); api.setScenes([a]);
+  await assert.rejects(api.saveScene(a, true), /Guarda a cena/);
+  assert.equal(api.pending().unsaved.length, 1);
+  assert.equal(env.nodes.get('[data-save-state]').classList.contains('is-error'), true);
+});
+
+test('successive saves of one scene reach the server in revision order', async () => {
+  const env = environment(), fetch = env.options.fetch;
+  let release, entered;
+  const firstStarted = new Promise(resolve => { entered = resolve; });
+  const blocked = new Promise(resolve => { release = resolve; });
+  env.options.fetch = async (url, options) => { if (!env.requests.length) { entered(); await blocked; } return fetch(url, options); };
+  const api = studio(env.options), a = scene(1, [marker('p', 10, 20)]); api.setScenes([a]);
+  const first = api.saveScene(a, true); await firstStarted;
+  a.objects[0].x = 30; const second = api.saveScene(a, true);
+  release(); await Promise.all([first, second]);
+  assert.deepEqual(env.requests.map(r => r.payload.estado.objectos[0].x), [10, 30]);
+  assert.equal(api.pending().unsaved.length, 0);
+});
 
 test('arrow tips end at the gesture endpoint and shafts stop before the triangle', () => {
   const api = studio();
@@ -111,18 +218,40 @@ test('preview reads each whole scene then hides drawings for all movements and p
   api.setScenes([first, second]);
   const at = ms => api.previewAt(ms / api.previewDuration());
   assert.equal(at(0).reading, true);
-  assert.ok(at(1000).objects.every(o => !o.hidden));
-  const movement = at(2150);
+  assert.ok(at(400).objects.every(o => !o.hidden));
+  const movement = at(1125);
   assert.equal(movement.reading, false);
   assert.ok(movement.objects.filter(o => o.pontos).every(o => o.hidden));
   assert.equal(movement.objects.find(o => o.id === 'p').x, 100);
-  assert.equal(at(2900).objects.find(o => o.id === 'p').x, 200);
-  assert.equal(at(3650).objects.find(o => o.id === 'p').x, 300);
-  assert.equal(at(4400).scene.id, 2);
-  assert.equal(at(4400).reading, true);
-  assert.ok(at(4400).objects.every(o => !o.hidden));
+  assert.equal(at(1550).objects.find(o => o.id === 'p').x, 200);
+  assert.equal(at(1975).objects.find(o => o.id === 'p').x, 300);
+  assert.equal(at(2400).scene.id, 2);
+  assert.equal(at(2400).reading, true);
+  assert.ok(at(2400).objects.every(o => !o.hidden));
   assert.equal(api.previewAt(1).objects.find(o => o.id === 'q').x, 500);
   assert.equal(JSON.stringify([first, second]), original);
+});
+
+test('compiled playback is repeatable when seeking backwards and leaves saved scenes untouched', () => {
+  const api = studio();
+  const initial = scene(1, [marker('p', 0, 0),
+    action('a', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }]),
+    action('b', 'seta_zigzag', [{ x: 200, y: 0 }, { x: 300, y: 100 }, { x: 400, y: 0 }])]);
+  const original = JSON.stringify(initial);
+  api.setScenes([initial]); api.preparePreview();
+  const at = ms => api.previewAt(ms / api.previewDuration());
+  assert.equal(at(1125).objects.find(o => o.id === 'p').x, 100);
+  assert.equal(api.previewAt(1).objects.find(o => o.id === 'p').x, 400);
+  assert.equal(at(1125).objects.find(o => o.id === 'p').x, 100);
+  assert.equal(at(1975).objects.find(o => o.id === 'p').y, 100);
+  assert.ok(at(1975).objects.filter(o => o.pontos).every(o => o.hidden));
+  assert.equal(at(100).reading, true);
+  assert.equal(JSON.stringify(initial), original);
+});
+
+test('short trajectory segments interpolate continuously', () => {
+  const api = studio();
+  assert.equal(api.pointAlong([{ x: 0, y: 0 }, { x: .5, y: 0 }], .5).x, .25);
 });
 
 test('simultaneous grouped movements start together and static scenes stay visible', () => {

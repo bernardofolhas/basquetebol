@@ -2,7 +2,7 @@
 {% set total_caixa_entrada = (nav.total_pendencias|default(0)) + (nav.total_notificacoes|default(0)) %}
 
 {% macro menu_link(href, label, descricao="", ativo=False) %}
-<a href="{{ href }}" class="sidebar-link {% if ativo %}is-active{% endif %}">
+<a href="{{ href }}" class="sidebar-link {% if ativo %}is-active{% endif %}"{% if descricao %} title="{{ descricao }}"{% endif %}>
   <span>{{ label }}</span>{% if descricao %}<small>{{ descricao }}</small>{% endif %}
 </a>
 {% endmacro %}
@@ -70,22 +70,22 @@
             {{ menu_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/macrociclos', 'Macrociclos', 'Grandes períodos') }}
             {{ menu_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/mesociclos', 'Mesociclos', 'Períodos mensais') }}
             {{ menu_link('/planeamento/equipas/' ~ equipa_contexto_id ~ '/microciclos', 'Microciclos', 'Visão semanal') }}
-            {{ menu_link('/treino/equipas/' ~ equipa_contexto_id ~ '/planos', 'Planos de treino', 'Preparar sessões') }}
             {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id ~ '?vista=planeamento', 'Planeamento físico', 'Organização opcional da preparação física') }}
-            {{ menu_link('/playbook/equipas/' ~ equipa_contexto_id, 'Playbook', 'Planeamento tático e sistemas') }}
+            {{ menu_link('/playbook/equipas/' ~ equipa_contexto_id, 'Playbook e Studio', 'Organizar jogadas e abrir o editor tático') }}
             {{ menu_link('/calendario?equipa_id=' ~ equipa_contexto_id, 'Calendário da equipa', 'Todos os eventos') }}
           </div>
           {% elif nav.equipas|default([]) %}
           <p class="ds-dropdown-title">Planeamento das equipas</p>
-          <div class="ds-team-switcher p-2">{% for item in nav.equipas %}<a href="/equipas/{{ item.id }}/resumo"><span class="ds-team-dot"></span><span class="truncate">{{ item.nome }}</span></a>{% endfor %}</div>
+          <p class="sidebar-hint">Planear a época de uma equipa:</p>
+          {% for item in nav.equipas %}{{ menu_link('/planeamento/equipas/' ~ item.id ~ '/anuais', item.nome, 'Planos anuais da equipa') }}{% endfor %}
           {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
           <div class="ds-dropdown-section">
             <p class="ds-dropdown-label px-2 pb-1">Planeamento do clube</p>
             <div class="sidebar-page-list">
-              {{ menu_link('/planeamento-clube/anual', 'Anual', 'Época do clube') }}
-              {{ menu_link('/planeamento-clube/mensal', 'Mensal', 'Organização por mês') }}
-              {{ menu_link('/planeamento-clube/semanal', 'Semanal', 'Horários e publicação') }}
+              {{ menu_link('/planeamento-clube/anual', 'Plano anual do clube', 'Época do clube') }}
+              {{ menu_link('/planeamento-clube/mensal', 'Plano mensal do clube', 'Organização por mês') }}
+              {{ menu_link('/planeamento-clube/semanal', 'Horários semanais', 'Horários e publicação') }}
               {{ menu_link('/planeamento-clube/atribuicao-espacos', 'Atribuir espaços', 'Mapa semanal') }}
             </div>
           </div>
@@ -103,7 +103,7 @@
             {{ menu_link('/treino/equipas/' ~ equipa_contexto_id ~ '/planos', 'Treinos', 'Sessões e planos de treino', p.startswith('/treino')) }}
             {{ menu_link('/jogos/equipas/' ~ equipa_contexto_id, 'Competição', 'Jogos, resultados e convocatórias', p.startswith('/jogos')) }}
             {{ menu_link('/estatisticas/equipas/' ~ equipa_contexto_id, 'Estatísticas', 'Registo offline e box scores', p.startswith('/estatisticas')) }}
-            {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id ~ '/registar', 'Assiduidade', 'Presenças e RPE individual', p.startswith('/assiduidade')) }}
+            {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id ~ '/registar', 'Registar presenças', 'Presenças e RPE individual', p.endswith('/registar') and p.startswith('/assiduidade')) }}
             {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/eventos', 'Eventos', 'Atividades da equipa', p.endswith('/eventos')) }}
           </div>
           {% endif %}
@@ -114,31 +114,35 @@
           <div class="ds-dropdown-section">
             <p class="ds-dropdown-label px-2 pb-1">Logística</p>
             <div class="sidebar-page-list">
-              {{ menu_link('/planeamento-clube/atribuicao-espacos', 'Atribuir espaços', 'Distribuir horários e pavilhões') }}
-              {{ menu_link('/planeamento-clube/espacos', 'Espaços e slots', 'Disponibilidades e bloqueios') }}
+              {{ menu_link('/planeamento-clube/espacos', 'Espaços e horários', 'Disponibilidades e bloqueios') }}
               {{ menu_link('/dashboard/clube/espacos', 'Conflitos', 'Choques de espaço e horário') }}
               {{ menu_link('/dashboard/clube', 'Visão do clube', 'Coberturas e operação') }}
             </div>
           </div>
           {% elif perfil == 'secretaria' %}
           {{ menu_link('/planeamento-clube/semanal', 'Horários previstos', 'Consulta semanal') }}
-          {{ menu_link('/planeamento-clube/espacos', 'Espaços e slots', 'Consulta de espaços') }}
+          {{ menu_link('/planeamento-clube/espacos', 'Espaços e horários', 'Consulta de espaços') }}
           {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}{{ menu_link('/biblioteca', 'Biblioteca de exercícios', 'Pesquisar e reutilizar') }}{% endif %}
         </div>
       </section>
 
-      {% if equipa_contexto_id and perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
+      {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
       <section class="sidebar-group ds-nav-order-analise">
         <h2 class="sidebar-heading {% if p.startswith('/analise') or p.startswith('/fisico/jogadores') or p.startswith('/scouting') or p.startswith('/dashboard/clube/carga') or p.startswith('/dashboard/clube/executado') %}is-active{% endif %}">Análise </h2>
         <div class="sidebar-pages w-[25rem]">
           <p class="ds-dropdown-title">Análise integrada · {{ equipa_contexto_nome }}</p>
+          {% if equipa_contexto_id %}
           <div class="sidebar-page-list">
-            {{ menu_link('/analise/equipas/' ~ equipa_contexto_id, 'Desempenho da equipa', 'Técnico, tático, físico e psicológico', p.startswith('/analise')) }}
+            {{ menu_link('/analise/equipas/' ~ equipa_contexto_id, 'Desempenho da equipa', 'Técnico, tático, físico e psicológico', p == '/analise/equipas/' ~ equipa_contexto_id) }}
             {{ menu_link('/analise/equipas/' ~ equipa_contexto_id ~ '/registar', 'Nova avaliação', 'Avaliar atletas e parâmetros') }}
             {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id, 'Análise física e testes', 'Testes e evolução física') }}
-            {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id, 'Assiduidade e RPE', 'Participação e esforço percebido') }}
+            {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id, 'Relatório de presenças e RPE', 'Consultar participação e esforço percebido') }}
           </div>
+          {% else %}
+          <p class="sidebar-hint">Escolhe a equipa que queres analisar.</p>
+          {% for item in nav.equipas|default([]) %}{{ menu_link('/analise/equipas/' ~ item.id, item.nome, 'Abrir análise da equipa') }}{% else %}{{ menu_link('/equipas', 'Selecionar equipa') }}{% endfor %}
+          {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
           <div class="ds-dropdown-section">
             <p class="ds-dropdown-label px-2 pb-1">Análise global</p>
@@ -175,7 +179,7 @@
     </div>
 
 
-    {% if not modo_plataforma %}
+    {% if not modo_plataforma and nav.acoes_rapidas|default([]) %}
     <section class="sidebar-group"><h2>Ações rápidas</h2>
       {% for acao in nav.acoes_rapidas|default([]) %}<a class="sidebar-link" href="{{ acao.link }}">{{ acao.label }}</a>{% endfor %}
     </section>
@@ -200,4 +204,4 @@
     </dialog>
     {% endif %}
 
-<script src="/static/js/sidebar.js?v=20260907-design-fix"></script>
+<script src="/static/js/sidebar.js?v=20260909-1"></script>

@@ -20,8 +20,8 @@
   <link rel="icon" href="/static/img/favicon-plataforma.svg">
   <link rel="apple-touch-icon" href="/static/img/favicon-plataforma.svg">
   {% endif %}
-  <link rel="stylesheet" href="/static/css/design-system.css?v=20260908-playbook-v3">
-  <link rel="stylesheet" href="/static/css/sidebar.css?v=20260907-design-fix">
+  <link rel="stylesheet" href="/static/css/design-system.css?v=20260909-review-1">
+  <link rel="stylesheet" href="/static/css/sidebar.css?v=20260909-review-1">
   {% block estilos_extra %}{% endblock %}
   <style>:root{--clube-primary:{{ '#334155' if modo_plataforma else identidade.cor_principal|default('#f97316') }};--clube-secondary:{{ '#0f172a' if modo_plataforma else identidade.cor_secundaria|default('#1f2937') }};--clube-accent:{{ '#64748b' if modo_plataforma else identidade.cor_destaque|default('#0ea5e9') }};--clube-primary-light:{{ '#f1f5f9' if modo_plataforma else identidade.cor_principal_clara|default('#fff7ed') }};--clube-primary-dark:{{ '#1e293b' if modo_plataforma else identidade.cor_principal_escura|default('#c2410c') }};--clube-primary-hover:{{ '#475569' if modo_plataforma else identidade.cor_principal_hover|default('#ea580c') }};--clube-primary-surface:{{ '#f8fafc' if modo_plataforma else identidade.cor_principal_superficie|default('#fff7ed') }};--clube-primary-border:{{ '#cbd5e1' if modo_plataforma else identidade.cor_borda_marca|default('#fed7aa') }};--clube-on-primary:{{ '#fff' if modo_plataforma else identidade.texto_sobre_principal|default('#fff') }};--clube-on-secondary:{{ '#fff' if modo_plataforma else identidade.texto_sobre_secundaria|default('#fff') }};--clube-on-accent:{{ '#fff' if modo_plataforma else identidade.texto_sobre_destaque|default('#111827') }};--clube-header-text:{{ '#fff' if modo_plataforma else identidade.texto_cabecalho|default(identidade.cor_secundaria)|default('#fff') }}}</style>
   <meta name="csrf-token" content="{{ request.session.get('_csrf', '') }}">
@@ -128,7 +128,8 @@
           try{window.sessionStorage.removeItem(storageKey)}catch(error){}
         }
         if(window.location.hash){
-          var hashTarget=document.querySelector(window.location.hash);
+          var hashTarget=null;
+          try { hashTarget=document.getElementById(decodeURIComponent(window.location.hash.slice(1))); } catch (_) {}
           var hashPanel=hashTarget&&hashTarget.closest('[data-workspace-panel^="'+group+':"]');
           if(hashPanel)initial=hashPanel.dataset.workspacePanel.slice(group.length+1);
         }
