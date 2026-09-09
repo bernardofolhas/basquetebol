@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/playbook-studio.css?v=20260908-2">
   <script defer src="/static/js/tactical-legacy.js?v=20260907-1"></script>
-  <script defer src="/static/js/playbook-studio.js?v=20260908-7"></script>
+  <script defer src="/static/js/playbook-studio.js?v=20260909-1"></script>
 </head>
 <body>
   <div class="pbs-app" data-playbook-studio data-setplay-id="{{ setplay.id }}" data-equipa-id="{{ equipa.id }}" data-imported="{{ 'true' if setplay.origem == 'ebp' else 'false' }}">
@@ -48,6 +48,7 @@
         <button type="button" class="pbs-tool" data-tool="seta_tracejada" title="Passe reto ou curvo (P)"><b>⇢</b><span>Passe</span></button>
         <button type="button" class="pbs-tool" data-tool="seta_zigzag" title="Drible reto ou curvo (G)"><b>≋</b><span>Drible</span></button>
         <button type="button" class="pbs-tool" data-tool="bloqueio" title="Bloqueio reto ou curvo"><b>⊣</b><span>Bloqueio</span></button>
+        <button type="button" class="pbs-tool" data-tool="lancamento" title="Lançamento reto ou curvo (L)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h13M3 15h13"/><path d="m15 5 7 7-7 7Z" fill="currentColor" stroke="none"/></svg><span>Lançamento</span></button>
         <button type="button" class="pbs-tool" data-tool="caneta" title="Desenho livre"><b>✎</b><span>Caneta</span></button>
         <button type="button" class="pbs-tool" data-tool="borracha" title="Borracha (E)"><b>⌫</b><span>Borracha</span></button>
       </div>

@@ -19,11 +19,13 @@
   const notes = document.querySelector("[data-scene-notes]");
   const saveState = document.querySelector("[data-save-state]");
   const data = JSON.parse(document.querySelector("#pbs-studio-data")?.textContent || "{}");
-  const movementTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "seta_curva", "bloqueio", "linha"]);
+  const movementTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "seta_curva", "bloqueio", "linha", "lancamento"]);
   const markerTypes = new Set(["jogador_ataque", "jogador_defesa", "bola", "cone", "coach"]);
   const straightLineTypes = new Set(["linha"]);
-  const curvedMovementTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "bloqueio"]);
-  const playerMovementTypes = new Set(["seta", "seta_zigzag", "seta_curva"]);
+  const curvedMovementTypes = new Set(["seta", "seta_tracejada", "seta_zigzag", "bloqueio", "lancamento"]);
+  const playerMovementTypes = new Set(["seta", "seta_zigzag", "seta_curva", "bloqueio"]);
+  const PREVIEW_READ_MS = 1400;
+  const PREVIEW_MOVE_MS = 1500;
 
   let scenes = (data.passos || []).map(normalizeScene).sort((a, b) => a.ordem - b.ordem);
   let activeId = scenes[0]?.id || null;
@@ -81,7 +83,6 @@
         object.largura = Number(object.largura || 1) * sx;
         object.altura = Number(object.altura || 1) * sy;
       }
-      cleanDrawnLine(object);
       return object;
     }) : [];
     return {
@@ -219,18 +220,55 @@
 
   function zigzagPoints(points) {
     if (points.length < 2) return points;
-    const output = [points[0]];
-    for (let index = 1; index < points.length; index += 1) {
-      const a = points[index - 1]; const b = points[index];
-      const length = Math.hypot(b.x - a.x, b.y - a.y); const count = Math.max(2, Math.floor(length / 18));
-      const nx = -(b.y - a.y) / Math.max(1, length); const ny = (b.x - a.x) / Math.max(1, length);
-      for (let step = 1; step < count; step += 1) {
-        const ratio = step / count; const side = step % 2 ? 8 : -8;
-        output.push({ x: a.x + (b.x - a.x) * ratio + nx * side, y: a.y + (b.y - a.y) * ratio + ny * side });
+    const total = pathLength(points);
+    const waves = Math.max(1, Math.round(total / 30));
+    const count = Math.max(2, Math.ceil(total / 3));
+    return Array.from({ length: count + 1 }, (_, index) => {
+      const t = index / count;
+      const point = pointAlong(points, t);
+      const before = pointAlong(points, Math.max(0, t - 1 / count));
+      const after = pointAlong(points, Math.min(1, t + 1 / count));
+      const angle = Math.atan2(after.y - before.y, after.x - before.x);
+      const offset = index === 0 || index === count ? 0 : Math.sin(t * waves * Math.PI * 2) * Math.min(7, total / 8);
+      return { x: point.x - Math.sin(angle) * offset, y: point.y + Math.cos(angle) * offset };
+    });
+  }
+
+  function pathLength(points) {
+    return points.slice(1).reduce((sum, point, index) => sum + Math.hypot(point.x - points[index].x, point.y - points[index].y), 0);
+  }
+
+  function trimPath(points, trim) {
+    const limit = Math.max(0, pathLength(points) - trim);
+    const result = [points[0]];
+    let travelled = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      const a = points[i - 1]; const b = points[i];
+      const length = Math.hypot(b.x - a.x, b.y - a.y);
+      if (travelled + length >= limit) {
+        const t = length ? (limit - travelled) / length : 0;
+        result.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+        break;
       }
-      output.push(b);
+      result.push(b); travelled += length;
     }
-    return output;
+    return result;
+  }
+
+  function smoothMovement(points) {
+    // Resample before smoothing so pointer speed does not change the curve.
+    const count = Math.max(2, Math.min(400, Math.ceil(pathLength(points) / 8)));
+    let result = Array.from({ length: count + 1 }, (_, i) => pointAlong(points, i / count));
+    for (let pass = 0; pass < 2; pass += 1) {
+      const next = [result[0]];
+      for (let i = 1; i < result.length; i += 1) {
+        const a = result[i - 1]; const b = result[i];
+        next.push({ x: a.x * .75 + b.x * .25, y: a.y * .75 + b.y * .25 });
+        next.push({ x: a.x * .25 + b.x * .75, y: a.y * .25 + b.y * .75 });
+      }
+      next.push(result.at(-1)); result = next;
+    }
+    return result;
   }
 
   function fitCurve(points) {
@@ -319,31 +357,49 @@
       const length = Math.hypot(end.x - start.x, end.y - start.y);
       const deviation = object.pontos.slice(1, -1).reduce((max, point) => Math.max(max, distanceToSegment(point, start, end)), 0);
       object.curva = object.pontos.length > 2 && deviation > Math.max(8, length * .07);
-      object.pontos = object.curva ? fitCurve(object.pontos) : [start, end];
+      object.pontos = object.curva ? smoothMovement(object.pontos) : [start, end];
     } else if (straightLineTypes.has(object.tipo)) object.pontos = [start, end];
   }
 
   function drawLine(target, object, alpha = 1) {
-    let points = object.pontos || [];
-    if (points.length < 2) return;
-    if (object.tipo === "seta_zigzag" && !object.curva) points = zigzagPoints(points);
+    const trajectory = object.pontos || [];
+    if (trajectory.length < 2) return;
+    const hasArrow = !["linha", "caneta", "bloqueio"].includes(object.tipo);
+    const headLength = Math.min(22, pathLength(trajectory) * .4);
+    const end = trajectory.at(-1);
+    const before = [...trajectory].reverse().find(point => Math.hypot(end.x - point.x, end.y - point.y) > .01) || trajectory[0];
+    const angle = Math.atan2(end.y - before.y, end.x - before.x);
+    const base = { x: end.x - Math.cos(angle) * headLength, y: end.y - Math.sin(angle) * headLength };
+    let points = hasArrow ? trimPath(trajectory, headLength) : trajectory;
+    if (hasArrow) points[points.length - 1] = base;
+    if (object.tipo === "seta_zigzag") points = zigzagPoints(points);
     target.save(); target.globalAlpha = alpha; target.strokeStyle = object.cor || "#202936"; target.fillStyle = object.cor || "#202936";
-    target.lineWidth = Number(object.largura) || 6; target.lineCap = "round"; target.lineJoin = "round";
+    target.lineWidth = Number(object.largura) || 6; target.lineCap = hasArrow ? "butt" : "round"; target.lineJoin = "round";
     target.setLineDash(object.tipo === "seta_tracejada" ? [15, 12] : []);
     target.beginPath(); target.moveTo(points[0].x, points[0].y);
     if (object.tipo === "caneta") {
       for (let i = 1; i < points.length - 1; i += 1) target.quadraticCurveTo(points[i].x, points[i].y, (points[i].x + points[i + 1].x) / 2, (points[i].y + points[i + 1].y) / 2);
       target.lineTo(points.at(-1).x, points.at(-1).y);
+    } else if (object.tipo === "lancamento") {
+      target.lineWidth = Math.max(2, target.lineWidth * .55);
+      target.beginPath();
+      for (const side of [-1, 1]) {
+        points.forEach((point, index) => {
+          const a = points[Math.max(0, index - 1)]; const b = points[Math.min(points.length - 1, index + 1)];
+          const tangent = Math.atan2(b.y - a.y, b.x - a.x);
+          const x = point.x - Math.sin(tangent) * side * 5;
+          const y = point.y + Math.cos(tangent) * side * 5;
+          if (index === 0) target.moveTo(x, y); else target.lineTo(x, y);
+        });
+      }
     } else points.slice(1).forEach((point) => target.lineTo(point.x, point.y));
     target.stroke(); target.setLineDash([]);
-    const end = points.at(-1); const before = points.at(-2); const angle = Math.atan2(end.y - before.y, end.x - before.x);
     if (object.tipo === "bloqueio") {
       target.beginPath(); target.moveTo(end.x - Math.sin(angle) * 18, end.y + Math.cos(angle) * 18); target.lineTo(end.x + Math.sin(angle) * 18, end.y - Math.cos(angle) * 18); target.stroke();
     } else if (!["linha", "caneta"].includes(object.tipo)) {
-      const length = 22;
-      const baseX = end.x - Math.cos(angle) * length;
-      const baseY = end.y - Math.sin(angle) * length;
-      const halfWidth = 8;
+      const baseX = base.x;
+      const baseY = base.y;
+      const halfWidth = Math.min(10, headLength * .5);
       target.beginPath();
       target.moveTo(end.x, end.y);
       target.lineTo(baseX - Math.sin(angle) * halfWidth, baseY + Math.cos(angle) * halfWidth);
@@ -665,8 +721,7 @@
       cleanDrawnLine(object);
     }
     if (wasDrawing && object?.pontos?.length >= 2) {
-      const start = object.pontos[0]; const end = object.pontos.at(-1);
-      if (Math.hypot(end.x - start.x, end.y - start.y) < 2) scene.objects.splice(scene.objects.indexOf(object), 1);
+      if (pathLength(object.pontos) < 2) scene.objects.splice(scene.objects.indexOf(object), 1);
     } else if (wasDrawing && object) scene.objects.splice(scene.objects.indexOf(object), 1);
     render(); renderTimeline(); saveScene(scene);
   }
@@ -687,7 +742,7 @@
   }
 
   function movementLabel(object, index) {
-    const labels = { seta: "Movimento", seta_curva: "Movimento curvo", seta_tracejada: "Passe", seta_zigzag: "Drible", bloqueio: "Bloqueio", linha: "Indicação" };
+    const labels = { seta: "Movimento", seta_curva: "Movimento curvo", seta_tracejada: "Passe", seta_zigzag: "Drible", bloqueio: "Bloqueio", linha: "Indicação", lancamento: "Lançamento" };
     const start = object.pontos?.[0];
     const players = activeScene()?.objects.filter((item) => item.tipo.startsWith("jogador_") && start) || [];
     const player = players.sort((a, b) => Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y))[0];
@@ -768,23 +823,31 @@
     const markers = scene.objects
       .filter((object) => markerTypes.has(object.tipo))
       .map((object) => ({ ...clone(object), id: uid() }));
-    actionPlan(scene).forEach((group) => {
-      const changes = [];
-      group.actions.forEach((action) => {
-        const start = action.pontos?.[0];
-        const end = action.pontos?.at(-1);
-        if (!start || !end) return;
-        let actor = null;
-        if (playerMovementTypes.has(action.tipo)) {
-          actor = nearestMarker(markers, start, (object) => object.tipo?.startsWith("jogador_"));
-        } else if (action.tipo === "seta_tracejada") {
-          actor = nearestMarker(markers, start, (object) => object.tipo === "bola");
-        }
-        if (actor) changes.push({ actor, end });
-      });
-      changes.forEach(({ actor, end }) => { actor.x = end.x; actor.y = end.y; });
-    });
+    actionPlan(scene).forEach(group => applyMovementGroup(markers, group, 1));
     return markers;
+  }
+
+  function applyMovementGroup(objects, group, progress) {
+    const changes = [];
+    group.actions.forEach(action => {
+      const start = action.pontos[0];
+      const position = pointAlong(action.pontos, progress);
+      const isBall = ["seta_tracejada", "lancamento"].includes(action.tipo);
+      const actor = isBall
+        ? nearestMarker(objects, start, object => object.tipo === "bola")
+        : playerMovementTypes.has(action.tipo)
+          ? nearestMarker(objects, start, object => object.tipo?.startsWith("jogador_")) : null;
+      if (!actor) return;
+      changes.push({ actor, position });
+      if (action.tipo === "seta_zigzag") {
+        const ball = nearestMarker(objects, actor, object => object.tipo === "bola");
+        if (ball && Math.hypot(ball.x - actor.x, ball.y - actor.y) < 45) {
+          changes.push({ actor: ball, position: { x: position.x + ball.x - actor.x, y: position.y + ball.y - actor.y } });
+        }
+      }
+    });
+    // Resolve simultaneous actions against the same starting positions.
+    changes.forEach(({ actor, position }) => Object.assign(actor, position));
   }
 
   function pointAlong(points, progress) {
@@ -801,35 +864,46 @@
   }
 
   function animatedObjects(scene, groupIndex, progress) {
-    const objects = clone(scene.objects); const groups = actionPlan(scene); const group = groups[groupIndex];
-    const activeIds = new Set(group?.actions.map((action) => action.id) || []);
+    const objects = clone(scene.objects); const groups = actionPlan(scene);
     objects.forEach((object) => {
-      if (movementTypes.has(object.tipo)) object.hidden = !activeIds.has(object.id) || progress > 0.02;
+      if (movementTypes.has(object.tipo) || object.tipo === "caneta") object.hidden = true;
     });
-    if (!group) return objects;
-    group.actions.forEach((action) => {
-      const copy = objects.find((object) => object.id === action.id); if (copy) copy.previewProgress = progress;
-      const start = action.pontos[0];
-      let actor = objects.filter((object) => object.tipo.startsWith("jogador_")).sort((a, b) => Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y))[0];
-      if (action.tipo === "seta_tracejada") actor = objects.filter((object) => object.tipo === "bola").sort((a, b) => Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y))[0] || actor;
-      if (actor && Math.hypot(actor.x - start.x, actor.y - start.y) < 110) Object.assign(actor, pointAlong(action.pontos, progress));
-    });
+    for (let index = 0; index <= groupIndex && index < groups.length; index += 1) {
+      applyMovementGroup(objects, groups[index], index < groupIndex ? 1 : progress);
+    }
     return objects;
   }
 
+  function scenePreviewDuration(scene) {
+    return PREVIEW_READ_MS + (imported ? 0 : actionPlan(scene).length * PREVIEW_MOVE_MS);
+  }
+
   function previewDuration() {
-    return scenes.reduce((total, scene) => total + Math.max(1, actionPlan(scene).length) * 1500, 0);
+    return scenes.reduce((total, scene) => total + scenePreviewDuration(scene), 0);
+  }
+
+  function previewAt(progress) {
+    let remaining = Math.max(0, Math.min(1, progress)) * previewDuration();
+    for (let index = 0; index < scenes.length; index += 1) {
+      const scene = scenes[index];
+      const duration = scenePreviewDuration(scene);
+      if (remaining < duration || index === scenes.length - 1) {
+        const count = actionPlan(scene).length;
+        const reading = imported || remaining < PREVIEW_READ_MS || count === 0;
+        const elapsed = Math.max(0, remaining - PREVIEW_READ_MS);
+        const groupIndex = Math.min(count - 1, Math.floor(elapsed / PREVIEW_MOVE_MS));
+        const local = Math.min(1, (elapsed - groupIndex * PREVIEW_MOVE_MS) / PREVIEW_MOVE_MS);
+        return { scene, index, reading, objects: reading ? scene.objects : animatedObjects(scene, groupIndex, local) };
+      }
+      remaining -= duration;
+    }
+    return { scene: null, index: 0, reading: true, objects: [] };
   }
 
   function renderPreview(progress) {
-    const duration = previewDuration(); let remaining = progress * duration; let scene = scenes[0]; let groupIndex = 0; let local = 0;
-    for (const candidate of scenes) {
-      const groups = Math.max(1, actionPlan(candidate).length); const sceneDuration = groups * 1500;
-      if (remaining <= sceneDuration) { scene = candidate; groupIndex = Math.min(groups - 1, Math.floor(remaining / 1500)); local = (remaining % 1500) / 1500; break; }
-      remaining -= sceneDuration; scene = candidate; groupIndex = groups - 1; local = 1;
-    }
-    const index = Math.max(0, scenes.indexOf(scene));
-    document.querySelector("[data-preview-scene]").textContent = `Cena ${index + 1} de ${scenes.length}`;
+    const duration = previewDuration();
+    const { scene, index, reading, objects } = previewAt(progress);
+    document.querySelector("[data-preview-scene]").textContent = `Cena ${index + 1} de ${scenes.length} · ${reading ? "Desenho" : "Movimento"}`;
     document.querySelector("[data-preview-notes]").textContent = scene?.observacao || "Sem instruções.";
     const importedImage = document.querySelector("[data-preview-imported]");
     if (imported) { importedImage.src = scene?.imagemCoach || scene?.desenho || ""; importedImage.hidden = !importedImage.src; previewCanvas.hidden = true; }
@@ -838,10 +912,11 @@
       const court = dimensions(scene); const wrap = document.querySelector(".pbs-preview-court");
       previewCanvas.width = court.width; previewCanvas.height = court.height; wrap.style.aspectRatio = `${court.width} / ${court.height}`;
       document.querySelector("[data-preview-court-image]").src = court.src;
-      render(previewCtx, scene ? animatedObjects(scene, groupIndex, local) : [], false);
+      render(previewCtx, objects, false);
     }
     document.querySelector("[data-preview-progress]").value = Math.round(progress * 1000);
-    document.querySelector("[data-preview-time]").textContent = `0:${String(Math.round(duration * progress / 1000)).padStart(2, "0")}`;
+    const seconds = Math.round(duration * progress / 1000);
+    document.querySelector("[data-preview-time]").textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
   }
 
   function previewTick(time) {
@@ -909,7 +984,7 @@
     document.querySelector("[data-mobile-inspector]")?.addEventListener("click", () => closeMobilePanels(document.querySelector(".pbs-inspector")));
     document.addEventListener("keydown", (event) => {
       if (event.target.matches("input,textarea,select")) return;
-      const shortcuts = { v: "selecionar", a: "jogador_ataque", d: "jogador_defesa", m: "seta", p: "seta_tracejada", g: "seta_zigzag", e: "borracha" };
+      const shortcuts = { v: "selecionar", a: "jogador_ataque", d: "jogador_defesa", m: "seta", p: "seta_tracejada", g: "seta_zigzag", l: "lancamento", e: "borracha" };
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redo() : undo(); }
       else if (["Backspace", "Delete"].includes(event.key) && selectedId) { const scene = activeScene(); const object = scene.objects.find((item) => item.id === selectedId); if (object) { snapshot(scene); scene.objects.splice(scene.objects.indexOf(object), 1); selectedId = null; render(); renderTimeline(); saveScene(scene); } }
       else if (shortcuts[event.key.toLowerCase()]) setTool(shortcuts[event.key.toLowerCase()]);
