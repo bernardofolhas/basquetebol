@@ -44,7 +44,7 @@ def _equipas_para_utilizador(utilizador, db: Session) -> list:
     """Devolve as equipas acessíveis pelo utilizador atual."""
     if verificar_perfil(utilizador, ["administrador", "coordenador"]):
         return db.query(Equipa).all()
-    if utilizador.perfil == PerfilEnum.staff:
+    if utilizador.perfil in {PerfilEnum.staff, PerfilEnum.fisioterapeuta}:
         return list(utilizador.equipas_staff or [])
     if utilizador.treinador_id:
         from models.treinador import Treinador
@@ -61,7 +61,7 @@ def _verificar_acesso_jogador(utilizador, jogador: Jogador, db: Session) -> None
         return
     if jogador.equipa_id:
         verificar_ou_negar_equipa(utilizador, jogador.equipa_id, db)
-    elif verificar_perfil(utilizador, ["treinador", "staff"]):
+    elif verificar_perfil(utilizador, ["treinador", "staff", "fisioterapeuta"]):
         raise AcessoNegado("/jogadores")
 
 

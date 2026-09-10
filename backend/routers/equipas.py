@@ -97,7 +97,7 @@ def listar_equipas(
     from auth import verificar_perfil
     if verificar_perfil(utilizador, ["administrador", "coordenador"]):
         equipas = db.query(Equipa).options(joinedload(Equipa.jogadores)).all()
-    elif getattr(utilizador.perfil, "value", utilizador.perfil) == "staff":
+    elif getattr(utilizador.perfil, "value", utilizador.perfil) in {"staff", "fisioterapeuta"}:
         equipas = list(utilizador.equipas_staff or [])
     else:
         if utilizador.treinador_id:
@@ -177,13 +177,18 @@ def detalhe_equipa(
         db, equipa_id, inicio_semana, inicio_semana + timedelta(days=6)
     )
 
-    return templates.TemplateResponse(request, "equipas/detalhe.html", {
+    template = "equipas/resumo_fisioterapeuta.html" if utilizador.perfil.value == "fisioterapeuta" else "equipas/detalhe.html"
+    contexto = {
         "utilizador": utilizador,
         "equipa": equipa,
         "agenda_proxima": agenda,
         "semana_prevista": semana_prevista,
         "erro": None,
-    })
+    }
+    if utilizador.perfil.value == "fisioterapeuta":
+        from services.dashboard_service import obter_resumo_fisioterapia
+        contexto["dados_fisioterapia"] = obter_resumo_fisioterapia(db, equipa)
+    return templates.TemplateResponse(request, template, contexto)
 
 
 @router.get("/{equipa_id}/equipa-tecnica", response_class=HTMLResponse)

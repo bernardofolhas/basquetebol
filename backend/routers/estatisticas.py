@@ -68,7 +68,7 @@ def _eventos_jogo(db: Session, jogo_id: int) -> list[EventoEstatistica]:
 
 
 def _pode_registar(utilizador) -> bool:
-    return utilizador.perfil.value in {"administrador", "coordenador", "treinador", "superadministrador"}
+    return utilizador.perfil.value in {"administrador", "coordenador", "treinador", "fisioterapeuta", "superadministrador"}
 
 
 def _jogadores_equipa(db: Session, equipa_id: int) -> list[Jogador]:

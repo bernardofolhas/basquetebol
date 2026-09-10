@@ -32,6 +32,11 @@ def _equipas_permitidas(db, utilizador, clube_atual=None) -> list:
             list(getattr(utilizador, "equipas_staff", []) or []),
             key=lambda equipa: equipa.nome.lower(),
         )
+    if utilizador.perfil == PerfilEnum.fisioterapeuta:
+        return sorted(
+            list(getattr(utilizador, "equipas_staff", []) or []),
+            key=lambda equipa: equipa.nome.lower(),
+        )
     if utilizador.perfil in {PerfilEnum.administrador, PerfilEnum.coordenador, PerfilEnum.superadministrador}:
         clube_id = getattr(clube_atual, "id", None) or getattr(utilizador, "clube_id", None)
         if clube_id:
@@ -124,7 +129,7 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
         }
 
     equipas = _equipas_permitidas(db, utilizador, clube_atual)
-    equipa_ids = [equipa.id for equipa in equipas] if utilizador.perfil in {PerfilEnum.treinador, PerfilEnum.staff} else None
+    equipa_ids = [equipa.id for equipa in equipas] if utilizador.perfil in {PerfilEnum.treinador, PerfilEnum.staff, PerfilEnum.fisioterapeuta} else None
     painel = obter_painel_operacional(
         db,
         equipa_ids=equipa_ids,
@@ -133,6 +138,8 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
     tarefas = painel.get("tarefas", [])
     if utilizador.perfil == PerfilEnum.secretaria:
         tarefas = [tarefa for tarefa in tarefas if _grupo_tarefa(tarefa) == "secretaria"]
+    elif utilizador.perfil == PerfilEnum.fisioterapeuta:
+        tarefas = []
     elif utilizador.perfil == PerfilEnum.coordenador:
         # A coordenação mantém acesso aos registos, sem os receber como pendências diárias.
         tarefas = [tarefa for tarefa in tarefas if _grupo_tarefa(tarefa) != "secretaria"]

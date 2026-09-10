@@ -26,7 +26,7 @@
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Perfil</th>
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Treinador</th>
-        <th class="text-left px-4 py-3 font-semibold text-gray-600">Equipas de staff</th>
+        <th class="text-left px-4 py-3 font-semibold text-gray-600">Equipas atribuídas</th>
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Estado</th>
         <th class="text-left px-4 py-3 font-semibold text-gray-600">Ações</th>
         </tr>
@@ -39,7 +39,7 @@
                 <td class="px-4 py-3 text-gray-600">{{ u.email }}</td>
                 <td class="px-4 py-3">
                     <span class="inline-block bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full">
-                        {{ u.perfil.value }}
+                        {{ 'Fisioterapeuta' if u.perfil.value == 'fisioterapeuta' else u.perfil.value }}
                     </span>
                 </td>
                 <td class="px-4 py-3 text-gray-600">
@@ -50,7 +50,7 @@
                     {% endif %}
                 </td>
                 <td class="px-4 py-3 text-gray-600">
-                    {% if u.perfil.value == 'staff' %}{{ u.equipas_staff | map(attribute='nome') | join(', ') or 'Sem equipas atribuídas' }}{% else %}—{% endif %}
+                    {% if u.perfil.value in ['staff', 'fisioterapeuta'] %}{{ u.equipas_staff | map(attribute='nome') | join(', ') or 'Sem equipas atribuídas' }}{% else %}—{% endif %}
                 </td>
                 <td class="px-4 py-3">
                     {% if u.ativo %}

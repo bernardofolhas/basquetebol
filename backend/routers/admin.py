@@ -137,7 +137,7 @@ async def criar_utilizador(
 
     try:
         perfil_enum = PerfilEnum(perfil)
-        equipas_staff = _equipas_staff_selecionadas(db, equipa_ids, utilizador.clube_id) if perfil_enum == PerfilEnum.staff else []
+        equipas_staff = _equipas_staff_selecionadas(db, equipa_ids, utilizador.clube_id) if perfil_enum in {PerfilEnum.staff, PerfilEnum.fisioterapeuta} else []
     except ValueError as erro:
         return templates.TemplateResponse(request, "admin/utilizadores_form.html", _contexto_formulario_utilizador(db, utilizador, erro=str(erro)))
 
@@ -208,7 +208,7 @@ async def editar_utilizador(
 
     try:
         perfil_enum = PerfilEnum(perfil)
-        equipas_staff = _equipas_staff_selecionadas(db, equipa_ids, admin.clube_id) if perfil_enum == PerfilEnum.staff else []
+        equipas_staff = _equipas_staff_selecionadas(db, equipa_ids, admin.clube_id) if perfil_enum in {PerfilEnum.staff, PerfilEnum.fisioterapeuta} else []
     except ValueError as erro:
         return templates.TemplateResponse(request, "admin/utilizadores_form.html", _contexto_formulario_utilizador(db, admin, utilizador_editar, str(erro), "editar"))
 

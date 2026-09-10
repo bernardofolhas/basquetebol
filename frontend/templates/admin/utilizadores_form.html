@@ -51,8 +51,8 @@
         </div>
 
         <div id="equipas-staff" class="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Equipas do staff</label>
-            <p class="mb-2 text-xs text-slate-500">Uma conta de staff só vê e edita estas equipas. Não pode alterar planeamento, scouting ou planos de jogo.</p>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Equipas atribuídas</label>
+            <p class="mb-2 text-xs text-slate-500">A conta só vê as equipas selecionadas. O fisioterapeuta pode trabalhar todos os dados dessas equipas.</p>
             <select name="equipa_ids" multiple size="{{ [equipas|length, 6]|min }}"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
                 {% set equipas_staff_ids = utilizador_editar.equipas_staff | map(attribute='id') | list if modo == 'editar' else [] %}
@@ -78,7 +78,7 @@
                     {% for p in perfis %}
                     <option value="{{ p.value }}"
                         {% if modo == "editar" and utilizador_editar.perfil.value == p.value %}selected{% endif %}>
-                        {{ 'Staff da equipa' if p.value == 'staff' else p.value|capitalize }}
+                        {{ 'Staff da equipa' if p.value == 'staff' else ('Fisioterapeuta' if p.value == 'fisioterapeuta' else p.value|capitalize) }}
                     </option>
                     {% endfor %}
                 </select>
@@ -128,7 +128,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const perfil = document.querySelector('select[name="perfil"]');
     const equipasStaff = document.getElementById('equipas-staff');
-    const atualizar = () => { equipasStaff.hidden = perfil.value !== 'staff'; };
+    const atualizar = () => { equipasStaff.hidden = !['staff', 'fisioterapeuta'].includes(perfil.value); };
     perfil.addEventListener('change', atualizar);
     atualizar();
 });

@@ -19,10 +19,10 @@
     <button id="sidebar-close" type="button" aria-label="Esconder navegação">×</button>
   </div>
   <nav id="sidebar-scroll" aria-label="Páginas da plataforma">
-    {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
+    {% if not modo_plataforma and perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta', 'superadministrador'] %}
     <form action="/pesquisa" method="get" class="sidebar-search"><input name="q" minlength="2" aria-label="Pesquisar no clube" placeholder="Pesquisar no clube"><button type="submit" aria-label="Pesquisar">→</button></form>
     {% endif %}
-    <div class="sidebar-sections">
+    <div class="sidebar-sections {% if perfil == 'fisioterapeuta' %}sidebar-sections-physio{% endif %}">
       <a href="{{ nav.dashboard_url|default('/dashboard') }}" class="sidebar-heading {% if p == '/dashboard' %}is-active{% endif %}">Início</a>
 
       {% if perfil == 'atleta' %}
@@ -46,7 +46,7 @@
         </div>
       </section>
       {% else %}
-      {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
+      {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta', 'superadministrador'] %}
       <section class="sidebar-group ds-nav-order-equipa">
         <h2 class="sidebar-heading {% if not equipa_contexto_id and p.startswith('/equipas') %}is-active{% endif %}">
           <span>Equipa</span>
@@ -117,7 +117,7 @@
             {{ menu_link('/equipas/' ~ equipa_contexto_id ~ '/eventos', 'Eventos', 'Atividades da equipa', p.endswith('/eventos')) }}
           </div>
           {% endif %}
-          {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
+          {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta', 'superadministrador'] %}
           {{ menu_link('/calendario', 'Calendário operacional', 'Toda a atividade do clube', p.startswith('/calendario')) }}
           {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}
@@ -133,11 +133,11 @@
           {{ menu_link('/planeamento-clube/semanal', 'Horários previstos', 'Consulta semanal') }}
           {{ menu_link('/planeamento-clube/espacos', 'Espaços e horários', 'Consulta de espaços') }}
           {% endif %}
-          {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}{{ menu_link('/biblioteca', 'Biblioteca de exercícios', 'Pesquisar e reutilizar') }}{% endif %}
+          {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta', 'superadministrador'] %}{{ menu_link('/biblioteca', 'Biblioteca de exercícios', 'Pesquisar e reutilizar') }}{% endif %}
         </div>
       </section>
 
-      {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
+      {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta', 'superadministrador'] %}
       <section class="sidebar-group ds-nav-order-analise">
         <h2 class="sidebar-heading {% if p.startswith('/analise') or p.startswith('/fisico/jogadores') or p.startswith('/scouting') or p.startswith('/questionarios') or p.startswith('/dashboard/clube/carga') or p.startswith('/dashboard/clube/executado') %}is-active{% endif %}">Análise </h2>
         <div class="sidebar-pages w-[25rem]">

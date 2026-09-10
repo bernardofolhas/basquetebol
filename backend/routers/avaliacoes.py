@@ -38,7 +38,7 @@ PARAMETROS_INICIAIS = {
 
 def _pode_editar(utilizador) -> bool:
     return utilizador.perfil.value in {
-        "administrador", "coordenador", "treinador", "staff", "superadministrador"
+        "administrador", "coordenador", "treinador", "staff", "fisioterapeuta", "superadministrador"
     }
 
 

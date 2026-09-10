@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 def _pode_editar_fisico(utilizador) -> bool:
     return utilizador.perfil.value in {
-        "administrador", "coordenador", "treinador", "staff", "superadministrador"
+        "administrador", "coordenador", "treinador", "staff", "fisioterapeuta", "superadministrador"
     }
 
 

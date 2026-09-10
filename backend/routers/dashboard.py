@@ -14,6 +14,7 @@ from services.dashboard_service import (
     get_dashboard_clube_executado,
     get_dashboard_clube_sincronizacao,
     get_dashboard_coordenador,
+    get_dashboard_fisioterapeuta,
     get_dashboard_treinador,
 )
 
@@ -32,6 +33,9 @@ def dashboard(
         return RedirectResponse(url="/superadmin/clubes", status_code=303)
     if utilizador.perfil.value == "atleta":
         return RedirectResponse(url="/questionarios/diario", status_code=303)
+    if utilizador.perfil.value == "fisioterapeuta":
+        contexto = get_dashboard_fisioterapeuta(db, utilizador)
+        return templates.TemplateResponse(request, "dashboard_fisioterapeuta.html", contexto)
     if utilizador.perfil.value in {"treinador", "staff"}:
         contexto = get_dashboard_treinador(db, utilizador)
         return templates.TemplateResponse(request, "dashboard_treinador.html", contexto)

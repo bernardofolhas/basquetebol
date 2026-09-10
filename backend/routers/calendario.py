@@ -45,6 +45,8 @@ def _equipas_visiveis(db: Session, utilizador) -> list[Equipa]:
     if utilizador.perfil.value == "treinador":
         treinador = db.query(Treinador).filter(Treinador.id == utilizador.treinador_id).first()
         return list(treinador.equipas) if treinador else []
+    if utilizador.perfil.value in {"staff", "fisioterapeuta"}:
+        return list(getattr(utilizador, "equipas_staff", []) or [])
     return db.query(Equipa).order_by(Equipa.nome).all()
 
 
@@ -79,7 +81,9 @@ def _obter_contexto_calendario(request: Request, db: Session, utilizador) -> dic
     ids_visiveis = [equipa.id for equipa in equipas]
     filtro_equipa = request.query_params.get("equipa_id", "").strip()
     equipa_id = int(filtro_equipa) if filtro_equipa.isdigit() and int(filtro_equipa) in ids_visiveis else None
-    ids_consulta = [equipa_id] if equipa_id else (ids_visiveis if utilizador.perfil.value == "treinador" else None)
+    ids_consulta = [equipa_id] if equipa_id else (
+        ids_visiveis if utilizador.perfil.value in {"treinador", "staff", "fisioterapeuta"} else None
+    )
     itens = _obter_itens_calendario(db, inicio, fim, ids_consulta, utilizador.perfil.value)
     itens_por_data: dict[date, list] = {}
     for item in itens:

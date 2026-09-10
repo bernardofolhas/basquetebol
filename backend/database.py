@@ -149,6 +149,13 @@ def actualizar_estrutura_perfis() -> None:
         if not existe_staff:
             ligacao.execute(text("ALTER TYPE perfilenum ADD VALUE 'staff'"))
             logger.info("Perfil 'staff' adicionado ao enum da base de dados.")
+        existe_fisioterapeuta = ligacao.execute(text(
+            "SELECT 1 FROM pg_enum "
+            "WHERE enumtypid = 'perfilenum'::regtype AND enumlabel = 'fisioterapeuta'"
+        )).first()
+        if not existe_fisioterapeuta:
+            ligacao.execute(text("ALTER TYPE perfilenum ADD VALUE 'fisioterapeuta'"))
+            logger.info("Perfil 'fisioterapeuta' adicionado ao enum da base de dados.")
         existe_atleta = ligacao.execute(text(
             "SELECT 1 FROM pg_enum "
             "WHERE enumtypid = 'perfilenum'::regtype AND enumlabel = 'atleta'"
@@ -209,7 +216,7 @@ def actualizar_estrutura_questionarios() -> None:
 
 
 def actualizar_estrutura_staff() -> None:
-    """Cria os vínculos de staff e converte a conta Staff23 sem alterar credenciais."""
+    """Cria vínculos de equipas para staff e fisioterapeutas."""
     inspector = inspect(engine)
     if not inspector.has_table("utilizadores") or not inspector.has_table("equipas"):
         return

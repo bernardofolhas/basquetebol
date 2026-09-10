@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block titulo %}Dashboard do fisioterapeuta{% endblock %}
+
+{% block conteudo %}
+<div class="mb-8 rounded-3xl bg-slate-950 px-6 py-8 text-white shadow-xl sm:px-8">
+    <p class="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">Área de análise e bem-estar</p>
+    <div class="mt-3 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+        <div>
+            <h1 class="text-3xl font-black tracking-tight">Dashboard do fisioterapeuta</h1>
+            <p class="mt-2 max-w-2xl text-sm text-slate-300">Respostas dos atletas, alertas de bem-estar e carga planeada das equipas atribuídas.</p>
+        </div>
+        <div class="rounded-2xl bg-white/10 px-5 py-4 text-right">
+            <p class="text-2xl font-black">{{ dados_equipas|length }}</p>
+            <p class="text-xs text-slate-300">equipa(s) atribuída(s)</p>
+        </div>
+    </div>
+</div>
+
+{% if dados_equipas %}
+<div class="space-y-8">
+{% for dados in dados_equipas %}
+<section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex flex-col justify-between gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center">
+        <div>
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Equipa atribuída</p>
+            <h2 class="mt-1 text-2xl font-black text-slate-900">{{ dados.equipa.nome }}</h2>
+            <p class="mt-1 text-sm text-slate-500">Semana de {{ dados.inicio_semana|data_pt }} a {{ dados.fim_semana|data_pt }}</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="/questionarios/equipas/{{ dados.equipa.id }}" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700">Abrir questionários</a>
+            <a href="/equipas/{{ dados.equipa.id }}/resumo" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Resumo da equipa</a>
+        </div>
+    </div>
+
+    <div class="grid gap-4 border-b border-slate-100 bg-slate-50/70 p-6 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-100"><p class="text-xs font-bold uppercase tracking-wider text-slate-400">Resposta hoje</p><p class="mt-2 text-3xl font-black text-slate-900">{{ dados.respostas_hoje }}</p><p class="mt-1 text-xs text-slate-500">{{ dados.taxa_resposta }}% dos atletas ativos</p></div>
+        <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-100"><p class="text-xs font-bold uppercase tracking-wider text-slate-400">Alertas</p><p class="mt-2 text-3xl font-black {% if dados.alertas %}text-red-600{% else %}text-emerald-600{% endif %}">{{ dados.alertas|length }}</p><p class="mt-1 text-xs text-slate-500">queixas, dor ou PSE elevado</p></div>
+        <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-100"><p class="text-xs font-bold uppercase tracking-wider text-slate-400">Carga semanal</p><p class="mt-2 text-3xl font-black text-slate-900">{{ dados.carga_total }}</p><p class="mt-1 text-xs text-slate-500">minutos × RPE planeados</p></div>
+        <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-100"><p class="text-xs font-bold uppercase tracking-wider text-slate-400">Treino físico</p><p class="mt-2 text-3xl font-black text-slate-900">{{ dados.minutos_fisicos }} <span class="text-base font-bold">min</span></p><p class="mt-1 text-xs text-slate-500">{{ dados.sessoes_fisicas|length }} sessão(ões) · RPE {{ dados.media_rpe }}</p></div>
+    </div>
+
+    <div class="grid gap-6 p-6 xl:grid-cols-[1.15fr_.85fr]">
+        <div>
+            <div class="flex items-center justify-between gap-3"><h3 class="text-lg font-black text-slate-900">Questionários</h3><span class="text-sm text-slate-500">{{ dados.respostas_semana }} respostas esta semana</span></div>
+            <div class="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200">
+                {% for questionario in dados.questionarios %}
+                <a href="/questionarios/modelos/{{ questionario.id }}" class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"><span class="font-semibold text-slate-800">{{ questionario.nome }}</span><span class="text-sm font-bold text-emerald-700">Abrir</span></a>
+                {% else %}<p class="px-4 py-5 text-sm text-slate-500">Ainda não existem questionários personalizados para esta equipa.</p>{% endfor %}
+            </div>
+        </div>
+        <div>
+            <div class="flex items-center justify-between gap-3"><h3 class="text-lg font-black text-slate-900">Atenção necessária</h3><a href="/analise/equipas/{{ dados.equipa.id }}" class="text-sm font-bold text-emerald-700">Analisar equipa</a></div>
+            {% if dados.alertas %}
+            <div class="mt-4 space-y-2">{% for resposta in dados.alertas[:5] %}<div class="rounded-2xl border border-red-100 bg-red-50 px-4 py-3"><p class="font-bold text-red-900">{{ resposta.jogador.nome }}</p><p class="mt-1 text-xs text-red-700">PSE {{ resposta.pse_esforco }}/10 · Dor {{ resposta.dor_membros_inferiores }}/{{ resposta.dor_membros_superiores }}{% if resposta.tem_queixa %} · Queixa reportada{% endif %}</p></div>{% endfor %}</div>
+            {% else %}<div class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-5 text-sm font-semibold text-emerald-800">Sem alertas de bem-estar registados esta semana.</div>{% endif %}
+        </div>
+    </div>
+</section>
+{% endfor %}
+</div>
+{% else %}
+<div class="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center"><h2 class="text-xl font-black text-slate-900">Sem equipas atribuídas</h2><p class="mt-2 text-sm text-slate-500">Pede ao administrador do clube para associar uma ou mais equipas a esta conta.</p></div>
+{% endif %}
+{% endblock %}

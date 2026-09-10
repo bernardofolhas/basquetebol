@@ -12,6 +12,7 @@ class PerfilEnum(str, enum.Enum):
     treinador = "treinador"
     secretaria = "secretaria"
     staff = "staff"
+    fisioterapeuta = "fisioterapeuta"
     atleta = "atleta"
 
 

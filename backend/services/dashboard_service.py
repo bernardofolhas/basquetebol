@@ -438,6 +438,110 @@ def get_dashboard_treinador(db, utilizador):
     }
 
 
+def obter_resumo_fisioterapia(db, equipa, hoje=None):
+    """Resume questionários e carga da equipa para o trabalho do fisioterapeuta."""
+    from models.jogador import Jogador
+    from models.planeamento import SessaoTreino
+    from models.questionario import (
+        AplicacaoQuestionario,
+        QuestionarioPersonalizado,
+        RespostaQuestionarioDiario,
+    )
+
+    hoje = hoje or date.today()
+    inicio_semana = hoje - timedelta(days=hoje.weekday())
+    fim_semana = inicio_semana + timedelta(days=6)
+
+    sessoes = db.query(SessaoTreino).filter(
+        SessaoTreino.data >= inicio_semana,
+        SessaoTreino.data <= fim_semana,
+        SessaoTreino.e_jogo.is_(False),
+        SessaoTreino.ativa.is_(True),
+    ).all()
+    sessoes_equipa = []
+    for sessao in sessoes:
+        try:
+            if sessao.microciclo.mesociclo.macrociclo.equipa_id == equipa.id:
+                sessoes_equipa.append(sessao)
+        except AttributeError:
+            continue
+
+    questionarios = db.query(QuestionarioPersonalizado).filter(
+        QuestionarioPersonalizado.equipa_id == equipa.id,
+        QuestionarioPersonalizado.ativo.is_(True),
+    ).order_by(QuestionarioPersonalizado.nome).all()
+    aplicacoes = db.query(AplicacaoQuestionario).filter(
+        AplicacaoQuestionario.equipa_id == equipa.id,
+        AplicacaoQuestionario.data >= inicio_semana,
+        AplicacaoQuestionario.data <= fim_semana,
+        AplicacaoQuestionario.ativa.is_(True),
+    ).all()
+    respostas_personalizadas = sum(len(aplicacao.submissoes or []) for aplicacao in aplicacoes)
+    respostas_personalizadas_hoje = sum(
+        len(aplicacao.submissoes or []) for aplicacao in aplicacoes if aplicacao.data == hoje
+    )
+
+    respostas_diarias = db.query(RespostaQuestionarioDiario).join(Jogador).filter(
+        Jogador.equipa_id == equipa.id,
+        RespostaQuestionarioDiario.data >= inicio_semana,
+        RespostaQuestionarioDiario.data <= fim_semana,
+    ).order_by(RespostaQuestionarioDiario.data.desc(), RespostaQuestionarioDiario.criado_em.desc()).all()
+    respostas_hoje = [resposta for resposta in respostas_diarias if resposta.data == hoje]
+    atletas_ativos = db.query(Jogador).filter(
+        Jogador.equipa_id == equipa.id,
+        Jogador.ativo.is_(True),
+    ).count()
+
+    alertas = [resposta for resposta in respostas_diarias if (
+        resposta.tem_queixa or
+        (resposta.pse_esforco is not None and resposta.pse_esforco >= 8) or
+        (resposta.dor_membros_inferiores is not None and resposta.dor_membros_inferiores >= 5) or
+        (resposta.dor_membros_superiores is not None and resposta.dor_membros_superiores >= 5)
+    )]
+    ultima_resposta_por_jogador = {}
+    for resposta in respostas_diarias:
+        ultima_resposta_por_jogador.setdefault(resposta.jogador_id, resposta)
+
+    volume_total = sum(sessao.volume_minutos or 0 for sessao in sessoes_equipa)
+    carga_total = sum((sessao.volume_minutos or 0) * (sessao.intensidade_rpe or 0) for sessao in sessoes_equipa)
+    sessoes_fisicas = [sessao for sessao in sessoes_equipa if (
+        (sessao.tipo_treino or "").lower() == "fisico" or (sessao.min_fisicos or 0) > 0
+    )]
+    minutos_fisicos = sum((sessao.min_fisicos or sessao.volume_minutos or 0) for sessao in sessoes_fisicas)
+    rpes = [sessao.intensidade_rpe for sessao in sessoes_equipa if sessao.intensidade_rpe is not None]
+
+    return {
+        "equipa": equipa,
+        "inicio_semana": inicio_semana,
+        "fim_semana": fim_semana,
+        "questionarios": questionarios,
+        "respostas_hoje": len(respostas_hoje) + respostas_personalizadas_hoje,
+        "respostas_semana": len(respostas_diarias) + respostas_personalizadas,
+        "atletas_ativos": atletas_ativos,
+        "taxa_resposta": round(((len(respostas_hoje) + respostas_personalizadas_hoje) / atletas_ativos) * 100) if atletas_ativos else 0,
+        "alertas": alertas,
+        "ultima_resposta_por_jogador": list(ultima_resposta_por_jogador.values()),
+        "sessoes_semana": sessoes_equipa,
+        "sessoes_fisicas": sessoes_fisicas,
+        "volume_total": volume_total,
+        "carga_total": round(carga_total),
+        "minutos_fisicos": minutos_fisicos,
+        "media_rpe": round(sum(rpes) / len(rpes), 1) if rpes else 0,
+    }
+
+
+def get_dashboard_fisioterapeuta(db, utilizador):
+    """Dashboard focado em bem-estar, questionários e carga das equipas atribuídas."""
+    equipas = sorted(
+        list(getattr(utilizador, "equipas_staff", []) or []),
+        key=lambda equipa: (equipa.nome or "").lower(),
+    )
+    return {
+        "utilizador": utilizador,
+        "dados_equipas": [obter_resumo_fisioterapia(db, equipa) for equipa in equipas],
+    }
+
+
 def get_dashboard_coordenador(db, utilizador):
     """Constrói o contexto do dashboard do coordenador."""
     hoje, limite = _obter_intervalo_alertas()
