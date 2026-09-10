@@ -19,10 +19,14 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     conta_id = None
     try:
-        painel = client_admin.get(f"/questionarios/equipas/{equipa_id}")
-        assert painel.status_code == 200
-        assert "Questionários e bem-estar" in painel.text
-        assert "responderam hoje" in painel.text
+        selecao = client_admin.get(f"/questionarios/equipas/{equipa_id}")
+        assert selecao.status_code == 200
+        assert "Escolher questionário" in selecao.text
+        assert "Questionário Matinal" in selecao.text
+        assert f"/questionarios/equipas/{equipa_id}/matinal" in selecao.text
+        painel_matinal = client_admin.get(f"/questionarios/equipas/{equipa_id}/matinal")
+        assert painel_matinal.status_code == 200
+        assert "responderam hoje" in painel_matinal.text
 
         conta = db.query(Utilizador).execution_options(ignorar_clube=True).filter_by(
             jogador_id=jogador_id
@@ -101,7 +105,8 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
         assert "Editar resposta" not in fechado.text
         assert "Nova resposta" not in fechado.text
 
-        painel = client_admin.get(f"/questionarios/equipas/{equipa_id}")
+        painel = client_admin.get(f"/questionarios/equipas/{equipa_id}/matinal")
+        assert "Questionário Matinal" in painel.text
         assert "Dor no joelho direito" in painel.text
         assert "Atenção necessária" in painel.text
         assert "Registos recebidos hoje" in painel.text
@@ -133,7 +138,7 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
             f"/questionarios/equipas/{equipa_id}/novo?modelo=acompanhamento-diario-original"
         )
         assert modelo_original.status_code == 200
-        assert "Questionário diário de bem-estar" in modelo_original.text
+        assert "Questionário Matinal" in modelo_original.text
         assert "acompanhamento-diario-original" in modelo_original.text
 
         perguntas = [
@@ -168,6 +173,11 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         aplicacao = db.query(AplicacaoQuestionario).filter_by(questionario_id=questionario.id).one()
         assert len(questionario.perguntas) == 2
         assert aplicacao.data == date.today()
+        selecao = client_admin.get(f"/questionarios/equipas/{equipa_id}")
+        assert selecao.status_code == 200
+        assert "Questionário Matinal" in selecao.text
+        assert "PSE personalizado" in selecao.text
+        assert selecao.text.count("Abrir dashboard") == 2
         biblioteca = client_admin.get(f"/questionarios/equipas/{equipa_id}/biblioteca")
         assert biblioteca.status_code == 200
         assert "Dashboards por questionário" in biblioteca.text
@@ -187,7 +197,7 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
             sessao_treino_id=sessao.id,
         ).one().data == sessao.data
 
-        client_admin.get(f"/questionarios/equipas/{equipa_id}")
+        client_admin.get(f"/questionarios/equipas/{equipa_id}/matinal")
         conta = db.query(Utilizador).execution_options(ignorar_clube=True).filter_by(jogador_id=jogador_id).one()
         conta.deve_alterar_password = False
         db.commit()

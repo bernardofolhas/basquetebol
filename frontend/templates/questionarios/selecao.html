@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block titulo %}Questionários · {{ equipa.nome }}{% endblock %}
+{% block conteudo %}
+<div class="space-y-6">
+  <header class="flex flex-wrap items-end justify-between gap-5 rounded-[28px] bg-slate-900 px-7 py-7 text-white shadow-xl">
+    <div>
+      <p class="text-xs font-extrabold uppercase tracking-[.2em] text-emerald-300">Acompanhamento dos atletas</p>
+      <h1 class="mt-2 text-3xl font-extrabold">Escolher questionário</h1>
+      <p class="mt-2 text-sm text-slate-300">{{ equipa.nome }} · cada questionário tem o seu próprio dashboard e resultados.</p>
+    </div>
+    <a href="/questionarios/equipas/{{ equipa.id }}/biblioteca" class="rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-slate-900">Gerir modelos</a>
+  </header>
+
+  <section>
+    <div class="mb-4">
+      <h2 class="text-xl font-extrabold text-slate-900">Dashboards disponíveis</h2>
+      <p class="text-sm text-slate-500">Seleciona o questionário que queres analisar ou editar.</p>
+    </div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <article class="flex min-h-64 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="h-2 bg-emerald-500"></div>
+        <div class="flex flex-1 flex-col p-6">
+          <div class="flex items-center justify-between gap-3">
+            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-emerald-700">Modelo base</span>
+            <span class="text-xs font-bold text-slate-400">Diário</span>
+          </div>
+          <h3 class="mt-4 text-xl font-extrabold text-slate-900">Questionário Matinal</h3>
+          <p class="mt-2 flex-1 text-sm leading-6 text-slate-500">Disponibilidade, sono, esforço, dores e queixas dos atletas.</p>
+          <div class="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            <span class="text-xs font-bold text-slate-500">{{ respostas_matinal }} respostas</span>
+            <a href="/questionarios/equipas/{{ equipa.id }}/matinal" class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-slate-700">Abrir dashboard</a>
+          </div>
+        </div>
+      </article>
+
+      {% for item in questionarios %}
+      {% set total_respostas = namespace(valor=0) %}
+      {% for aplicacao in item.aplicacoes %}{% set total_respostas.valor = total_respostas.valor + (aplicacao.submissoes|length) %}{% endfor %}
+      <article class="flex min-h-64 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="h-2 bg-[var(--clube-primary)]"></div>
+        <div class="flex flex-1 flex-col p-6">
+          <div class="flex items-center justify-between gap-3">
+            <span class="rounded-full bg-[var(--clube-primary-surface)] px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-[var(--clube-primary-dark)]">Questionário criado</span>
+            <span class="text-xs font-bold text-slate-400">{{ item.aplicacoes|length }} aplicações</span>
+          </div>
+          <h3 class="mt-4 text-xl font-extrabold text-slate-900">{{ item.nome }}</h3>
+          <p class="mt-2 flex-1 text-sm leading-6 text-slate-500">{{ item.descricao or 'Sem descrição.' }}</p>
+          <div class="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            <span class="text-xs font-bold text-slate-500">{{ total_respostas.valor }} respostas</span>
+            <a href="/questionarios/modelos/{{ item.id }}" class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-slate-700">Abrir dashboard</a>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+
+      <a href="/questionarios/equipas/{{ equipa.id }}/novo" class="flex min-h-64 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white p-6 text-center transition hover:border-[var(--clube-primary)] hover:bg-slate-50">
+        <span class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-2xl font-light text-white">+</span>
+        <strong class="mt-4 text-base text-slate-900">Criar questionário</strong>
+        <span class="mt-1 text-sm text-slate-500">De raiz ou a partir de um modelo</span>
+      </a>
+    </div>
+  </section>
+</div>
+{% endblock %}

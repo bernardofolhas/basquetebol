@@ -1,6 +1,6 @@
 MODELOS_QUESTIONARIO = {
     "acompanhamento-diario-original": {
-        "nome": "Questionário diário de bem-estar",
+        "nome": "Questionário Matinal",
         "descricao": "Modelo original completo: sessão, sono, esforço, dores e queixas do atleta.",
         "perguntas": [
             {"texto": "Tipo de sessão", "tipo": "escolha", "opcoes": ["Descanso", "Treino", "Jogo"]},

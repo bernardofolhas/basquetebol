@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Questionário diário{% endblock %}
+{% block titulo %}Questionário Matinal{% endblock %}
 {% block estilos_extra %}<style>
 .wellness-shell{max-width:760px;margin:auto}.wellness-card{border:1px solid #e2e8f0;border-radius:24px;background:#fff;padding:clamp(18px,4vw,32px);box-shadow:0 18px 45px rgba(15,23,42,.07)}
 .wellness-scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.wellness-scale input{position:absolute;opacity:0}.wellness-scale label{display:flex;min-height:58px;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;border:1px solid #dbe2ea;border-radius:13px;background:#f8fafc;font-weight:800;color:#475569;transition:.15s}.wellness-scale label small{font-size:10px;font-weight:600}.wellness-scale input:checked+label{border-color:var(--clube-primary);background:var(--clube-primary-surface);color:var(--clube-primary-dark);box-shadow:0 0 0 2px var(--clube-primary-soft)}
@@ -12,7 +12,7 @@
 {% block conteudo %}
 <div class="wellness-shell space-y-5">
   <header class="rounded-[26px] bg-slate-900 px-6 py-7 text-white shadow-xl">
-    <p class="text-xs font-extrabold uppercase tracking-[.2em] text-emerald-300">Acompanhamento diário</p>
+    <p class="text-xs font-extrabold uppercase tracking-[.2em] text-emerald-300">Questionário Matinal</p>
     <h1 class="mt-2 text-3xl font-extrabold">Olá, {{ jogador.nome.split()[0] }}</h1>
     <p class="mt-2 text-sm text-slate-300">{{ data_resposta|data_pt }} · demora cerca de 1 minuto</p>
   </header>

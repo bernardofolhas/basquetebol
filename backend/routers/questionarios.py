@@ -243,7 +243,37 @@ def historico_atleta(
 
 
 @router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
-def painel_equipa(
+def selecionar_dashboard_questionario(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse("/equipas", status_code=303)
+    questionarios = db.query(QuestionarioPersonalizado).options(
+        selectinload(QuestionarioPersonalizado.perguntas),
+        selectinload(QuestionarioPersonalizado.aplicacoes)
+        .selectinload(AplicacaoQuestionario.submissoes),
+    ).filter(
+        QuestionarioPersonalizado.equipa_id == equipa_id,
+        QuestionarioPersonalizado.ativo.is_(True),
+    ).order_by(QuestionarioPersonalizado.atualizado_em.desc()).all()
+    respostas_matinal = db.query(RespostaQuestionarioDiario).join(Jogador).filter(
+        Jogador.equipa_id == equipa_id,
+    ).count()
+    return templates.TemplateResponse(request, "questionarios/selecao.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "questionarios": questionarios,
+        "respostas_matinal": respostas_matinal,
+    })
+
+
+@router.get("/equipas/{equipa_id}/matinal", response_class=HTMLResponse)
+def painel_questionario_matinal(
     equipa_id: int,
     request: Request,
     db: Session = Depends(get_db),
