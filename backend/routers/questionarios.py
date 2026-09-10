@@ -96,7 +96,9 @@ def _normalizar_perguntas(perguntas_json: str) -> list[dict]:
 def _obter_questionario_tecnico(db: Session, questionario_id: int, utilizador):
     questionario = db.query(QuestionarioPersonalizado).options(
         selectinload(QuestionarioPersonalizado.perguntas),
-        selectinload(QuestionarioPersonalizado.aplicacoes),
+        selectinload(QuestionarioPersonalizado.aplicacoes)
+        .selectinload(AplicacaoQuestionario.submissoes)
+        .selectinload(SubmissaoQuestionario.respostas),
     ).filter(QuestionarioPersonalizado.id == questionario_id).first()
     if questionario:
         verificar_ou_negar_equipa(utilizador, questionario.equipa_id, db)
@@ -114,11 +116,26 @@ def _obter_aplicacao_tecnica(db: Session, aplicacao_id: int, utilizador):
     return aplicacao
 
 
+def _adicionar_perguntas(db: Session, questionario_id: int, perguntas: list[dict]) -> None:
+    for ordem, item in enumerate(perguntas, start=1):
+        db.add(PerguntaQuestionario(
+            questionario_id=questionario_id,
+            texto=item["texto"],
+            ajuda=item["ajuda"],
+            tipo=item["tipo"],
+            obrigatoria=item["obrigatoria"],
+            ordem=ordem,
+            minimo=item["minimo"],
+            maximo=item["maximo"],
+            rotulo_minimo=item["rotulo_minimo"],
+            rotulo_maximo=item["rotulo_maximo"],
+            opcoes_json=json.dumps(item["opcoes"], ensure_ascii=False),
+        ))
+
+
 @router.get("/diario", response_class=HTMLResponse)
 def questionario_diario(
     request: Request,
-    resposta_id: int | None = None,
-    nova: bool = False,
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_atleta),
 ):
@@ -132,23 +149,12 @@ def questionario_diario(
         RespostaQuestionarioDiario.criado_em.desc(),
         RespostaQuestionarioDiario.id.desc(),
     ).all()
-    resposta = None
-    if resposta_id is not None:
-        resposta = db.query(RespostaQuestionarioDiario).filter(
-            RespostaQuestionarioDiario.id == resposta_id,
-            RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id,
-        ).first()
-        if not resposta:
-            set_flash(request, "A resposta que tentaste editar não foi encontrada.", "error")
-            return RedirectResponse("/questionarios/diario", status_code=303)
-    elif not nova and respostas_hoje:
-        resposta = respostas_hoje[0]
+    resposta = respostas_hoje[0] if respostas_hoje else None
     return templates.TemplateResponse(request, "questionarios/diario.html", {
         "utilizador": utilizador,
         "jogador": jogador,
         "resposta": resposta,
         "respostas_hoje": respostas_hoje,
-        "nova_resposta": nova,
         "data_resposta": resposta.data if resposta else date.today(),
         "hoje": date.today(),
     })
@@ -159,7 +165,6 @@ def guardar_questionario_diario(
     request: Request,
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_atleta),
-    resposta_id: int | None = Form(None),
     tipo_sessao: str = Form(...),
     horas_sono: str = Form(""),
     qualidade_sono: int = Form(...),
@@ -170,6 +175,14 @@ def guardar_questionario_diario(
     descricao_queixa: str = Form(""),
     observacoes: str = Form(""),
 ):
+    db.query(Jogador.id).filter(Jogador.id == utilizador.jogador_id).with_for_update().first()
+    existente = db.query(RespostaQuestionarioDiario.id).filter(
+        RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id,
+        RespostaQuestionarioDiario.data == date.today(),
+    ).first()
+    if existente:
+        set_flash(request, "O questionário de hoje já foi respondido e está fechado.", "error")
+        return RedirectResponse("/questionarios/diario", status_code=303)
     try:
         if tipo_sessao not in {"descanso", "treino", "jogo"}:
             raise ValueError("Seleciona o tipo de sessão de hoje.")
@@ -187,22 +200,12 @@ def guardar_questionario_diario(
         set_flash(request, str(erro), "error")
         return RedirectResponse("/questionarios/diario", status_code=303)
 
-    resposta = None
-    if resposta_id is not None:
-        resposta = db.query(RespostaQuestionarioDiario).filter(
-            RespostaQuestionarioDiario.id == resposta_id,
-            RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id,
-        ).first()
-        if not resposta:
-            set_flash(request, "A resposta que tentaste editar não foi encontrada.", "error")
-            return RedirectResponse("/questionarios/diario", status_code=303)
-    if resposta is None:
-        resposta = RespostaQuestionarioDiario(
-            clube_id=utilizador.clube_id,
-            jogador_id=utilizador.jogador_id,
-            data=date.today(),
-        )
-        db.add(resposta)
+    resposta = RespostaQuestionarioDiario(
+        clube_id=utilizador.clube_id,
+        jogador_id=utilizador.jogador_id,
+        data=date.today(),
+    )
+    db.add(resposta)
     resposta.tipo_sessao = tipo_sessao
     resposta.horas_sono = horas
     resposta.qualidade_sono = qualidade_sono
@@ -214,8 +217,8 @@ def guardar_questionario_diario(
     resposta.observacoes = observacoes.strip() or None
     db.commit()
     db.refresh(resposta)
-    set_flash(request, "Resposta atualizada." if resposta_id else "Nova resposta guardada. Obrigado.")
-    return RedirectResponse(f"/questionarios/diario?resposta_id={resposta.id}", status_code=303)
+    set_flash(request, "Questionário enviado e concluído. Obrigado.")
+    return RedirectResponse("/questionarios/diario", status_code=303)
 
 
 @router.get("/historico", response_class=HTMLResponse)
@@ -355,6 +358,8 @@ def novo_questionario(
         "modelos": MODELOS_QUESTIONARIO,
         "modelo_chave": modelo if selecionado else "",
         "modelo": selecionado,
+        "questionario_edicao": None,
+        "perguntas_iniciais": selecionado["perguntas"] if selecionado else [],
         "tipos_pergunta": TIPOS_PERGUNTA,
         "sessoes": _sessoes_da_equipa(db, equipa_id),
         "hoje": date.today(),
@@ -373,7 +378,6 @@ def criar_questionario(
     perguntas_json: str = Form("[]"),
     data_aplicacao: str = Form(""),
     sessao_treino_id: str = Form(""),
-    permite_multiplas: str = Form(""),
 ):
     verificar_ou_negar_equipa(utilizador, equipa_id, db)
     try:
@@ -406,20 +410,7 @@ def criar_questionario(
     )
     db.add(questionario)
     db.flush()
-    for ordem, item in enumerate(perguntas, start=1):
-        db.add(PerguntaQuestionario(
-            questionario_id=questionario.id,
-            texto=item["texto"],
-            ajuda=item["ajuda"],
-            tipo=item["tipo"],
-            obrigatoria=item["obrigatoria"],
-            ordem=ordem,
-            minimo=item["minimo"],
-            maximo=item["maximo"],
-            rotulo_minimo=item["rotulo_minimo"],
-            rotulo_maximo=item["rotulo_maximo"],
-            opcoes_json=json.dumps(item["opcoes"], ensure_ascii=False),
-        ))
+    _adicionar_perguntas(db, questionario.id, perguntas)
     if data_alvo:
         db.add(AplicacaoQuestionario(
             clube_id=utilizador.clube_id,
@@ -427,7 +418,7 @@ def criar_questionario(
             questionario_id=questionario.id,
             sessao_treino_id=sessao.id if sessao else None,
             data=data_alvo,
-            permite_multiplas=permite_multiplas == "sim",
+            permite_multiplas=False,
         ))
     db.commit()
     set_flash(request, "Questionário criado" + (" e associado à data escolhida." if data_alvo else "."))
@@ -444,6 +435,18 @@ def detalhe_questionario(
     questionario = _obter_questionario_tecnico(db, questionario_id, utilizador)
     if not questionario:
         return RedirectResponse("/equipas", status_code=303)
+    submissoes = [submissao for aplicacao in questionario.aplicacoes for submissao in aplicacao.submissoes]
+    analise_global = {}
+    for pergunta in questionario.perguntas:
+        valores = [
+            resposta.valor for submissao in submissoes for resposta in submissao.respostas
+            if resposta.pergunta_id == pergunta.id and resposta.valor not in (None, "")
+        ]
+        media = None
+        if pergunta.tipo in {"escala", "numero"} and valores:
+            numeros = [float(valor) for valor in valores]
+            media = round(sum(numeros) / len(numeros), 1)
+        analise_global[pergunta.id] = {"total": len(valores), "media": media}
     return templates.TemplateResponse(request, "questionarios/detalhe.html", {
         "utilizador": utilizador,
         "questionario": questionario,
@@ -451,7 +454,97 @@ def detalhe_questionario(
         "sessoes": _sessoes_da_equipa(db, questionario.equipa_id),
         "hoje": date.today(),
         "base_url": str(request.base_url).rstrip("/"),
+        "total_submissoes": len(submissoes),
+        "atletas_distintos": len({submissao.jogador_id for submissao in submissoes}),
+        "analise_global": analise_global,
     })
+
+
+@router.get("/modelos/{questionario_id}/editar", response_class=HTMLResponse)
+def editar_questionario(
+    questionario_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    questionario = _obter_questionario_tecnico(db, questionario_id, utilizador)
+    if not questionario:
+        return RedirectResponse("/equipas", status_code=303)
+    perguntas = [{
+        "texto": pergunta.texto,
+        "ajuda": pergunta.ajuda,
+        "tipo": pergunta.tipo,
+        "obrigatoria": pergunta.obrigatoria,
+        "minimo": pergunta.minimo,
+        "maximo": pergunta.maximo,
+        "rotulo_minimo": pergunta.rotulo_minimo,
+        "rotulo_maximo": pergunta.rotulo_maximo,
+        "opcoes": pergunta.opcoes,
+    } for pergunta in questionario.perguntas]
+    tem_respostas = any(aplicacao.submissoes for aplicacao in questionario.aplicacoes)
+    return templates.TemplateResponse(request, "questionarios/construtor.html", {
+        "utilizador": utilizador,
+        "equipa": questionario.equipa,
+        "modelos": MODELOS_QUESTIONARIO,
+        "modelo_chave": questionario.origem_modelo or "",
+        "modelo": None,
+        "questionario_edicao": questionario,
+        "perguntas_iniciais": perguntas,
+        "tipos_pergunta": TIPOS_PERGUNTA,
+        "sessoes": [],
+        "hoje": date.today(),
+        "tem_respostas": tem_respostas,
+    })
+
+
+@router.post("/modelos/{questionario_id}/editar")
+def guardar_edicao_questionario(
+    questionario_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+    nome: str = Form(...),
+    descricao: str = Form(""),
+    perguntas_json: str = Form("[]"),
+):
+    questionario = _obter_questionario_tecnico(db, questionario_id, utilizador)
+    if not questionario:
+        return RedirectResponse("/equipas", status_code=303)
+    try:
+        perguntas = _normalizar_perguntas(perguntas_json)
+        nome_limpo = nome.strip()
+        if not nome_limpo:
+            raise ValueError("Indica um nome para o questionário.")
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(f"/questionarios/modelos/{questionario.id}/editar", status_code=303)
+    tem_respostas = any(aplicacao.submissoes for aplicacao in questionario.aplicacoes)
+    if tem_respostas:
+        questionario.ativo = False
+        atualizado = QuestionarioPersonalizado(
+            clube_id=questionario.clube_id,
+            equipa_id=questionario.equipa_id,
+            nome=nome_limpo[:180],
+            descricao=descricao.strip() or None,
+            origem_modelo=f"versao:{questionario.id}",
+        )
+        db.add(atualizado)
+        db.flush()
+        _adicionar_perguntas(db, atualizado.id, perguntas)
+        destino_id = atualizado.id
+        mensagem = "Nova versão criada. Os resultados anteriores ficaram preservados."
+    else:
+        questionario.nome = nome_limpo[:180]
+        questionario.descricao = descricao.strip() or None
+        db.query(PerguntaQuestionario).filter(
+            PerguntaQuestionario.questionario_id == questionario.id
+        ).delete(synchronize_session=False)
+        _adicionar_perguntas(db, questionario.id, perguntas)
+        destino_id = questionario.id
+        mensagem = "Questionário atualizado."
+    db.commit()
+    set_flash(request, mensagem)
+    return RedirectResponse(f"/questionarios/modelos/{destino_id}", status_code=303)
 
 
 @router.post("/modelos/{questionario_id}/aplicar")
@@ -463,7 +556,6 @@ def aplicar_questionario(
     data_aplicacao: str = Form(""),
     sessao_treino_id: str = Form(""),
     titulo: str = Form(""),
-    permite_multiplas: str = Form(""),
 ):
     questionario = _obter_questionario_tecnico(db, questionario_id, utilizador)
     if not questionario:
@@ -488,7 +580,7 @@ def aplicar_questionario(
         sessao_treino_id=sessao.id if sessao else None,
         data=data_alvo,
         titulo=titulo.strip()[:180] or None,
-        permite_multiplas=permite_multiplas == "sim",
+        permite_multiplas=False,
     )
     db.add(aplicacao)
     db.commit()
@@ -524,8 +616,6 @@ def questionarios_disponiveis(
 def responder_questionario(
     aplicacao_id: int,
     request: Request,
-    submissao_id: int | None = None,
-    nova: bool = False,
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_atleta),
 ):
@@ -541,22 +631,14 @@ def responder_questionario(
         set_flash(request, "Este questionário ainda não está aberto.", "error")
         return RedirectResponse("/questionarios/disponiveis", status_code=303)
     submissoes = [item for item in aplicacao.submissoes if item.jogador_id == jogador.id]
-    submissao = None
-    if submissao_id is not None:
-        submissao = next((item for item in submissoes if item.id == submissao_id), None)
-        if not submissao:
-            set_flash(request, "A resposta selecionada não foi encontrada.", "error")
-            return RedirectResponse(f"/questionarios/responder/{aplicacao.id}", status_code=303)
-    elif not nova and submissoes:
-        submissao = submissoes[0]
-    valores = {resposta.pergunta_id: resposta.valor for resposta in submissao.respostas} if submissao else {}
+    if submissoes:
+        set_flash(request, "Este questionário já foi respondido e está concluído.")
+        return RedirectResponse("/questionarios/disponiveis", status_code=303)
     return templates.TemplateResponse(request, "questionarios/responder.html", {
         "utilizador": utilizador,
         "jogador": jogador,
         "aplicacao": aplicacao,
-        "submissoes": submissoes,
-        "submissao": submissao,
-        "valores": valores,
+        "valores": {},
     })
 
 
@@ -576,26 +658,15 @@ async def guardar_resposta_personalizada(
     if aplicacao.data > date.today():
         set_flash(request, "Este questionário ainda não está aberto.", "error")
         return RedirectResponse("/questionarios/disponiveis", status_code=303)
+    db.query(Jogador.id).filter(Jogador.id == jogador.id).with_for_update().first()
     formulario = await request.form()
-    submissao_id = formulario.get("submissao_id")
-    submissao = None
-    if submissao_id:
-        try:
-            submissao = db.query(SubmissaoQuestionario).filter(
-                SubmissaoQuestionario.id == int(submissao_id),
-                SubmissaoQuestionario.aplicacao_id == aplicacao.id,
-                SubmissaoQuestionario.jogador_id == jogador.id,
-            ).first()
-        except (TypeError, ValueError):
-            submissao = None
-        if submissao is None:
-            set_flash(request, "A resposta que tentaste editar não foi encontrada.", "error")
-            return RedirectResponse(f"/questionarios/responder/{aplicacao.id}", status_code=303)
-    if submissao is None and not aplicacao.permite_multiplas:
-        submissao = db.query(SubmissaoQuestionario).filter(
-            SubmissaoQuestionario.aplicacao_id == aplicacao.id,
-            SubmissaoQuestionario.jogador_id == jogador.id,
-        ).order_by(SubmissaoQuestionario.id.desc()).first()
+    submissao = db.query(SubmissaoQuestionario).filter(
+        SubmissaoQuestionario.aplicacao_id == aplicacao.id,
+        SubmissaoQuestionario.jogador_id == jogador.id,
+    ).first()
+    if submissao:
+        set_flash(request, "Este questionário já foi respondido e está concluído.", "error")
+        return RedirectResponse("/questionarios/disponiveis", status_code=303)
     valores = {}
     try:
         for pergunta in aplicacao.questionario.perguntas:
@@ -613,21 +684,14 @@ async def guardar_resposta_personalizada(
     except (TypeError, ValueError) as erro:
         set_flash(request, str(erro), "error")
         destino = f"/questionarios/responder/{aplicacao.id}"
-        if submissao:
-            destino += f"?submissao_id={submissao.id}"
         return RedirectResponse(destino, status_code=303)
-    if submissao is None:
-        submissao = SubmissaoQuestionario(
-            clube_id=aplicacao.clube_id,
-            aplicacao_id=aplicacao.id,
-            jogador_id=jogador.id,
-        )
-        db.add(submissao)
-        db.flush()
-    else:
-        db.query(RespostaPerguntaQuestionario).filter(
-            RespostaPerguntaQuestionario.submissao_id == submissao.id
-        ).delete(synchronize_session=False)
+    submissao = SubmissaoQuestionario(
+        clube_id=aplicacao.clube_id,
+        aplicacao_id=aplicacao.id,
+        jogador_id=jogador.id,
+    )
+    db.add(submissao)
+    db.flush()
     for pergunta_id, valor in valores.items():
         db.add(RespostaPerguntaQuestionario(
             submissao_id=submissao.id,
@@ -635,7 +699,7 @@ async def guardar_resposta_personalizada(
             valor=valor or None,
         ))
     db.commit()
-    set_flash(request, "Resposta atualizada." if submissao_id else "Questionário enviado. Obrigado.")
+    set_flash(request, "Questionário enviado e concluído. Obrigado.")
     return RedirectResponse("/questionarios/disponiveis", status_code=303)
 
 
