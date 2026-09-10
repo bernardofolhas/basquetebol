@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -8,9 +8,6 @@ from database import Base
 
 class RespostaQuestionarioDiario(Base):
     __tablename__ = "respostas_questionario_diario"
-    __table_args__ = (
-        UniqueConstraint("jogador_id", "data", name="uq_questionario_diario_jogador_data"),
-    )
 
     id = Column(Integer, primary_key=True, index=True)
     clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)

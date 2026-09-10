@@ -159,7 +159,7 @@ def actualizar_estrutura_perfis() -> None:
 
 
 def actualizar_estrutura_questionarios() -> None:
-    """Adiciona a ligação entre cada conta de atleta e a respetiva ficha."""
+    """Mantém contas de atleta e respostas múltiplas compatíveis sem Alembic automático."""
     inspector = inspect(engine)
     if not inspector.has_table("utilizadores"):
         return
@@ -183,6 +183,12 @@ def actualizar_estrutura_questionarios() -> None:
                     "CREATE UNIQUE INDEX IF NOT EXISTS ix_utilizadores_jogador_id ON utilizadores (jogador_id)"
                 ))
         logger.info("Ligação das contas aos atletas adicionada.")
+    if engine.dialect.name == "postgresql" and inspector.has_table("respostas_questionario_diario"):
+        with engine.begin() as ligacao:
+            ligacao.execute(text(
+                "ALTER TABLE respostas_questionario_diario "
+                "DROP CONSTRAINT IF EXISTS uq_questionario_diario_jogador_data"
+            ))
 
 
 def actualizar_estrutura_staff() -> None:

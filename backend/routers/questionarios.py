@@ -30,20 +30,39 @@ def _validar_escala(valor: int, nome: str, maximo: int = 10) -> None:
 @router.get("/diario", response_class=HTMLResponse)
 def questionario_diario(
     request: Request,
+    resposta_id: int | None = None,
+    nova: bool = False,
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_atleta),
 ):
     jogador = db.query(Jogador).options(joinedload(Jogador.equipa)).filter(
         Jogador.id == utilizador.jogador_id
     ).first()
-    resposta = db.query(RespostaQuestionarioDiario).filter(
+    respostas_hoje = db.query(RespostaQuestionarioDiario).filter(
         RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id,
         RespostaQuestionarioDiario.data == date.today(),
-    ).first()
+    ).order_by(
+        RespostaQuestionarioDiario.criado_em.desc(),
+        RespostaQuestionarioDiario.id.desc(),
+    ).all()
+    resposta = None
+    if resposta_id is not None:
+        resposta = db.query(RespostaQuestionarioDiario).filter(
+            RespostaQuestionarioDiario.id == resposta_id,
+            RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id,
+        ).first()
+        if not resposta:
+            set_flash(request, "A resposta que tentaste editar não foi encontrada.", "error")
+            return RedirectResponse("/questionarios/diario", status_code=303)
+    elif not nova and respostas_hoje:
+        resposta = respostas_hoje[0]
     return templates.TemplateResponse(request, "questionarios/diario.html", {
         "utilizador": utilizador,
         "jogador": jogador,
         "resposta": resposta,
+        "respostas_hoje": respostas_hoje,
+        "nova_resposta": nova,
+        "data_resposta": resposta.data if resposta else date.today(),
         "hoje": date.today(),
     })
 
@@ -53,6 +72,7 @@ def guardar_questionario_diario(
     request: Request,
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_atleta),
+    resposta_id: int | None = Form(None),
     tipo_sessao: str = Form(...),
     horas_sono: str = Form(""),
     qualidade_sono: int = Form(...),
@@ -80,11 +100,16 @@ def guardar_questionario_diario(
         set_flash(request, str(erro), "error")
         return RedirectResponse("/questionarios/diario", status_code=303)
 
-    resposta = db.query(RespostaQuestionarioDiario).filter(
-        RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id,
-        RespostaQuestionarioDiario.data == date.today(),
-    ).first()
-    if not resposta:
+    resposta = None
+    if resposta_id is not None:
+        resposta = db.query(RespostaQuestionarioDiario).filter(
+            RespostaQuestionarioDiario.id == resposta_id,
+            RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id,
+        ).first()
+        if not resposta:
+            set_flash(request, "A resposta que tentaste editar não foi encontrada.", "error")
+            return RedirectResponse("/questionarios/diario", status_code=303)
+    if resposta is None:
         resposta = RespostaQuestionarioDiario(
             clube_id=utilizador.clube_id,
             jogador_id=utilizador.jogador_id,
@@ -101,8 +126,9 @@ def guardar_questionario_diario(
     resposta.descricao_queixa = descricao_queixa.strip() or None
     resposta.observacoes = observacoes.strip() or None
     db.commit()
-    set_flash(request, "Questionário de hoje guardado. Obrigado pela resposta.")
-    return RedirectResponse("/questionarios/diario", status_code=303)
+    db.refresh(resposta)
+    set_flash(request, "Resposta atualizada." if resposta_id else "Nova resposta guardada. Obrigado.")
+    return RedirectResponse(f"/questionarios/diario?resposta_id={resposta.id}", status_code=303)
 
 
 @router.get("/historico", response_class=HTMLResponse)
@@ -116,7 +142,11 @@ def historico_atleta(
     ).first()
     respostas = db.query(RespostaQuestionarioDiario).filter(
         RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id
-    ).order_by(RespostaQuestionarioDiario.data.desc()).limit(60).all()
+    ).order_by(
+        RespostaQuestionarioDiario.data.desc(),
+        RespostaQuestionarioDiario.criado_em.desc(),
+        RespostaQuestionarioDiario.id.desc(),
+    ).limit(100).all()
     return templates.TemplateResponse(request, "questionarios/historico.html", {
         "utilizador": utilizador, "jogador": jogador, "respostas": respostas,
     })
@@ -148,9 +178,18 @@ def painel_equipa(
     ).filter(
         RespostaQuestionarioDiario.jogador_id.in_([j.id for j in jogadores]),
         RespostaQuestionarioDiario.data >= inicio,
-    ).order_by(RespostaQuestionarioDiario.data.desc()).all() if jogadores else []
-    hoje_por_jogador = {r.jogador_id: r for r in respostas if r.data == date.today()}
-    alertas = [r for r in hoje_por_jogador.values() if (
+    ).order_by(
+        RespostaQuestionarioDiario.data.desc(),
+        RespostaQuestionarioDiario.criado_em.desc(),
+        RespostaQuestionarioDiario.id.desc(),
+    ).all() if jogadores else []
+    respostas_hoje = [r for r in respostas if r.data == date.today()]
+    hoje_por_jogador = {}
+    respostas_hoje_por_jogador = defaultdict(int)
+    for resposta in respostas_hoje:
+        hoje_por_jogador.setdefault(resposta.jogador_id, resposta)
+        respostas_hoje_por_jogador[resposta.jogador_id] += 1
+    alertas = [r for r in respostas_hoje if (
         r.tem_queixa or r.pse_esforco >= 8 or r.dor_membros_inferiores >= 7
         or r.dor_membros_superiores >= 7 or r.qualidade_sono <= 2
     )]
@@ -174,6 +213,8 @@ def painel_equipa(
         "jogadores": jogadores,
         "acessos": acessos,
         "hoje_por_jogador": hoje_por_jogador,
+        "respostas_hoje": respostas_hoje,
+        "respostas_hoje_por_jogador": respostas_hoje_por_jogador,
         "alertas": sorted(alertas, key=lambda r: max(r.dor_membros_inferiores, r.dor_membros_superiores, r.pse_esforco), reverse=True),
         "tendencia": tendencia,
         "respondidos": len(hoje_por_jogador),

@@ -60,16 +60,62 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
             follow_redirects=False,
         )
         assert resposta.status_code == 303
+        assert resposta.headers["location"].startswith("/questionarios/diario?resposta_id=")
         db.expire_all()
         registo = db.query(RespostaQuestionarioDiario).filter_by(jogador_id=jogador_id).one()
         assert (registo.pse_esforco, registo.qualidade_sono, registo.tem_queixa) == (8, 2, True)
 
+        nova_resposta = cliente_atleta.post(
+            "/questionarios/diario",
+            data={
+                "tipo_sessao": "treino",
+                "horas_sono": "8",
+                "qualidade_sono": "4",
+                "pse_esforco": "4",
+                "dor_membros_inferiores": "2",
+                "dor_membros_superiores": "1",
+                "tem_queixa": "nao",
+                "descricao_queixa": "",
+                "observacoes": "Depois da recuperação",
+            },
+            follow_redirects=False,
+        )
+        assert nova_resposta.status_code == 303
+        db.expire_all()
+        assert db.query(RespostaQuestionarioDiario).filter_by(jogador_id=jogador_id).count() == 2
+
+        editar_resposta = cliente_atleta.post(
+            "/questionarios/diario",
+            data={
+                "resposta_id": str(registo.id),
+                "tipo_sessao": "treino",
+                "horas_sono": "7.5",
+                "qualidade_sono": "2",
+                "pse_esforco": "9",
+                "dor_membros_inferiores": "7",
+                "dor_membros_superiores": "3",
+                "tem_queixa": "sim",
+                "descricao_queixa": "Dor no joelho direito",
+                "observacoes": "Resposta corrigida",
+            },
+            follow_redirects=False,
+        )
+        assert editar_resposta.status_code == 303
+        db.expire_all()
+        assert db.query(RespostaQuestionarioDiario).filter_by(id=registo.id).one().pse_esforco == 9
+        assert db.query(RespostaQuestionarioDiario).filter_by(jogador_id=jogador_id).count() == 2
+
         painel = client_admin.get(f"/questionarios/equipas/{equipa_id}")
         assert "Dor no joelho direito" in painel.text
         assert "Atenção necessária" in painel.text
+        assert "2 registos" in painel.text
+        assert "Registos recebidos hoje" in painel.text
+        assert "9/10" in painel.text
+        assert "4/10" in painel.text
         historico = cliente_atleta.get("/questionarios/historico")
         assert historico.status_code == 200
-        assert "8/10" in historico.text
+        assert "9/10" in historico.text
+        assert "Editar" in historico.text
     finally:
         db.query(RespostaQuestionarioDiario).filter(
             RespostaQuestionarioDiario.jogador_id.in_([jogador_id, outro_id])
