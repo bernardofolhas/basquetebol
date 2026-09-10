@@ -465,6 +465,10 @@ def detalhe_questionario(
     questionario = _obter_questionario_tecnico(db, questionario_id, utilizador)
     if not questionario:
         return RedirectResponse("/equipas", status_code=303)
+    jogadores = db.query(Jogador).filter(
+        Jogador.equipa_id == questionario.equipa_id,
+        Jogador.ativo.is_(True),
+    ).order_by(Jogador.nome).all()
     submissoes = [submissao for aplicacao in questionario.aplicacoes for submissao in aplicacao.submissoes]
     analise_global = {}
     for pergunta in questionario.perguntas:
@@ -477,6 +481,40 @@ def detalhe_questionario(
             numeros = [float(valor) for valor in valores]
             media = round(sum(numeros) / len(numeros), 1)
         analise_global[pergunta.id] = {"total": len(valores), "media": media}
+    aplicacao_atual = questionario.aplicacoes[0] if questionario.aplicacoes else None
+    submissoes_atuais = aplicacao_atual.submissoes if aplicacao_atual else []
+    atletas_atuais = {submissao.jogador_id for submissao in submissoes_atuais}
+    pergunta_indicador = next(
+        (pergunta for pergunta in questionario.perguntas if pergunta.tipo in {"escala", "numero"}),
+        None,
+    )
+    tendencia = []
+    for deslocamento in range(13, -1, -1):
+        dia = date.today() - timedelta(days=deslocamento)
+        valores_dia = []
+        if pergunta_indicador:
+            valores_dia = [
+                float(resposta.valor)
+                for aplicacao in questionario.aplicacoes if aplicacao.data == dia
+                for submissao in aplicacao.submissoes
+                for resposta in submissao.respostas
+                if resposta.pergunta_id == pergunta_indicador.id and resposta.valor not in (None, "")
+            ]
+        valor_medio = round(sum(valores_dia) / len(valores_dia), 1) if valores_dia else None
+        amplitude = (
+            float(pergunta_indicador.maximo) - float(pergunta_indicador.minimo)
+            if pergunta_indicador and pergunta_indicador.maximo != pergunta_indicador.minimo else 0
+        )
+        percentagem = (
+            max(4, min(100, round((valor_medio - float(pergunta_indicador.minimo)) / amplitude * 100)))
+            if valor_medio is not None and amplitude > 0 else 4
+        )
+        tendencia.append({
+            "data": dia,
+            "total": len(valores_dia),
+            "valor": valor_medio,
+            "percentagem": percentagem,
+        })
     return templates.TemplateResponse(request, "questionarios/detalhe.html", {
         "utilizador": utilizador,
         "questionario": questionario,
@@ -487,6 +525,17 @@ def detalhe_questionario(
         "total_submissoes": len(submissoes),
         "atletas_distintos": len({submissao.jogador_id for submissao in submissoes}),
         "analise_global": analise_global,
+        "jogadores": jogadores,
+        "aplicacao_atual": aplicacao_atual,
+        "submissoes_atuais": submissoes_atuais,
+        "atletas_atuais": atletas_atuais,
+        "taxa_resposta": round(len(atletas_atuais) / len(jogadores) * 100) if jogadores else 0,
+        "ligacao_atual": (
+            str(request.base_url).rstrip("/") + f"/questionarios/responder/{aplicacao_atual.id}"
+            if aplicacao_atual else ""
+        ),
+        "pergunta_indicador": pergunta_indicador,
+        "tendencia": tendencia,
     })
 
 

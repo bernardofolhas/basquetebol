@@ -22,8 +22,8 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
         selecao = client_admin.get(f"/questionarios/equipas/{equipa_id}")
         assert selecao.status_code == 200
         assert "Escolher questionário" in selecao.text
-        assert "Questionário Matinal" in selecao.text
-        assert f"/questionarios/equipas/{equipa_id}/matinal" in selecao.text
+        assert "Ainda não existem questionários" in selecao.text
+        assert f"/questionarios/equipas/{equipa_id}/matinal" not in selecao.text
         painel_matinal = client_admin.get(f"/questionarios/equipas/{equipa_id}/matinal")
         assert painel_matinal.status_code == 200
         assert "responderam hoje" in painel_matinal.text
@@ -111,6 +111,9 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
         assert "Atenção necessária" in painel.text
         assert "Registos recebidos hoje" in painel.text
         assert "8/10" in painel.text
+        selecao = client_admin.get(f"/questionarios/equipas/{equipa_id}")
+        assert "Questionário Matinal" in selecao.text
+        assert "Modelo base" not in selecao.text
         historico = cliente_atleta.get("/questionarios/historico")
         assert historico.status_code == 200
         assert "8/10" in historico.text
@@ -175,9 +178,9 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         assert aplicacao.data == date.today()
         selecao = client_admin.get(f"/questionarios/equipas/{equipa_id}")
         assert selecao.status_code == 200
-        assert "Questionário Matinal" in selecao.text
+        assert "Questionário Matinal" not in selecao.text
         assert "PSE personalizado" in selecao.text
-        assert selecao.text.count("Abrir dashboard") == 2
+        assert selecao.text.count("Abrir dashboard") == 1
         biblioteca = client_admin.get(f"/questionarios/equipas/{equipa_id}/biblioteca")
         assert biblioteca.status_code == 200
         assert "Dashboards por questionário" in biblioteca.text
@@ -249,7 +252,8 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         assert dashboard.status_code == 200
         assert "Dashboard do questionário" in dashboard.text
         assert "Editar questionário" in dashboard.text
-        assert "Respostas recebidas" in dashboard.text
+        assert "Taxa de resposta" in dashboard.text
+        assert "Estado dos atletas" in dashboard.text
         assert "Indicadores globais" in dashboard.text
         edicao = client_admin.get(f"/questionarios/modelos/{questionario.id}/editar")
         assert edicao.status_code == 200

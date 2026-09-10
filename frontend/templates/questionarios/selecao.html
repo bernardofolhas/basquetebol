@@ -17,11 +17,11 @@
       <p class="text-sm text-slate-500">Seleciona o questionário que queres analisar ou editar.</p>
     </div>
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <article class="flex min-h-64 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {% if respostas_matinal %}<article class="flex min-h-64 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div class="h-2 bg-emerald-500"></div>
         <div class="flex flex-1 flex-col p-6">
           <div class="flex items-center justify-between gap-3">
-            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-emerald-700">Modelo base</span>
+            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-emerald-700">Questionário criado</span>
             <span class="text-xs font-bold text-slate-400">Diário</span>
           </div>
           <h3 class="mt-4 text-xl font-extrabold text-slate-900">Questionário Matinal</h3>
@@ -31,7 +31,7 @@
             <a href="/questionarios/equipas/{{ equipa.id }}/matinal" class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-slate-700">Abrir dashboard</a>
           </div>
         </div>
-      </article>
+      </article>{% endif %}
 
       {% for item in questionarios %}
       {% set total_respostas = namespace(valor=0) %}
@@ -52,6 +52,13 @@
         </div>
       </article>
       {% endfor %}
+
+      {% if not respostas_matinal and not questionarios %}
+      <div class="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+        <strong class="text-lg text-slate-900">Ainda não existem questionários</strong>
+        <span class="mt-2 max-w-xs text-sm leading-6 text-slate-500">Cria o primeiro questionário desta equipa a partir de um modelo ou de raiz.</span>
+      </div>
+      {% endif %}
 
       <a href="/questionarios/equipas/{{ equipa.id }}/novo" class="flex min-h-64 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white p-6 text-center transition hover:border-[var(--clube-primary)] hover:bg-slate-50">
         <span class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-2xl font-light text-white">+</span>
