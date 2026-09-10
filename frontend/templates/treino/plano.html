@@ -6,6 +6,7 @@
 
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
+<script src="/static/js/tactical-ink-recognizer.js?v=20260910-1"></script>
 <div class="training-workspace" data-training-plan="{{ plano.id }}" data-training-session-start="{{ sessao.hora_inicio or plano.hora_inicio or '' }}" data-training-reorder-url="/treino/planos/{{ plano.id }}/exercicios/reordenar">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
@@ -1130,7 +1131,7 @@ function inicializarDesenho(canvasId) {
         redesenhar(canvasId);
     };
     const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, gestoCaneta: null, ultimoToqueCaneta: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033' };
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, gestoCaneta: null, ultimoToqueCaneta: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033', reconhecimentoAtivo: false, reconhecimentoBackup: null };
     requestAnimationFrame(() => {
         configurarCanvas();
         if (canvas.dataset.estado) restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
@@ -1286,6 +1287,20 @@ function eObjectoMovel(obj) {
         || Boolean(window.TacticalLegacy?.eRecorte(obj));
 }
 
+function escalarObjectosDesenho(objectos, escalaX, escalaY) {
+    return (Array.isArray(objectos) ? objectos : []).map((original) => {
+        const obj = JSON.parse(JSON.stringify(original));
+        if (Number.isFinite(Number(obj.x))) obj.x = Number(obj.x) * escalaX;
+        if (Number.isFinite(Number(obj.y))) obj.y = Number(obj.y) * escalaY;
+        if (Array.isArray(obj.pontos)) obj.pontos = obj.pontos.map(p => ({ x: Number(p.x) * escalaX, y: Number(p.y) * escalaY }));
+        if (window.TacticalLegacy?.eRecorte(obj)) {
+            obj.largura = Number(obj.largura) * escalaX;
+            obj.altura = Number(obj.altura) * escalaY;
+        } else if (Number.isFinite(Number(obj.largura))) obj.largura = Number(obj.largura) * ((escalaX + escalaY) / 2);
+        return obj;
+    });
+}
+
 function restaurarEstadoDesenho(canvasId, estadoSerializado) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
@@ -1295,17 +1310,9 @@ function restaurarEstadoDesenho(canvasId, estadoSerializado) {
         const alturaOrigem = Math.max(1, Number(guardado.altura) || est.canvas.height);
         const escalaX = est.canvas.width / larguraOrigem;
         const escalaY = est.canvas.height / alturaOrigem;
-        est.objectos = Array.isArray(guardado.objectos) ? guardado.objectos.map((original) => {
-            const obj = JSON.parse(JSON.stringify(original));
-            if (Number.isFinite(Number(obj.x))) obj.x = Number(obj.x) * escalaX;
-            if (Number.isFinite(Number(obj.y))) obj.y = Number(obj.y) * escalaY;
-            if (Array.isArray(obj.pontos)) obj.pontos = obj.pontos.map(p => ({ x: Number(p.x) * escalaX, y: Number(p.y) * escalaY }));
-            if (window.TacticalLegacy?.eRecorte(obj)) {
-                obj.largura = Number(obj.largura) * escalaX;
-                obj.altura = Number(obj.altura) * escalaY;
-            } else if (Number.isFinite(Number(obj.largura))) obj.largura = Number(obj.largura) * ((escalaX + escalaY) / 2);
-            return obj;
-        }) : [];
+        est.objectos = escalarObjectosDesenho(guardado.objectos, escalaX, escalaY);
+        est.reconhecimentoAtivo = Boolean(guardado.reconhecimentoAtivo && Array.isArray(guardado.reconhecimentoBackup));
+        est.reconhecimentoBackup = est.reconhecimentoAtivo ? escalarObjectosDesenho(guardado.reconhecimentoBackup, escalaX, escalaY) : null;
         const maiorAtaque = Math.max(0, ...est.objectos.filter(o => o.tipo === 'jogador_ataque').map(o => Number(o.numero) || 0));
         const maiorDefesa = Math.max(0, ...est.objectos.filter(o => o.tipo === 'jogador_defesa').map(o => Number(o.numero) || 0));
         est.contadores = {
@@ -1325,6 +1332,7 @@ function restaurarEstadoDesenho(canvasId, estadoSerializado) {
         }
         redesenhar(canvasId);
         sincronizarNumeroJogador(canvasId);
+        sincronizarBotaoReconhecimento(canvasId);
     } catch (_) {
         est.objectos = [];
         redesenhar(canvasId);
@@ -1341,6 +1349,8 @@ function estadoDesenhoParaGuardar(est) {
         larguraLinha: est.larguraLinha,
         corLinha: est.corLinha,
         fundoLegado: est.imagemFundo?.src || null,
+        reconhecimentoAtivo: est.reconhecimentoAtivo,
+        reconhecimentoBackup: est.reconhecimentoAtivo ? est.reconhecimentoBackup : null,
     };
 }
 
@@ -1349,6 +1359,62 @@ function clonarObjectosDesenho(objectos) {
         ...obj,
         pontos: Array.isArray(obj.pontos) ? obj.pontos.map(ponto => ({ ...ponto })) : obj.pontos,
     }));
+}
+
+function sincronizarBotaoReconhecimento(canvasId, mensagem = '') {
+    const est = CANVAS_ESTADO[canvasId];
+    const toolbar = document.getElementById('toolbar_' + canvasId);
+    if (!est || !toolbar) return;
+    const botao = toolbar.querySelector('[data-recognize-ink]');
+    const label = toolbar.querySelector('[data-recognize-label]');
+    const estado = toolbar.querySelector('[data-recognize-status]');
+    if (botao) {
+        botao.classList.toggle('is-converted', est.reconhecimentoAtivo);
+        botao.setAttribute('aria-pressed', est.reconhecimentoAtivo ? 'true' : 'false');
+    }
+    if (label) label.textContent = est.reconhecimentoAtivo ? 'Ver desenho original' : 'Interpretar desenho';
+    if (estado) estado.textContent = mensagem || (est.reconhecimentoAtivo
+        ? 'Interpretação ativa. Os restantes riscos foram preservados.'
+        : 'Números viram atacantes; rodeados recebem bola; cruzes viram defensores.');
+}
+
+function alternarReconhecimentoDesenho(canvasId) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est) return;
+    finalizarLinhaPendente(canvasId);
+    if (est.reconhecimentoAtivo && Array.isArray(est.reconhecimentoBackup)) {
+        est.objectos = clonarObjectosDesenho(est.reconhecimentoBackup);
+        est.reconhecimentoAtivo = false;
+        est.reconhecimentoBackup = null;
+        est.objectoSeleccionado = null;
+        redesenhar(canvasId);
+        sincronizarBotaoReconhecimento(canvasId, 'Desenho livre original reposto.');
+        return;
+    }
+    if (!window.TacticalInkRecognizer) {
+        sincronizarBotaoReconhecimento(canvasId, 'O assistente não ficou disponível. Atualiza a página.');
+        return;
+    }
+    const original = clonarObjectosDesenho(est.objectos);
+    const resultado = window.TacticalInkRecognizer.interpret(original, {
+        nextAttack: est.contadores.ataque,
+        nextDefence: est.contadores.defesa,
+    });
+    if (!resultado.recognised) {
+        sincronizarBotaoReconhecimento(canvasId, 'Não encontrei símbolos seguros. Os riscos não foram alterados.');
+        return;
+    }
+    est.reconhecimentoBackup = original;
+    est.reconhecimentoAtivo = true;
+    est.objectos = resultado.objects;
+    est.contadores.ataque = Math.max(est.contadores.ataque, resultado.nextAttack);
+    est.contadores.defesa = Math.max(est.contadores.defesa, resultado.nextDefence);
+    est.numerosSelecionados.ataque = est.contadores.ataque;
+    est.numerosSelecionados.defesa = est.contadores.defesa;
+    est.objectoSeleccionado = null;
+    redesenhar(canvasId);
+    sincronizarNumeroJogador(canvasId);
+    sincronizarBotaoReconhecimento(canvasId, `${resultado.recognised} jogador(es) interpretado(s). Guarda o desenho para manter a conversão.`);
 }
 
 function tentarAlternarFerramentaApplePencil(canvasId, evento) {
@@ -1580,11 +1646,11 @@ function desenharSimbolo(ctx, obj) {
     const t = obj.tamanho || 1;
     if (obj.tipo === 'jogador_ataque') {
         ctx.beginPath(); ctx.arc(obj.x, obj.y, 22 * t, 0, Math.PI * 2); ctx.fillStyle = '#e35b19'; ctx.fill(); ctx.strokeStyle = '#9f3510'; ctx.lineWidth = 3; ctx.stroke();
-        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(16 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y);
+        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(16 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero ?? '', obj.x, obj.y);
     } else if (obj.tipo === 'jogador_defesa') {
         const h = 25 * t; ctx.beginPath(); ctx.moveTo(obj.x, obj.y - h); ctx.lineTo(obj.x + h * 0.9, obj.y + h * 0.7); ctx.lineTo(obj.x - h * 0.9, obj.y + h * 0.7); ctx.closePath();
         ctx.fillStyle = '#2563eb'; ctx.fill(); ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = 3; ctx.stroke();
-        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(15 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero || '', obj.x, obj.y + 3 * t);
+        ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(15 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero ?? '', obj.x, obj.y + 3 * t);
     } else if (obj.tipo === 'cone') {
         ctx.beginPath(); ctx.arc(obj.x, obj.y, 14 * t, 0, Math.PI * 2); ctx.strokeStyle = '#f97316'; ctx.lineWidth = 3; ctx.stroke();
     } else if (obj.tipo === 'bola') {
@@ -1775,8 +1841,11 @@ function limparTudo(canvasId) {
     est.imagemFundo = null;
     est.contadores = { ataque: 1, defesa: 1 };
     est.numerosSelecionados = { ataque: 1, defesa: 1 };
+    est.reconhecimentoAtivo = false;
+    est.reconhecimentoBackup = null;
     redesenhar(canvasId);
     sincronizarNumeroJogador(canvasId);
+    sincronizarBotaoReconhecimento(canvasId);
 }
 
 function desfazer(canvasId) {

@@ -55,6 +55,11 @@ def test_desenho_editavel_guarda_imagem_e_objectos_sem_quebrar_formato_legado():
         "altura": 600,
         "objectos": [{"tipo": "jogador_defesa", "x": 120, "y": 90, "numero": 4}],
         "contadores": {"ataque": 1, "defesa": 5},
+        "reconhecimentoAtivo": True,
+        "reconhecimentoBackup": [{
+            "tipo": "caneta",
+            "pontos": [{"x": 100, "y": 60}, {"x": 140, "y": 120}],
+        }],
     }
 
     pacote = empacotar_desenho_editavel(imagem, estado)

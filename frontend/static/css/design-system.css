@@ -457,6 +457,11 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
     .ds-week-agenda { grid-template-columns: 1fr; }
 }
 
+.ds-tactical-assistant { min-width:10rem; }
+.ds-tactical-recognize { display:flex;align-items:center;justify-content:center;gap:.45rem;width:100%;min-height:2.7rem;border:1px solid var(--clube-primary-border);border-radius:.65rem;padding:.55rem .7rem;background:var(--clube-primary-surface);color:var(--clube-primary-dark);font-size:.7rem;font-weight:800;line-height:1.2; }
+.ds-tactical-recognize:hover,.ds-tactical-recognize.is-converted { border-color:var(--clube-primary);background:var(--clube-primary);color:var(--clube-on-primary); }
+.ds-tactical-assistant>small { display:block;margin-top:.4rem;max-width:11rem;color:var(--text-muted);font-size:.62rem;line-height:1.4; }
+
 @media (min-width: 768px) {
     .ds-calendar-desktop { display: block; }
 }

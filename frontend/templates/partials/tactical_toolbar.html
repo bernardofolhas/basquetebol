@@ -45,5 +45,12 @@
             <button type="button" class="ds-tactical-tool ds-tactical-tool-danger" onclick="limparTudo('{{ canvas_id }}')" title="Limpar o desenho"><span>□</span><small>Limpar</small></button>
         </div>
     </section>
+    <section class="ds-tactical-tool-group ds-tactical-assistant">
+        <h4>Assistente</h4>
+        <button type="button" class="ds-tactical-recognize" data-recognize-ink onclick="alternarReconhecimentoDesenho('{{ canvas_id }}')" title="Transformar números e cruzes desenhados à mão em jogadores">
+            <span aria-hidden="true">◇</span><span data-recognize-label>Interpretar desenho</span>
+        </button>
+        <small data-recognize-status>Números viram atacantes; rodeados recebem bola; cruzes viram defensores.</small>
+    </section>
 </aside>
 {% endmacro %}
