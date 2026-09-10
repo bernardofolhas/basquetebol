@@ -177,7 +177,9 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         )
         assert criada.status_code == 303
         questionario = db.query(QuestionarioPersonalizado).filter_by(equipa_id=equipa_id).one()
+        questionario_id = questionario.id
         aplicacao = db.query(AplicacaoQuestionario).filter_by(questionario_id=questionario.id).one()
+        aplicacao_id = aplicacao.id
         assert len(questionario.perguntas) == 2
         assert aplicacao.data == date.today()
         selecao = client_admin.get(f"/questionarios/equipas/{equipa_id}")
@@ -264,17 +266,19 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         assert "Resposta a resposta" in dashboard.text
         assert "Aplicações" in dashboard.text
         assert "Configuração" in dashboard.text
+        assert "Retirar questionário e manter os dados" in dashboard.text
+        assert "Eliminar questionário e todos os dados" in dashboard.text
         edicao = client_admin.get(f"/questionarios/modelos/{questionario.id}/editar")
         assert edicao.status_code == 200
         assert "PSE personalizado" in edicao.text
-        assert "Os resultados existentes serão preservados" in edicao.text
+        assert "As respostas existentes serão mantidas" in edicao.text
         assert "Sempre que há um treino nesse dia" in edicao.text
         assert "Sempre que há um jogo nesse dia" in edicao.text
         assert "Sempre que há um treino físico nesse dia" in edicao.text
         assert "Aplicar diariamente" in edicao.text
         perguntas_editadas = [
-            {**perguntas[0], "texto": "PSE final da sessão"},
-            perguntas[1],
+            {**perguntas[0], "id": ids[0], "texto": "PSE final da sessão"},
+            {**perguntas[1], "id": ids[1]},
         ]
         atualizada = client_admin.post(
             f"/questionarios/modelos/{questionario.id}/editar",
@@ -288,16 +292,36 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         assert atualizada.status_code == 303
         db.expire_all()
         versoes = db.query(QuestionarioPersonalizado).filter_by(equipa_id=equipa_id).all()
-        assert len(versoes) == 2
-        anterior = next(item for item in versoes if item.id == questionario.id)
-        nova_versao = next(item for item in versoes if item.id != questionario.id)
-        assert anterior.ativo is False
-        assert nova_versao.ativo is True
-        assert nova_versao.nome == "PSE personalizado atualizado"
-        assert atualizada.headers["location"] == f"/questionarios/modelos/{nova_versao.id}"
+        assert len(versoes) == 1
+        atualizado = versoes[0]
+        assert atualizado.id == questionario.id
+        assert atualizado.ativo is True
+        assert atualizado.nome == "PSE personalizado atualizado"
+        assert atualizada.headers["location"] == f"/questionarios/modelos/{questionario.id}"
         resultados_preservados = client_admin.get(f"/questionarios/aplicacoes/{aplicacao.id}/resultados")
         assert resultados_preservados.status_code == 200
         assert "8.0" in resultados_preservados.text
+        assert "PSE final da sessão" in resultados_preservados.text
+
+        arquivada = client_admin.post(
+            f"/questionarios/modelos/{questionario.id}/eliminar",
+            data={"modo": "arquivar"},
+            follow_redirects=False,
+        )
+        assert arquivada.status_code == 303
+        db.expire_all()
+        assert db.query(QuestionarioPersonalizado).filter_by(id=questionario.id).one().ativo is False
+        assert db.query(SubmissaoQuestionario).filter_by(aplicacao_id=aplicacao.id).count() == 1
+
+        eliminada = client_admin.post(
+            f"/questionarios/modelos/{questionario.id}/eliminar",
+            data={"modo": "tudo"},
+            follow_redirects=False,
+        )
+        assert eliminada.status_code == 303
+        db.expire_all()
+        assert db.query(QuestionarioPersonalizado).filter_by(id=questionario_id).first() is None
+        assert db.query(SubmissaoQuestionario).filter_by(aplicacao_id=aplicacao_id).count() == 0
     finally:
         db.query(QuestionarioPersonalizado).filter(
             QuestionarioPersonalizado.equipa_id == equipa_id

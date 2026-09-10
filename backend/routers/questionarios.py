@@ -65,6 +65,11 @@ def _normalizar_perguntas(perguntas_json: str) -> list[dict]:
         raise ValueError("Cada questionário pode ter até 40 perguntas.")
     resultado = []
     for indice, item in enumerate(recebidas):
+        pergunta_id = item.get("id")
+        try:
+            pergunta_id = int(pergunta_id) if pergunta_id not in (None, "") else None
+        except (TypeError, ValueError):
+            pergunta_id = None
         texto_pergunta = str(item.get("texto") or "").strip()
         tipo = str(item.get("tipo") or "").strip()
         if not texto_pergunta:
@@ -90,6 +95,7 @@ def _normalizar_perguntas(perguntas_json: str) -> list[dict]:
         if tipo == "escolha" and len(opcoes) < 2:
             raise ValueError(f"Adiciona pelo menos duas opções à pergunta {indice + 1}.")
         resultado.append({
+            "id": pergunta_id,
             "texto": texto_pergunta[:300],
             "ajuda": str(item.get("ajuda") or "").strip()[:300] or None,
             "tipo": tipo,
@@ -144,6 +150,35 @@ def _adicionar_perguntas(db: Session, questionario_id: int, perguntas: list[dict
             rotulo_maximo=item["rotulo_maximo"],
             opcoes_json=json.dumps(item["opcoes"], ensure_ascii=False),
         ))
+
+
+def _atualizar_perguntas(
+    db: Session,
+    questionario: QuestionarioPersonalizado,
+    perguntas: list[dict],
+) -> None:
+    existentes = {pergunta.id: pergunta for pergunta in questionario.perguntas}
+    usados = set()
+    for ordem, item in enumerate(perguntas, start=1):
+        pergunta = existentes.get(item["id"])
+        if pergunta and pergunta.id not in usados:
+            usados.add(pergunta.id)
+        else:
+            pergunta = PerguntaQuestionario(questionario_id=questionario.id)
+            db.add(pergunta)
+        pergunta.texto = item["texto"]
+        pergunta.ajuda = item["ajuda"]
+        pergunta.tipo = item["tipo"]
+        pergunta.obrigatoria = item["obrigatoria"]
+        pergunta.ordem = ordem
+        pergunta.minimo = item["minimo"]
+        pergunta.maximo = item["maximo"]
+        pergunta.rotulo_minimo = item["rotulo_minimo"]
+        pergunta.rotulo_maximo = item["rotulo_maximo"]
+        pergunta.opcoes_json = json.dumps(item["opcoes"], ensure_ascii=False)
+    for pergunta_id, pergunta in existentes.items():
+        if pergunta_id not in usados:
+            db.delete(pergunta)
 
 
 def _sincronizar_aplicacoes_automaticas(
@@ -591,8 +626,13 @@ def detalhe_questionario(
         ]
         media = None
         if pergunta.tipo in {"escala", "numero"} and valores:
-            numeros = [float(valor) for valor in valores]
-            media = round(sum(numeros) / len(numeros), 1)
+            numeros = []
+            for valor in valores:
+                try:
+                    numeros.append(float(valor))
+                except (TypeError, ValueError):
+                    continue
+            media = round(sum(numeros) / len(numeros), 1) if numeros else None
         analise_global[pergunta.id] = {"total": len(valores), "media": media}
     aplicacao_atual = questionario.aplicacoes[0] if questionario.aplicacoes else None
     submissoes_atuais = aplicacao_atual.submissoes if aplicacao_atual else []
@@ -606,13 +646,18 @@ def detalhe_questionario(
         dia = date.today() - timedelta(days=deslocamento)
         valores_dia = []
         if pergunta_indicador:
-            valores_dia = [
-                float(resposta.valor)
+            valores_dia_brutos = [
+                resposta.valor
                 for aplicacao in questionario.aplicacoes if aplicacao.data == dia
                 for submissao in aplicacao.submissoes
                 for resposta in submissao.respostas
                 if resposta.pergunta_id == pergunta_indicador.id and resposta.valor not in (None, "")
             ]
+            for valor in valores_dia_brutos:
+                try:
+                    valores_dia.append(float(valor))
+                except (TypeError, ValueError):
+                    continue
         valor_medio = round(sum(valores_dia) / len(valores_dia), 1) if valores_dia else None
         amplitude = (
             float(pergunta_indicador.maximo) - float(pergunta_indicador.minimo)
@@ -665,6 +710,7 @@ def editar_questionario(
     if not questionario:
         return RedirectResponse("/equipas", status_code=303)
     perguntas = [{
+        "id": pergunta.id,
         "texto": pergunta.texto,
         "ajuda": pergunta.ajuda,
         "tipo": pergunta.tipo,
@@ -716,42 +762,46 @@ def guardar_edicao_questionario(
     except ValueError as erro:
         set_flash(request, str(erro), "error")
         return RedirectResponse(f"/questionarios/modelos/{questionario.id}/editar", status_code=303)
-    tem_respostas = any(aplicacao.submissoes for aplicacao in questionario.aplicacoes)
-    if tem_respostas:
-        questionario.ativo = False
-        for aplicacao in questionario.aplicacoes:
-            if aplicacao.automatica and aplicacao.data >= date.today() and not aplicacao.submissoes:
-                aplicacao.ativa = False
-        atualizado = QuestionarioPersonalizado(
-            clube_id=questionario.clube_id,
-            equipa_id=questionario.equipa_id,
-            nome=nome_limpo[:180],
-            descricao=descricao.strip() or None,
-            origem_modelo=f"versao:{questionario.id}",
-            regra_aplicacao=regra_aplicacao,
-        )
-        db.add(atualizado)
-        db.flush()
-        _adicionar_perguntas(db, atualizado.id, perguntas)
-        destino_id = atualizado.id
-        mensagem = "Nova versão criada. Os resultados anteriores ficaram preservados."
-    else:
-        questionario.nome = nome_limpo[:180]
-        questionario.descricao = descricao.strip() or None
-        questionario.regra_aplicacao = regra_aplicacao
-        db.query(PerguntaQuestionario).filter(
-            PerguntaQuestionario.questionario_id == questionario.id
-        ).delete(synchronize_session=False)
-        _adicionar_perguntas(db, questionario.id, perguntas)
-        destino_id = questionario.id
-        mensagem = "Questionário atualizado."
+    questionario.nome = nome_limpo[:180]
+    questionario.descricao = descricao.strip() or None
+    questionario.regra_aplicacao = regra_aplicacao
+    _atualizar_perguntas(db, questionario, perguntas)
+    destino_id = questionario.id
     db.commit()
     destino = db.query(QuestionarioPersonalizado).filter(
         QuestionarioPersonalizado.id == destino_id
     ).first()
     _sincronizar_aplicacoes_automaticas(db, [destino])
-    set_flash(request, mensagem)
+    set_flash(request, "Questionário atualizado.")
     return RedirectResponse(f"/questionarios/modelos/{destino_id}", status_code=303)
+
+
+@router.post("/modelos/{questionario_id}/eliminar")
+def eliminar_questionario(
+    questionario_id: int,
+    request: Request,
+    modo: str = Form("arquivar"),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    questionario = _obter_questionario_tecnico(db, questionario_id, utilizador)
+    if not questionario:
+        return RedirectResponse("/equipas", status_code=303)
+    equipa_id = questionario.equipa_id
+    if modo == "arquivar":
+        questionario.ativo = False
+        for aplicacao in questionario.aplicacoes:
+            aplicacao.ativa = False
+        mensagem = "Questionário retirado. Os dados históricos foram mantidos."
+    elif modo == "tudo":
+        db.delete(questionario)
+        mensagem = "Questionário e todos os respetivos dados foram eliminados."
+    else:
+        set_flash(request, "Escolhe uma opção de eliminação válida.", "error")
+        return RedirectResponse(f"/questionarios/modelos/{questionario.id}", status_code=303)
+    db.commit()
+    set_flash(request, mensagem)
+    return RedirectResponse(f"/questionarios/equipas/{equipa_id}", status_code=303)
 
 
 @router.post("/modelos/{questionario_id}/aplicar")
