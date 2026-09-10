@@ -6,7 +6,7 @@
 
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
-<script src="/static/js/tactical-ink-recognizer.js?v=20260910-1"></script>
+<script src="/static/js/tactical-ink-recognizer.js?v=20260910-2"></script>
 <div class="training-workspace" data-training-plan="{{ plano.id }}" data-training-session-start="{{ sessao.hora_inicio or plano.hora_inicio or '' }}" data-training-reorder-url="/treino/planos/{{ plano.id }}/exercicios/reordenar">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
@@ -1131,7 +1131,7 @@ function inicializarDesenho(canvasId) {
         redesenhar(canvasId);
     };
     const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'jogador_ataque', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, gestoCaneta: null, ultimoToqueCaneta: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033', reconhecimentoAtivo: false, reconhecimentoBackup: null };
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'seleccionar', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, gestoCaneta: null, ultimoToqueCaneta: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033', reconhecimentoAtivo: false, reconhecimentoBackup: null };
     requestAnimationFrame(() => {
         configurarCanvas();
         if (canvas.dataset.estado) restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
@@ -1204,7 +1204,7 @@ function togglePainelDesenhos(exercicioId, aberto) {
         const canvasId = canvas.id;
         if (!CANVAS_ESTADO[canvasId]) {
             inicializarDesenho(canvasId);
-            setTimeout(() => definirFerramenta(canvasId, 'jogador_ataque'), 200);
+            setTimeout(() => definirFerramenta(canvasId, 'seleccionar'), 200);
         }
     });
 }
@@ -1374,8 +1374,8 @@ function sincronizarBotaoReconhecimento(canvasId, mensagem = '') {
     }
     if (label) label.textContent = est.reconhecimentoAtivo ? 'Ver desenho original' : 'Interpretar desenho';
     if (estado) estado.textContent = mensagem || (est.reconhecimentoAtivo
-        ? 'Interpretação ativa. Os restantes riscos foram preservados.'
-        : 'Números viram atacantes; rodeados recebem bola; cruzes viram defensores.');
+        ? 'Interpretação ativa. Usa o Cursor para mover os objetos reconhecidos.'
+        : 'Números, jogadores e riscos viram objetos editáveis do sistema.');
 }
 
 function alternarReconhecimentoDesenho(canvasId) {
@@ -1414,7 +1414,8 @@ function alternarReconhecimentoDesenho(canvasId) {
     est.objectoSeleccionado = null;
     redesenhar(canvasId);
     sincronizarNumeroJogador(canvasId);
-    sincronizarBotaoReconhecimento(canvasId, `${resultado.recognised} jogador(es) interpretado(s). Guarda o desenho para manter a conversão.`);
+    definirFerramenta(canvasId, 'seleccionar');
+    sincronizarBotaoReconhecimento(canvasId, `${resultado.recognisedPlayers || 0} jogador(es) e ${resultado.recognisedActions || 0} movimento(s) reconhecido(s). Usa o Cursor para os ajustar.`);
 }
 
 function tentarAlternarFerramentaApplePencil(canvasId, evento) {
@@ -1480,6 +1481,7 @@ function aoPremir(canvasId, e) {
                 if (eObjectoMovel(est.objectos[i])) est.offsetMover = { x: pos.x - est.objectos[i].x, y: pos.y - est.objectos[i].y };
                 else est.offsetMover = { x: pos.x - est.objectos[i].pontos[0].x, y: pos.y - est.objectos[i].pontos[0].y };
                 est.aDesconhar = true;
+                est.canvas.style.cursor = 'grabbing';
                 break;
             }
         }
@@ -1575,6 +1577,7 @@ function aoSoltar(canvasId) {
     }
     if (est.ferramenta === 'seleccionar') {
         est.aDesconhar = false;
+        est.canvas.style.cursor = 'grab';
         if (est.objectoSeleccionado) mostrarPainelTamanho(canvasId, est.objectoSeleccionado);
     }
 }
@@ -1692,6 +1695,19 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
             const n = Math.max(1, Math.floor(dist / 15)); const stepX = (p2.x - p1.x) / (n * 2), stepY = (p2.y - p1.y) / (n * 2); const perpX = -Math.sin(ang) * 6, perpY = Math.cos(ang) * 6;
             for (let j = 0; j < n; j++) { ctx.lineTo(p1.x + stepX * (j * 2 + 1) + (j % 2 === 0 ? perpX : -perpX), p1.y + stepY * (j * 2 + 1) + (j % 2 === 0 ? perpY : -perpY)); ctx.lineTo(p1.x + stepX * (j * 2 + 2), p1.y + stepY * (j * 2 + 2)); }
         }
+    } else if (linha.tipo === 'lancamento') {
+        const afastamento = 5;
+        for (const lado of [-1, 1]) {
+            ctx.beginPath();
+            todosPontos.forEach((ponto, indice) => {
+                const anterior = todosPontos[Math.max(0, indice - 1)], seguinte = todosPontos[Math.min(todosPontos.length - 1, indice + 1)];
+                const angulo = Math.atan2(seguinte.y - anterior.y, seguinte.x - anterior.x);
+                const x = ponto.x - Math.sin(angulo) * lado * afastamento;
+                const y = ponto.y + Math.cos(angulo) * lado * afastamento;
+                if (indice === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+        }
     } else {
         ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
         for (let i = 1; i < todosPontos.length; i++) ctx.lineTo(todosPontos[i].x, todosPontos[i].y);
@@ -1773,7 +1789,7 @@ function definirFerramenta(canvasId, ferramenta) {
     finalizarLinhaPendente(canvasId);
     est.ferramenta = ferramenta;
     const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
-    est.canvas.style.cursor = simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'cell' : 'crosshair';
+    est.canvas.style.cursor = ferramenta === 'seleccionar' ? 'grab' : simbolos.includes(ferramenta) ? 'copy' : ferramenta === 'apagar' ? 'cell' : 'crosshair';
     const toolbar = document.getElementById('toolbar_' + canvasId);
     if (toolbar) {
         toolbar.querySelectorAll('button[data-ferramenta]').forEach(btn => {

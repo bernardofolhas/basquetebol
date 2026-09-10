@@ -9,16 +9,18 @@ const arc = (cx, cy, rx, ry, start, end, steps = 30) => Array.from({ length: ste
   return { x: cx + Math.cos(angle) * rx, y: cy + Math.sin(angle) * ry };
 });
 
-test('converts a handwritten number to an attacker and preserves an unrelated movement line', () => {
+test('converts a handwritten number with its correct value and a free stroke to movement', () => {
   const three = stroke([
     ...arc(50, 35, 22, 18, -Math.PI / 2, Math.PI / 2, 15),
     ...arc(50, 70, 22, 18, -Math.PI / 2, Math.PI / 2, 15),
   ], 'three');
   const movement = stroke(line([140, 180], [220, 130], [310, 150]), 'movement');
   const result = recognizer.interpret([three, movement], { nextAttack: 1 });
-  assert.equal(result.recognised, 1);
+  assert.equal(result.recognised, 2);
+  assert.equal(result.recognisedPlayers, 1);
+  assert.equal(result.recognisedActions, 1);
   assert.equal(result.objects.find(item => item.tipo === 'jogador_ataque').numero, 3);
-  assert.equal(result.objects.find(item => item.id === 'movement'), movement);
+  assert.equal(result.objects.find(item => item.tipo === 'seta').id.startsWith('ink-'), true);
 });
 
 test('converts a circled number to one attacker with a ball', () => {
@@ -68,11 +70,41 @@ test('recognises zero as a visible attacker number', () => {
   assert.equal(result.objects[0].numero, 0);
 });
 
-test('does not alter the input and refuses unsafe large or incomplete shapes', () => {
-  const original = [stroke(line([0, 0], [300, 260]), 'long'), stroke(arc(50, 50, 12, 10, 0, Math.PI), 'open')];
+test('does not alter the input and preserves small incomplete marks', () => {
+  const original = [stroke(line([0, 0], [8, 7]), 'short'), stroke(arc(50, 50, 8, 7, 0, Math.PI), 'open')];
   const snapshot = JSON.stringify(original);
   const result = recognizer.interpret(original);
   assert.equal(result.recognised, 0);
   assert.equal(JSON.stringify(original), snapshot);
   assert.deepEqual(result.objects, original);
+});
+
+test('recognises a zigzag as an editable dribble', () => {
+  const dribble = stroke(line([20, 80], [35, 60], [50, 82], [65, 58], [80, 80], [96, 55]), 'dribble');
+  const result = recognizer.interpret([dribble]);
+  assert.equal(result.recognisedActions, 1);
+  assert.equal(result.objects[0].tipo, 'seta_zigzag');
+  assert.deepEqual(result.objects[0].pontos, dribble.pontos);
+});
+
+test('recognises separated aligned strokes as a pass', () => {
+  const pass = [
+    stroke(line([10, 40], [28, 40]), 'dash-1'),
+    stroke(line([42, 40], [60, 40]), 'dash-2'),
+    stroke(line([74, 40], [92, 40]), 'dash-3'),
+  ];
+  const result = recognizer.interpret(pass);
+  assert.equal(result.recognisedActions, 1);
+  assert.equal(result.objects[0].tipo, 'seta_tracejada');
+});
+
+test('recognises two parallel strokes as a shot', () => {
+  const shot = [
+    stroke(line([20, 80], [50, 48], [82, 20]), 'shot-1'),
+    stroke(line([28, 86], [58, 54], [90, 26]), 'shot-2'),
+  ];
+  const result = recognizer.interpret(shot);
+  assert.equal(result.recognisedActions, 1);
+  assert.equal(result.objects[0].tipo, 'lancamento');
+  assert.equal(result.objects[0].pontos.length, 28);
 });

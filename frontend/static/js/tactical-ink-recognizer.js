@@ -62,7 +62,7 @@
     3: [[...arc(.34, .25, .5, .25, -Math.PI / 2, Math.PI / 2, 12), ...arc(.34, .75, .5, .25, -Math.PI / 2, Math.PI / 2, 12)]],
     4: [[...line([[.76, 1], [.76, 0], [.08, .65], [1, .65]])]],
     5: [[...line([[.92, 0], [.15, 0], [.12, .48], [.65, .48]]), ...arc(.5, .72, .42, .28, -Math.PI / 2, Math.PI / 1.8, 12)]],
-    6: [[...arc(.55, .53, .42, .48, -.15 * Math.PI, 1.8 * Math.PI, 28)]],
+    6: [[...line([[.78, 0], [.38, .18], [.16, .55]]), ...arc(.5, .7, .34, .27, Math.PI, Math.PI * 3, 20)]],
     7: [[...line([[.05, 0], [.95, 0], [.35, 1]])]],
     8: [[...arc(.5, .25, .34, .25, -Math.PI / 2, Math.PI * 1.5, 16), ...arc(.5, .74, .4, .26, -Math.PI / 2, Math.PI * 1.5, 16)]],
     9: [[...arc(.48, .27, .4, .27, Math.PI * .45, Math.PI * 2.45, 20), ...line([[.86, .28], [.65, 1]])]],
@@ -76,6 +76,10 @@
   function recogniseDigit(strokes) {
     const box = bounds(strokes);
     if (box.height < 14 || box.height > 125 || box.width > box.height * 1.35) return null;
+    if (strokes.length === 1 && isClosed(strokes[0])) {
+      const points = strokes[0].pontos || [], diagonal = Math.hypot(box.width, box.height);
+      if (Math.hypot(points[0].x - points.at(-1).x, points[0].y - points.at(-1).y) < diagonal * .16) return { digit: 0, score: 0 };
+    }
     if (box.width < box.height * .22) return { digit: 1, score: 0 };
     const candidate = normalize(strokes);
     const scores = Object.entries(templates).map(([digit, template]) => ({ digit: Number(digit), score: chamfer(candidate, normalize(template.map(pontos => ({ pontos })))) }));
@@ -112,7 +116,10 @@
     const angleB = Math.atan2(pb.at(-1).y - pb[0].y, pb.at(-1).x - pb[0].x);
     const angle = Math.abs(Math.sin(angleA - angleB));
     const lengths = [pathLength(pa), pathLength(pb)];
-    return angle > .55 && Math.min(...lengths) > 18 && Math.max(...lengths) < 130 && Math.max(...lengths) / Math.min(...lengths) < 2.2 ? intersection : null;
+    const directionA = point(pa.at(-1).x - pa[0].x, pa.at(-1).y - pa[0].y);
+    const directionB = point(pb.at(-1).x - pb[0].x, pb.at(-1).y - pb[0].y);
+    const opposingDiagonals = directionA.x * directionA.y * directionB.x * directionB.y < 0;
+    return angle > .62 && opposingDiagonals && Math.min(...lengths) > 18 && Math.max(...lengths) < 130 && Math.max(...lengths) / Math.min(...lengths) < 2.2 ? intersection : null;
   }
 
   function simplify(points, tolerance = 4) {
@@ -134,7 +141,12 @@
     for (let i = 0; i < points.length - 1; i += 1) for (let j = i + 2; j < points.length - 1; j += 1) {
       if (i === 0 && j === points.length - 2 && Math.hypot(points[0].x - points.at(-1).x, points[0].y - points.at(-1).y) < 8) continue;
       const centre = segmentIntersection(points[i], points[i + 1], points[j], points[j + 1]);
-      if (centre) return centre;
+      if (!centre) continue;
+      const first = point(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
+      const second = point(points[j + 1].x - points[j].x, points[j + 1].y - points[j].y);
+      const diagonal = Math.hypot(box.width, box.height);
+      const opposingDiagonals = first.x * first.y * second.x * second.y < 0;
+      if (opposingDiagonals && Math.hypot(first.x, first.y) > diagonal * .42 && Math.hypot(second.x, second.y) > diagonal * .42) return centre;
     }
     return null;
   }
@@ -168,8 +180,84 @@
         return { number: digits[0].digit * 10 + digits[1].digit, score: Math.max(...digits.map(item => item.score)) };
       }
     }
+    if (strokes.length > 1) {
+      const directions = strokes.map(direction);
+      const parallel = directions.every((current, index) => index === 0 || Math.abs(current.x * directions[0].x + current.y * directions[0].y) > .86);
+      if (parallel) return null;
+    }
     const digit = recogniseDigit(strokes);
     return digit ? { number: digit.digit, score: digit.score } : null;
+  }
+
+  function direction(stroke) {
+    const points = stroke.pontos || [];
+    if (points.length < 2) return point(0, 0);
+    const start = points[0], end = points.at(-1);
+    const length = Math.max(.001, Math.hypot(end.x - start.x, end.y - start.y));
+    return point((end.x - start.x) / length, (end.y - start.y) / length);
+  }
+
+  function averagePaths(a, b) {
+    const first = interpolate(a.pontos || [], 28), secondRaw = interpolate(b.pontos || [], 28);
+    const sameDirection = Math.hypot(first[0].x - secondRaw[0].x, first[0].y - secondRaw[0].y)
+      <= Math.hypot(first[0].x - secondRaw.at(-1).x, first[0].y - secondRaw.at(-1).y);
+    const second = sameDirection ? secondRaw : [...secondRaw].reverse();
+    return first.map((p, index) => point((p.x + second[index].x) / 2, (p.y + second[index].y) / 2));
+  }
+
+  function shotPair(a, b) {
+    const lengthA = pathLength(a.pontos || []), lengthB = pathLength(b.pontos || []);
+    if (Math.min(lengthA, lengthB) < 32 || Math.max(lengthA, lengthB) / Math.max(1, Math.min(lengthA, lengthB)) > 1.8) return false;
+    const da = direction(a), db = direction(b);
+    const parallel = Math.abs(da.x * db.x + da.y * db.y);
+    if (parallel < .88) return false;
+    const ba = bounds([a]), bb = bounds([b]);
+    const centreDistance = Math.hypot(ba.cx - bb.cx, ba.cy - bb.cy);
+    const averageLength = (Math.hypot(ba.width, ba.height) + Math.hypot(bb.width, bb.height)) / 2;
+    return centreDistance > 3 && centreDistance < Math.max(30, averageLength * .32);
+  }
+
+  function dribbleStroke(stroke) {
+    const points = interpolate(stroke.pontos || [], 36);
+    if (points.length < 8) return false;
+    const start = points[0], end = points.at(-1), dx = end.x - start.x, dy = end.y - start.y;
+    const chord = Math.hypot(dx, dy);
+    if (chord < 24 || pathLength(points) / chord < 1.12) return false;
+    const values = points.map(p => ((p.x - start.x) * -dy + (p.y - start.y) * dx) / chord);
+    const threshold = Math.max(2.5, chord * .018);
+    let changes = 0, previous = 0;
+    values.forEach(value => {
+      const sign = value > threshold ? 1 : value < -threshold ? -1 : 0;
+      if (sign && previous && sign !== previous) changes += 1;
+      if (sign) previous = sign;
+    });
+    return changes >= 2;
+  }
+
+  function dashedGroup(strokes) {
+    if (strokes.length < 3 || strokes.length > 12 || strokes.some(stroke => pathLength(stroke.pontos || []) > 48)) return null;
+    const centres = strokes.map(stroke => bounds([stroke])).map(box => point(box.cx, box.cy));
+    const firstDrawn = centres[0];
+    const outer = bounds(strokes), horizontal = outer.width >= outer.height;
+    centres.sort((a, b) => horizontal ? a.x - b.x : a.y - b.y);
+    const start = centres[0], end = centres.at(-1), dx = end.x - start.x, dy = end.y - start.y, chord = Math.hypot(dx, dy);
+    if (chord < 45) return null;
+    const maxOffset = Math.max(...centres.map(p => Math.abs((p.x - start.x) * -dy + (p.y - start.y) * dx) / chord));
+    if (maxOffset > Math.max(14, chord * .16)) return null;
+    if (Math.hypot(firstDrawn.x - end.x, firstDrawn.y - end.y) < Math.hypot(firstDrawn.x - start.x, firstDrawn.y - start.y)) centres.reverse();
+    return centres;
+  }
+
+  function nativeLine(strokes, type, uid) {
+    const source = strokes[0];
+    const points = type === "lancamento" ? averagePaths(strokes[0], strokes[1])
+      : type === "seta_tracejada" ? dashedGroup(strokes)
+      : (source.pontos || []).map(p => point(p.x, p.y));
+    return {
+      id: uid(), tipo: type, pontos: points, largura: Number(source.largura) || 4,
+      cor: source.cor || "#172033", tamanho: Number(source.tamanho) || 1,
+      origemReconhecimento: true,
+    };
   }
 
   function interpret(objects, options = {}) {
@@ -207,7 +295,7 @@
       nextAttack = Math.max(nextAttack, number.number + 1);
     });
 
-    cluster(freehand.filter(stroke => !consumed.has(stroke))).forEach(group => {
+    cluster(freehand.filter(stroke => !consumed.has(stroke)), 10).forEach(group => {
       const number = recogniseNumber(group), box = bounds(group);
       if (!number) return;
       replacements.push({ tipo: "jogador_ataque", x: box.cx, y: box.cy, tamanho: 1, numero: number.number, origemReconhecimento: true });
@@ -215,11 +303,38 @@
       nextAttack = Math.max(nextAttack, number.number + 1);
     });
 
-    const recognised = replacements.filter(object => object.tipo.startsWith("jogador_")).length;
+    const actionStrokes = freehand.filter(stroke => !consumed.has(stroke));
+    for (let i = 0; i < actionStrokes.length; i += 1) {
+      if (consumed.has(actionStrokes[i])) continue;
+      for (let j = i + 1; j < actionStrokes.length; j += 1) {
+        if (consumed.has(actionStrokes[j]) || !shotPair(actionStrokes[i], actionStrokes[j])) continue;
+        replacements.push(nativeLine([actionStrokes[i], actionStrokes[j]], "lancamento", uid));
+        consumed.add(actionStrokes[i]); consumed.add(actionStrokes[j]);
+        break;
+      }
+    }
+
+    cluster(actionStrokes.filter(stroke => !consumed.has(stroke)), 26).forEach(group => {
+      const path = dashedGroup(group);
+      if (!path) return;
+      replacements.push(nativeLine(group, "seta_tracejada", uid));
+      group.forEach(stroke => consumed.add(stroke));
+    });
+
+    actionStrokes.filter(stroke => !consumed.has(stroke)).forEach(stroke => {
+      const box = bounds([stroke]);
+      if (pathLength(stroke.pontos || []) < 34 || Math.hypot(box.width, box.height) < 25) return;
+      replacements.push(nativeLine([stroke], dribbleStroke(stroke) ? "seta_zigzag" : "seta", uid));
+      consumed.add(stroke);
+    });
+
+    const recognisedPlayers = replacements.filter(object => object.tipo.startsWith("jogador_")).length;
+    const recognisedActions = replacements.filter(object => ["seta", "seta_tracejada", "seta_zigzag", "lancamento"].includes(object.tipo)).length;
+    const recognised = recognisedPlayers + recognisedActions;
     const kept = objects.filter(object => !consumed.has(object));
-    replacements.forEach(object => { object.id = uid(); kept.push(object); });
-    return { objects: kept, recognised, consumed: consumed.size, nextAttack, nextDefence };
+    replacements.forEach(object => { if (!object.id) object.id = uid(); kept.push(object); });
+    return { objects: kept, recognised, recognisedPlayers, recognisedActions, consumed: consumed.size, nextAttack, nextDefence };
   }
 
-  return { bounds, crossed, interpret, isClosed, recogniseDigit };
+  return { bounds, crossed, dribbleStroke, interpret, isClosed, recogniseDigit };
 });

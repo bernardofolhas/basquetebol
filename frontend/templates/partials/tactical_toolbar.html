@@ -3,7 +3,7 @@
     <section class="ds-tactical-tool-group">
         <h4>Jogadores</h4>
         <div class="ds-tactical-tool-grid">
-            <button type="button" class="ds-tactical-tool is-active" data-ferramenta="jogador_ataque" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_ataque')" title="Adicionar jogador atacante"><span class="ds-tactical-symbol ds-tactical-symbol-attack">1</span><small>Ataque</small></button>
+            <button type="button" class="ds-tactical-tool" data-ferramenta="jogador_ataque" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_ataque')" title="Adicionar jogador atacante"><span class="ds-tactical-symbol ds-tactical-symbol-attack">1</span><small>Ataque</small></button>
             <button type="button" class="ds-tactical-tool" data-ferramenta="jogador_defesa" onclick="definirFerramenta('{{ canvas_id }}', 'jogador_defesa')" title="Adicionar jogador defensor"><span class="ds-tactical-symbol ds-tactical-symbol-defence">1</span><small>Defesa</small></button>
             <button type="button" class="ds-tactical-tool" data-ferramenta="coach" onclick="definirFerramenta('{{ canvas_id }}', 'coach')" title="Adicionar treinador"><span class="ds-tactical-symbol ds-tactical-symbol-coach">C</span><small>Coach</small></button>
         </div>
@@ -23,7 +23,7 @@
         <h4>Movimentos</h4>
         <div class="ds-tactical-tool-grid">
             <button type="button" class="ds-tactical-tool ds-tactical-tool-pen" data-ferramenta="caneta" onclick="definirFerramenta('{{ canvas_id }}', 'caneta')" title="Desenhar livremente com Apple Pencil, toque ou rato"><span aria-hidden="true">&#9998;</span><small>Caneta livre</small></button>
-            {% for ferramenta, simbolo, label in [('seta','→','Corrida'),('seta_tracejada','⇢','Passe'),('seta_zigzag','≋','Drible'),('seta_curva','⌒','Curva'),('bloqueio','⊣','Bloqueio'),('linha','—','Linha')] %}
+            {% for ferramenta, simbolo, label in [('seta','→','Corrida'),('seta_tracejada','⇢','Passe'),('seta_zigzag','≋','Drible'),('lancamento','⇉','Lançamento'),('seta_curva','⌒','Curva'),('bloqueio','⊣','Bloqueio'),('linha','—','Linha')] %}
             <button type="button" class="ds-tactical-tool" data-ferramenta="{{ ferramenta }}" onclick="definirFerramenta('{{ canvas_id }}', '{{ ferramenta }}')" title="{{ label }}"><span>{{ simbolo }}</span><small>{{ label }}</small></button>
             {% endfor %}
         </div>
@@ -39,7 +39,7 @@
     <section class="ds-tactical-tool-group">
         <h4>Edição</h4>
         <div class="ds-tactical-tool-grid">
-            <button type="button" class="ds-tactical-tool" data-ferramenta="seleccionar" onclick="definirFerramenta('{{ canvas_id }}', 'seleccionar')" title="Selecionar e mover"><span>↖</span><small>Mover</small></button>
+            <button type="button" class="ds-tactical-tool is-active" data-ferramenta="seleccionar" onclick="definirFerramenta('{{ canvas_id }}', 'seleccionar')" title="Cursor sem desenho: selecionar e mover objetos"><span>↖</span><small>Cursor</small></button>
             <button type="button" class="ds-tactical-tool" onclick="desfazer('{{ canvas_id }}')" title="Desfazer"><span>↶</span><small>Desfazer</small></button>
             <button type="button" class="ds-tactical-tool" data-ferramenta="apagar" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')" title="Borracha: apagar apenas a zona percorrida"><span>×</span><small>Borracha</small></button>
             <button type="button" class="ds-tactical-tool ds-tactical-tool-danger" onclick="limparTudo('{{ canvas_id }}')" title="Limpar o desenho"><span>□</span><small>Limpar</small></button>
@@ -47,10 +47,10 @@
     </section>
     <section class="ds-tactical-tool-group ds-tactical-assistant">
         <h4>Assistente</h4>
-        <button type="button" class="ds-tactical-recognize" data-recognize-ink onclick="alternarReconhecimentoDesenho('{{ canvas_id }}')" title="Transformar números e cruzes desenhados à mão em jogadores">
+        <button type="button" class="ds-tactical-recognize" data-recognize-ink onclick="alternarReconhecimentoDesenho('{{ canvas_id }}')" title="Transformar o desenho livre em jogadores e movimentos editáveis">
             <span aria-hidden="true">◇</span><span data-recognize-label>Interpretar desenho</span>
         </button>
-        <small data-recognize-status>Números viram atacantes; rodeados recebem bola; cruzes viram defensores.</small>
+        <small data-recognize-status>Números, jogadores e riscos viram objetos editáveis do sistema.</small>
     </section>
 </aside>
 {% endmacro %}
