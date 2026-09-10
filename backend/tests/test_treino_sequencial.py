@@ -145,18 +145,15 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
             assert texto in pagina.text
         assert 'class="training-exercise-card"' in pagina.text
         assert 'data-training-exercise-drag' in pagina.text
-        assert 'draggable="true"' in pagina.text
+        assert 'draggable="true"' not in pagina.text
         assert "function posicionarCartao" in pagina.text
-        assert "window.addEventListener('pointermove'" in pagina.text
-        assert "window.addEventListener('pointerup'" in pagina.text
+        assert "document.addEventListener('pointermove'" in pagina.text
+        assert "document.addEventListener('pointerup'" in pagina.text
         assert "setPointerCapture" in pagina.text
-        assert "root.addEventListener('dragstart'" in pagina.text
-        assert "root.addEventListener('dragover'" in pagina.text
-        assert "root.addEventListener('drop'" in pagina.text
-        assert "Cartão selecionado" in pagina.text
-        assert "colocarCartaoSelecionadoAntesDe" in pagina.text
+        assert "root.addEventListener('dragstart'" not in pagina.text
+        assert "rect.top + rect.height / 2" in pagina.text
         assert 'data-training-reorder-url=' in pagina.text
-        assert "cartao.getBoundingClientRect()" in pagina.text
+        assert "referencia.getBoundingClientRect()" in pagina.text
         assert "atualizarHorasNoEcra()" in pagina.text
         assert "getCoalescedEvents" in pagina.text
         assert 'data-drawing-preview=' in pagina.text

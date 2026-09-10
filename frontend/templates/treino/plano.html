@@ -366,7 +366,7 @@
                 <button type="button" class="ds-button ds-button-primary" aria-controls="training-add-panel" aria-expanded="false" data-training-add><span aria-hidden="true">+</span> Adicionar exercício</button>
                 <label><input type="checkbox" data-training-block-mode> Planear por blocos</label>
             </div>
-            <p class="training-reorder-status" data-training-reorder-status aria-live="polite"></p>
+            <p class="training-reorder-status" data-training-reorder-status aria-live="polite">Arraste a pega de um exercício para alterar a sequência; os horários são recalculados automaticamente.</p>
             <div data-training-block-only hidden>
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h2 class="text-xl font-semibold text-gray-800">Blocos do treino</h2><p class="mt-1 text-sm text-gray-500">Cria apenas os blocos necessários.</p></div><form method="POST" action="/treino/planos/{{ plano.id }}/blocos" class="flex flex-wrap gap-2"><input name="nome" required placeholder="Ex: Aquecimento" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><input name="tipo" placeholder="Tipo opcional" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><button class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white">Criar bloco</button></form></div>
             </div>
@@ -465,7 +465,7 @@
                         <article id="exercicio-{{ ex.id }}" class="training-exercise-card" data-training-exercise-id="{{ ex.id }}" data-training-exercise-duration="{{ ex.minutos or 0 }}" aria-grabbed="false">
                             <header class="training-exercise-card-head">
                                 <div class="training-exercise-title min-w-0">
-                                    <button type="button" draggable="true" class="training-exercise-drag" data-training-exercise-drag aria-label="Arrastar o cartão para alterar a ordem de {{ ex.nome if ex.nome else 'exercício' }}" title="Arrastar o cartão para alterar a ordem">
+                                    <button type="button" class="training-exercise-drag" data-training-exercise-drag aria-label="Arrastar o cartão para alterar a ordem de {{ ex.nome if ex.nome else 'exercício' }}" title="Pressiona e arrasta para alterar a ordem">
                                         <svg aria-hidden="true" viewBox="0 0 16 20" focusable="false"><circle cx="5" cy="4" r="1.4"/><circle cx="11" cy="4" r="1.4"/><circle cx="5" cy="10" r="1.4"/><circle cx="11" cy="10" r="1.4"/><circle cx="5" cy="16" r="1.4"/><circle cx="11" cy="16" r="1.4"/></svg>
                                     </button>
                                     <div class="min-w-0">
@@ -484,14 +484,12 @@
                                 </div>
                             </header>
 
-                            {% if ex.hora or ex.minutos or ex.categoria or ex.rpe is not none %}
                             <dl class="training-exercise-meta">
-                                {% if ex.hora %}<div><dt>Hora</dt><dd data-training-exercise-time>{{ ex.hora }}</dd></div>{% endif %}
+                                <div><dt>Hora</dt><dd data-training-exercise-time>{{ ex.hora if ex.hora else '-' }}</dd></div>
                                 {% if ex.minutos %}<div><dt>Duração</dt><dd>{{ ex.minutos }} min</dd></div>{% endif %}
                                 {% if ex.categoria %}<div><dt>Tipo</dt><dd>{{ ex.categoria }}</dd></div>{% endif %}
                                 {% if ex.rpe is not none %}<div><dt>RPE</dt><dd>{{ ex.rpe }}</dd></div>{% endif %}
                             </dl>
-                            {% endif %}
 
                             <form method="POST" action="/treino/exercicios/{{ ex.id }}/notas" class="training-exercise-workbench" onsubmit="guardarNotasExercicio(event, this, {{ ex.id }})">
                                 <section class="training-exercise-visuals">
@@ -693,14 +691,14 @@
     }
 
     const status = root.querySelector('[data-training-reorder-status]');
+    const estadoInicial = 'Arraste a pega de um exercício para alterar a sequência; os horários são recalculados automaticamente.';
     const obterCartoes = () => Array.from(root.querySelectorAll('[data-training-exercise-id]'));
     const obterListas = () => Array.from(root.querySelectorAll('[data-training-exercise-list]'));
     let aGuardarOrdem = false;
-    let cartaoSelecionado = null;
 
     function definirEstado(mensagem, tipo = '') {
         if (!status) return;
-        status.textContent = mensagem;
+        status.textContent = mensagem || estadoInicial;
         status.classList.toggle('is-success', tipo === 'success');
         status.classList.toggle('is-error', tipo === 'error');
     }
@@ -805,24 +803,18 @@
 
     let arrasto = null;
 
-    function obterListaAlvo(evento) {
-        const elemento = document.elementFromPoint(evento.clientX, evento.clientY);
-        return elemento?.closest('[data-training-exercise-list]');
-    }
-
     function posicionarCartao(cartao, lista, clientY) {
         if (!cartao || !lista) return false;
-        const alturaCartaoEmArrasto = cartao.getBoundingClientRect().height;
         const cartoes = Array.from(lista.querySelectorAll(':scope > [data-training-exercise-id]'))
             .filter(item => item !== cartao);
         const seguinte = cartoes.find(item => {
-            const rect = item.getBoundingClientRect();
-            const alturaReferencia = Math.max(rect.height, alturaCartaoEmArrasto || 0);
-            return clientY < rect.top + alturaReferencia / 2;
+            const referencia = item.querySelector('.training-exercise-card-head') || item;
+            const rect = referencia.getBoundingClientRect();
+            return clientY < rect.top + rect.height / 2;
         });
-        const listaAnterior = cartao.parentElement;
+        const seguinteAnterior = cartao.nextElementSibling;
         lista.insertBefore(cartao, seguinte || null);
-        return listaAnterior !== cartao.parentElement || seguinte !== cartao.nextElementSibling;
+        return seguinteAnterior !== cartao.nextElementSibling;
     }
 
     function atualizarEstadoVisualDoArrasto(estado, ativo) {
@@ -831,38 +823,10 @@
         obterListas().forEach(lista => lista.classList.toggle('is-drag-target', ativo));
     }
 
-    function selecionarCartaoParaReordenar(cartao) {
-        if (cartaoSelecionado && cartaoSelecionado !== cartao) {
-            cartaoSelecionado.classList.remove('is-reorder-selected');
-        }
-        cartaoSelecionado = cartao;
-        cartao.classList.add('is-reorder-selected');
-        cartao.querySelector('[data-training-exercise-drag]')?.setAttribute('aria-pressed', 'true');
-        definirEstado('Cartão selecionado. Clique noutro cartão para o colocar nessa posição.');
-    }
-
-    function limparCartaoSelecionado() {
-        if (!cartaoSelecionado) return;
-        cartaoSelecionado.classList.remove('is-reorder-selected');
-        cartaoSelecionado.querySelector('[data-training-exercise-drag]')?.setAttribute('aria-pressed', 'false');
-        cartaoSelecionado = null;
-    }
-
-    function colocarCartaoSelecionadoAntesDe(alvo) {
-        if (!cartaoSelecionado || !alvo || cartaoSelecionado === alvo) return;
-        const lista = alvo.closest('[data-training-exercise-list]');
-        if (!lista) return;
-        const anterior = capturarEstado();
-        lista.insertBefore(cartaoSelecionado, alvo);
-        limparCartaoSelecionado();
-        renumerarExercicios();
-        atualizarHorasNoEcra();
-        guardarNovaOrdem(anterior);
-    }
-
     function concluirArrasto(estado, cancelar = false) {
         if (!estado) return;
         atualizarEstadoVisualDoArrasto(estado, false);
+        try { estado.pega?.releasePointerCapture?.(estado.pointerId); } catch (_) {}
         if (cancelar) {
             restaurarEstado(estado.anterior);
             return;
@@ -870,7 +834,8 @@
         const ordemAnterior = estado.idsOriginais.join(',');
         const ordemAtual = obterCartoes().map(cartao => cartao.dataset.trainingExerciseId).join(',');
         if (!estado.ativo) {
-            if (!cancelar) selecionarCartaoParaReordenar(estado.cartao);
+            definirEstado('Mantém o botão pressionado e arrasta-o para cima ou para baixo.');
+            window.setTimeout(() => definirEstado(''), 1800);
             return;
         }
         if (ordemAnterior === ordemAtual) return;
@@ -882,10 +847,12 @@
     function iniciarArrastoPonteiro(evento, cartao, pega) {
         if (aGuardarOrdem || arrasto || !cartao?.closest('[data-training-exercise-list]')) return;
         if (evento.pointerType !== 'touch' && evento.pointerType !== 'pen' && evento.button !== 0) return;
+        evento.preventDefault();
         try { pega?.setPointerCapture?.(evento.pointerId); } catch (_) {}
         arrasto = {
             cartao,
             pega,
+            lista: cartao.closest('[data-training-exercise-list]'),
             pointerId: evento.pointerId,
             pointerType: evento.pointerType,
             inicioY: evento.clientY,
@@ -894,34 +861,6 @@
             idsOriginais: obterCartoes().map(item => item.dataset.trainingExerciseId),
         };
         cartao.setAttribute('aria-grabbed', 'true');
-        // O documento acompanha o ponteiro mesmo quando este sai do botão.
-    }
-
-    function obterAlvoDeArrasto(evento) {
-        const elemento = evento.target instanceof Element
-            ? evento.target
-            : document.elementFromPoint(evento.clientX, evento.clientY);
-        return elemento?.closest('[data-training-exercise-list], [data-training-exercise-id]');
-    }
-
-    function moverArrastoNativo(evento) {
-        if (!arrasto?.nativo) return;
-        evento.preventDefault();
-        const alvo = obterAlvoDeArrasto(evento);
-        const lista = alvo?.matches('[data-training-exercise-list]')
-            ? alvo
-            : alvo?.closest('[data-training-exercise-list]');
-        if (!lista) return;
-        arrasto.ativo = true;
-        atualizarEstadoVisualDoArrasto(arrasto, true);
-        posicionarCartao(arrasto.cartao, lista, evento.clientY);
-    }
-
-    function terminarArrastoNativo(cancelar = false) {
-        if (!arrasto?.nativo) return;
-        const terminado = arrasto;
-        arrasto = null;
-        concluirArrasto(terminado, cancelar);
     }
 
     function moverArrastoPonteiro(evento) {
@@ -930,8 +869,9 @@
         evento.preventDefault();
         arrasto.ativo = true;
         atualizarEstadoVisualDoArrasto(arrasto, true);
-        const lista = obterListaAlvo(evento) || arrasto.cartao.closest('[data-training-exercise-list]');
-        posicionarCartao(arrasto.cartao, lista, evento.clientY);
+        posicionarCartao(arrasto.cartao, arrasto.lista, evento.clientY);
+        renumerarExercicios();
+        atualizarHorasNoEcra();
 
         const margemScroll = 72;
         if (evento.clientY < margemScroll) window.scrollBy({top: -14, behavior: 'auto'});
@@ -954,110 +894,15 @@
     }
 
     root.addEventListener('pointerdown', evento => {
-        const pega = evento.target.closest('[data-training-exercise-drag]');
+        const alvo = evento.target instanceof Element ? evento.target : null;
+        const pega = alvo?.closest('[data-training-exercise-drag]');
         if (!pega || !root.contains(pega)) return;
         iniciarArrastoPonteiro(evento, pega.closest('[data-training-exercise-id]'), pega);
     }, {capture: true});
-    root.addEventListener('dragstart', evento => {
-        const elemento = evento.target instanceof Element ? evento.target : null;
-        const pega = elemento?.closest('[data-training-exercise-drag]');
-        const cartao = pega?.closest('[data-training-exercise-id]');
-        if (!pega || !cartao || !root.contains(pega)) return;
-        if (!arrasto) {
-            arrasto = {
-                cartao,
-                pega,
-                pointerId: 'native-drag',
-                pointerType: 'native',
-                inicioY: evento.clientY || 0,
-                ativo: true,
-                nativo: true,
-                anterior: capturarEstado(),
-                idsOriginais: obterCartoes().map(item => item.dataset.trainingExerciseId),
-            };
-        } else {
-            arrasto.nativo = true;
-            arrasto.ativo = true;
-        }
-        evento.dataTransfer.effectAllowed = 'move';
-        evento.dataTransfer.setData('text/plain', cartao.dataset.trainingExerciseId);
-        atualizarEstadoVisualDoArrasto(arrasto, true);
-    });
-    root.addEventListener('dragover', moverArrastoNativo, {passive: false});
-    root.addEventListener('drop', evento => {
-        if (!arrasto?.nativo) return;
-        evento.preventDefault();
-        moverArrastoNativo(evento);
-        terminarArrastoNativo();
-    });
-    root.addEventListener('dragend', () => terminarArrastoNativo(true));
-    root.addEventListener('click', evento => {
-        const alvo = evento.target.closest('[data-training-exercise-id]');
-        if (!cartaoSelecionado || !alvo || !root.contains(alvo)) return;
-        if (evento.target.closest('[data-training-exercise-drag], button, a, input, textarea, select, option, form')) return;
-        evento.preventDefault();
-        colocarCartaoSelecionadoAntesDe(alvo);
-    });
-    window.addEventListener('pointermove', moverArrastoPonteiro, {passive: false});
-    window.addEventListener('pointerup', evento => terminarArrastoPonteiro(evento));
-    window.addEventListener('pointercancel', evento => terminarArrastoPonteiro(evento, true));
+    document.addEventListener('pointermove', moverArrastoPonteiro, {capture: true, passive: false});
+    document.addEventListener('pointerup', evento => terminarArrastoPonteiro(evento), {capture: true});
+    document.addEventListener('pointercancel', evento => terminarArrastoPonteiro(evento, true), {capture: true});
     window.addEventListener('blur', cancelarArrastoAoSair);
-
-    // Fallback para navegadores que perdem eventos de ponteiro ao mover o rato ou a caneta.
-    root.addEventListener('mousedown', evento => {
-        const pega = evento.target.closest('[data-training-exercise-drag]');
-        if (!pega || !root.contains(pega)) return;
-        iniciarArrastoPonteiro({
-            pointerType: 'mouse',
-            pointerId: 'mouse-fallback',
-            clientX: evento.clientX,
-            clientY: evento.clientY,
-            button: evento.button,
-            preventDefault: () => evento.preventDefault(),
-        }, pega.closest('[data-training-exercise-id]'), pega);
-    }, {capture: true});
-    window.addEventListener('mousemove', evento => {
-        if (!arrasto || arrasto.pointerType !== 'mouse') return;
-        moverArrastoPonteiro({
-            pointerId: arrasto.pointerId,
-            clientX: evento.clientX,
-            clientY: evento.clientY,
-            preventDefault: () => evento.preventDefault(),
-        });
-    }, {passive: false});
-    window.addEventListener('mouseup', evento => {
-        if (!arrasto || arrasto.pointerType !== 'mouse') return;
-        terminarArrastoPonteiro({pointerId: arrasto.pointerId, clientX: evento.clientX, clientY: evento.clientY});
-    });
-    root.addEventListener('touchstart', evento => {
-        const pega = evento.target.closest('[data-training-exercise-drag]');
-        const toque = evento.touches[0];
-        if (!pega || !toque || !root.contains(pega)) return;
-        iniciarArrastoPonteiro({
-            pointerType: 'touch',
-            pointerId: 'touch-fallback',
-            clientX: toque.clientX,
-            clientY: toque.clientY,
-            button: 0,
-            preventDefault: () => evento.preventDefault(),
-        }, pega.closest('[data-training-exercise-id]'), pega);
-    }, {capture: true, passive: false});
-    window.addEventListener('touchmove', evento => {
-        if (!arrasto || arrasto.pointerType !== 'touch' || !evento.touches[0]) return;
-        const toque = evento.touches[0];
-        moverArrastoPonteiro({
-            pointerId: arrasto.pointerId,
-            clientX: toque.clientX,
-            clientY: toque.clientY,
-            preventDefault: () => evento.preventDefault(),
-        });
-    }, {passive: false});
-    window.addEventListener('touchend', () => {
-        if (arrasto?.pointerType === 'touch') terminarArrastoPonteiro({pointerId: arrasto.pointerId});
-    });
-    window.addEventListener('touchcancel', () => {
-        if (arrasto?.pointerType === 'touch') terminarArrastoPonteiro({pointerId: arrasto.pointerId}, true);
-    });
 
     root.querySelectorAll('[data-training-exercise-drag]').forEach(pega => {
         pega.setAttribute('aria-grabbed', 'false');
