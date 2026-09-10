@@ -1323,19 +1323,23 @@ async def adicionar_exercicio(
     ).count()
 
     biblioteca = None
-    if biblioteca_id:
+    biblioteca_solicitada = bool((biblioteca_id or "").strip())
+    if biblioteca_solicitada:
         try:
             biblioteca = db.query(BibliotecoExercicio).filter(
-                BibliotecoExercicio.id == int(biblioteca_id)
+                BibliotecoExercicio.id == int(biblioteca_id),
+                BibliotecoExercicio.clube_id == plano.clube_id,
             ).first()
-        except ValueError:
+        except (TypeError, ValueError):
             biblioteca = None
+        if not biblioteca:
+            set_flash(request, "O exercício selecionado já não está disponível na biblioteca.", "error")
+            return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
 
     if biblioteca:
-        nome = nome or biblioteca.nome
-        categoria = categoria or biblioteca.categoria or ""
-        organizacao = organizacao or biblioteca.organizacao or ""
-        coaching_points = coaching_points or biblioteca.coaching_points or ""
+        # O formulário recebe uma cópia completa e pode adaptá-la, incluindo
+        # limpar campos. Apenas o nome tem fallback para manter o registo válido.
+        nome = (nome or "").strip() or biblioteca.nome
 
     if not (hora or "").strip():
         hora = _hora_sugerida_exercicio(plano.sessao, list(plano.exercicios)) or ""
@@ -1362,21 +1366,34 @@ async def adicionar_exercicio(
     db.add(exercicio)
 
     nome_norm = nome.strip() if nome else None
-    if nome_norm:
+    guardado_na_biblioteca = False
+    # Um exercício criado de raiz entra uma vez na biblioteca. Uma escolha da
+    # biblioteca é apenas uma cópia para este plano e nunca escreve no original.
+    if nome_norm and not biblioteca_solicitada:
         existente = db.query(BibliotecoExercicio).filter(
-            BibliotecoExercicio.nome.ilike(nome_norm)
+            BibliotecoExercicio.clube_id == plano.clube_id,
+            BibliotecoExercicio.nome.ilike(nome_norm),
         ).first()
         if not existente:
             db.add(BibliotecoExercicio(
+                clube_id=plano.clube_id,
                 nome=nome_norm,
                 categoria=categoria or None,
                 organizacao=organizacao or None,
                 coaching_points=coaching_points or None,
             ))
+            guardado_na_biblioteca = True
 
     db.flush()
     sincronizar_minutos_categorias(plano, db)
     db.commit()
+
+    if biblioteca_solicitada:
+        set_flash(request, "Cópia adicionada ao plano. O exercício da biblioteca ficou inalterado.", "success")
+    elif guardado_na_biblioteca:
+        set_flash(request, "Exercício adicionado ao plano e guardado automaticamente na biblioteca.", "success")
+    else:
+        set_flash(request, "Exercício adicionado ao plano.", "success")
 
     return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
 
@@ -1396,8 +1413,13 @@ async def adicionar_exercicio_da_biblioteca(
     """Cria uma cópia editável de um exercício da biblioteca no plano."""
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
     plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
-    biblioteca = db.query(BibliotecoExercicio).filter(BibliotecoExercicio.id == biblioteca_id).first()
-    if not plano or not biblioteca:
+    if not plano:
+        return RedirectResponse(url="/equipas", status_code=303)
+    biblioteca = db.query(BibliotecoExercicio).filter(
+        BibliotecoExercicio.id == biblioteca_id,
+        BibliotecoExercicio.clube_id == plano.clube_id,
+    ).first()
+    if not biblioteca:
         return RedirectResponse(url="/equipas", status_code=303)
     try:
         rpe_exercicio = _normalizar_rpe(rpe)

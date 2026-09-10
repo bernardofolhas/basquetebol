@@ -1,5 +1,5 @@
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
-from models.treino import PlanoTreino, ExercicioPlano
+from models.treino import BibliotecoExercicio, PlanoTreino, ExercicioPlano
 from test_fase2_assiduidade_evolucao import _criar_contexto, _limpar_contexto
 
 
@@ -63,6 +63,88 @@ def test_hora_do_novo_exercicio_continua_a_sequencia_do_plano(client_admin):
         )
         exercicios = db.query(ExercicioPlano).filter_by(plano_id=plano.id).order_by(ExercicioPlano.id).all()
         assert [(ex.hora, ex.minutos) for ex in exercicios] == [("18:00", 15), ("18:15", 20)]
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
+def test_biblioteca_recebe_novo_exercicio_e_reutilizacao_fica_independente(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        nome_original = f"Exercicio base {macro_id}"
+
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={
+                "nome": nome_original,
+                "categoria": "TIO",
+                "minutos": "12",
+                "organizacao": "Organizacao original",
+                "coaching_points": "Coaching original",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        base = db.query(BibliotecoExercicio).filter_by(
+            clube_id=plano.clube_id,
+            nome=nome_original,
+        ).one()
+        assert (base.categoria, base.organizacao, base.coaching_points) == (
+            "TIO", "Organizacao original", "Coaching original"
+        )
+
+        nome_copia = f"Copia adaptada {macro_id}"
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={
+                "biblioteca_id": str(base.id),
+                "nome": nome_copia,
+                "categoria": "TCO",
+                "minutos": "20",
+                "organizacao": "Organizacao so deste treino",
+                "coaching_points": "Coaching so deste treino",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        db.expire_all()
+
+        base = db.query(BibliotecoExercicio).filter_by(id=base.id).one()
+        assert (base.nome, base.categoria, base.organizacao, base.coaching_points) == (
+            nome_original, "TIO", "Organizacao original", "Coaching original"
+        )
+        assert db.query(BibliotecoExercicio).filter_by(
+            clube_id=plano.clube_id,
+            nome=nome_copia,
+        ).count() == 0
+        copia = db.query(ExercicioPlano).filter_by(plano_id=plano.id, nome=nome_copia).one()
+        assert (copia.categoria, copia.minutos, copia.organizacao, copia.coaching_points) == (
+            "TCO", 20, "Organizacao so deste treino", "Coaching so deste treino"
+        )
+
+        resposta = client_admin.post(
+            f"/treino/exercicios/{copia.id}/atualizar",
+            data={
+                "nome": f"Versao final {macro_id}",
+                "categoria": "TID",
+                "hora": copia.hora or "",
+                "minutos": "25",
+                "organizacao": "Alterada novamente no plano",
+                "coaching_points": "Sem tocar na biblioteca",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        db.expire_all()
+        base = db.query(BibliotecoExercicio).filter_by(id=base.id).one()
+        assert (base.nome, base.categoria, base.organizacao, base.coaching_points) == (
+            nome_original, "TIO", "Organizacao original", "Coaching original"
+        )
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()

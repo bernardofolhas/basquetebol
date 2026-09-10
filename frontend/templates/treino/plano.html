@@ -388,6 +388,7 @@
 
             <form id="form_adicionar_exercicio" method="POST" action="/treino/planos/{{ plano.id }}/exercicios" class="mt-5 space-y-4">
                 <input type="hidden" name="biblioteca_id" id="biblioteca_id_form_adicionar_exercicio" value="">
+                <p data-library-copy-notice hidden class="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">Será criada uma cópia independente no plano. As alterações feitas aqui não modificam a biblioteca.</p>
                 <div class="training-exercise-fields">
                     <div data-training-block-only hidden>
                         <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
@@ -397,7 +398,7 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-gray-500">Exercício</label>
-                        <input type="text" name="nome" placeholder="Nome do exercício" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        <input type="text" name="nome" required placeholder="Nome do exercício" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-gray-500">Categoria</label>
@@ -528,6 +529,7 @@
                                     <form id="form_exercicio_{{ ex.id }}" method="POST" action="/treino/exercicios/{{ ex.id }}/atualizar" class="space-y-4 p-5">
                                         <input type="hidden" name="organizacao" data-modal-organizacao="{{ ex.id }}" value="{{ ex.organizacao if ex.organizacao else '' }}">
                                         <input type="hidden" name="coaching_points" data-modal-coaching="{{ ex.id }}" value="{{ ex.coaching_points if ex.coaching_points else '' }}">
+                                        <p data-library-copy-notice hidden class="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">Os dados foram copiados da biblioteca apenas para este exercício. O original não será alterado.</p>
                                         <div class="training-exercise-fields">
                                             <div data-training-block-only hidden>
                                                 <label class="mb-1 block text-xs font-medium text-gray-500">Bloco</label>
@@ -1809,6 +1811,8 @@ function selecionarDaBiblioteca(ex) {
     if (cpEl) cpEl.value = ex.coaching_points || '';
     const bibliotecaIdEl = form.querySelector('[name="biblioteca_id"]');
     if (bibliotecaIdEl) bibliotecaIdEl.value = ex.id;
+    const avisoCopia = form.querySelector('[data-library-copy-notice]');
+    if (avisoCopia) avisoCopia.hidden = false;
     fecharBiblioteca();
 }
 
@@ -1830,6 +1834,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <h2 class="font-semibold text-gray-800">📖 Biblioteca de Exercícios</h2>
             <button onclick="fecharBiblioteca()" class="text-xl leading-none text-gray-400 hover:text-gray-600">✕</button>
         </div>
+        <p class="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-700">Ao selecionar um exercício, é criada uma cópia independente no plano. Para alterar o original, edite-o diretamente na biblioteca.</p>
         <div class="mb-3 flex gap-2">
             <input id="bib_pesquisa" type="text" placeholder="Pesquisar exercício..." class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
             <select id="bib_categoria" onchange="pesquisarBiblioteca()" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
