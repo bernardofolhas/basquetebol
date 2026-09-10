@@ -20,13 +20,14 @@ from models.equipa import Equipa
 from models.avaliacao import AvaliacaoJogador
 from models.fisico import TesteFisico
 from models.jogador import Jogador, RegistoAntropometrico
-from models.utilizador import PerfilEnum
+from models.utilizador import PerfilEnum, Utilizador
 from paths import TEMPLATES_DIR
 from services.assiduidade_service import obter_relatorio_assiduidade_jogador
 from services.avaliacao_service import dados_dashboard_avaliacoes
 from services.pdf_service import renderizar_pdf
 from services.desenho_service import imagem_estatica_data_uri
 from services.fotografia_jogador_service import apagar_fotografia, caminho_fotografia, guardar_fotografia
+from services.questionarios_service import criar_acesso_atleta
 
 router = APIRouter(prefix="/jogadores")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -69,8 +70,12 @@ def _apagar_jogador_com_dependencias(db: Session, jogador: Jogador) -> str | Non
     from models.assiduidade import RegistoAssiduidade
     from models.documento_jogador import DocumentoJogador
     from models.jogo import Convocado, PlanoJogo
+    from models.questionario import RespostaQuestionarioDiario
 
     jogador_id = jogador.id
+    conta_atleta = db.query(Utilizador).execution_options(ignorar_clube=True).filter(
+        Utilizador.jogador_id == jogador_id
+    ).first()
     plano = db.query(PlanoJogo).filter(
         (PlanoJogo.titular_1 == jogador_id)
         | (PlanoJogo.titular_2 == jogador_id)
@@ -83,14 +88,20 @@ def _apagar_jogador_com_dependencias(db: Session, jogador: Jogador) -> str | Non
         db.query(RegistoAntropometrico).filter(RegistoAntropometrico.jogador_id == jogador_id).first(),
         db.query(TesteFisico).filter(TesteFisico.jogador_id == jogador_id).first(),
         db.query(DocumentoJogador).filter(DocumentoJogador.jogador_id == jogador_id).first(),
+        db.query(RespostaQuestionarioDiario).filter(RespostaQuestionarioDiario.jogador_id == jogador_id).first(),
         db.query(Convocado).filter(Convocado.jogador_id == jogador_id).first(), plano,
     ])
     if tem_historico:
         jogador.ativo = False
         jogador.equipa_id = None
         jogador.inscricao_estado = "inativo"
+        if conta_atleta:
+            conta_atleta.ativo = False
+            conta_atleta.sessao_versao = (conta_atleta.sessao_versao or 0) + 1
         return None
     fotografia = jogador.fotografia
+    if conta_atleta:
+        db.delete(conta_atleta)
     db.delete(jogador)
     return fotografia
 
@@ -200,8 +211,13 @@ async def criar_jogador(
     )
 
     db.add(jogador)
+    db.flush()
+    conta_atleta, password_inicial = criar_acesso_atleta(db, jogador)
     db.commit()
-    set_flash(request, f"Atleta '{nome}' registado com sucesso.")
+    set_flash(
+        request,
+        f"Atleta '{nome}' registado. Acesso: {conta_atleta.username} / {password_inicial}",
+    )
     return RedirectResponse(url="/jogadores", status_code=303)
 
 

@@ -42,6 +42,13 @@ class ClubeContextoMiddleware(BaseHTTPMiddleware):
                                     return HTMLResponse("Clube arquivado: acesso apenas de leitura.", status_code=403)
                     if utilizador and utilizador.deve_alterar_password and request.url.path not in {"/minha-conta", "/minha-conta/alterar-password", "/logout"}:
                         return RedirectResponse("/minha-conta", status_code=303)
+                    if utilizador and utilizador.perfil == PerfilEnum.atleta:
+                        caminho = request.url.path
+                        permitido = caminho.startswith("/questionarios") or caminho.startswith("/static") or caminho in {
+                            "/login", "/minha-conta", "/minha-conta/alterar-password", "/logout", "/service-worker.js",
+                        }
+                        if not permitido:
+                            return RedirectResponse("/questionarios/diario", status_code=303)
                 finally:
                     db.close()
             return await call_next(request)

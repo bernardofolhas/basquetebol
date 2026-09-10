@@ -12,6 +12,7 @@ class PerfilEnum(str, enum.Enum):
     treinador = "treinador"
     secretaria = "secretaria"
     staff = "staff"
+    atleta = "atleta"
 
 
 # As contas de staff pertencem a uma ou mais equipas sem precisarem de ser
@@ -41,8 +42,10 @@ class Utilizador(Base):
 
     # Ligação opcional ao treinador
     treinador_id = Column(Integer, ForeignKey("treinadores.id"), nullable=True)
+    jogador_id = Column(Integer, ForeignKey("jogadores.id", ondelete="CASCADE"), nullable=True, unique=True, index=True)
 
     # Relação ORM para aceder ao treinador associado
     treinador = relationship("Treinador", backref="utilizadores")
+    jogador = relationship("Jogador", foreign_keys=[jogador_id], backref="utilizador")
     clube = relationship("Clube", foreign_keys=[clube_id], backref="utilizadores")
     equipas_staff = relationship("Equipa", secondary=utilizador_staff_equipa, backref="utilizadores_staff")

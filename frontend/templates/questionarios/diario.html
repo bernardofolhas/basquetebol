@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Questionário diário{% endblock %}
+{% block estilos_extra %}<style>
+.wellness-shell{max-width:760px;margin:auto}.wellness-card{border:1px solid #e2e8f0;border-radius:24px;background:#fff;padding:clamp(18px,4vw,32px);box-shadow:0 18px 45px rgba(15,23,42,.07)}
+.wellness-scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.wellness-scale input{position:absolute;opacity:0}.wellness-scale label{display:flex;min-height:58px;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;border:1px solid #dbe2ea;border-radius:13px;background:#f8fafc;font-weight:800;color:#475569;transition:.15s}.wellness-scale label small{font-size:10px;font-weight:600}.wellness-scale input:checked+label{border-color:var(--clube-primary);background:var(--clube-primary-surface);color:var(--clube-primary-dark);box-shadow:0 0 0 2px var(--clube-primary-soft)}
+.wellness-choice{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.wellness-choice input{position:absolute;opacity:0}.wellness-choice label{cursor:pointer;border:1px solid #dbe2ea;border-radius:14px;padding:13px;text-align:center;font-weight:700;color:#475569}.wellness-choice input:checked+label{border-color:var(--clube-primary);background:var(--clube-primary-surface);color:var(--clube-primary-dark)}
+@media(max-width:520px){.wellness-scale{grid-template-columns:repeat(5,1fr);gap:5px}.wellness-scale label{min-height:50px}.wellness-choice{grid-template-columns:1fr}}
+</style>{% endblock %}
+{% macro escala(nome, titulo, valor, ajuda='1 baixo · 10 muito elevado') %}
+<fieldset class="space-y-3"><legend class="text-base font-extrabold text-slate-900">{{ titulo }}</legend><p class="text-xs text-slate-500">{{ ajuda }}</p><div class="wellness-scale">{% for numero in range(1, 11) %}<div><input id="{{ nome }}-{{ numero }}" type="radio" name="{{ nome }}" value="{{ numero }}" required {% if valor == numero %}checked{% endif %}><label for="{{ nome }}-{{ numero }}"><span>{{ numero }}</span>{% if numero == 1 %}<small>Baixo</small>{% elif numero == 5 %}<small>Médio</small>{% elif numero == 10 %}<small>Máximo</small>{% endif %}</label></div>{% endfor %}</div></fieldset>
+{% endmacro %}
+{% block conteudo %}
+<div class="wellness-shell space-y-5">
+  <header class="rounded-[26px] bg-slate-900 px-6 py-7 text-white shadow-xl">
+    <p class="text-xs font-extrabold uppercase tracking-[.2em] text-emerald-300">Acompanhamento diário</p>
+    <h1 class="mt-2 text-3xl font-extrabold">Olá, {{ jogador.nome.split()[0] }}</h1>
+    <p class="mt-2 text-sm text-slate-300">{{ hoje|data_pt }} · demora cerca de 1 minuto</p>
+  </header>
+  {% if resposta %}<div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">A resposta de hoje já foi enviada. Podes atualizá-la até ao fim do dia.</div>{% endif %}
+  <form method="POST" action="/questionarios/diario" class="wellness-card space-y-8">
+    <fieldset><legend class="mb-3 text-base font-extrabold text-slate-900">Tipo de dia</legend><div class="wellness-choice">{% for valor, label in [('descanso','Descanso'),('treino','Treino'),('jogo','Jogo')] %}<div><input id="tipo-{{ valor }}" type="radio" name="tipo_sessao" value="{{ valor }}" required {% if resposta and resposta.tipo_sessao == valor %}checked{% endif %}><label for="tipo-{{ valor }}">{{ label }}</label></div>{% endfor %}</div></fieldset>
+    <label class="block"><span class="text-base font-extrabold text-slate-900">Quantas horas dormiste?</span><input type="number" name="horas_sono" min="0" max="24" step="0.5" value="{{ resposta.horas_sono if resposta and resposta.horas_sono is not none else '' }}" placeholder="Ex.: 8" class="mt-3 w-full rounded-xl border border-slate-300 px-4 py-3"></label>
+    <fieldset class="space-y-3"><legend class="text-base font-extrabold text-slate-900">Como descreves o teu sono?</legend><div class="wellness-scale">{% for numero, label in [(1,'Muito mau'),(2,'Mau'),(3,'Normal'),(4,'Bom'),(5,'Muito bom')] %}<div><input id="sono-{{ numero }}" type="radio" name="qualidade_sono" value="{{ numero }}" required {% if resposta and resposta.qualidade_sono == numero %}checked{% endif %}><label for="sono-{{ numero }}"><span>{{ numero }}</span><small>{{ label }}</small></label></div>{% endfor %}</div></fieldset>
+    {{ escala('pse_esforco', 'Perceção subjetiva de esforço (PSE)', resposta.pse_esforco if resposta else none, '1 mínimo · 5 moderado · 10 fadiga máxima') }}
+    {{ escala('dor_membros_inferiores', 'Dores musculares: membros inferiores', resposta.dor_membros_inferiores if resposta else none, '1 dor leve · 5 dor severa · 10 dor muito severa') }}
+    {{ escala('dor_membros_superiores', 'Dores musculares: membros superiores', resposta.dor_membros_superiores if resposta else none, '1 dor leve · 5 dor severa · 10 dor muito severa') }}
+    <fieldset><legend class="mb-3 text-base font-extrabold text-slate-900">Tens alguma dor ou queixa específica?</legend><div class="wellness-choice !grid-cols-2"><div><input id="queixa-nao" type="radio" name="tem_queixa" value="nao" required {% if not resposta or not resposta.tem_queixa %}checked{% endif %}><label for="queixa-nao">Não</label></div><div><input id="queixa-sim" type="radio" name="tem_queixa" value="sim" {% if resposta and resposta.tem_queixa %}checked{% endif %}><label for="queixa-sim">Sim</label></div></div></fieldset>
+    <label class="block"><span class="text-sm font-bold text-slate-700">Se sim, descreve onde e o que sentes</span><textarea name="descricao_queixa" rows="3" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Ex.: dor no joelho direito ao saltar">{{ resposta.descricao_queixa if resposta and resposta.descricao_queixa else '' }}</textarea></label>
+    <label class="block"><span class="text-sm font-bold text-slate-700">Algo mais que a equipa técnica deva saber?</span><textarea name="observacoes" rows="2" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Opcional">{{ resposta.observacoes if resposta and resposta.observacoes else '' }}</textarea></label>
+    <button type="submit" class="w-full rounded-xl bg-[var(--clube-primary)] px-5 py-4 text-base font-extrabold text-[var(--clube-on-primary)] shadow-lg transition hover:brightness-95">{{ 'Atualizar resposta' if resposta else 'Enviar resposta de hoje' }}</button>
+  </form>
+</div>
+{% endblock %}

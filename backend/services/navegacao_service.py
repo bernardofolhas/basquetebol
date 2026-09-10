@@ -103,6 +103,13 @@ def _acoes_rapidas(utilizador, equipas: list) -> list[dict]:
 
 def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
     """Devolve apenas contexto permitido para a barra global."""
+    if utilizador.perfil == PerfilEnum.atleta:
+        return {
+            "dashboard_url": "/questionarios/diario",
+            "equipas": [], "pendencias": [], "total_pendencias": 0,
+            "total_urgentes": 0, "acoes_rapidas": [],
+            "notificacoes": [], "total_notificacoes": 0,
+        }
     modo_plataforma = utilizador.perfil == PerfilEnum.superadministrador and not clube_atual
     if modo_plataforma:
         return {

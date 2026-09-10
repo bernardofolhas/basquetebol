@@ -45,6 +45,14 @@ def exigir_autenticacao(request: Request, db: Session = Depends(get_db)):
     return utilizador
 
 
+def exigir_atleta(request: Request, db: Session = Depends(get_db)):
+    """Apenas uma conta associada a uma ficha de atleta."""
+    utilizador = exigir_autenticacao(request, db)
+    if utilizador.perfil.value != "atleta" or not utilizador.jogador_id:
+        raise SemPermissao("/dashboard")
+    return utilizador
+
+
 def exigir_qualquer_perfil(request: Request, db: Session = Depends(get_db)):
     """Utilizador autenticado com qualquer perfil válido do sistema."""
     utilizador = obter_utilizador_atual(request, db)

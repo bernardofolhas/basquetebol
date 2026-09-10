@@ -25,7 +25,16 @@
     <div class="sidebar-sections">
       <a href="{{ nav.dashboard_url|default('/dashboard') }}" class="sidebar-heading {% if p == '/dashboard' %}is-active{% endif %}">Início</a>
 
-      {% if modo_plataforma %}
+      {% if perfil == 'atleta' %}
+      <section class="sidebar-group">
+        <h2 class="sidebar-heading {% if p.startswith('/questionarios') %}is-active{% endif %}">Acompanhamento</h2>
+        <div class="sidebar-pages w-80">
+          <p class="ds-dropdown-title">Área do atleta</p>
+          {{ menu_link('/questionarios/diario', 'Questionário de hoje', 'Registar esforço, dor e recuperação', p == '/questionarios/diario') }}
+          {{ menu_link('/questionarios/historico', 'O meu histórico', 'Consultar respostas anteriores', p == '/questionarios/historico') }}
+        </div>
+      </section>
+      {% elif modo_plataforma %}
       <section class="sidebar-group ds-nav-order-equipa">
         <h2 class="sidebar-heading {% if p.startswith('/superadmin') %}is-active{% endif %}">Plataforma </h2>
         <div class="sidebar-pages w-[22rem]">
@@ -129,7 +138,7 @@
 
       {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'superadministrador'] %}
       <section class="sidebar-group ds-nav-order-analise">
-        <h2 class="sidebar-heading {% if p.startswith('/analise') or p.startswith('/fisico/jogadores') or p.startswith('/scouting') or p.startswith('/dashboard/clube/carga') or p.startswith('/dashboard/clube/executado') %}is-active{% endif %}">Análise </h2>
+        <h2 class="sidebar-heading {% if p.startswith('/analise') or p.startswith('/fisico/jogadores') or p.startswith('/scouting') or p.startswith('/questionarios') or p.startswith('/dashboard/clube/carga') or p.startswith('/dashboard/clube/executado') %}is-active{% endif %}">Análise </h2>
         <div class="sidebar-pages w-[25rem]">
           <p class="ds-dropdown-title">Análise integrada · {{ equipa_contexto_nome }}</p>
           {% if equipa_contexto_id %}
@@ -138,6 +147,7 @@
             {{ menu_link('/analise/equipas/' ~ equipa_contexto_id ~ '/registar', 'Nova avaliação', 'Avaliar atletas e parâmetros') }}
             {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id, 'Análise física e testes', 'Testes e evolução física') }}
             {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id, 'Relatório de presenças e RPE', 'Consultar participação e esforço percebido') }}
+            {{ menu_link('/questionarios/equipas/' ~ equipa_contexto_id, 'Questionário diário', 'Bem-estar, esforço, dor e respostas em falta', p.startswith('/questionarios')) }}
           </div>
           {% else %}
           <p class="sidebar-hint">Escolhe a equipa que queres analisar.</p>

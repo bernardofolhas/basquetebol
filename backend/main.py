@@ -28,6 +28,7 @@ import models.indisponibilidade_treinador
 import models.planeamento
 import models.planeamento_clube
 import models.playbook
+import models.questionario
 import models.recuperacao_password
 import models.scouting
 import models.treinador
@@ -56,6 +57,7 @@ from database import (
     actualizar_estrutura_mapa_conteudos,
     actualizar_estrutura_convocacoes_assiduidade,
     actualizar_estrutura_recuperacao_password,
+    actualizar_estrutura_questionarios,
     actualizar_estrutura_objetivos_planeamento,
     actualizar_estrutura_playbook,
     base_dados_disponivel,
@@ -95,6 +97,7 @@ from routers import planeamento
 from routers import planeamento_clube
 from routers import playbook
 from routers import pesquisa
+from routers import questionarios
 from routers import pdf_partilhavel
 from routers import treinadores
 from routers import treino
@@ -118,6 +121,7 @@ try:
     validar_ligacao_base_dados()
     Base.metadata.create_all(bind=engine)
     actualizar_estrutura_perfis()
+    actualizar_estrutura_questionarios()
     actualizar_estrutura_staff()
     actualizar_estrutura_planeamento_clube()
     actualizar_estrutura_recuperacao_password()
@@ -131,6 +135,8 @@ try:
     actualizar_estrutura_jogadores()
     actualizar_estrutura_estatisticas()
     with SessionLocal() as db:
+        from services.questionarios_service import sincronizar_acessos_atletas
+        sincronizar_acessos_atletas(db)
         renumerar_todos_os_ciclos(db)
         sincronizar_volumes_automaticos(db)
         db.commit()
@@ -191,6 +197,7 @@ app.include_router(planeamento_clube.router)
 app.include_router(playbook.router)
 app.include_router(pesquisa.router)
 app.include_router(pdf_partilhavel.router)
+app.include_router(questionarios.router)
 app.include_router(assiduidade.router)
 app.include_router(treino.router)
 app.include_router(jogos.router)

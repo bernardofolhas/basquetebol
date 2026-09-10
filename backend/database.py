@@ -149,6 +149,40 @@ def actualizar_estrutura_perfis() -> None:
         if not existe_staff:
             ligacao.execute(text("ALTER TYPE perfilenum ADD VALUE 'staff'"))
             logger.info("Perfil 'staff' adicionado ao enum da base de dados.")
+        existe_atleta = ligacao.execute(text(
+            "SELECT 1 FROM pg_enum "
+            "WHERE enumtypid = 'perfilenum'::regtype AND enumlabel = 'atleta'"
+        )).first()
+        if not existe_atleta:
+            ligacao.execute(text("ALTER TYPE perfilenum ADD VALUE 'atleta'"))
+            logger.info("Perfil 'atleta' adicionado ao enum da base de dados.")
+
+
+def actualizar_estrutura_questionarios() -> None:
+    """Adiciona a ligação entre cada conta de atleta e a respetiva ficha."""
+    inspector = inspect(engine)
+    if not inspector.has_table("utilizadores"):
+        return
+    colunas = {coluna["name"] for coluna in inspector.get_columns("utilizadores")}
+    if "jogador_id" not in colunas:
+        with engine.begin() as ligacao:
+            if engine.dialect.name == "postgresql":
+                ligacao.execute(text(
+                    "ALTER TABLE utilizadores ADD COLUMN IF NOT EXISTS jogador_id INTEGER "
+                    "REFERENCES jogadores(id) ON DELETE CASCADE"
+                ))
+                ligacao.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_utilizadores_jogador_id "
+                    "ON utilizadores (jogador_id) WHERE jogador_id IS NOT NULL"
+                ))
+            else:
+                ligacao.execute(text(
+                    "ALTER TABLE utilizadores ADD COLUMN jogador_id INTEGER REFERENCES jogadores(id) ON DELETE CASCADE"
+                ))
+                ligacao.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_utilizadores_jogador_id ON utilizadores (jogador_id)"
+                ))
+        logger.info("Ligação das contas aos atletas adicionada.")
 
 
 def actualizar_estrutura_staff() -> None:

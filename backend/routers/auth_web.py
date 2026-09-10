@@ -72,7 +72,8 @@ async def processar_login(
         request=request,
     )
     db.commit()
-    return RedirectResponse(url="/dashboard", status_code=303)
+    destino = "/questionarios/diario" if utilizador.perfil.value == "atleta" else "/dashboard"
+    return RedirectResponse(url=destino, status_code=303)
 
 
 @router.get("/logout")
