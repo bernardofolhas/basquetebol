@@ -195,7 +195,15 @@
         }
 
         function fecharDialogo() {
-            if (dialogo && dialogo.open) dialogo.close();
+            if (!dialogo || !dialogo.open) return;
+            if (typeof dialogo.close === "function") dialogo.close();
+            else dialogo.removeAttribute("open");
+        }
+
+        function abrirDialogo() {
+            if (!dialogo) return;
+            if (typeof dialogo.showModal === "function") dialogo.showModal();
+            else dialogo.setAttribute("open", "");
         }
 
         function prepararDialogoCriacao() {
@@ -217,15 +225,6 @@
             kickerDialogo.textContent = "Conteúdo existente";
             tituloDialogo.textContent = "Editar conteúdo";
             botaoSubmeter.textContent = "Guardar alterações";
-        }
-
-        function registarBotaoEdicao(botao) {
-            botao.addEventListener("click", function () {
-                if (!podeAlterarEstrutura()) return;
-                prepararDialogoEdicao(botao);
-                dialogo.showModal();
-                window.setTimeout(function () { formulario.elements.nome.focus(); }, 0);
-            });
         }
 
         function criarCabecalhoGrupo(classe, texto, area, subarea) {
@@ -309,7 +308,6 @@
             referencia.insertAdjacentElement("afterend", linha);
 
             linha.querySelectorAll("[data-priority-cell]").forEach(registarCelulaPrioridade);
-            registarBotaoEdicao(editar);
             registarBotaoEliminacao(eliminar);
             registarPegaArrasto(pega);
             registarAlvoDeArrasto(celulaConteudo);
@@ -319,10 +317,19 @@
             botaoAdicionar.addEventListener("click", function () {
                 if (!podeAlterarEstrutura()) return;
                 prepararDialogoCriacao();
-                dialogo.showModal();
+                abrirDialogo();
                 window.setTimeout(function () { formulario.elements.area.focus(); }, 0);
             });
-            mapa.querySelectorAll("[data-edit-content]").forEach(registarBotaoEdicao);
+            mapa.addEventListener("click", function (event) {
+                var botao = event.target.closest && event.target.closest("[data-edit-content]");
+                if (!botao || !mapa.contains(botao)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (!podeAlterarEstrutura()) return;
+                prepararDialogoEdicao(botao);
+                abrirDialogo();
+                window.setTimeout(function () { formulario.elements.nome.focus(); }, 0);
+            });
             mapa.querySelectorAll("[data-content-cancel]").forEach(function (botao) {
                 botao.addEventListener("click", fecharDialogo);
             });
@@ -342,8 +349,8 @@
                         nome: dadosFormulario.get("nome")
                     });
                     if (urlEdicao) {
-                        window.sessionStorage.setItem(chaveMensagem, resultado.mensagem);
-                        window.location.reload();
+                        fecharDialogo();
+                        await atualizarMapaSemRecarregar(resultado.mensagem);
                         return;
                     }
                     inserirConteudoNoMapa(resultado, {

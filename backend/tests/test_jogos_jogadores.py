@@ -340,6 +340,69 @@ def test_edicao_de_jogo_funciona():
         _limpar_dados_teste()
 
 
+def test_reflexao_do_jogo_e_partilhada_com_o_plano_de_jogo():
+    from database import SessionLocal
+    from models.equipa import Equipa
+    from models.jogo import Jogo, PlanoJogo
+    from models.utilizador import Utilizador
+
+    client = _criar_client()
+    _limpar_dados_teste()
+
+    try:
+        _fazer_login(client, "admin")
+        db = SessionLocal()
+        try:
+            admin = db.query(Utilizador).filter(Utilizador.username == "admin").one()
+            equipa = db.query(Equipa).execution_options(ignorar_clube=True).filter(
+                Equipa.clube_id == admin.clube_id,
+            ).first()
+            assert equipa is not None
+            jogo = Jogo(
+                clube_id=admin.clube_id,
+                equipa_id=equipa.id,
+                data=date.fromisoformat("2026-04-20"),
+                adversario=ADVERSARIO_JOGO_TESTE,
+                em_casa=True,
+            )
+            db.add(jogo)
+            db.commit()
+            jogo_id = jogo.id
+        finally:
+            db.close()
+
+        pagina_jogo = client.get(f"/jogos/{jogo_id}")
+        assert pagina_jogo.status_code == 200
+        assert 'data-workspace-tab="reflexao"' in pagina_jogo.text
+        assert f'action="/jogos/{jogo_id}/reflexao"' in pagina_jogo.text
+
+        guardada_no_jogo = client.post(
+            f"/jogos/{jogo_id}/reflexao",
+            data={"reflexao": "Controlámos o ressalto defensivo."},
+            follow_redirects=False,
+        )
+        assert guardada_no_jogo.status_code == 303
+        assert guardada_no_jogo.headers["location"] == f"/jogos/{jogo_id}#reflexao-jogo"
+        assert "Controlámos o ressalto defensivo." in client.get(f"/jogos/{jogo_id}/plano").text
+
+        guardada_no_plano = client.post(
+            f"/jogos/{jogo_id}/plano",
+            data={"reflexao": "Precisamos de melhorar a transição defensiva."},
+            follow_redirects=False,
+        )
+        assert guardada_no_plano.status_code == 303
+        assert "Precisamos de melhorar a transição defensiva." in client.get(f"/jogos/{jogo_id}").text
+
+        db = SessionLocal()
+        try:
+            plano = db.query(PlanoJogo).filter(PlanoJogo.jogo_id == jogo_id).one()
+            assert plano.reflexao == "Precisamos de melhorar a transição defensiva."
+        finally:
+            db.close()
+    finally:
+        _limpar_dados_teste()
+
+
 def test_eliminacao_de_jogo_funciona():
     from database import SessionLocal
     from models.jogo import Jogo

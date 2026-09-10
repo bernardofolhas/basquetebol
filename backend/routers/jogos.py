@@ -30,6 +30,16 @@ def _obter_jogo(db: Session, jogo_id: int):
     return db.query(Jogo).filter(Jogo.id == jogo_id).first()
 
 
+def _obter_ou_criar_plano_jogo(db: Session, jogo: Jogo) -> PlanoJogo:
+    """Mantém os dados de preparação e reflexão num único registo do jogo."""
+    plano = db.query(PlanoJogo).filter(PlanoJogo.jogo_id == jogo.id).first()
+    if plano:
+        return plano
+    plano = PlanoJogo(jogo_id=jogo.id, clube_id=jogo.clube_id)
+    db.add(plano)
+    return plano
+
+
 def _verificar_acesso_plano_jogo(
     utilizador, jogo: Jogo, db: Session, permitir_consulta_staff: bool = True
 ) -> None:
@@ -297,6 +307,27 @@ async def registar_resultado(
     return RedirectResponse(url=f"/jogos/{jogo_id}", status_code=303)
 
 
+@router.post("/{jogo_id}/reflexao")
+def guardar_reflexao_jogo(
+    jogo_id: int,
+    request: Request,
+    reflexao: str = Form(""),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Guarda a mesma reflexão apresentada no jogo e no plano de jogo."""
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+
+    plano = _obter_ou_criar_plano_jogo(db, jogo)
+    plano.reflexao = reflexao.strip() or None
+    db.commit()
+    set_flash(request, "Reflexão do jogo guardada.")
+    return RedirectResponse(url=f"/jogos/{jogo_id}#reflexao-jogo", status_code=303)
+
+
 @router.post("/{jogo_id}/convocatoria")
 async def guardar_convocatoria(
     jogo_id: int,
@@ -404,10 +435,7 @@ async def guardar_plano_jogo(
 
     dados = await request.form()
 
-    plano = db.query(PlanoJogo).filter(PlanoJogo.jogo_id == jogo_id).first()
-    if not plano:
-        plano = PlanoJogo(jogo_id=jogo_id)
-        db.add(plano)
+    plano = _obter_ou_criar_plano_jogo(db, jogo)
 
     campos_texto = [
         "rotacoes", "chaves_ataque", "chaves_defesa", "movimentos_ofensivos",
