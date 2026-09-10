@@ -35,6 +35,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 REGRAS_APLICACAO = {
     "manual": "Aplicar manualmente",
+    "diario": "Aplicar diariamente",
     "treino": "Sempre que há um treino nesse dia",
     "jogo": "Sempre que há um jogo nesse dia",
     "treino_fisico": "Sempre que há um treino físico nesse dia",
@@ -155,7 +156,9 @@ def _sincronizar_aplicacoes_automaticas(
     for questionario in questionarios:
         regra = questionario.regra_aplicacao or "manual"
         eventos_por_data = {}
-        if regra == "jogo":
+        if regra == "diario":
+            eventos_por_data = {hoje: None}
+        elif regra == "jogo":
             jogos = db.query(Jogo).filter(
                 Jogo.equipa_id == questionario.equipa_id,
                 Jogo.data >= hoje,
@@ -205,7 +208,9 @@ def _sincronizar_aplicacoes_automaticas(
                 questionario_id=questionario.id,
                 sessao_treino_id=sessao.id if sessao else None,
                 data=data_evento,
-                titulo=REGRAS_APLICACAO[regra].replace("Sempre que há um ", "").replace(" nesse dia", "").capitalize(),
+                titulo=("Diário" if regra == "diario" else REGRAS_APLICACAO[regra].replace(
+                    "Sempre que há um ", ""
+                ).replace(" nesse dia", "").capitalize()),
                 permite_multiplas=False,
                 automatica=True,
             ))

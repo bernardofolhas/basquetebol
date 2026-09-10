@@ -271,6 +271,7 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         assert "Sempre que há um treino nesse dia" in edicao.text
         assert "Sempre que há um jogo nesse dia" in edicao.text
         assert "Sempre que há um treino físico nesse dia" in edicao.text
+        assert "Aplicar diariamente" in edicao.text
         perguntas_editadas = [
             {**perguntas[0], "texto": "PSE final da sessão"},
             perguntas[1],
@@ -352,6 +353,7 @@ def test_regras_automaticas_seguem_calendario_sem_duplicar(client_admin):
             "obrigatoria": True,
         }]
         regras = {
+            "diario": date.today(),
             "treino": data_normal,
             "treino_fisico": data_fisico,
             "jogo": data_jogo,
