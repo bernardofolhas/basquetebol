@@ -70,7 +70,7 @@ def _apagar_jogador_com_dependencias(db: Session, jogador: Jogador) -> str | Non
     from models.assiduidade import RegistoAssiduidade
     from models.documento_jogador import DocumentoJogador
     from models.jogo import Convocado, PlanoJogo
-    from models.questionario import RespostaQuestionarioDiario
+    from models.questionario import RespostaQuestionarioDiario, SubmissaoQuestionario
 
     jogador_id = jogador.id
     conta_atleta = db.query(Utilizador).execution_options(ignorar_clube=True).filter(
@@ -89,6 +89,7 @@ def _apagar_jogador_com_dependencias(db: Session, jogador: Jogador) -> str | Non
         db.query(TesteFisico).filter(TesteFisico.jogador_id == jogador_id).first(),
         db.query(DocumentoJogador).filter(DocumentoJogador.jogador_id == jogador_id).first(),
         db.query(RespostaQuestionarioDiario).filter(RespostaQuestionarioDiario.jogador_id == jogador_id).first(),
+        db.query(SubmissaoQuestionario).filter(SubmissaoQuestionario.jogador_id == jogador_id).first(),
         db.query(Convocado).filter(Convocado.jogador_id == jogador_id).first(), plano,
     ])
     if tem_historico:
