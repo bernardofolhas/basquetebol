@@ -1,8 +1,9 @@
-from datetime import date
+from datetime import date, timedelta
 import json
 
 from auth import verificar_password
 from database import SessionLocal
+from models.jogo import Jogo
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.questionario import (
     AplicacaoQuestionario,
@@ -107,6 +108,9 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
 
         painel = client_admin.get(f"/questionarios/equipas/{equipa_id}/matinal")
         assert "Questionário Matinal" in painel.text
+        assert "Editar questionário" in painel.text
+        assert "Análise" in painel.text
+        assert "Respostas por atleta" in painel.text
         assert "Dor no joelho direito" in painel.text
         assert "Atenção necessária" in painel.text
         assert "Registos recebidos hoje" in painel.text
@@ -255,10 +259,18 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         assert "Taxa de resposta" in dashboard.text
         assert "Estado dos atletas" in dashboard.text
         assert "Indicadores globais" in dashboard.text
+        assert "Análise" in dashboard.text
+        assert "Respostas por atleta" in dashboard.text
+        assert "Resposta a resposta" in dashboard.text
+        assert "Aplicações" in dashboard.text
+        assert "Configuração" in dashboard.text
         edicao = client_admin.get(f"/questionarios/modelos/{questionario.id}/editar")
         assert edicao.status_code == 200
         assert "PSE personalizado" in edicao.text
         assert "Os resultados existentes serão preservados" in edicao.text
+        assert "Sempre que há um treino nesse dia" in edicao.text
+        assert "Sempre que há um jogo nesse dia" in edicao.text
+        assert "Sempre que há um treino físico nesse dia" in edicao.text
         perguntas_editadas = [
             {**perguntas[0], "texto": "PSE final da sessão"},
             perguntas[1],
@@ -289,6 +301,118 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         db.query(QuestionarioPersonalizado).filter(
             QuestionarioPersonalizado.equipa_id == equipa_id
         ).delete(synchronize_session=False)
+        db.query(Utilizador).execution_options(ignorar_clube=True).filter(
+            Utilizador.jogador_id.in_([jogador_id, outro_id])
+        ).delete(synchronize_session=False)
+        db.commit()
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
+def test_regras_automaticas_seguem_calendario_sem_duplicar(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    jogo_id = None
+    try:
+        sessao_normal = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        data_normal = date.today() + timedelta(days=1)
+        data_fisico = date.today() + timedelta(days=2)
+        data_jogo = date.today() + timedelta(days=3)
+        sessao_normal.data = data_normal
+        sessao_normal.tipo_treino = "normal"
+        sessao_normal.e_jogo = False
+        sessao_fisico = SessaoTreino(
+            clube_id=sessao_normal.clube_id,
+            data=data_fisico,
+            local="Ginásio",
+            hora_inicio="10:00",
+            hora_fim="11:00",
+            tipo_treino="fisico",
+            e_jogo=False,
+            ativa=True,
+            microciclo_id=sessao_normal.microciclo_id,
+        )
+        jogo = Jogo(
+            clube_id=sessao_normal.clube_id,
+            equipa_id=equipa_id,
+            data=data_jogo,
+            adversario="Adversário automático",
+            em_casa=True,
+        )
+        db.add_all([sessao_fisico, jogo])
+        db.commit()
+        jogo_id = jogo.id
+
+        perguntas = [{
+            "texto": "Como estás?",
+            "tipo": "escala",
+            "minimo": 1,
+            "maximo": 10,
+            "obrigatoria": True,
+        }]
+        regras = {
+            "treino": data_normal,
+            "treino_fisico": data_fisico,
+            "jogo": data_jogo,
+        }
+        questionarios = {}
+        for regra, data_esperada in regras.items():
+            resposta = client_admin.post(
+                f"/questionarios/equipas/{equipa_id}/criar",
+                data={
+                    "nome": f"Questionário {regra}",
+                    "descricao": "Aplicação automática",
+                    "perguntas_json": json.dumps(perguntas),
+                    "data_aplicacao": "",
+                    "regra_aplicacao": regra,
+                },
+                follow_redirects=False,
+            )
+            assert resposta.status_code == 303
+            questionario = db.query(QuestionarioPersonalizado).filter_by(
+                equipa_id=equipa_id,
+                regra_aplicacao=regra,
+            ).one()
+            questionarios[regra] = questionario
+            aplicacoes = db.query(AplicacaoQuestionario).filter_by(
+                questionario_id=questionario.id,
+                automatica=True,
+            ).all()
+            assert [item.data for item in aplicacoes] == [data_esperada]
+
+        client_admin.get(f"/questionarios/equipas/{equipa_id}")
+        client_admin.get(f"/questionarios/equipas/{equipa_id}")
+        for questionario in questionarios.values():
+            assert db.query(AplicacaoQuestionario).filter_by(
+                questionario_id=questionario.id,
+                automatica=True,
+            ).count() == 1
+
+        treino = questionarios["treino"]
+        resposta = client_admin.post(
+            f"/questionarios/modelos/{treino.id}/editar",
+            data={
+                "nome": treino.nome,
+                "descricao": treino.descricao or "",
+                "perguntas_json": json.dumps(perguntas),
+                "regra_aplicacao": "manual",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        db.expire_all()
+        assert db.query(QuestionarioPersonalizado).filter_by(id=treino.id).one().regra_aplicacao == "manual"
+        assert db.query(AplicacaoQuestionario).filter_by(
+            questionario_id=treino.id,
+            automatica=True,
+        ).count() == 0
+    finally:
+        db.query(QuestionarioPersonalizado).filter(
+            QuestionarioPersonalizado.equipa_id == equipa_id
+        ).delete(synchronize_session=False)
+        if jogo_id:
+            db.query(Jogo).filter(Jogo.id == jogo_id).delete(synchronize_session=False)
         db.query(Utilizador).execution_options(ignorar_clube=True).filter(
             Utilizador.jogador_id.in_([jogador_id, outro_id])
         ).delete(synchronize_session=False)

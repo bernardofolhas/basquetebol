@@ -159,7 +159,7 @@ def actualizar_estrutura_perfis() -> None:
 
 
 def actualizar_estrutura_questionarios() -> None:
-    """Mantém contas de atleta e respostas múltiplas compatíveis sem Alembic automático."""
+    """Mantém contas, questionários e regras automáticas compatíveis sem Alembic automático."""
     inspector = inspect(engine)
     if not inspector.has_table("utilizadores"):
         return
@@ -189,6 +189,23 @@ def actualizar_estrutura_questionarios() -> None:
                 "ALTER TABLE respostas_questionario_diario "
                 "DROP CONSTRAINT IF EXISTS uq_questionario_diario_jogador_data"
             ))
+    inspector = inspect(engine)
+    if inspector.has_table("questionarios_personalizados"):
+        colunas = {coluna["name"] for coluna in inspector.get_columns("questionarios_personalizados")}
+        if "regra_aplicacao" not in colunas:
+            with engine.begin() as ligacao:
+                ligacao.execute(text(
+                    "ALTER TABLE questionarios_personalizados "
+                    "ADD COLUMN regra_aplicacao VARCHAR(30) NOT NULL DEFAULT 'manual'"
+                ))
+    if inspector.has_table("aplicacoes_questionario"):
+        colunas = {coluna["name"] for coluna in inspector.get_columns("aplicacoes_questionario")}
+        if "automatica" not in colunas:
+            with engine.begin() as ligacao:
+                ligacao.execute(text(
+                    "ALTER TABLE aplicacoes_questionario "
+                    "ADD COLUMN automatica BOOLEAN NOT NULL DEFAULT FALSE"
+                ))
 
 
 def actualizar_estrutura_staff() -> None:

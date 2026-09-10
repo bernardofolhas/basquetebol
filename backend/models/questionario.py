@@ -39,6 +39,7 @@ class QuestionarioPersonalizado(Base):
     nome = Column(String(180), nullable=False)
     descricao = Column(Text, nullable=True)
     origem_modelo = Column(String(80), nullable=True)
+    regra_aplicacao = Column(String(30), nullable=False, default="manual", server_default="manual")
     ativo = Column(Boolean, nullable=False, default=True)
     criado_em = Column(DateTime, nullable=False, default=datetime.now)
     atualizado_em = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
@@ -111,6 +112,7 @@ class AplicacaoQuestionario(Base):
     data = Column(Date, nullable=False, index=True)
     titulo = Column(String(180), nullable=True)
     permite_multiplas = Column(Boolean, nullable=False, default=False)
+    automatica = Column(Boolean, nullable=False, default=False, server_default="false")
     ativa = Column(Boolean, nullable=False, default=True)
     criado_em = Column(DateTime, nullable=False, default=datetime.now)
 

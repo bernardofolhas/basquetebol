@@ -4,6 +4,7 @@ import json
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from auth import encriptar_password
@@ -11,6 +12,7 @@ from auth_deps import exigir_atleta, exigir_operacao_desportiva, verificar_ou_ne
 from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
+from models.jogo import Jogo
 from models.jogador import Jogador
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.questionario import (
@@ -30,6 +32,13 @@ from template_config import Jinja2Templates
 
 router = APIRouter(prefix="/questionarios")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+REGRAS_APLICACAO = {
+    "manual": "Aplicar manualmente",
+    "treino": "Sempre que há um treino nesse dia",
+    "jogo": "Sempre que há um jogo nesse dia",
+    "treino_fisico": "Sempre que há um treino físico nesse dia",
+}
 
 
 def _validar_escala(valor: int, nome: str, maximo: int = 10) -> None:
@@ -99,6 +108,9 @@ def _obter_questionario_tecnico(db: Session, questionario_id: int, utilizador):
         selectinload(QuestionarioPersonalizado.aplicacoes)
         .selectinload(AplicacaoQuestionario.submissoes)
         .selectinload(SubmissaoQuestionario.respostas),
+        selectinload(QuestionarioPersonalizado.aplicacoes)
+        .selectinload(AplicacaoQuestionario.submissoes)
+        .joinedload(SubmissaoQuestionario.jogador),
     ).filter(QuestionarioPersonalizado.id == questionario_id).first()
     if questionario:
         verificar_ou_negar_equipa(utilizador, questionario.equipa_id, db)
@@ -131,6 +143,76 @@ def _adicionar_perguntas(db: Session, questionario_id: int, perguntas: list[dict
             rotulo_maximo=item["rotulo_maximo"],
             opcoes_json=json.dumps(item["opcoes"], ensure_ascii=False),
         ))
+
+
+def _sincronizar_aplicacoes_automaticas(
+    db: Session,
+    questionarios: list[QuestionarioPersonalizado],
+) -> bool:
+    """Materializa aplicações futuras a partir dos eventos reais da equipa."""
+    alterado = False
+    hoje = date.today()
+    for questionario in questionarios:
+        regra = questionario.regra_aplicacao or "manual"
+        eventos_por_data = {}
+        if regra == "jogo":
+            jogos = db.query(Jogo).filter(
+                Jogo.equipa_id == questionario.equipa_id,
+                Jogo.data >= hoje,
+            ).order_by(Jogo.data, Jogo.id).all()
+            eventos_por_data = {jogo.data: None for jogo in jogos}
+        elif regra in {"treino", "treino_fisico"}:
+            consulta = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+                Macrociclo.equipa_id == questionario.equipa_id,
+                SessaoTreino.data >= hoje,
+                SessaoTreino.ativa.is_(True),
+                SessaoTreino.e_jogo.is_not(True),
+            )
+            if regra == "treino_fisico":
+                consulta = consulta.filter(SessaoTreino.tipo_treino == "fisico")
+            else:
+                consulta = consulta.filter(or_(
+                    SessaoTreino.tipo_treino.is_(None),
+                    SessaoTreino.tipo_treino != "fisico",
+                ))
+            for sessao in consulta.order_by(SessaoTreino.data, SessaoTreino.id).all():
+                eventos_por_data.setdefault(sessao.data, sessao)
+
+        automaticas = db.query(AplicacaoQuestionario).options(
+            selectinload(AplicacaoQuestionario.submissoes)
+        ).filter(
+            AplicacaoQuestionario.questionario_id == questionario.id,
+            AplicacaoQuestionario.automatica.is_(True),
+            AplicacaoQuestionario.data >= hoje,
+        ).all()
+        for aplicacao in automaticas:
+            if aplicacao.data not in eventos_por_data and not aplicacao.submissoes:
+                db.delete(aplicacao)
+                alterado = True
+
+        datas_existentes = {
+            item[0] for item in db.query(AplicacaoQuestionario.data).filter(
+                AplicacaoQuestionario.questionario_id == questionario.id,
+                AplicacaoQuestionario.data.in_(list(eventos_por_data) or [date.min]),
+            ).all()
+        }
+        for data_evento, sessao in eventos_por_data.items():
+            if data_evento in datas_existentes:
+                continue
+            db.add(AplicacaoQuestionario(
+                clube_id=questionario.clube_id,
+                equipa_id=questionario.equipa_id,
+                questionario_id=questionario.id,
+                sessao_treino_id=sessao.id if sessao else None,
+                data=data_evento,
+                titulo=REGRAS_APLICACAO[regra].replace("Sempre que há um ", "").replace(" nesse dia", "").capitalize(),
+                permite_multiplas=False,
+                automatica=True,
+            ))
+            alterado = True
+    if alterado:
+        db.commit()
+    return alterado
 
 
 @router.get("/diario", response_class=HTMLResponse)
@@ -261,6 +343,14 @@ def selecionar_dashboard_questionario(
         QuestionarioPersonalizado.equipa_id == equipa_id,
         QuestionarioPersonalizado.ativo.is_(True),
     ).order_by(QuestionarioPersonalizado.atualizado_em.desc()).all()
+    if _sincronizar_aplicacoes_automaticas(db, questionarios):
+        questionarios = db.query(QuestionarioPersonalizado).options(
+            selectinload(QuestionarioPersonalizado.perguntas),
+            selectinload(QuestionarioPersonalizado.aplicacoes).selectinload(AplicacaoQuestionario.submissoes),
+        ).filter(
+            QuestionarioPersonalizado.equipa_id == equipa_id,
+            QuestionarioPersonalizado.ativo.is_(True),
+        ).order_by(QuestionarioPersonalizado.atualizado_em.desc()).all()
     respostas_matinal = db.query(RespostaQuestionarioDiario).join(Jogador).filter(
         Jogador.equipa_id == equipa_id,
     ).count()
@@ -269,6 +359,7 @@ def selecionar_dashboard_questionario(
         "equipa": equipa,
         "questionarios": questionarios,
         "respostas_matinal": respostas_matinal,
+        "regras_aplicacao": REGRAS_APLICACAO,
     })
 
 
@@ -361,11 +452,20 @@ def biblioteca_questionarios(
         QuestionarioPersonalizado.equipa_id == equipa_id,
         QuestionarioPersonalizado.ativo.is_(True),
     ).order_by(QuestionarioPersonalizado.atualizado_em.desc()).all()
+    if _sincronizar_aplicacoes_automaticas(db, questionarios):
+        questionarios = db.query(QuestionarioPersonalizado).options(
+            selectinload(QuestionarioPersonalizado.perguntas),
+            selectinload(QuestionarioPersonalizado.aplicacoes),
+        ).filter(
+            QuestionarioPersonalizado.equipa_id == equipa_id,
+            QuestionarioPersonalizado.ativo.is_(True),
+        ).order_by(QuestionarioPersonalizado.atualizado_em.desc()).all()
     return templates.TemplateResponse(request, "questionarios/biblioteca.html", {
         "utilizador": utilizador,
         "equipa": equipa,
         "questionarios": questionarios,
         "modelos": MODELOS_QUESTIONARIO,
+        "regras_aplicacao": REGRAS_APLICACAO,
     })
 
 
@@ -391,6 +491,7 @@ def novo_questionario(
         "questionario_edicao": None,
         "perguntas_iniciais": selecionado["perguntas"] if selecionado else [],
         "tipos_pergunta": TIPOS_PERGUNTA,
+        "regras_aplicacao": REGRAS_APLICACAO,
         "sessoes": _sessoes_da_equipa(db, equipa_id),
         "hoje": date.today(),
     })
@@ -408,6 +509,7 @@ def criar_questionario(
     perguntas_json: str = Form("[]"),
     data_aplicacao: str = Form(""),
     sessao_treino_id: str = Form(""),
+    regra_aplicacao: str = Form("manual"),
 ):
     verificar_ou_negar_equipa(utilizador, equipa_id, db)
     try:
@@ -415,6 +517,8 @@ def criar_questionario(
         nome_limpo = nome.strip()
         if not nome_limpo:
             raise ValueError("Indica um nome para o questionário.")
+        if regra_aplicacao not in REGRAS_APLICACAO:
+            raise ValueError("Escolhe uma regra de aplicação válida.")
         sessao = None
         if sessao_treino_id.strip():
             sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
@@ -437,6 +541,7 @@ def criar_questionario(
         nome=nome_limpo[:180],
         descricao=descricao.strip() or None,
         origem_modelo=modelo_chave if modelo_chave in MODELOS_QUESTIONARIO else None,
+        regra_aplicacao=regra_aplicacao,
     )
     db.add(questionario)
     db.flush()
@@ -451,6 +556,7 @@ def criar_questionario(
             permite_multiplas=False,
         ))
     db.commit()
+    _sincronizar_aplicacoes_automaticas(db, [questionario])
     set_flash(request, "Questionário criado" + (" e associado à data escolhida." if data_alvo else "."))
     return RedirectResponse(f"/questionarios/modelos/{questionario.id}", status_code=303)
 
@@ -465,6 +571,8 @@ def detalhe_questionario(
     questionario = _obter_questionario_tecnico(db, questionario_id, utilizador)
     if not questionario:
         return RedirectResponse("/equipas", status_code=303)
+    if _sincronizar_aplicacoes_automaticas(db, [questionario]):
+        questionario = _obter_questionario_tecnico(db, questionario_id, utilizador)
     jogadores = db.query(Jogador).filter(
         Jogador.equipa_id == questionario.equipa_id,
         Jogador.ativo.is_(True),
@@ -525,6 +633,7 @@ def detalhe_questionario(
         "total_submissoes": len(submissoes),
         "atletas_distintos": len({submissao.jogador_id for submissao in submissoes}),
         "analise_global": analise_global,
+        "submissoes": sorted(submissoes, key=lambda item: item.criado_em, reverse=True),
         "jogadores": jogadores,
         "aplicacao_atual": aplicacao_atual,
         "submissoes_atuais": submissoes_atuais,
@@ -536,6 +645,7 @@ def detalhe_questionario(
         ),
         "pergunta_indicador": pergunta_indicador,
         "tendencia": tendencia,
+        "regras_aplicacao": REGRAS_APLICACAO,
     })
 
 
@@ -573,6 +683,7 @@ def editar_questionario(
         "sessoes": [],
         "hoje": date.today(),
         "tem_respostas": tem_respostas,
+        "regras_aplicacao": REGRAS_APLICACAO,
     })
 
 
@@ -585,6 +696,7 @@ def guardar_edicao_questionario(
     nome: str = Form(...),
     descricao: str = Form(""),
     perguntas_json: str = Form("[]"),
+    regra_aplicacao: str = Form("manual"),
 ):
     questionario = _obter_questionario_tecnico(db, questionario_id, utilizador)
     if not questionario:
@@ -594,18 +706,24 @@ def guardar_edicao_questionario(
         nome_limpo = nome.strip()
         if not nome_limpo:
             raise ValueError("Indica um nome para o questionário.")
+        if regra_aplicacao not in REGRAS_APLICACAO:
+            raise ValueError("Escolhe uma regra de aplicação válida.")
     except ValueError as erro:
         set_flash(request, str(erro), "error")
         return RedirectResponse(f"/questionarios/modelos/{questionario.id}/editar", status_code=303)
     tem_respostas = any(aplicacao.submissoes for aplicacao in questionario.aplicacoes)
     if tem_respostas:
         questionario.ativo = False
+        for aplicacao in questionario.aplicacoes:
+            if aplicacao.automatica and aplicacao.data >= date.today() and not aplicacao.submissoes:
+                aplicacao.ativa = False
         atualizado = QuestionarioPersonalizado(
             clube_id=questionario.clube_id,
             equipa_id=questionario.equipa_id,
             nome=nome_limpo[:180],
             descricao=descricao.strip() or None,
             origem_modelo=f"versao:{questionario.id}",
+            regra_aplicacao=regra_aplicacao,
         )
         db.add(atualizado)
         db.flush()
@@ -615,6 +733,7 @@ def guardar_edicao_questionario(
     else:
         questionario.nome = nome_limpo[:180]
         questionario.descricao = descricao.strip() or None
+        questionario.regra_aplicacao = regra_aplicacao
         db.query(PerguntaQuestionario).filter(
             PerguntaQuestionario.questionario_id == questionario.id
         ).delete(synchronize_session=False)
@@ -622,6 +741,10 @@ def guardar_edicao_questionario(
         destino_id = questionario.id
         mensagem = "Questionário atualizado."
     db.commit()
+    destino = db.query(QuestionarioPersonalizado).filter(
+        QuestionarioPersonalizado.id == destino_id
+    ).first()
+    _sincronizar_aplicacoes_automaticas(db, [destino])
     set_flash(request, mensagem)
     return RedirectResponse(f"/questionarios/modelos/{destino_id}", status_code=303)
 
@@ -675,6 +798,12 @@ def questionarios_disponiveis(
     utilizador=Depends(exigir_atleta),
 ):
     jogador = db.query(Jogador).filter(Jogador.id == utilizador.jogador_id).first()
+    if jogador and jogador.equipa_id:
+        questionarios = db.query(QuestionarioPersonalizado).filter(
+            QuestionarioPersonalizado.equipa_id == jogador.equipa_id,
+            QuestionarioPersonalizado.ativo.is_(True),
+        ).all()
+        _sincronizar_aplicacoes_automaticas(db, questionarios)
     aplicacoes = db.query(AplicacaoQuestionario).options(
         joinedload(AplicacaoQuestionario.questionario),
         selectinload(AplicacaoQuestionario.submissoes),
