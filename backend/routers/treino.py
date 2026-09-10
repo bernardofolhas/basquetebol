@@ -1729,14 +1729,24 @@ async def apagar_campo_exercicio(
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_autenticacao),
 ):
+    resposta_json = "application/json" in request.headers.get("accept", "").lower()
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
     exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
     if not exercicio or numero <= 0:
+        if resposta_json:
+            return JSONResponse({"sucesso": False, "erro": "Campo ou exercício inválido."}, status_code=404)
         return RedirectResponse(url="/equipas", status_code=303)
+    if numero not in _slots_ativos(exercicio):
+        if resposta_json:
+            return JSONResponse({"sucesso": False, "erro": "O campo já não existe."}, status_code=404)
+        set_flash(request, "O campo já não existe.", "error")
+        return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}", status_code=303)
     _definir_slots_ativos(exercicio, [slot for slot in _slots_ativos(exercicio) if slot != numero])
     _definir_desenho_campo(exercicio, numero, None)
     _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
     db.commit()
+    if resposta_json:
+        return JSONResponse({"sucesso": True, "numero": numero})
     set_flash(request, "Campo removido sem afetar os restantes.")
     return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}", status_code=303)
 

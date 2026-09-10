@@ -25,7 +25,7 @@
         {{ tactical_toolbar(canvas_id, 'toolbar_' ~ canvas_id) }}
     </div>
     <div class="mt-2 flex flex-wrap justify-end gap-2">
-        <form method="POST" action="/treino/exercicios/{{ ex_id }}/campos/{{ campo.numero }}/apagar" onsubmit="return confirm('Remover apenas este campo e o respetivo desenho?')">
+        <form method="POST" action="/treino/exercicios/{{ ex_id }}/campos/{{ campo.numero }}/apagar" onsubmit="removerCampoSemRecarregar(event, this, {{ ex_id }}, {{ campo.numero }})">
             <button type="submit" class="rounded-lg border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover campo</button>
         </form>
         <button type="button" onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ campo.numero }})" class="rounded-lg bg-orange-500 px-3 py-1 text-xs font-medium text-white transition hover:bg-orange-600">Guardar desenho</button>
@@ -34,7 +34,7 @@
 {% endmacro %}
 
 {% macro campo_previsualizacao(ex_id, campo) %}
-<figure class="training-drawing-preview" role="button" tabindex="0" onclick="abrirEditorDesenho({{ ex_id }}, {{ campo.numero }})" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); abrirEditorDesenho({{ ex_id }}, {{ campo.numero }}); }" aria-label="Editar {{ campo.label }}" title="Editar {{ campo.label }}">
+<figure class="training-drawing-preview" data-drawing-preview-field="{{ campo.numero }}" role="button" tabindex="0" onclick="abrirEditorDesenho({{ ex_id }}, {{ campo.numero }})" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); abrirEditorDesenho({{ ex_id }}, {{ campo.numero }}); }" aria-label="Editar {{ campo.label }}" title="Editar {{ campo.label }}">
     <div class="training-drawing-preview-stage" style="aspect-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %};">
         <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}" class="training-drawing-court">
         <img src="{{ campo.desenho|default('', true)|e }}" alt="Desenho de {{ campo.label }}" class="training-drawing-overlay" data-drawing-preview="{{ ex_id }}-{{ campo.numero }}" {% if not campo.desenho %}hidden{% endif %}>
@@ -1114,6 +1114,7 @@ async function adicionarCampoSemRecarregar(evento, formulario, exercicioId) {
         if (grelhaPrevisualizacao) {
             const figura = document.createElement('figure');
             figura.className = 'training-drawing-preview';
+            figura.dataset.drawingPreviewField = String(dados.campo.numero);
             figura.setAttribute('role', 'button');
             figura.tabIndex = 0;
             figura.setAttribute('aria-label', `Editar ${dados.campo.label}`);
@@ -1136,6 +1137,52 @@ async function adicionarCampoSemRecarregar(evento, formulario, exercicioId) {
     } catch (erro) {
         window.alert(erro.message || 'Não foi possível acrescentar o campo.');
     } finally {
+        if (botao) {
+            botao.disabled = false;
+            botao.textContent = textoOriginal;
+        }
+    }
+}
+
+async function removerCampoSemRecarregar(evento, formulario, exercicioId, campoNumero) {
+    evento.preventDefault();
+    if (!window.confirm('Remover apenas este campo e o respetivo desenho?')) return;
+
+    const botao = formulario.querySelector('button[type="submit"], button:not([type])');
+    const textoOriginal = botao?.textContent;
+    if (botao) {
+        botao.disabled = true;
+        botao.textContent = 'A remover...';
+    }
+    try {
+        const resposta = await fetch(formulario.action, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+        });
+        const dados = await resposta.json();
+        if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível remover o campo.');
+
+        const modal = document.getElementById(`modal_desenho_${exercicioId}`);
+        const campo = modal?.querySelector(`[data-editor-field="${campoNumero}"]`);
+        const canvas = campo?.querySelector('canvas');
+        if (canvas?.id) delete CANVAS_ESTADO[canvas.id];
+        campo?.remove();
+
+        const grelhaEditor = modal?.querySelector('.training-drawing-editor-grid');
+        if (grelhaEditor && !grelhaEditor.querySelector('[data-editor-field]')) {
+            grelhaEditor.insertAdjacentHTML('beforeend', '<div class="training-drawing-empty">Acrescenta um campo meio ou completo para começar a desenhar.</div>');
+        }
+
+        const grelhaPrevisualizacao = document.querySelector(`#exercicio-${exercicioId} .training-drawing-preview-grid`);
+        grelhaPrevisualizacao?.querySelector(`[data-drawing-preview-field="${campoNumero}"]`)?.remove();
+        if (grelhaPrevisualizacao && !grelhaPrevisualizacao.querySelector('[data-drawing-preview-field]')) {
+            grelhaPrevisualizacao.insertAdjacentHTML('beforeend', '<div class="training-drawing-empty">Sem quadros</div>');
+        }
+    } catch (erro) {
+        window.alert(erro.message || 'Não foi possível remover o campo.');
         if (botao) {
             botao.disabled = false;
             botao.textContent = textoOriginal;

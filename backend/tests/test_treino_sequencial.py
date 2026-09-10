@@ -242,6 +242,7 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         assert '<figcaption>' not in pagina.text
         assert 'data-drawing-editor' in pagina.text
         assert "adicionarCampoSemRecarregar(event, this" in pagina.text
+        assert "removerCampoSemRecarregar(event, this" in pagina.text
         assert 'data-court-template="meio"' in pagina.text
         assert "est.ctx.drawImage(est.imagemFundo" in pagina.text
         assert 'action="/treino/exercicios/' in pagina.text
@@ -264,6 +265,14 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
                 "imagem": "campo_meio.png?v=20260908-madeira-1",
             },
         }
+        campo_removido = client_admin.post(
+            f"/treino/exercicios/{exercicio.id}/campos/3/apagar",
+            headers={"Accept": "application/json"},
+        )
+        assert campo_removido.status_code == 200
+        assert campo_removido.json() == {"sucesso": True, "numero": 3}
+        db.refresh(exercicio)
+        assert "3" not in (exercicio.campos_ativos or "").split(",")
         notas = client_admin.post(
             f"/treino/exercicios/{exercicio.id}/notas",
             data={"organizacao": "Quatro grupos.", "coaching_points": "Passe forte."},
