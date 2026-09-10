@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Enum, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
 import enum
@@ -30,6 +30,12 @@ class Equipa(Base):
     escalao = Column(Enum(EscalaoEnum), nullable=False)
     genero = Column(Enum(GeneroEnum), nullable=False)
     seccionista = Column(String, nullable=True)
+    questionario_matinal_ativo = Column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="true",
+    )
 
     # Relação com treinadores — uma equipa pode ter vários treinadores
     # Vamos definir isto melhor quando criarmos o modelo de treinador

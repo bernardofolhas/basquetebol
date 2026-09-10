@@ -168,6 +168,16 @@ def actualizar_estrutura_perfis() -> None:
 def actualizar_estrutura_questionarios() -> None:
     """Mantém contas, questionários e regras automáticas compatíveis sem Alembic automático."""
     inspector = inspect(engine)
+    if inspector.has_table("equipas"):
+        colunas_equipas = {coluna["name"] for coluna in inspector.get_columns("equipas")}
+        if "questionario_matinal_ativo" not in colunas_equipas:
+            with engine.begin() as ligacao:
+                default = "TRUE" if engine.dialect.name == "postgresql" else "1"
+                ligacao.execute(text(
+                    "ALTER TABLE equipas ADD COLUMN questionario_matinal_ativo "
+                    f"BOOLEAN NOT NULL DEFAULT {default}"
+                ))
+            logger.info("Estado do Questionário Matinal adicionado às equipas.")
     if not inspector.has_table("utilizadores"):
         return
     colunas = {coluna["name"] for coluna in inspector.get_columns("utilizadores")}

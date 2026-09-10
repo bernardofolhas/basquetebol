@@ -3,6 +3,7 @@ import json
 
 from auth import verificar_password
 from database import SessionLocal
+from models.equipa import Equipa
 from models.jogo import Jogo
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.questionario import (
@@ -128,6 +129,54 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
         ).delete(synchronize_session=False)
         db.query(Utilizador).execution_options(ignorar_clube=True).filter(
             Utilizador.jogador_id.in_([jogador_id, outro_id])
+        ).delete(synchronize_session=False)
+        db.commit()
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
+def test_elimina_questionario_matinal_sem_apagar_historico(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        equipa = db.query(Equipa).filter_by(id=equipa_id).one()
+        db.add(RespostaQuestionarioDiario(
+            clube_id=equipa.clube_id,
+            jogador_id=jogador_id,
+            data=date.today(),
+            tipo_sessao="treino",
+            horas_sono=8,
+            qualidade_sono=4,
+            pse_esforco=5,
+            dor_membros_inferiores=1,
+            dor_membros_superiores=1,
+            tem_queixa=False,
+        ))
+        db.commit()
+
+        painel = client_admin.get(f"/questionarios/equipas/{equipa_id}/matinal")
+        assert painel.status_code == 200
+        assert "Eliminar questionário" in painel.text
+
+        eliminado = client_admin.post(
+            f"/questionarios/equipas/{equipa_id}/matinal/eliminar",
+            data={"modo": "questionario"},
+            follow_redirects=False,
+        )
+        assert eliminado.status_code == 303
+        assert eliminado.headers["location"] == f"/questionarios/equipas/{equipa_id}"
+
+        db.expire_all()
+        assert db.query(RespostaQuestionarioDiario).filter_by(jogador_id=jogador_id).count() == 1
+        assert db.query(Equipa).filter_by(id=equipa_id).one().questionario_matinal_ativo is False
+        bloqueado = client_admin.get(
+            f"/questionarios/equipas/{equipa_id}/matinal",
+            follow_redirects=False,
+        )
+        assert bloqueado.status_code == 303
+        assert bloqueado.headers["location"] == f"/questionarios/equipas/{equipa_id}"
+    finally:
+        db.query(RespostaQuestionarioDiario).filter(
+            RespostaQuestionarioDiario.jogador_id.in_([jogador_id, outro_id])
         ).delete(synchronize_session=False)
         db.commit()
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)

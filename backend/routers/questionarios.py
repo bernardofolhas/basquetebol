@@ -264,6 +264,9 @@ def questionario_diario(
     jogador = db.query(Jogador).options(joinedload(Jogador.equipa)).filter(
         Jogador.id == utilizador.jogador_id
     ).first()
+    if jogador and not jogador.equipa.questionario_matinal_ativo:
+        set_flash(request, "O Questionário Matinal já não está ativo para esta equipa.", "error")
+        return RedirectResponse("/questionarios/disponiveis", status_code=303)
     respostas_hoje = db.query(RespostaQuestionarioDiario).filter(
         RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id,
         RespostaQuestionarioDiario.data == date.today(),
@@ -297,6 +300,12 @@ def guardar_questionario_diario(
     descricao_queixa: str = Form(""),
     observacoes: str = Form(""),
 ):
+    jogador = db.query(Jogador).options(joinedload(Jogador.equipa)).filter(
+        Jogador.id == utilizador.jogador_id
+    ).first()
+    if jogador and not jogador.equipa.questionario_matinal_ativo:
+        set_flash(request, "O Questionário Matinal já não está ativo para esta equipa.", "error")
+        return RedirectResponse("/questionarios/disponiveis", status_code=303)
     db.query(Jogador.id).filter(Jogador.id == utilizador.jogador_id).with_for_update().first()
     existente = db.query(RespostaQuestionarioDiario.id).filter(
         RespostaQuestionarioDiario.jogador_id == utilizador.jogador_id,
@@ -391,14 +400,17 @@ def selecionar_dashboard_questionario(
             QuestionarioPersonalizado.equipa_id == equipa_id,
             QuestionarioPersonalizado.ativo.is_(True),
         ).order_by(QuestionarioPersonalizado.atualizado_em.desc()).all()
-    respostas_matinal = db.query(RespostaQuestionarioDiario).join(Jogador).filter(
-        Jogador.equipa_id == equipa_id,
-    ).count()
+    respostas_matinal = 0
+    if equipa.questionario_matinal_ativo:
+        respostas_matinal = db.query(RespostaQuestionarioDiario).join(Jogador).filter(
+            Jogador.equipa_id == equipa_id,
+        ).count()
     return templates.TemplateResponse(request, "questionarios/selecao.html", {
         "utilizador": utilizador,
         "equipa": equipa,
         "questionarios": questionarios,
         "respostas_matinal": respostas_matinal,
+        "questionario_matinal_ativo": equipa.questionario_matinal_ativo,
         "regras_aplicacao": REGRAS_APLICACAO,
     })
 
@@ -414,6 +426,9 @@ def painel_questionario_matinal(
     equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
     if not equipa:
         return RedirectResponse("/equipas", status_code=303)
+    if not equipa.questionario_matinal_ativo:
+        set_flash(request, "O Questionário Matinal já não está ativo para esta equipa.", "error")
+        return RedirectResponse(f"/questionarios/equipas/{equipa_id}", status_code=303)
     jogadores = db.query(Jogador).filter(
         Jogador.equipa_id == equipa_id, Jogador.ativo.is_(True)
     ).order_by(Jogador.nome).all()
@@ -472,6 +487,37 @@ def painel_questionario_matinal(
         "total": len(jogadores),
         "ligacao": str(request.base_url).rstrip("/") + "/questionarios/diario",
     })
+
+
+@router.post("/equipas/{equipa_id}/matinal/eliminar")
+def eliminar_questionario_matinal(
+    equipa_id: int,
+    request: Request,
+    modo: str = Form("questionario"),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse("/equipas", status_code=303)
+    if modo not in {"questionario", "tudo"}:
+        set_flash(request, "Escolhe uma opção de eliminação válida.", "error")
+        return RedirectResponse(f"/questionarios/equipas/{equipa_id}/matinal", status_code=303)
+
+    if modo == "tudo":
+        jogador_ids = db.query(Jogador.id).filter(Jogador.equipa_id == equipa_id).subquery()
+        db.query(RespostaQuestionarioDiario).filter(
+            RespostaQuestionarioDiario.clube_id == equipa.clube_id,
+            RespostaQuestionarioDiario.jogador_id.in_(jogador_ids),
+        ).delete(synchronize_session=False)
+        mensagem = "Questionário Matinal e respetivas respostas eliminados."
+    else:
+        mensagem = "Questionário Matinal eliminado. As respostas históricas foram mantidas."
+    equipa.questionario_matinal_ativo = False
+    db.commit()
+    set_flash(request, mensagem)
+    return RedirectResponse(f"/questionarios/equipas/{equipa_id}", status_code=303)
 
 
 @router.get("/equipas/{equipa_id}/biblioteca", response_class=HTMLResponse)
