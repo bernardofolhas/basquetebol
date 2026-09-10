@@ -1688,11 +1688,16 @@ async def adicionar_campo_exercicio(
     utilizador=Depends(exigir_autenticacao),
     tipo: str = Form(...),
 ):
+    resposta_json = "application/json" in request.headers.get("accept", "").lower()
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
     exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
     if not exercicio:
+        if resposta_json:
+            return JSONResponse({"sucesso": False, "erro": "Exercício não encontrado."}, status_code=404)
         return RedirectResponse(url="/equipas", status_code=303)
     if tipo not in IMAGENS_CAMPO:
+        if resposta_json:
+            return JSONResponse({"sucesso": False, "erro": "Tipo de campo inválido."}, status_code=422)
         set_flash(request, "Tipo de campo inválido.", "error")
         return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}", status_code=303)
     slots = _slots_ativos(exercicio)
@@ -1701,6 +1706,17 @@ async def adicionar_campo_exercicio(
     _definir_slots_ativos(exercicio, slots)
     _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
     db.commit()
+    if resposta_json:
+        tipo_campo, label, imagem = _configuracao_campo(disponivel)
+        return JSONResponse({
+            "sucesso": True,
+            "campo": {
+                "numero": disponivel,
+                "tipo": tipo_campo,
+                "label": label,
+                "imagem": imagem,
+            },
+        })
     set_flash(request, "Campo acrescentado ao exercício.")
     return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}", status_code=303)
 

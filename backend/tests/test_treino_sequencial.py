@@ -241,12 +241,29 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         assert 'data-drawing-preview=' in pagina.text
         assert '<figcaption>' not in pagina.text
         assert 'data-drawing-editor' in pagina.text
+        assert "adicionarCampoSemRecarregar(event, this" in pagina.text
+        assert 'data-court-template="meio"' in pagina.text
         assert "est.ctx.drawImage(est.imagemFundo" in pagina.text
         assert 'action="/treino/exercicios/' in pagina.text
         assert "/notas" in pagina.text
         assert "Editar dados do exercício" not in pagina.text
 
         exercicio = db.query(ExercicioPlano).filter_by(plano_id=plano.id).one()
+        novo_campo = client_admin.post(
+            f"/treino/exercicios/{exercicio.id}/campos",
+            data={"tipo": "meio"},
+            headers={"Accept": "application/json"},
+        )
+        assert novo_campo.status_code == 200
+        assert novo_campo.json() == {
+            "sucesso": True,
+            "campo": {
+                "numero": 3,
+                "tipo": "meio",
+                "label": "Campo meio 2",
+                "imagem": "campo_meio.png?v=20260908-madeira-1",
+            },
+        }
         notas = client_admin.post(
             f"/treino/exercicios/{exercicio.id}/notas",
             data={"organizacao": "Quatro grupos.", "coaching_points": "Passe forte."},

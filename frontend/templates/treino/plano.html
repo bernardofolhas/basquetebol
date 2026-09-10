@@ -574,8 +574,8 @@
                                         <div class="training-drawing-dialog-actions">
                                             <p>Escolhe apenas os campos necessários para representar o exercício.</p>
                                             <div>
-                                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos"><input type="hidden" name="tipo" value="meio"><button class="ds-button ds-button-secondary ds-button-sm">+ Campo meio</button></form>
-                                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos"><input type="hidden" name="tipo" value="completo"><button class="ds-button ds-button-secondary ds-button-sm">+ Campo completo</button></form>
+                                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos" onsubmit="adicionarCampoSemRecarregar(event, this, {{ ex.id }})"><input type="hidden" name="tipo" value="meio"><button type="submit" class="ds-button ds-button-secondary ds-button-sm">+ Campo meio</button></form>
+                                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos" onsubmit="adicionarCampoSemRecarregar(event, this, {{ ex.id }})"><input type="hidden" name="tipo" value="completo"><button type="submit" class="ds-button ds-button-secondary ds-button-sm">+ Campo completo</button></form>
                                             </div>
                                         </div>
                                         <div class="training-drawing-editor-grid">
@@ -585,6 +585,8 @@
                                             <div class="training-drawing-empty">Acrescenta um campo meio ou completo para começar a desenhar.</div>
                                             {% endfor %}
                                         </div>
+                                        <template data-court-template="meio">{{ campo_desenho('__CANVAS_ID__', ex.id, {'numero': '__CAMPO_NUMERO__', 'tipo': 'meio', 'label': '__CAMPO_LABEL__', 'imagem': IMAGENS_CAMPO.meio if IMAGENS_CAMPO is defined else 'campo_meio.png?v=20260908-madeira-1', 'desenho': '', 'estado_desenho': none}) }}</template>
+                                        <template data-court-template="completo">{{ campo_desenho('__CANVAS_ID__', ex.id, {'numero': '__CAMPO_NUMERO__', 'tipo': 'completo', 'label': '__CAMPO_LABEL__', 'imagem': IMAGENS_CAMPO.completo if IMAGENS_CAMPO is defined else 'campo_completo.png?v=20260908-madeira-1', 'desenho': '', 'estado_desenho': none}) }}</template>
                                     </div>
                                     <footer class="training-editor-dialog-footer"><button type="button" onclick="fecharEditorDesenho({{ ex.id }})" class="ds-button ds-button-primary">Concluir</button></footer>
                                 </div>
@@ -1070,6 +1072,75 @@ function abrirEditorDesenho(exercicioId, campoNumero = null) {
 
 function fecharEditorDesenho(exercicioId) {
     document.getElementById(`modal_desenho_${exercicioId}`)?.close();
+}
+
+async function adicionarCampoSemRecarregar(evento, formulario, exercicioId) {
+    evento.preventDefault();
+    const botao = formulario.querySelector('button[type="submit"], button:not([type])');
+    const textoOriginal = botao?.textContent;
+    if (botao) {
+        botao.disabled = true;
+        botao.textContent = 'A acrescentar...';
+    }
+    try {
+        const resposta = await fetch(formulario.action, {
+            method: 'POST',
+            body: new FormData(formulario),
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+        });
+        const dados = await resposta.json();
+        if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível acrescentar o campo.');
+
+        const modal = document.getElementById(`modal_desenho_${exercicioId}`);
+        const grelha = modal?.querySelector('.training-drawing-editor-grid');
+        const modelo = modal?.querySelector(`template[data-court-template="${dados.campo.tipo}"]`);
+        if (!grelha || !modelo) throw new Error('O editor do novo campo não ficou disponível.');
+
+        const canvasId = `canvas${dados.campo.numero}_${exercicioId}`;
+        const html = modelo.innerHTML
+            .replaceAll('__CANVAS_ID__', canvasId)
+            .replaceAll('__CAMPO_NUMERO__', String(dados.campo.numero))
+            .replaceAll('__CAMPO_LABEL__', dados.campo.label);
+        const contentor = document.createElement('div');
+        contentor.innerHTML = html.trim();
+        const novoCampo = contentor.firstElementChild;
+        grelha.querySelector('.training-drawing-empty')?.remove();
+        grelha.appendChild(novoCampo);
+
+        const grelhaPrevisualizacao = document.querySelector(`#exercicio-${exercicioId} .training-drawing-preview-grid`);
+        if (grelhaPrevisualizacao) {
+            const figura = document.createElement('figure');
+            figura.className = 'training-drawing-preview';
+            figura.setAttribute('role', 'button');
+            figura.tabIndex = 0;
+            figura.setAttribute('aria-label', `Editar ${dados.campo.label}`);
+            figura.title = `Editar ${dados.campo.label}`;
+            figura.innerHTML = `<div class="training-drawing-preview-stage" style="aspect-ratio:${dados.campo.tipo === 'meio' ? '887 / 777' : '682 / 1182'}"><img src="/static/campos/${dados.campo.imagem}" alt="${dados.campo.label}" class="training-drawing-court"><img src="" alt="Desenho de ${dados.campo.label}" class="training-drawing-overlay" data-drawing-preview="${exercicioId}-${dados.campo.numero}" hidden></div>`;
+            const abrir = () => abrirEditorDesenho(exercicioId, dados.campo.numero);
+            figura.addEventListener('click', abrir);
+            figura.addEventListener('keydown', (eventoTeclado) => {
+                if (eventoTeclado.key !== 'Enter' && eventoTeclado.key !== ' ') return;
+                eventoTeclado.preventDefault();
+                abrir();
+            });
+            grelhaPrevisualizacao.querySelector('.training-drawing-empty')?.remove();
+            grelhaPrevisualizacao.appendChild(figura);
+        }
+
+        inicializarDesenho(canvasId);
+        setTimeout(() => definirFerramenta(canvasId, 'seleccionar'), 200);
+        novoCampo.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    } catch (erro) {
+        window.alert(erro.message || 'Não foi possível acrescentar o campo.');
+    } finally {
+        if (botao) {
+            botao.disabled = false;
+            botao.textContent = textoOriginal;
+        }
+    }
 }
 
 function abrirModalExercicio(exercicioId) {
