@@ -7,7 +7,7 @@ from models.fisico import TesteFisico as ModeloTesteFisico
 from models.jogador import Jogador, RegistoAntropometrico
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.utilizador import Utilizador
-from services.assiduidade_service import calcular_resumo_assiduidade
+from services.assiduidade_service import calcular_pse_real, calcular_resumo_assiduidade
 import routers.assiduidade as assiduidade_router
 
 
@@ -250,6 +250,28 @@ def test_pse_rapida_abre_treino_do_dia_e_guarda_valores_individuais(client_admin
         assert f'data-player-id="{jogadora_id}"' in pagina.text
         assert "pse-player-card" in pagina.text
         assert 'id="pse-entry-dialog"' in pagina.text
+        assert "fetch(form.action" in pagina.text
+        assert "select.value" not in pagina.text
+
+        resposta = client_admin.post(
+            f"/assiduidade/sessoes/{sessao_id}/pse",
+            data={f"rpe_{segunda_jogadora_id}": "8"},
+            headers={
+                "Accept": "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        )
+        assert resposta.status_code == 200
+        dados = resposta.json()
+        assert dados["sucesso"] is True
+        assert dados["jogador_id"] == segunda_jogadora_id
+        assert dados["rpe"] == 8
+        assert dados["total_preenchidos"] == 2
+        assert dados["total_jogadores"] == 2
+        db.expire_all()
+        assert calcular_pse_real(db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao_id,
+        ).all()) == 7.8
 
         resposta = client_admin.post(
             f"/assiduidade/sessoes/{sessao_id}/pse",

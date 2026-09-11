@@ -1,7 +1,7 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from template_config import Jinja2Templates
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -210,6 +210,7 @@ async def guardar_pse_individual(
     verificar_ou_negar_equipa(utilizador, equipa.id, db)
 
     dados = await request.form()
+    pedido_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", "")
     jogadores, _ = _jogadores_folha_assiduidade(db, equipa, sessao_id)
     registos = db.query(RegistoAssiduidade).filter(
         RegistoAssiduidade.sessao_id == sessao_id,
@@ -226,6 +227,8 @@ async def guardar_pse_individual(
             rpe = _normalizar_rpe_individual(valor) if str(valor or "").strip() else None
             valores.append((jogador, rpe))
     except ValueError as erro:
+        if pedido_ajax:
+            return JSONResponse({"sucesso": False, "erro": str(erro)}, status_code=422)
         set_flash(request, str(erro), "error")
         return RedirectResponse(url=f"/assiduidade/equipas/{equipa.id}/pse", status_code=303)
 
@@ -240,6 +243,7 @@ async def guardar_pse_individual(
                 estado="presente",
             )
             db.add(registo)
+            registos_por_jogador[jogador.id] = registo
         if registo:
             registo.rpe_individual = rpe
             if rpe is not None:
@@ -247,6 +251,20 @@ async def guardar_pse_individual(
                 registo.estado = "presente"
 
     db.commit()
+    if pedido_ajax:
+        total_preenchidos = sum(
+            1 for registo in registos_por_jogador.values()
+            if registo.rpe_individual is not None
+        )
+        atualizado = valores[0] if valores else (None, None)
+        return JSONResponse({
+            "sucesso": True,
+            "sessao_id": sessao_id,
+            "jogador_id": atualizado[0].id if atualizado[0] else None,
+            "rpe": atualizado[1],
+            "total_preenchidos": total_preenchidos,
+            "total_jogadores": len(jogadores),
+        })
     set_flash(request, "PSE individual guardada com sucesso.")
     return RedirectResponse(url=f"/assiduidade/equipas/{equipa.id}/pse?sessao_id={sessao_id}", status_code=303)
 

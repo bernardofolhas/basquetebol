@@ -20,6 +20,7 @@ from database import get_db
 from flash import set_flash
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
 from models.equipa import Equipa
+from models.assiduidade import RegistoAssiduidade
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.planeamento_clube import EventoPlaneamentoClube
 from models.treino import (
@@ -38,6 +39,7 @@ from services.desenho_service import (
 )
 from services.conteudos_sessao_service import construir_sugestoes_plano_treino
 from services.horarios_exercicios import recalcular_horas_exercicios
+from services.assiduidade_service import calcular_pse_real
 from services.mapa_conteudos_service import obter_sugestoes_conteudos_microciclo
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
 from services.auditoria_service import registar_auditoria
@@ -603,6 +605,15 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
     validacao_local = validar_local_sessao(db, sessao, equipa.id)
 
     volume_planeado = sum(ex.minutos or 0 for ex in plano.exercicios)
+    registos_pse = db.query(RegistoAssiduidade).filter(
+        RegistoAssiduidade.sessao_id == sessao_id,
+        RegistoAssiduidade.rpe_individual.isnot(None),
+    ).all()
+    pse_real = calcular_pse_real(registos_pse)
+    carga_real = (
+        round((volume_planeado or 0) * pse_real, 1)
+        if pse_real is not None else None
+    )
     duracao_prevista = _duracao_prevista_minutos(sessao)
     importacao_ativa = _importacao_ativa(plano)
     modo_edicao_importacao = bool(importacao_ativa and request.query_params.get("editar") == "1")
@@ -630,6 +641,9 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "blocos_ui": [{"key": f"d{bloco.id}", "id": bloco.id, "nome": bloco.nome, "tipo": bloco.tipo, "legado": False} for bloco in plano.blocos] + [{"key": letra, "id": None, "nome": f"Bloco {letra}", "tipo": "Legado", "legado": True} for letra in ["A", "B", "C", "D"] if letra in exercicios_por_bloco],
         "total_exercicios": len(plano.exercicios),
         "volume_planeado": volume_planeado,
+        "pse_real": pse_real,
+        "carga_real": carga_real,
+        "pse_real_respostas": len(registos_pse),
         "duracao_prevista": duracao_prevista,
         "diferenca_duracao": volume_planeado - duracao_prevista if duracao_prevista is not None else None,
         "estados_sessao": opcoes_transicao_sessao(sessao.estado),

@@ -274,7 +274,9 @@
                     <div data-training-block-only hidden><dt>Blocos</dt><dd>{{ resumo_blocos | length }}</dd></div>
                     <div><dt>Exercícios</dt><dd>{{ total_exercicios }}</dd></div>
                     <div><dt>Minutos</dt><dd>{{ volume_planeado if volume_planeado else "—" }}</dd></div>
-                    <div><dt>RPE</dt><dd>{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else "—" }}</dd></div>
+                    <div><dt>PSE planeada</dt><dd>{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else "—" }}</dd></div>
+                    <div><dt>PSE real</dt><dd>{{ pse_real if pse_real is not none else "—" }}</dd><small>{{ pse_real_respostas }} resposta(s)</small></div>
+                    <div><dt>Carga real</dt><dd>{{ carga_real if carga_real is not none else "—" }}</dd><small>min × PSE</small></div>
                 </dl>
             </div>
             <form method="POST" action="/treino/planos/{{ plano.id }}/cabecalho" class="space-y-6 px-6 py-6">

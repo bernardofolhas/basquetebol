@@ -475,6 +475,7 @@ def _media(valores) -> float | None:
 def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
     """Resume respostas reais e carga da equipa num período selecionável."""
     from models.jogador import Jogador
+    from models.assiduidade import RegistoAssiduidade
     from models.planeamento import SessaoTreino
     from models.questionario import (
         AplicacaoQuestionario,
@@ -484,6 +485,7 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
         RespostaQuestionarioDiario,
         SubmissaoQuestionario,
     )
+    from services.assiduidade_service import calcular_pse_real
     from sqlalchemy.orm import joinedload, selectinload
 
     hoje = hoje or date.today()
@@ -506,6 +508,16 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
                 sessoes_equipa.append(sessao)
         except AttributeError:
             continue
+
+    registos_pse_por_sessao = defaultdict(list)
+    sessao_ids = [sessao.id for sessao in sessoes_equipa]
+    if sessao_ids:
+        registos_pse = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id.in_(sessao_ids),
+            RegistoAssiduidade.rpe_individual.isnot(None),
+        ).all()
+        for registo in registos_pse:
+            registos_pse_por_sessao[registo.sessao_id].append(registo)
 
     questionarios = db.query(QuestionarioPersonalizado).filter(
         QuestionarioPersonalizado.equipa_id == equipa.id,
@@ -631,6 +643,15 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
 
     for sessao in sessoes_equipa:
         dia = sessao.data
+        pse_real = calcular_pse_real(registos_pse_por_sessao[sessao.id])
+        sessao.pse_real = pse_real
+        sessao.carga_real = (
+            round((sessao.volume_minutos or 0) * pse_real, 1)
+            if pse_real is not None else None
+        )
+        if pse_real is not None:
+            valores_por_indicador["rpe_real"][dia].append(pse_real)
+            valores_por_indicador["carga_real"][dia].append(sessao.carga_real)
         if sessao.intensidade_rpe is not None:
             valores_por_indicador["rpe_planeado"][dia].append(sessao.intensidade_rpe)
         valores_por_indicador["carga_planeada"][dia].append(
@@ -649,6 +670,8 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
         {"valor": "respondentes", "label": "Atletas que responderam", "unidade": ""},
         {"valor": "rpe_planeado", "label": "RPE planeado", "unidade": "/10"},
         {"valor": "carga_planeada", "label": "Carga planeada", "unidade": ""},
+        {"valor": "rpe_real", "label": "PSE real das sessões", "unidade": "/10"},
+        {"valor": "carga_real", "label": "Carga real das sessões", "unidade": ""},
         {"valor": "minutos_fisicos", "label": "Minutos de treino físico", "unidade": " min"},
     ]
     chaves_adicionadas = {item["valor"] for item in indicadores}
@@ -699,6 +722,14 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
         (sessao.volume_minutos or 0) * (sessao.intensidade_rpe or 0)
         for sessao in sessoes_equipa
     )
+    cargas_reais = [
+        sessao.carga_real for sessao in sessoes_equipa
+        if sessao.carga_real is not None
+    ]
+    rpes_reais = [
+        sessao.pse_real for sessao in sessoes_equipa
+        if sessao.pse_real is not None
+    ]
     sessoes_fisicas = [
         sessao for sessao in sessoes_equipa
         if (sessao.tipo_treino or "").lower() == "fisico" or (sessao.min_fisicos or 0) > 0
@@ -736,9 +767,12 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
         "sessoes_fisicas": sessoes_fisicas,
         "volume_total": volume_total,
         "carga_total": round(carga_total),
+        "carga_total_real": round(sum(cargas_reais), 1) if cargas_reais else None,
+        "pse_respostas": sum(len(registos) for registos in registos_pse_por_sessao.values()),
         "minutos_fisicos": minutos_fisicos,
         "media_rpe": _media(rpes_planeados) or 0,
         "media_rpe_planeado": _media(rpes_planeados),
+        "media_rpe_real": _media(rpes_reais),
         "media_rpe_atletas": _media([
             valor for valores in valores_por_indicador["rpe"].values() for valor in valores
         ]),

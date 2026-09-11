@@ -76,6 +76,16 @@ def calcular_resumo_assiduidade(registos: list[RegistoAssiduidade]) -> dict:
     }
 
 
+def calcular_pse_real(registos: list[RegistoAssiduidade]) -> float | None:
+    """Calcula a média da PSE individual efetivamente registada na sessão."""
+    valores = [
+        float(registo.rpe_individual)
+        for registo in registos
+        if getattr(registo, "rpe_individual", None) is not None
+    ]
+    return round(sum(valores) / len(valores), 1) if valores else None
+
+
 def _sessoes_da_equipa(
     db: Session,
     equipa_id: int,
