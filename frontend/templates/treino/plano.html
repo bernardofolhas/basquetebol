@@ -946,6 +946,16 @@
         delete addForm.dataset.bibliotecaId;
         if (aviso) aviso.hidden = true;
     }
+    addForm?.addEventListener('submit', () => {
+        // O título pode ser alterado livremente, mas a origem da cópia tem de
+        // continuar associada ao envio do formulário.
+        const bibliotecaId = addForm.dataset.bibliotecaId;
+        if (!bibliotecaId) return;
+        const idEl = addForm.querySelector('[name="biblioteca_id"]');
+        const origemEl = addForm.querySelector('[name="origem_biblioteca"]');
+        if (idEl) idEl.value = bibliotecaId;
+        if (origemEl) origemEl.value = 'biblioteca';
+    });
     add?.addEventListener('click', () => {
         panel.hidden = false;
         add.setAttribute('aria-expanded', 'true');
