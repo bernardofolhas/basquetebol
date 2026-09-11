@@ -1,8 +1,18 @@
+from datetime import date, datetime, timedelta
 from uuid import uuid4
 
 from database import SessionLocal
 from models.equipa import Equipa
+from models.questionario import (
+    AplicacaoQuestionario,
+    PerguntaQuestionario,
+    QuestionarioPersonalizado,
+    RespostaPerguntaQuestionario,
+    SubmissaoQuestionario,
+)
 from models.utilizador import PerfilEnum, Utilizador
+from services.dashboard_service import obter_resumo_fisioterapia
+from test_fase2_assiduidade_evolucao import _criar_contexto, _limpar_contexto
 
 
 def test_criacao_fisioterapeuta_exige_equipa(client_admin):
@@ -74,7 +84,12 @@ def test_fisioterapeuta_tem_primeiro_acesso_e_dashboard_proprio(client_admin):
         assert dashboard.status_code == 200
         assert "Dashboard do fisioterapeuta" in dashboard.text
         assert equipa.nome in dashboard.text
-        assert "Abrir questionários" in dashboard.text
+        assert "Questionários" in dashboard.text
+        dashboard_filtrado = client_admin.get(
+            "/dashboard?dias=14&metrica=respondentes"
+        )
+        assert dashboard_filtrado.status_code == 200
+        assert "Atletas que responderam" in dashboard_filtrado.text
     finally:
         if conta_id:
             conta = db.query(Utilizador).filter(Utilizador.id == conta_id).first()
@@ -82,4 +97,58 @@ def test_fisioterapeuta_tem_primeiro_acesso_e_dashboard_proprio(client_admin):
                 conta.equipas_staff = []
                 db.delete(conta)
                 db.commit()
+        db.close()
+
+
+def test_dashboard_conta_submissao_pela_data_real_de_envio():
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        equipa = db.query(Equipa).filter_by(id=equipa_id).one()
+        questionario = QuestionarioPersonalizado(
+            clube_id=equipa.clube_id,
+            equipa_id=equipa_id,
+            nome="PSE de teste",
+            ativo=True,
+        )
+        pergunta = PerguntaQuestionario(
+            texto="Perceção subjetiva de esforço (PSE)",
+            tipo="escala",
+            minimo=1,
+            maximo=10,
+            obrigatoria=True,
+            questionario=questionario,
+        )
+        aplicacao = AplicacaoQuestionario(
+            clube_id=equipa.clube_id,
+            equipa_id=equipa_id,
+            questionario=questionario,
+            data=date.today() - timedelta(days=1),
+            ativa=True,
+        )
+        submissao = SubmissaoQuestionario(
+            clube_id=equipa.clube_id,
+            aplicacao=aplicacao,
+            jogador_id=jogador_id,
+            criado_em=datetime.now(),
+        )
+        db.add_all([questionario, pergunta, aplicacao, submissao])
+        db.flush()
+        db.add(RespostaPerguntaQuestionario(
+            submissao_id=submissao.id,
+            pergunta_id=pergunta.id,
+            valor="8",
+        ))
+        db.commit()
+
+        resumo = obter_resumo_fisioterapia(db, equipa, hoje=date.today(), dias=7)
+
+        assert resumo["respostas_hoje"] == 1
+        assert resumo["media_rpe_atletas"] == 8.0
+        assert resumo["indicador_selecionado"]["valor"] == "rpe"
+    finally:
+        questionario = locals().get("questionario")
+        if questionario is not None:
+            db.delete(questionario)
+            db.flush()
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()

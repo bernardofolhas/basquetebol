@@ -25,6 +25,9 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(
     request: Request,
+    equipa_id: int | None = None,
+    dias: int = 7,
+    metrica: str = "rpe",
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_autenticacao),
 ):
@@ -34,7 +37,13 @@ def dashboard(
     if utilizador.perfil.value == "atleta":
         return RedirectResponse(url="/questionarios/disponiveis", status_code=303)
     if utilizador.perfil.value == "fisioterapeuta":
-        contexto = get_dashboard_fisioterapeuta(db, utilizador)
+        contexto = get_dashboard_fisioterapeuta(
+            db,
+            utilizador,
+            equipa_id=equipa_id,
+            dias=dias,
+            metrica=metrica,
+        )
         return templates.TemplateResponse(request, "dashboard_fisioterapeuta.html", contexto)
     if utilizador.perfil.value in {"treinador", "staff"}:
         contexto = get_dashboard_treinador(db, utilizador)

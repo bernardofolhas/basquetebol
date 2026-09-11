@@ -1,5 +1,7 @@
 from calendar import monthrange
-from datetime import date, timedelta
+from collections import defaultdict
+from datetime import date, datetime, time, timedelta
+import unicodedata
 from services.alertas_service import obter_alertas_globais, obter_alertas_treinador
 from services.operacao_clube_service import (
     obter_dashboard_carga_treino,
@@ -438,23 +440,62 @@ def get_dashboard_treinador(db, utilizador):
     }
 
 
-def obter_resumo_fisioterapia(db, equipa, hoje=None):
-    """Resume questionários e carga da equipa para o trabalho do fisioterapeuta."""
+def _texto_sem_acentos(valor) -> str:
+    texto = unicodedata.normalize("NFKD", str(valor or "").lower())
+    return "".join(caractere for caractere in texto if not unicodedata.combining(caractere))
+
+
+def _numero_resposta(valor):
+    try:
+        return float(str(valor).strip().replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def _indicador_da_pergunta(texto: str) -> str | None:
+    normalizado = _texto_sem_acentos(texto)
+    if "rpe" in normalizado or "pse" in normalizado or (
+        "esforco" in normalizado and ("percecao" in normalizado or "subjetiv" in normalizado)
+    ):
+        return "rpe"
+    if "sono" in normalizado and ("hora" in normalizado or "duracao" in normalizado):
+        return "horas_sono"
+    if "sono" in normalizado:
+        return "qualidade_sono"
+    if "dor" in normalizado:
+        return "dor"
+    return None
+
+
+def _media(valores) -> float | None:
+    numeros = [float(valor) for valor in valores if valor is not None]
+    return round(sum(numeros) / len(numeros), 1) if numeros else None
+
+
+def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
+    """Resume respostas reais e carga da equipa num período selecionável."""
     from models.jogador import Jogador
     from models.planeamento import SessaoTreino
     from models.questionario import (
         AplicacaoQuestionario,
+        PerguntaQuestionario,
         QuestionarioPersonalizado,
+        RespostaPerguntaQuestionario,
         RespostaQuestionarioDiario,
+        SubmissaoQuestionario,
     )
+    from sqlalchemy.orm import joinedload, selectinload
 
     hoje = hoje or date.today()
-    inicio_semana = hoje - timedelta(days=hoje.weekday())
-    fim_semana = inicio_semana + timedelta(days=6)
+    dias = dias if dias in {1, 7, 14, 30} else 7
+    inicio_periodo = hoje - timedelta(days=dias - 1)
+    fim_periodo = hoje
+    inicio_data_hora = datetime.combine(inicio_periodo, time.min)
+    fim_data_hora = datetime.combine(hoje + timedelta(days=1), time.min)
 
     sessoes = db.query(SessaoTreino).filter(
-        SessaoTreino.data >= inicio_semana,
-        SessaoTreino.data <= fim_semana,
+        SessaoTreino.data >= inicio_periodo,
+        SessaoTreino.data <= fim_periodo,
         SessaoTreino.e_jogo.is_(False),
         SessaoTreino.ativa.is_(True),
     ).all()
@@ -470,83 +511,272 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None):
         QuestionarioPersonalizado.equipa_id == equipa.id,
         QuestionarioPersonalizado.ativo.is_(True),
     ).order_by(QuestionarioPersonalizado.nome).all()
-    aplicacoes = db.query(AplicacaoQuestionario).filter(
+    submissoes = db.query(SubmissaoQuestionario).options(
+        joinedload(SubmissaoQuestionario.jogador),
+        joinedload(SubmissaoQuestionario.aplicacao),
+        selectinload(SubmissaoQuestionario.respostas).joinedload(
+            RespostaPerguntaQuestionario.pergunta
+        ),
+    ).join(
+        AplicacaoQuestionario,
+        SubmissaoQuestionario.aplicacao_id == AplicacaoQuestionario.id,
+    ).filter(
         AplicacaoQuestionario.equipa_id == equipa.id,
-        AplicacaoQuestionario.data >= inicio_semana,
-        AplicacaoQuestionario.data <= fim_semana,
-        AplicacaoQuestionario.ativa.is_(True),
+        SubmissaoQuestionario.criado_em >= inicio_data_hora,
+        SubmissaoQuestionario.criado_em < fim_data_hora,
+    ).order_by(SubmissaoQuestionario.criado_em.desc()).all()
+
+    respostas_diarias = db.query(RespostaQuestionarioDiario).options(
+        joinedload(RespostaQuestionarioDiario.jogador)
+    ).join(Jogador).filter(
+        Jogador.equipa_id == equipa.id,
+        RespostaQuestionarioDiario.data >= inicio_periodo,
+        RespostaQuestionarioDiario.data <= fim_periodo,
+    ).order_by(
+        RespostaQuestionarioDiario.data.desc(),
+        RespostaQuestionarioDiario.criado_em.desc(),
     ).all()
-    respostas_personalizadas = sum(len(aplicacao.submissoes or []) for aplicacao in aplicacoes)
-    submissoes_personalizadas_hoje = [
-        submissao
-        for aplicacao in aplicacoes if aplicacao.data == hoje
-        for submissao in (aplicacao.submissoes or [])
+
+    atletas_ativos_ids = {
+        jogador_id for jogador_id, in db.query(Jogador.id).filter(
+            Jogador.equipa_id == equipa.id,
+            Jogador.ativo.is_(True),
+        ).all()
+    }
+    respostas_hoje = [
+        resposta for resposta in respostas_diarias
+        if resposta.data == hoje or resposta.criado_em.date() == hoje
     ]
+    submissoes_hoje = [
+        submissao for submissao in submissoes if submissao.criado_em.date() == hoje
+    ]
+    atletas_que_responderam_hoje = ({
+        resposta.jogador_id for resposta in respostas_hoje
+    } | {
+        submissao.jogador_id for submissao in submissoes_hoje
+    }) & atletas_ativos_ids
 
-    respostas_diarias = db.query(RespostaQuestionarioDiario).join(Jogador).filter(
-        Jogador.equipa_id == equipa.id,
-        RespostaQuestionarioDiario.data >= inicio_semana,
-        RespostaQuestionarioDiario.data <= fim_semana,
-    ).order_by(RespostaQuestionarioDiario.data.desc(), RespostaQuestionarioDiario.criado_em.desc()).all()
-    respostas_hoje = [resposta for resposta in respostas_diarias if resposta.data == hoje]
-    atletas_ativos = db.query(Jogador).filter(
-        Jogador.equipa_id == equipa.id,
-        Jogador.ativo.is_(True),
-    ).count()
+    perguntas_numericas = db.query(PerguntaQuestionario).join(
+        QuestionarioPersonalizado,
+        PerguntaQuestionario.questionario_id == QuestionarioPersonalizado.id,
+    ).filter(
+        QuestionarioPersonalizado.equipa_id == equipa.id,
+        QuestionarioPersonalizado.ativo.is_(True),
+        PerguntaQuestionario.tipo.in_(["escala", "numero"]),
+    ).order_by(PerguntaQuestionario.ordem, PerguntaQuestionario.id).all()
 
-    alertas = [resposta for resposta in respostas_diarias if (
-        resposta.tem_queixa or
-        (resposta.pse_esforco is not None and resposta.pse_esforco >= 8) or
-        (resposta.dor_membros_inferiores is not None and resposta.dor_membros_inferiores >= 5) or
-        (resposta.dor_membros_superiores is not None and resposta.dor_membros_superiores >= 5)
-    )]
+    valores_por_indicador = defaultdict(lambda: defaultdict(list))
+    respondentes_por_dia = defaultdict(set)
+    alertas = []
+
+    for resposta in respostas_diarias:
+        dia = resposta.data
+        respondentes_por_dia[dia].add(resposta.jogador_id)
+        valores_por_indicador["rpe"][dia].append(resposta.pse_esforco)
+        valores_por_indicador["dor"][dia].append(max(
+            resposta.dor_membros_inferiores or 0,
+            resposta.dor_membros_superiores or 0,
+        ))
+        valores_por_indicador["qualidade_sono"][dia].append(resposta.qualidade_sono)
+        valores_por_indicador["horas_sono"][dia].append(resposta.horas_sono)
+        if (
+            resposta.tem_queixa
+            or (resposta.pse_esforco is not None and resposta.pse_esforco >= 8)
+            or (resposta.dor_membros_inferiores is not None and resposta.dor_membros_inferiores >= 5)
+            or (resposta.dor_membros_superiores is not None and resposta.dor_membros_superiores >= 5)
+        ):
+            detalhes = [
+                f"RPE {resposta.pse_esforco}/10",
+                f"Dor {max(resposta.dor_membros_inferiores, resposta.dor_membros_superiores)}/10",
+            ]
+            if resposta.tem_queixa:
+                detalhes.append("Queixa reportada")
+            alertas.append({
+                "jogador": resposta.jogador,
+                "resumo": " · ".join(detalhes),
+                "data": dia,
+                "gravidade": max(
+                    resposta.pse_esforco or 0,
+                    resposta.dor_membros_inferiores or 0,
+                    resposta.dor_membros_superiores or 0,
+                ),
+            })
+
+    for submissao in submissoes:
+        dia = submissao.criado_em.date()
+        respondentes_por_dia[dia].add(submissao.jogador_id)
+        alertas_submissao = []
+        gravidade = 0
+        for resposta in submissao.respostas:
+            numero = _numero_resposta(resposta.valor)
+            if numero is None:
+                continue
+            valores_por_indicador[f"pergunta:{resposta.pergunta_id}"][dia].append(numero)
+            indicador = _indicador_da_pergunta(resposta.pergunta.texto)
+            if indicador:
+                valores_por_indicador[indicador][dia].append(numero)
+            if indicador == "rpe" and numero >= 8:
+                alertas_submissao.append(f"RPE {numero:g}/10")
+                gravidade = max(gravidade, numero)
+            elif indicador == "dor" and numero >= 5:
+                alertas_submissao.append(f"Dor {numero:g}/10")
+                gravidade = max(gravidade, numero)
+        if alertas_submissao:
+            alertas.append({
+                "jogador": submissao.jogador,
+                "resumo": " · ".join(alertas_submissao),
+                "data": dia,
+                "gravidade": gravidade,
+            })
+
+    for sessao in sessoes_equipa:
+        dia = sessao.data
+        if sessao.intensidade_rpe is not None:
+            valores_por_indicador["rpe_planeado"][dia].append(sessao.intensidade_rpe)
+        valores_por_indicador["carga_planeada"][dia].append(
+            (sessao.volume_minutos or 0) * (sessao.intensidade_rpe or 0)
+        )
+        if (sessao.tipo_treino or "").lower() == "fisico" or (sessao.min_fisicos or 0) > 0:
+            valores_por_indicador["minutos_fisicos"][dia].append(
+                sessao.min_fisicos or sessao.volume_minutos or 0
+            )
+
+    indicadores = [
+        {"valor": "rpe", "label": "RPE reportado pelos atletas", "unidade": "/10"},
+        {"valor": "dor", "label": "Dor reportada", "unidade": "/10"},
+        {"valor": "qualidade_sono", "label": "Qualidade do sono", "unidade": "/5"},
+        {"valor": "horas_sono", "label": "Horas de sono", "unidade": " h"},
+        {"valor": "respondentes", "label": "Atletas que responderam", "unidade": ""},
+        {"valor": "rpe_planeado", "label": "RPE planeado", "unidade": "/10"},
+        {"valor": "carga_planeada", "label": "Carga planeada", "unidade": ""},
+        {"valor": "minutos_fisicos", "label": "Minutos de treino físico", "unidade": " min"},
+    ]
+    chaves_adicionadas = {item["valor"] for item in indicadores}
+    for pergunta in perguntas_numericas:
+        chave = f"pergunta:{pergunta.id}"
+        if chave not in chaves_adicionadas:
+            indicadores.append({"valor": chave, "label": pergunta.texto, "unidade": ""})
+
+    indicadores_por_chave = {item["valor"]: item for item in indicadores}
+    metrica = metrica if metrica in indicadores_por_chave else "rpe"
+    tendencia = []
+    for deslocamento in range(dias - 1, -1, -1):
+        dia = hoje - timedelta(days=deslocamento)
+        valor = (
+            len(respondentes_por_dia[dia])
+            if metrica == "respondentes"
+            else _media(valores_por_indicador[metrica][dia])
+        )
+        tendencia.append({"data": dia, "valor": valor})
+    maximo_tendencia = max(
+        [ponto["valor"] for ponto in tendencia if ponto["valor"] is not None],
+        default=0,
+    )
+    for ponto in tendencia:
+        ponto["percentagem"] = (
+            max(5, round((ponto["valor"] / maximo_tendencia) * 100))
+            if ponto["valor"] is not None and maximo_tendencia
+            else 0
+        )
+
+    valores_metrica = [
+        valor
+        for valores_dia in valores_por_indicador[metrica].values()
+        for valor in valores_dia
+    ]
+    valor_indicador = (
+        sum(len(jogadores) for jogadores in respondentes_por_dia.values())
+        if metrica == "respondentes"
+        else _media(valores_metrica)
+    )
+
     ultima_resposta_por_jogador = {}
     for resposta in respostas_diarias:
         ultima_resposta_por_jogador.setdefault(resposta.jogador_id, resposta)
 
     volume_total = sum(sessao.volume_minutos or 0 for sessao in sessoes_equipa)
-    carga_total = sum((sessao.volume_minutos or 0) * (sessao.intensidade_rpe or 0) for sessao in sessoes_equipa)
-    sessoes_fisicas = [sessao for sessao in sessoes_equipa if (
-        (sessao.tipo_treino or "").lower() == "fisico" or (sessao.min_fisicos or 0) > 0
-    )]
-    minutos_fisicos = sum((sessao.min_fisicos or sessao.volume_minutos or 0) for sessao in sessoes_fisicas)
-    rpes = [sessao.intensidade_rpe for sessao in sessoes_equipa if sessao.intensidade_rpe is not None]
-
-    atletas_que_responderam_hoje = {
-        resposta.jogador_id for resposta in respostas_hoje
-    } | {
-        submissao.jogador_id for submissao in submissoes_personalizadas_hoje
-    }
+    carga_total = sum(
+        (sessao.volume_minutos or 0) * (sessao.intensidade_rpe or 0)
+        for sessao in sessoes_equipa
+    )
+    sessoes_fisicas = [
+        sessao for sessao in sessoes_equipa
+        if (sessao.tipo_treino or "").lower() == "fisico" or (sessao.min_fisicos or 0) > 0
+    ]
+    minutos_fisicos = sum(
+        sessao.min_fisicos or sessao.volume_minutos or 0 for sessao in sessoes_fisicas
+    )
+    rpes_planeados = [
+        sessao.intensidade_rpe
+        for sessao in sessoes_equipa if sessao.intensidade_rpe is not None
+    ]
 
     return {
         "equipa": equipa,
-        "inicio_semana": inicio_semana,
-        "fim_semana": fim_semana,
+        "inicio_semana": inicio_periodo,
+        "fim_semana": fim_periodo,
+        "inicio_periodo": inicio_periodo,
+        "fim_periodo": fim_periodo,
+        "dias": dias,
         "questionarios": questionarios,
         "respostas_hoje": len(atletas_que_responderam_hoje),
-        "respostas_semana": len(respostas_diarias) + respostas_personalizadas,
-        "atletas_ativos": atletas_ativos,
-        "taxa_resposta": round((len(atletas_que_responderam_hoje) / atletas_ativos) * 100) if atletas_ativos else 0,
-        "alertas": alertas,
+        "respostas_semana": len(respostas_diarias) + len(submissoes),
+        "atletas_ativos": len(atletas_ativos_ids),
+        "taxa_resposta": (
+            round((len(atletas_que_responderam_hoje) / len(atletas_ativos_ids)) * 100)
+            if atletas_ativos_ids else 0
+        ),
+        "alertas": sorted(
+            alertas,
+            key=lambda item: (item["data"], item["gravidade"]),
+            reverse=True,
+        ),
         "ultima_resposta_por_jogador": list(ultima_resposta_por_jogador.values()),
         "sessoes_semana": sessoes_equipa,
         "sessoes_fisicas": sessoes_fisicas,
         "volume_total": volume_total,
         "carga_total": round(carga_total),
         "minutos_fisicos": minutos_fisicos,
-        "media_rpe": round(sum(rpes) / len(rpes), 1) if rpes else 0,
+        "media_rpe": _media(rpes_planeados) or 0,
+        "media_rpe_planeado": _media(rpes_planeados),
+        "media_rpe_atletas": _media([
+            valor for valores in valores_por_indicador["rpe"].values() for valor in valores
+        ]),
+        "media_dor": _media([
+            valor for valores in valores_por_indicador["dor"].values() for valor in valores
+        ]),
+        "media_sono": _media([
+            valor
+            for valores in valores_por_indicador["qualidade_sono"].values()
+            for valor in valores
+        ]),
+        "indicadores": indicadores,
+        "metrica": metrica,
+        "indicador_selecionado": indicadores_por_chave[metrica],
+        "valor_indicador": valor_indicador,
+        "tendencia": tendencia,
     }
 
 
-def get_dashboard_fisioterapeuta(db, utilizador):
+def get_dashboard_fisioterapeuta(db, utilizador, equipa_id=None, dias=7, metrica="rpe"):
     """Dashboard focado em bem-estar, questionários e carga das equipas atribuídas."""
     equipas = sorted(
         list(getattr(utilizador, "equipas_staff", []) or []),
         key=lambda equipa: (equipa.nome or "").lower(),
     )
+    equipa_ids = {equipa.id for equipa in equipas}
+    equipa_id = equipa_id if equipa_id in equipa_ids else (equipas[0].id if equipas else None)
+    equipa_selecionada = next((equipa for equipa in equipas if equipa.id == equipa_id), None)
+    dias = dias if dias in {1, 7, 14, 30} else 7
     return {
         "utilizador": utilizador,
-        "dados_equipas": [obter_resumo_fisioterapia(db, equipa) for equipa in equipas],
+        "equipas": equipas,
+        "total_equipas": len(equipas),
+        "equipa_selecionada_id": equipa_id,
+        "dias": dias,
+        "dados_equipas": [
+            obter_resumo_fisioterapia(db, equipa_selecionada, dias=dias, metrica=metrica)
+        ] if equipa_selecionada else [],
     }
 
 
