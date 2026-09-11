@@ -21,6 +21,56 @@
         }));
     }
 
+    function csrfMeta() {
+        return document.querySelector('meta[name="csrf-token"]');
+    }
+
+    function csrfToken() {
+        return csrfMeta()?.content || '';
+    }
+
+    async function obterRespostaJson(resposta) {
+        const tipo = resposta.headers.get('content-type') || '';
+        if (!tipo.includes('application/json')) {
+            const texto = await resposta.text();
+            throw new Error(
+                resposta.status === 403
+                    ? 'A sessão de edição expirou. Atualiza a página e tenta novamente.'
+                    : (texto.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || 'Resposta inválida do servidor.')
+            );
+        }
+        return resposta.json();
+    }
+
+    async function renovarCsrf() {
+        const resposta = await fetch(window.location.href, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!resposta.ok || resposta.redirected) return false;
+        const html = await resposta.text();
+        const documento = new DOMParser().parseFromString(html, 'text/html');
+        const token = documento.querySelector('meta[name="csrf-token"]')?.content || '';
+        if (!token) return false;
+        const meta = csrfMeta();
+        if (meta) meta.content = token;
+        return true;
+    }
+
+    async function enviarAgenda(formulario, action) {
+        return fetch(action || formulario.action, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-Token': csrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: new FormData(formulario),
+        });
+    }
+
     async function submeterAgenda(formulario, action) {
         const botao = campo('agenda-submit');
         const textoOriginal = botao ? botao.textContent : '';
@@ -29,15 +79,12 @@
             botao.textContent = 'A guardar…';
         }
         try {
-            const resposta = await fetch(action || formulario.action, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: new FormData(formulario),
-            });
-            const dados = await resposta.json();
+            let resposta = await enviarAgenda(formulario, action);
+            let dados = await obterRespostaJson(resposta);
+            if (resposta.status === 403 && dados.codigo === 'csrf_invalido' && await renovarCsrf()) {
+                resposta = await enviarAgenda(formulario, action);
+                dados = await obterRespostaJson(resposta);
+            }
             if (!resposta.ok || !dados.sucesso) {
                 throw new Error(dados.erro || 'Não foi possível concluir a operação.');
             }

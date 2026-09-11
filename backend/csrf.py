@@ -1,7 +1,7 @@
 import secrets
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.requests import Request
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, JSONResponse
 
 CSRF_SESSION_KEY = "_csrf"
 CSRF_FORM_FIELD = "csrf_token"
@@ -83,6 +83,22 @@ class CSRFMiddleware:
 
     @staticmethod
     async def _recusar(scope: Scope, receive: Receive, send: Send) -> None:
+        headers = dict(scope.get("headers") or [])
+        solicitado_json = (
+            headers.get(b"x-requested-with", b"").lower() == b"xmlhttprequest"
+            or b"application/json" in headers.get(b"accept", b"").lower()
+        )
+        if solicitado_json:
+            response = JSONResponse(
+                {
+                    "sucesso": False,
+                    "erro": "A sessão de edição expirou. Atualiza a página e tenta novamente.",
+                    "codigo": "csrf_invalido",
+                },
+                status_code=403,
+            )
+            await response(scope, receive, send)
+            return
         response = HTMLResponse(
             "<h1>Sessão expirada ou pedido inválido</h1>"
             "<p><a href='/login'>Voltar ao login</a></p>",

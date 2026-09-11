@@ -186,6 +186,23 @@ def test_agenda_assincrona_devolve_erro_sem_redirecionar(client_admin):
     assert "data" in resposta.json()["erro"].lower()
 
 
+def test_csrf_devolve_json_para_pedidos_assincronos(client_admin):
+    resposta = client_admin.post(
+        "/agenda/atividades",
+        data={"tipo": "folga", "data_evento": "2026-09-14"},
+        headers={
+            "Accept": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRF-Token": "token-expirado",
+        },
+        follow_redirects=False,
+    )
+
+    assert resposta.status_code == 403
+    assert resposta.headers["content-type"].startswith("application/json")
+    assert resposta.json()["codigo"] == "csrf_invalido"
+
+
 def test_admin_consegue_criar_atividade_comum_de_dia_inteiro(client_admin):
     resposta = client_admin.post(
         "/agenda/atividades",
