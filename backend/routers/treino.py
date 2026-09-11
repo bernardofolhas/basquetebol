@@ -37,6 +37,7 @@ from services.desenho_service import (
     imagem_estatica_data_uri,
 )
 from services.conteudos_sessao_service import construir_sugestoes_plano_treino
+from services.horarios_exercicios import recalcular_horas_exercicios
 from services.mapa_conteudos_service import obter_sugestoes_conteudos_microciclo
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
 from services.auditoria_service import registar_auditoria
@@ -1168,6 +1169,7 @@ async def guardar_cabecalho(
                 setattr(plano.sessao, campo, valor)
             if nova_data != data_anterior:
                 renumerar_treinos_equipa(db, plano.sessao.microciclo.mesociclo.macrociclo.equipa_id)
+            recalcular_horas_exercicios(plano)
         db.commit()
         set_flash(request, "Dados do plano de treino atualizados.")
 

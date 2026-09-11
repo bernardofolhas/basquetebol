@@ -19,6 +19,7 @@ from models.planeamento_clube import (
     TipoEventoPlaneamentoClubeEnum,
 )
 from services.agenda_service import conflitos_do_evento, metadados_tipo_agenda
+from services.horarios_exercicios import recalcular_horas_exercicios
 from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.numeracao_planeamento_service import renumerar_treinos_equipa
 from services.remocao_sessoes_service import eliminar_sessoes_treino
@@ -335,6 +336,8 @@ def _atualizar_sessao_ligada(db: Session, evento: EventoPlaneamentoClube, tipo: 
         sessao.tipo_treino = "fisico" if tipo == TipoEventoPlaneamentoClubeEnum.treino_fisico.value else "normal"
         sessao.alterada_manual = True
         sessao.sincronizada = False
+        if sessao.plano_treino:
+            recalcular_horas_exercicios(sessao.plano_treino)
     if evento.equipa_id:
         renumerar_treinos_equipa(db, evento.equipa_id)
 

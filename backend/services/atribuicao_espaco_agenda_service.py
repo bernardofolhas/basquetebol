@@ -6,6 +6,7 @@ from models.atribuicao_espaco_semanal import EstadoAtribuicaoEspacoEnum, TipoOcu
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.planeamento_clube import EventoPlaneamentoClube, OrigemEventoPlaneamentoClubeEnum, TipoEventoPlaneamentoClubeEnum
 from services.numeracao_planeamento_service import renumerar_treinos_equipa
+from services.horarios_exercicios import recalcular_horas_exercicios
 
 
 def _sobrepoe(inicio_a: str, fim_a: str, inicio_b: str | None, fim_b: str | None) -> bool:
@@ -144,6 +145,8 @@ def sincronizar_atribuicao_com_agenda(db: Session, atribuicao) -> str:
         sessao.local = atribuicao.espaco.nome
         sessao.hora_inicio = atribuicao.hora_inicio
         sessao.hora_fim = atribuicao.hora_fim
+        if sessao.plano_treino:
+            recalcular_horas_exercicios(sessao.plano_treino)
         sessao.plano_semanal_clube_id = atribuicao.plano_semanal_id
         sessao.evento_planeamento_clube_id = evento.id
         renumerar_treinos_equipa(db, atribuicao.equipa_id)

@@ -68,6 +68,46 @@ def test_hora_do_novo_exercicio_continua_a_sequencia_do_plano(client_admin):
         db.close()
 
 
+def test_alterar_horario_da_sessao_recalcula_horas_dos_exercicios(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        for nome, minutos in (("Primeiro", 15), ("Segundo", 20)):
+            client_admin.post(
+                f"/treino/planos/{plano.id}/exercicios",
+                data={"nome": nome, "minutos": str(minutos)},
+                follow_redirects=False,
+            )
+
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/cabecalho",
+            data={
+                "hora_inicio": "19:30",
+                "hora_fim": "21:00",
+                "local": "Pavilhão",
+                "escalao": "Sub-18",
+                "objectivos": "",
+                "intensidade_rpe": "7",
+            },
+            follow_redirects=False,
+        )
+
+        assert resposta.status_code == 303
+        db.expire_all()
+        exercicios = db.query(ExercicioPlano).filter_by(plano_id=plano.id).order_by(ExercicioPlano.ordem).all()
+        assert [(ex.hora, ex.minutos) for ex in exercicios] == [
+            ("19:30", 15),
+            ("19:45", 20),
+        ]
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_biblioteca_recebe_novo_exercicio_e_reutilizacao_fica_independente(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
