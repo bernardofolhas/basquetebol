@@ -270,6 +270,14 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
             questionario_id=questionario.id,
             sessao_treino_id=sessao.id,
         ).one().data == sessao.data
+        aplicacao_antiga = AplicacaoQuestionario(
+            clube_id=questionario.clube_id,
+            equipa_id=equipa_id,
+            questionario_id=questionario.id,
+            data=date.today() - timedelta(days=1),
+        )
+        db.add(aplicacao_antiga)
+        db.commit()
 
         client_admin.get(f"/questionarios/equipas/{equipa_id}/matinal")
         conta = db.query(Utilizador).execution_options(ignorar_clube=True).filter_by(jogador_id=jogador_id).one()
@@ -284,6 +292,13 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
         disponiveis = cliente_atleta.get("/questionarios/disponiveis")
         assert disponiveis.status_code == 200
         assert "PSE personalizado" in disponiveis.text
+        assert disponiveis.text.count("/questionarios/responder/") == 1
+        antiga_bloqueada = cliente_atleta.get(
+            f"/questionarios/responder/{aplicacao_antiga.id}",
+            follow_redirects=False,
+        )
+        assert antiga_bloqueada.status_code == 303
+        assert antiga_bloqueada.headers["location"] == "/questionarios/disponiveis"
         formulario = cliente_atleta.get(f"/questionarios/responder/{aplicacao.id}")
         assert formulario.status_code == 200
         assert "PSE da sessão" in formulario.text

@@ -940,7 +940,7 @@ def questionarios_disponiveis(
     ).join(AplicacaoQuestionario.questionario).filter(
         AplicacaoQuestionario.equipa_id == jogador.equipa_id,
         AplicacaoQuestionario.ativa.is_(True),
-        AplicacaoQuestionario.data >= date.today() - timedelta(days=30),
+        AplicacaoQuestionario.data == date.today(),
         QuestionarioPersonalizado.ativo.is_(True),
     ).order_by(AplicacaoQuestionario.data.desc()).all() if jogador and jogador.equipa_id else []
     return templates.TemplateResponse(request, "questionarios/disponiveis.html", {
@@ -969,8 +969,8 @@ def responder_questionario(
     if not aplicacao or not jogador or aplicacao.equipa_id != jogador.equipa_id or not aplicacao.ativa:
         set_flash(request, "Este questionário não está disponível para a tua equipa.", "error")
         return RedirectResponse("/questionarios/disponiveis", status_code=303)
-    if aplicacao.data > date.today():
-        set_flash(request, "Este questionário ainda não está aberto.", "error")
+    if aplicacao.data != date.today():
+        set_flash(request, "Este questionário só pode ser respondido no dia indicado.", "error")
         return RedirectResponse("/questionarios/disponiveis", status_code=303)
     submissoes = [item for item in aplicacao.submissoes if item.jogador_id == jogador.id]
     if submissoes:
@@ -1000,8 +1000,8 @@ async def guardar_resposta_personalizada(
     ).first()
     if not aplicacao or not jogador or aplicacao.equipa_id != jogador.equipa_id or not aplicacao.ativa:
         return RedirectResponse("/questionarios/disponiveis", status_code=303)
-    if aplicacao.data > date.today():
-        set_flash(request, "Este questionário ainda não está aberto.", "error")
+    if aplicacao.data != date.today():
+        set_flash(request, "Este questionário só pode ser respondido no dia indicado.", "error")
         return RedirectResponse("/questionarios/disponiveis", status_code=303)
     db.query(Jogador.id).filter(Jogador.id == jogador.id).with_for_update().first()
     formulario = await request.form()
