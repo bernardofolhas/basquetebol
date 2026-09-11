@@ -7,7 +7,9 @@
     <p>Próximos compromissos e acesso direto às tuas equipas.</p></div>
 </div>
 
+{% if utilizador.perfil.value != 'staff' %}
 {% include "partials/painel_operacional.html" %}
+{% endif %}
 
 <!-- Equipas -->
 {% if dados_equipas %}

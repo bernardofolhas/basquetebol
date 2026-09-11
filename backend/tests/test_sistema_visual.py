@@ -178,6 +178,13 @@ def test_equipa_abre_explicitamente_no_resumo_e_base_usa_logo_como_icone():
     ).read_text(encoding="utf-8")
 
 
+def test_dashboard_staff_fica_so_com_o_quadro_das_equipas():
+    dashboard = (TEMPLATES_DIR / "dashboard_treinador.html").read_text(encoding="utf-8")
+
+    assert "utilizador.perfil.value != 'staff'" in dashboard
+    assert "PSE de hoje" in dashboard
+
+
 def test_login_mantem_recuperacao_e_melhora_utilizacao():
     conteudo = (TEMPLATES_DIR / "login.html").read_text(encoding="utf-8")
 
