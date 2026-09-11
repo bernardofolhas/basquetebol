@@ -85,6 +85,16 @@ def test_fisioterapeuta_tem_primeiro_acesso_e_dashboard_proprio(client_admin):
         assert "Dashboard do fisioterapeuta" in dashboard.text
         assert equipa.nome in dashboard.text
         assert "Questionários" in dashboard.text
+        jogadores = client_admin.get("/jogadores")
+        assert jogadores.status_code == 200
+        assert "Eliminar selecionados" in jogadores.text
+        assert f"/jogadores/{equipa.jogadores[0].id}/apagar" in jogadores.text
+        plantel = client_admin.get(f"/equipas/{equipa.id}/plantel")
+        assert plantel.status_code == 200
+        assert "Eliminar selecionados" in plantel.text
+        ficha = client_admin.get(f"/jogadores/{equipa.jogadores[0].id}")
+        assert ficha.status_code == 200
+        assert f"/jogadores/{equipa.jogadores[0].id}/apagar" in ficha.text
         dashboard_filtrado = client_admin.get(
             "/dashboard?dias=14&metrica=respondentes"
         )

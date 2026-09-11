@@ -372,7 +372,7 @@
        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
         ✏️ Editar
     </a>
-    {% if utilizador.perfil.value == 'administrador' %}
+    {% if utilizador.perfil.value in ['administrador', 'coordenador', 'staff', 'fisioterapeuta'] %}
     <form method="POST" action="/jogadores/{{ jogador.id }}/apagar">
         <button type="button"
                 onclick="if(confirm('Tens a certeza que queres apagar este {{ termo_jogador(jogador.equipa, capitalizar=False) }}?')) this.closest('form').submit()"
