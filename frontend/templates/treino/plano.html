@@ -1253,9 +1253,10 @@ function eObjectoMovel(obj) {
 }
 
 function escalaFiguraCampo(canvas) {
-    // O campo inteiro tem aproximadamente o dobro do comprimento do meio
-    // campo; os símbolos devem manter essa proporção visual.
-    return canvas?.dataset?.campoTipo === 'completo' ? 0.45 : 1;
+    // Cada formato tem uma escala própria para manter os símbolos legíveis
+    // sem ocuparem demasiado espaço no desenho.
+    if (canvas?.dataset?.campoTipo === 'completo') return 0.45;
+    return 0.65;
 }
 
 function raioFigura(canvas, obj) {
