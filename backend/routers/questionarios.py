@@ -524,6 +524,31 @@ def eliminar_questionario_matinal(
     return RedirectResponse(f"/questionarios/equipas/{equipa_id}", status_code=303)
 
 
+@router.post("/equipas/{equipa_id}/matinal/respostas/{resposta_id}/eliminar")
+def eliminar_resposta_matinal(
+    equipa_id: int,
+    resposta_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse("/equipas", status_code=303)
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    resposta = db.query(RespostaQuestionarioDiario).join(Jogador).filter(
+        RespostaQuestionarioDiario.id == resposta_id,
+        Jogador.equipa_id == equipa_id,
+    ).first()
+    if not resposta:
+        set_flash(request, "A resposta indicada já não existe.", "error")
+        return RedirectResponse(f"/questionarios/equipas/{equipa_id}/matinal", status_code=303)
+    db.delete(resposta)
+    db.commit()
+    set_flash(request, "Resposta eliminada.")
+    return RedirectResponse(f"/questionarios/equipas/{equipa_id}/matinal", status_code=303)
+
+
 @router.get("/equipas/{equipa_id}/biblioteca", response_class=HTMLResponse)
 def biblioteca_questionarios(
     equipa_id: int,
@@ -1059,6 +1084,28 @@ def resultados_questionario(
         "atletas_respondidos": len({item.jogador_id for item in aplicacao.submissoes}),
         "ligacao": str(request.base_url).rstrip("/") + f"/questionarios/responder/{aplicacao.id}",
     })
+
+
+@router.post("/submissoes/{submissao_id}/eliminar")
+def eliminar_submissao_questionario(
+    submissao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    submissao = db.query(SubmissaoQuestionario).options(
+        joinedload(SubmissaoQuestionario.aplicacao)
+    ).filter(SubmissaoQuestionario.id == submissao_id).first()
+    if not submissao:
+        set_flash(request, "A resposta indicada já não existe.", "error")
+        return RedirectResponse("/equipas", status_code=303)
+    aplicacao = submissao.aplicacao
+    verificar_ou_negar_equipa(utilizador, aplicacao.equipa_id, db)
+    questionario_id = aplicacao.questionario_id
+    db.delete(submissao)
+    db.commit()
+    set_flash(request, "Resposta eliminada.")
+    return RedirectResponse(f"/questionarios/modelos/{questionario_id}", status_code=303)
 
 
 @router.post("/atletas/{jogador_id}/repor-acesso")

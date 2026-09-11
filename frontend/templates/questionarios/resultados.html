@@ -1,5 +1,73 @@
 {% extends "base.html" %}
 {% block titulo %}Resultados · {{ aplicacao.questionario.nome }}{% endblock %}
 {% block conteudo %}
-<div class="space-y-6"><header class="flex flex-wrap items-end justify-between gap-5 rounded-[28px] bg-slate-900 px-7 py-7 text-white shadow-xl"><div><p class="text-xs font-extrabold uppercase tracking-[.2em] text-emerald-300">{{ aplicacao.data|data_pt }} · {{ equipa.nome }}</p><h1 class="mt-2 text-3xl font-extrabold">{{ aplicacao.titulo or aplicacao.questionario.nome }}</h1><p class="mt-2 text-sm text-slate-300">Resultados desta aplicação, sem misturar outras datas.</p></div><div class="rounded-2xl bg-white/10 px-5 py-4 text-right"><strong class="text-3xl">{{ atletas_respondidos }}/{{ jogadores_total }}</strong><p class="text-xs text-slate-300">atletas responderam</p></div></header><section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{% for pergunta in aplicacao.questionario.perguntas %}{% set resumo = analise.get(pergunta.id) %}<article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Pergunta {{ loop.index }}</p><h2 class="mt-2 font-extrabold text-slate-900">{{ pergunta.texto }}</h2>{% if resumo.media is not none %}<strong class="mt-4 block text-3xl text-[var(--clube-primary)]">{{ resumo.media }}</strong><p class="text-xs text-slate-500">média de {{ resumo.total }} respostas</p>{% elif resumo.opcoes %}<div class="mt-4 space-y-2">{% for opcao,total in resumo.opcoes.items() %}<div class="flex justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"><span>{{ opcao }}</span><strong>{{ total }}</strong></div>{% endfor %}</div>{% else %}<p class="mt-4 text-sm text-slate-500">{{ resumo.total }} respostas de texto</p>{% endif %}</article>{% endfor %}</section><section class="rounded-2xl border border-slate-200 bg-white p-5"><label class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Ligação para responder</label><input readonly onclick="this.select()" value="{{ ligacao }}" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"></section><section class="space-y-3"><div><h2 class="text-xl font-extrabold text-slate-900">Respostas individuais</h2><p class="text-sm text-slate-500">Cada envio permanece identificado pelo atleta e pela hora.</p></div>{% for submissao in aplicacao.submissoes %}<article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div class="flex flex-wrap justify-between gap-2"><a href="/jogadores/{{ submissao.jogador_id }}" class="font-extrabold text-slate-900">{{ submissao.jogador.nome }}</a><time class="text-xs font-bold text-slate-500">{{ submissao.criado_em.strftime('%d/%m/%Y %H:%M') }}</time></div><dl class="mt-4 grid gap-3 md:grid-cols-2">{% for resposta in submissao.respostas %}<div class="rounded-xl bg-slate-50 p-3"><dt class="text-xs font-bold text-slate-500">{{ resposta.pergunta.texto }}</dt><dd class="mt-1 text-sm font-semibold text-slate-900">{{ resposta.valor or '—' }}</dd></div>{% endfor %}</dl></article>{% else %}<div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">Ainda não foram recebidas respostas.</div>{% endfor %}</section><div><a href="/questionarios/modelos/{{ aplicacao.questionario_id }}" class="font-bold text-[var(--clube-primary)]">Voltar ao questionário</a></div></div>
+<div class="space-y-6">
+  <header class="flex flex-wrap items-end justify-between gap-5 rounded-[28px] bg-slate-900 px-7 py-7 text-white shadow-xl">
+    <div>
+      <p class="text-xs font-extrabold uppercase tracking-[.2em] text-emerald-300">{{ aplicacao.data|data_pt }} · {{ equipa.nome }}</p>
+      <h1 class="mt-2 text-3xl font-extrabold">{{ aplicacao.titulo or aplicacao.questionario.nome }}</h1>
+      <p class="mt-2 text-sm text-slate-300">Resultados desta aplicação, sem misturar outras datas.</p>
+    </div>
+    <div class="rounded-2xl bg-white/10 px-5 py-4 text-right">
+      <strong class="text-3xl">{{ atletas_respondidos }}/{{ jogadores_total }}</strong>
+      <p class="text-xs text-slate-300">atletas responderam</p>
+    </div>
+  </header>
+
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    {% for pergunta in aplicacao.questionario.perguntas %}
+    {% set resumo = analise.get(pergunta.id) %}
+    <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Pergunta {{ loop.index }}</p>
+      <h2 class="mt-2 font-extrabold text-slate-900">{{ pergunta.texto }}</h2>
+      {% if resumo.media is not none %}
+      <strong class="mt-4 block text-3xl text-[var(--clube-primary)]">{{ resumo.media }}</strong>
+      <p class="text-xs text-slate-500">média de {{ resumo.total }} respostas</p>
+      {% elif resumo.opcoes %}
+      <div class="mt-4 space-y-2">
+        {% for opcao,total in resumo.opcoes.items() %}
+        <div class="flex justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"><span>{{ opcao }}</span><strong>{{ total }}</strong></div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="mt-4 text-sm text-slate-500">{{ resumo.total }} respostas de texto</p>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </section>
+
+  <section class="rounded-2xl border border-slate-200 bg-white p-5">
+    <label class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Ligação para responder</label>
+    <input readonly onclick="this.select()" value="{{ ligacao }}" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+  </section>
+
+  <section class="space-y-3">
+    <div>
+      <h2 class="text-xl font-extrabold text-slate-900">Respostas individuais</h2>
+      <p class="text-sm text-slate-500">Cada envio permanece identificado pelo atleta e pela hora.</p>
+    </div>
+    {% for submissao in aplicacao.submissoes %}
+    <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <a href="/jogadores/{{ submissao.jogador_id }}" class="font-extrabold text-slate-900">{{ submissao.jogador.nome }}</a>
+          <time class="mt-1 block text-xs font-bold text-slate-500">{{ submissao.criado_em.strftime('%d/%m/%Y %H:%M') }}</time>
+        </div>
+        <form method="POST" action="/questionarios/submissoes/{{ submissao.id }}/eliminar" onsubmit="return confirm('Eliminar esta resposta? Esta ação não pode ser anulada.')">
+          <button type="submit" class="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50">Eliminar resposta</button>
+        </form>
+      </div>
+      <dl class="mt-4 grid gap-3 md:grid-cols-2">
+        {% for resposta in submissao.respostas %}
+        <div class="rounded-xl bg-slate-50 p-3"><dt class="text-xs font-bold text-slate-500">{{ resposta.pergunta.texto }}</dt><dd class="mt-1 text-sm font-semibold text-slate-900">{{ resposta.valor or '—' }}</dd></div>
+        {% endfor %}
+      </dl>
+    </article>
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">Ainda não foram recebidas respostas.</div>
+    {% endfor %}
+  </section>
+
+  <div><a href="/questionarios/modelos/{{ aplicacao.questionario_id }}" class="font-bold text-[var(--clube-primary)]">Voltar ao questionário</a></div>
+</div>
 {% endblock %}

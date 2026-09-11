@@ -8,7 +8,9 @@ from models.jogo import Jogo
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.questionario import (
     AplicacaoQuestionario,
+    PerguntaQuestionario,
     QuestionarioPersonalizado,
+    RespostaPerguntaQuestionario,
     RespostaQuestionarioDiario,
     SubmissaoQuestionario,
 )
@@ -80,6 +82,7 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
         assert resposta.headers["location"] == "/questionarios/diario"
         db.expire_all()
         registo = db.query(RespostaQuestionarioDiario).filter_by(jogador_id=jogador_id).one()
+        registo_id = registo.id
         assert (registo.pse_esforco, registo.qualidade_sono, registo.tem_queixa) == (8, 2, True)
 
         nova_resposta = cliente_atleta.post(
@@ -118,6 +121,7 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
         assert "Atenção necessária" in painel.text
         assert "Registos recebidos hoje" in painel.text
         assert "8/10" in painel.text
+        assert f"/questionarios/equipas/{equipa_id}/matinal/respostas/{registo_id}/eliminar" in painel.text
         selecao = client_admin.get(f"/questionarios/equipas/{equipa_id}")
         assert "Questionário Matinal" in selecao.text
         assert "Modelo base" not in selecao.text
@@ -125,6 +129,13 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
         assert historico.status_code == 200
         assert "8/10" in historico.text
         assert "Editar" not in historico.text
+        eliminado = client_admin.post(
+            f"/questionarios/equipas/{equipa_id}/matinal/respostas/{registo_id}/eliminar",
+            follow_redirects=False,
+        )
+        assert eliminado.status_code == 303
+        db.expire_all()
+        assert db.query(RespostaQuestionarioDiario).filter_by(id=registo_id).first() is None
     finally:
         db.query(RespostaQuestionarioDiario).filter(
             RespostaQuestionarioDiario.jogador_id.in_([jogador_id, outro_id])
@@ -384,6 +395,72 @@ def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
             Utilizador.jogador_id.in_([jogador_id, outro_id])
         ).delete(synchronize_session=False)
         db.commit()
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
+def test_elimina_submissao_individual_sem_eliminar_questionario(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    questionario_id = None
+    submissao_id = None
+    try:
+        equipa = db.query(Equipa).filter_by(id=equipa_id).one()
+        questionario = QuestionarioPersonalizado(
+            clube_id=equipa.clube_id,
+            equipa_id=equipa_id,
+            nome="Questionário de teste",
+            ativo=True,
+        )
+        questionario.perguntas.append(PerguntaQuestionario(
+            texto="RPE",
+            tipo="escala",
+            minimo=1,
+            maximo=10,
+            obrigatoria=True,
+            ordem=1,
+        ))
+        db.add(questionario)
+        db.flush()
+        questionario_id = questionario.id
+        aplicacao = AplicacaoQuestionario(
+            clube_id=equipa.clube_id,
+            equipa_id=equipa_id,
+            questionario_id=questionario.id,
+            data=date.today(),
+        )
+        db.add(aplicacao)
+        db.flush()
+        submissao = SubmissaoQuestionario(
+            clube_id=equipa.clube_id,
+            aplicacao_id=aplicacao.id,
+            jogador_id=jogador_id,
+        )
+        db.add(submissao)
+        db.flush()
+        submissao_id = submissao.id
+        db.add(RespostaPerguntaQuestionario(
+            submissao_id=submissao.id,
+            pergunta_id=questionario.perguntas[0].id,
+            valor="8",
+        ))
+        db.commit()
+
+        eliminado = client_admin.post(
+            f"/questionarios/submissoes/{submissao.id}/eliminar",
+            follow_redirects=False,
+        )
+        assert eliminado.status_code == 303
+        assert eliminado.headers["location"] == f"/questionarios/modelos/{questionario.id}"
+        db.expire_all()
+        assert db.query(QuestionarioPersonalizado).filter_by(id=questionario_id).one().ativo is True
+        assert db.query(SubmissaoQuestionario).filter_by(id=submissao_id).first() is None
+        assert db.query(RespostaPerguntaQuestionario).filter_by(submissao_id=submissao_id).first() is None
+    finally:
+        if questionario_id:
+            db.query(QuestionarioPersonalizado).filter_by(id=questionario_id).delete(
+                synchronize_session=False
+            )
+            db.commit()
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()
 
