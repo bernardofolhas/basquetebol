@@ -108,6 +108,58 @@ def test_alterar_horario_da_sessao_recalcula_horas_dos_exercicios(client_admin):
         db.close()
 
 
+def test_cabecalho_sincroniza_evento_de_agenda_e_sessoes_ligadas(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    evento = None
+    try:
+        from models.planeamento_clube import EventoPlaneamentoClube, TipoEventoPlaneamentoClubeEnum
+
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={"nome": "Exercício ligado", "minutos": "15"},
+            follow_redirects=False,
+        )
+
+        evento = EventoPlaneamentoClube(
+            clube_id=sessao.clube_id,
+            equipa_id=equipa_id,
+            tipo=TipoEventoPlaneamentoClubeEnum.treino_equipa,
+            titulo="Treino da agenda",
+            data=sessao.data,
+            hora_inicio="18:00",
+            hora_fim="19:00",
+        )
+        db.add(evento)
+        db.flush()
+        sessao.evento_planeamento_clube = evento
+        db.commit()
+
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/cabecalho",
+            data={"hora_inicio": "20:00", "hora_fim": "21:00", "intensidade_rpe": "7"},
+            follow_redirects=False,
+        )
+
+        assert resposta.status_code == 303
+        db.expire_all()
+        evento = db.query(EventoPlaneamentoClube).filter_by(id=evento.id).one()
+        sessao = db.query(SessaoTreino).filter_by(id=sessao.id).one()
+        exercicio = db.query(ExercicioPlano).filter_by(plano_id=plano.id).one()
+        assert (evento.hora_inicio, evento.hora_fim) == ("20:00", "21:00")
+        assert (sessao.hora_inicio, sessao.hora_fim, exercicio.hora) == ("20:00", "21:00", "20:00")
+    finally:
+        if evento is not None:
+            db.query(EventoPlaneamentoClube).filter_by(id=evento.id).delete(synchronize_session=False)
+            db.commit()
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_biblioteca_recebe_novo_exercicio_e_reutilizacao_fica_independente(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:

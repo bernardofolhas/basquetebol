@@ -336,6 +336,9 @@ def _atualizar_sessao_ligada(db: Session, evento: EventoPlaneamentoClube, tipo: 
         sessao.tipo_treino = "fisico" if tipo == TipoEventoPlaneamentoClubeEnum.treino_fisico.value else "normal"
         sessao.alterada_manual = True
         sessao.sincronizada = False
+        for atribuicao in evento.atribuicoes_espaco:
+            atribuicao.hora_inicio = evento.hora_inicio
+            atribuicao.hora_fim = evento.hora_fim
         if sessao.plano_treino:
             recalcular_horas_exercicios(sessao.plano_treino)
     if evento.equipa_id:

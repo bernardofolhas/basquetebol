@@ -1170,6 +1170,29 @@ async def guardar_cabecalho(
             if nova_data != data_anterior:
                 renumerar_treinos_equipa(db, plano.sessao.microciclo.mesociclo.macrociclo.equipa_id)
             recalcular_horas_exercicios(plano)
+
+            # O cabeçalho é a fonte de verdade para o horário do treino.
+            # Quando a sessão veio da agenda do clube, sincroniza também o
+            # evento e todas as sessões/plano que lhe estão ligados.
+            evento_origem = plano.sessao.evento_planeamento_clube
+            if evento_origem:
+                evento_origem.hora_inicio = hora_inicio
+                evento_origem.hora_fim = hora_fim
+                for atribuicao in evento_origem.atribuicoes_espaco:
+                    atribuicao.hora_inicio = hora_inicio
+                    atribuicao.hora_fim = hora_fim
+                for sessao_ligada in evento_origem.sessoes_geradas:
+                    sessao_ligada.hora_inicio = hora_inicio
+                    sessao_ligada.hora_fim = hora_fim
+                    if sessao_ligada.plano_treino:
+                        sessao_ligada.plano_treino.hora_inicio = hora_inicio
+                        recalcular_horas_exercicios(sessao_ligada.plano_treino)
+            elif plano.sessao.plano_semanal_clube:
+                equipa_id = plano.sessao.microciclo.mesociclo.macrociclo.equipa_id
+                for atribuicao in plano.sessao.plano_semanal_clube.atribuicoes_espacos:
+                    if atribuicao.equipa_id == equipa_id and atribuicao.data == nova_data:
+                        atribuicao.hora_inicio = hora_inicio
+                        atribuicao.hora_fim = hora_fim
         db.commit()
         set_flash(request, "Dados do plano de treino atualizados.")
 
