@@ -36,28 +36,23 @@
     <form id="pse-quick-form" method="post" action="/assiduidade/sessoes/{{ sessao.id }}/pse" class="pse-quick-form">
         <div class="pse-quick-instructions">
             <strong>Como preencher</strong>
-            <span>Escolhe o atleta, indica o valor entre 0 e 10 e pressiona Enter para guardar automaticamente.</span>
+            <span>Carrega no cartão do atleta, indica o valor entre 0 e 10 e pressiona Enter para guardar automaticamente.</span>
         </div>
 
-        <div class="pse-quick-entry">
-            <label for="pse-player-select">Atleta</label>
-            <select id="pse-player-select" aria-label="Selecionar atleta para preencher PSE">
-                <option value="">Selecionar atleta</option>
-                {% for jogador in jogadores %}
-                {% set registo = registos_dict.get(jogador.id) %}
-                <option value="{{ jogador.id }}" data-current-pse="{{ registo.rpe_individual if registo and registo.rpe_individual is not none else '' }}">{{ jogador.nome }}{% if jogador.numero_camisola %} · #{{ jogador.numero_camisola }}{% endif %}</option>
-                {% endfor %}
-            </select>
-            <span class="pse-quick-entry-hint">Ao selecionar, abre o preenchimento rápido.</span>
-        </div>
-
-        <div class="pse-player-status-list" aria-label="Estado das PSE dos atletas">
+        <div class="pse-player-grid" aria-label="Atletas">
             {% for jogador in jogadores %}
             {% set registo = registos_dict.get(jogador.id) %}
-            <div class="pse-player-status-row">
-                <span class="pse-player-status-name">{{ jogador.nome }}{% if jogador.numero_camisola %} <small>#{{ jogador.numero_camisola }}</small>{% endif %}</span>
-                {% if registo and registo.rpe_individual is not none %}<strong>{{ registo.rpe_individual }}</strong>{% else %}<span>Por preencher</span>{% endif %}
-            </div>
+            <button type="button" class="pse-player-card" data-pse-player data-player-id="{{ jogador.id }}" data-player-name="{{ jogador.nome }}{% if jogador.numero_camisola %} · #{{ jogador.numero_camisola }}{% endif %}" data-current-pse="{{ registo.rpe_individual if registo and registo.rpe_individual is not none else '' }}">
+                <span class="pse-player-card-head">
+                    <span class="pse-player-avatar">{{ jogador.nome[:1]|upper }}</span>
+                    {% if jogador.numero_camisola %}<span class="pse-player-jersey">#{{ jogador.numero_camisola }}</span>{% endif %}
+                </span>
+                <strong class="pse-player-card-name">{{ jogador.nome }}</strong>
+                <span class="pse-player-card-foot">
+                    {% if registo and registo.rpe_individual is not none %}<span class="pse-player-card-value">PSE {{ registo.rpe_individual }}</span>{% else %}<span class="pse-player-card-value is-empty">Por preencher</span>{% endif %}
+                    <span class="pse-player-card-action">Preencher <span aria-hidden="true">→</span></span>
+                </span>
+            </button>
             {% endfor %}
         </div>
 
@@ -96,31 +91,25 @@
 </div>
 <script>
 (() => {
-    const select = document.getElementById('pse-player-select');
+    const cards = document.querySelectorAll('[data-pse-player]');
     const dialog = document.getElementById('pse-entry-dialog');
     const title = document.getElementById('pse-entry-title');
     const input = document.getElementById('pse-entry-value');
     const close = document.getElementById('pse-entry-close');
     const form = document.getElementById('pse-quick-form');
-    if (!select || !dialog || !title || !input || !form) return;
+    if (!cards.length || !dialog || !title || !input || !form) return;
 
-    function abrirEntrada() {
-        const option = select.selectedOptions[0];
-        if (!option || !option.value) return;
-        title.textContent = option.textContent;
-        input.name = 'rpe_' + option.value;
-        input.value = option.dataset.currentPse || '';
+    let cartaoAtivo = null;
+    function abrirEntrada(cartao) {
+        cartaoAtivo = cartao;
+        title.textContent = cartao.dataset.playerName || 'Atleta';
+        input.name = 'rpe_' + cartao.dataset.playerId;
+        input.value = cartao.dataset.currentPse || '';
         dialog.showModal();
         window.setTimeout(() => input.focus(), 50);
     }
 
-    select.addEventListener('change', abrirEntrada);
-    select.addEventListener('keydown', event => {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            abrirEntrada();
-        }
-    });
+    cards.forEach(cartao => cartao.addEventListener('click', () => abrirEntrada(cartao)));
     input.addEventListener('keydown', event => {
         if (event.key === 'Enter') {
             event.preventDefault();
@@ -129,12 +118,9 @@
     });
     close?.addEventListener('click', () => {
         dialog.close();
-        select.value = '';
-        select.focus();
+        cartaoAtivo?.focus();
     });
-    dialog.addEventListener('cancel', () => {
-        select.value = '';
-    });
+    dialog.addEventListener('cancel', () => cartaoAtivo?.focus());
     form.addEventListener('submit', event => {
         if (!input.name || !select.value) {
             event.preventDefault();

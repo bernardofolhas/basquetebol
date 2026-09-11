@@ -911,16 +911,17 @@ table tbody tr:hover { background:#fafbfd; }
 .pse-quick-form { overflow:hidden;border:1px solid var(--border-soft);border-radius:var(--radius-panel);background:#fff;box-shadow:var(--shadow-card); }
 .pse-quick-instructions { display:flex;align-items:baseline;gap:.7rem;border-bottom:1px solid var(--border-soft);background:var(--surface-subtle);padding:.85rem 1rem;color:var(--text-muted);font-size:.72rem;line-height:1.45; }
 .pse-quick-instructions strong { flex:none;color:var(--text-main);font-size:.75rem;font-weight:850; }
-.pse-quick-entry { display:grid;gap:.35rem;border-bottom:1px solid var(--border-soft);padding:1rem; }
-.pse-quick-entry label { color:var(--text-main);font-size:.75rem;font-weight:850; }
-.pse-quick-entry select { width:100%;height:3rem;font-size:.9rem;font-weight:750; }
-.pse-quick-entry-hint { color:var(--text-muted);font-size:.68rem; }
-.pse-player-status-list { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem;padding:1rem; }
-.pse-player-status-row { display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-width:0;border:1px solid var(--border-soft);border-radius:.7rem;background:var(--surface-subtle);padding:.6rem .7rem; }
-.pse-player-status-name { overflow:hidden;color:var(--text-main);font-size:.74rem;font-weight:750;text-overflow:ellipsis;white-space:nowrap; }
-.pse-player-status-name small { color:var(--text-muted);font-size:.64rem;font-weight:700; }
-.pse-player-status-row>strong { color:var(--clube-primary-dark);font-size:.8rem;font-weight:850; }
-.pse-player-status-row>span { flex:none;color:var(--text-muted);font-size:.64rem;font-weight:650; }
+.pse-player-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem;padding:1rem; }
+.pse-player-card { display:flex;min-width:0;flex-direction:column;align-items:stretch;gap:.55rem;border:1px solid var(--border-soft);border-radius:.95rem;background:#fff;padding:.8rem;text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s,transform .15s; }
+.pse-player-card:hover,.pse-player-card:focus-visible { border-color:var(--clube-primary);background:var(--clube-primary-surface);box-shadow:0 6px 18px rgb(15 23 42 / .08);outline:0;transform:translateY(-1px); }
+.pse-player-card-head { display:flex;align-items:center;justify-content:space-between;gap:.5rem; }
+.pse-player-avatar { display:grid;width:2.15rem;height:2.15rem;place-items:center;border-radius:50%;background:var(--clube-primary);color:var(--clube-on-primary);font-size:.8rem;font-weight:850; }
+.pse-player-jersey { border-radius:999px;background:var(--surface-muted);padding:.28rem .45rem;color:var(--text-muted);font-size:.62rem;font-weight:800; }
+.pse-player-card-name { overflow:hidden;color:var(--text-main);font-size:.8rem;font-weight:850;text-overflow:ellipsis;white-space:nowrap; }
+.pse-player-card-foot { display:flex;align-items:center;justify-content:space-between;gap:.5rem;border-top:1px solid var(--border-soft);padding-top:.55rem; }
+.pse-player-card-value { color:var(--clube-primary-dark);font-size:.68rem;font-weight:850; }
+.pse-player-card-value.is-empty { color:var(--text-muted);font-weight:700; }
+.pse-player-card-action { flex:none;color:var(--text-muted);font-size:.62rem;font-weight:750; }
 .pse-quick-submit { display:flex;align-items:center;justify-content:space-between;gap:1rem;border-top:1px solid var(--border-soft);background:var(--surface-subtle);padding:.85rem 1rem; }
 .pse-quick-submit span { color:var(--text-muted);font-size:.7rem; }
 .pse-entry-dialog { width:min(92vw,25rem);margin:auto;border:0;border-radius:1.15rem;background:#fff;padding:0;box-shadow:var(--shadow-raised); }
@@ -945,7 +946,9 @@ table tbody tr:hover { background:#fafbfd; }
     .pse-quick-session { align-items:stretch;flex-direction:column;gap:.75rem; }
     .pse-quick-session-picker { min-width:0; }
     .pse-quick-instructions { align-items:flex-start;flex-direction:column;gap:.15rem; }
-    .pse-player-status-list { grid-template-columns:minmax(0,1fr);padding:.75rem; }
+    .pse-player-grid { grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;padding:.75rem; }
+    .pse-player-card { min-height:7rem;padding:.7rem; }
+    .pse-player-card-name { font-size:.74rem; }
     .pse-quick-submit { padding:.7rem .75rem; }
 }
 .ds-attendance-heading h1 { margin:.15rem 0;color:#182230;font-size:clamp(1.45rem,2.5vw,2rem);font-weight:850;letter-spacing:-.035em; }
