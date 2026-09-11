@@ -386,8 +386,9 @@
                 </button>
             </div>
 
-            <form id="form_adicionar_exercicio" method="POST" action="/treino/planos/{{ plano.id }}/exercicios" class="mt-5 space-y-4">
+            <form id="form_adicionar_exercicio" method="POST" action="/treino/planos/{{ plano.id }}/exercicios" class="mt-5 space-y-4" data-library-add-form>
                 <input type="hidden" name="biblioteca_id" id="biblioteca_id_form_adicionar_exercicio" value="">
+                <input type="hidden" name="origem_biblioteca" value="novo">
                 <p data-library-copy-notice hidden class="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">Será criada uma cópia independente no plano. As alterações feitas aqui não modificam a biblioteca.</p>
                 <div class="training-exercise-fields">
                     <div data-training-block-only hidden>
@@ -934,6 +935,17 @@
     renumerarExercicios();
     const panel = document.getElementById('training-add-panel');
     const add = root.querySelector('[data-training-add]');
+    const addForm = document.getElementById('form_adicionar_exercicio');
+    function limparOrigemBiblioteca() {
+        if (!addForm) return;
+        const bibliotecaId = addForm.querySelector('[name="biblioteca_id"]');
+        const origem = addForm.querySelector('[name="origem_biblioteca"]');
+        const aviso = addForm.querySelector('[data-library-copy-notice]');
+        if (bibliotecaId) bibliotecaId.value = '';
+        if (origem) origem.value = 'novo';
+        delete addForm.dataset.bibliotecaId;
+        if (aviso) aviso.hidden = true;
+    }
     add?.addEventListener('click', () => {
         panel.hidden = false;
         add.setAttribute('aria-expanded', 'true');
@@ -941,6 +953,8 @@
     });
     root.querySelector('[data-training-cancel]')?.addEventListener('click', () => {
         panel.hidden = true;
+        addForm?.reset();
+        limparOrigemBiblioteca();
         add.setAttribute('aria-expanded', 'false');
         add.focus({preventScroll: true});
     });
@@ -1948,6 +1962,9 @@ function selecionarDaBiblioteca(ex) {
     if (cpEl) cpEl.value = ex.coaching_points || '';
     const bibliotecaIdEl = form.querySelector('[name="biblioteca_id"]');
     if (bibliotecaIdEl) bibliotecaIdEl.value = ex.id;
+    const origemBibliotecaEl = form.querySelector('[name="origem_biblioteca"]');
+    if (origemBibliotecaEl) origemBibliotecaEl.value = 'biblioteca';
+    if (form.matches('[data-library-add-form]')) form.dataset.bibliotecaId = String(ex.id);
     const avisoCopia = form.querySelector('[data-library-copy-notice]');
     if (avisoCopia) avisoCopia.hidden = false;
     fecharBiblioteca();

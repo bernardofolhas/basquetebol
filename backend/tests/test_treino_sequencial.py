@@ -189,12 +189,16 @@ def test_biblioteca_recebe_novo_exercicio_e_reutilizacao_fica_independente(clien
         assert (base.categoria, base.organizacao, base.coaching_points) == (
             "TIO", "Organizacao original", "Coaching original"
         )
+        total_biblioteca_antes_da_copia = db.query(BibliotecoExercicio).filter_by(
+            clube_id=plano.clube_id,
+        ).count()
 
         nome_copia = f"Copia adaptada {macro_id}"
         resposta = client_admin.post(
             f"/treino/planos/{plano.id}/exercicios",
             data={
                 "biblioteca_id": str(base.id),
+                "origem_biblioteca": "biblioteca",
                 "nome": nome_copia,
                 "categoria": "TCO",
                 "minutos": "20",
@@ -210,6 +214,9 @@ def test_biblioteca_recebe_novo_exercicio_e_reutilizacao_fica_independente(clien
         assert (base.nome, base.categoria, base.organizacao, base.coaching_points) == (
             nome_original, "TIO", "Organizacao original", "Coaching original"
         )
+        assert db.query(BibliotecoExercicio).filter_by(
+            clube_id=plano.clube_id,
+        ).count() == total_biblioteca_antes_da_copia
         assert db.query(BibliotecoExercicio).filter_by(
             clube_id=plano.clube_id,
             nome=nome_copia,
@@ -237,6 +244,13 @@ def test_biblioteca_recebe_novo_exercicio_e_reutilizacao_fica_independente(clien
         assert (base.nome, base.categoria, base.organizacao, base.coaching_points) == (
             nome_original, "TIO", "Organizacao original", "Coaching original"
         )
+        assert db.query(BibliotecoExercicio).filter_by(
+            clube_id=plano.clube_id,
+            nome=f"Versao final {macro_id}",
+        ).count() == 0
+        assert db.query(BibliotecoExercicio).filter_by(
+            clube_id=plano.clube_id,
+        ).count() == total_biblioteca_antes_da_copia
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()

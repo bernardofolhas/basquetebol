@@ -1326,7 +1326,8 @@ async def adicionar_exercicio(
     rpe: str = Form(""),
     organizacao: str = Form(""),
     coaching_points: str = Form(""),
-    biblioteca_id: str = Form("")
+    biblioteca_id: str = Form(""),
+    origem_biblioteca: str = Form("novo"),
 ):
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
     plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
@@ -1349,6 +1350,7 @@ async def adicionar_exercicio(
 
     biblioteca = None
     biblioteca_solicitada = bool((biblioteca_id or "").strip())
+    copia_da_biblioteca = (origem_biblioteca or "").strip().lower() == "biblioteca"
     if biblioteca_solicitada:
         try:
             biblioteca = db.query(BibliotecoExercicio).filter(
@@ -1360,6 +1362,11 @@ async def adicionar_exercicio(
         if not biblioteca:
             set_flash(request, "O exercício selecionado já não está disponível na biblioteca.", "error")
             return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
+    elif copia_da_biblioteca:
+        # Nunca guardar automaticamente um exercício se o formulário foi
+        # marcado como cópia mas perdeu a referência à origem.
+        set_flash(request, "Seleciona novamente o exercício da biblioteca antes de o adicionar.", "error")
+        return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
 
     if biblioteca:
         # O formulário recebe uma cópia completa e pode adaptá-la, incluindo
@@ -1394,7 +1401,7 @@ async def adicionar_exercicio(
     guardado_na_biblioteca = False
     # Um exercício criado de raiz entra uma vez na biblioteca. Uma escolha da
     # biblioteca é apenas uma cópia para este plano e nunca escreve no original.
-    if nome_norm and not biblioteca_solicitada:
+    if nome_norm and not biblioteca and not copia_da_biblioteca:
         existente = db.query(BibliotecoExercicio).filter(
             BibliotecoExercicio.clube_id == plano.clube_id,
             BibliotecoExercicio.nome.ilike(nome_norm),
