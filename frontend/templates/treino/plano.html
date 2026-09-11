@@ -20,7 +20,7 @@
     <div class="ds-tactical-editor">
         <div class="ds-tactical-stage relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %};">
             <img src="/static/campos/{{ campo.imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
-            <canvas id="{{ canvas_id }}" data-desenho="{{ campo.desenho|default('', true)|e }}"{% if campo.estado_desenho %} data-estado="{{ campo.estado_desenho|tojson|forceescape }}"{% endif %} class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
+            <canvas id="{{ canvas_id }}" data-campo-tipo="{{ campo.tipo }}" data-desenho="{{ campo.desenho|default('', true)|e }}"{% if campo.estado_desenho %} data-estado="{{ campo.estado_desenho|tojson|forceescape }}"{% endif %} class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
         </div>
         {{ tactical_toolbar(canvas_id, 'toolbar_' ~ canvas_id) }}
     </div>
@@ -1252,6 +1252,18 @@ function eObjectoMovel(obj) {
         || Boolean(window.TacticalLegacy?.eRecorte(obj));
 }
 
+function escalaFiguraCampo(canvas) {
+    return canvas?.dataset?.campoTipo === 'completo' ? 0.62 : 1;
+}
+
+function raioFigura(canvas, obj) {
+    const escala = escalaFiguraCampo(canvas) * (obj.tamanho || 1);
+    if (obj.tipo === 'jogador_defesa') return 25 * escala;
+    if (obj.tipo === 'cone') return 13 * escala;
+    if (obj.tipo === 'bola') return 14 * escala;
+    return 22 * escala;
+}
+
 function escalarObjectosDesenho(objectos, escalaX, escalaY) {
     return (Array.isArray(objectos) ? objectos : []).map((original) => {
         const obj = JSON.parse(JSON.stringify(original));
@@ -1441,7 +1453,7 @@ function aoPremir(canvasId, e) {
     if (est.ferramenta === 'seleccionar') {
         est.objectoSeleccionado = null;
         for (let i = est.objectos.length - 1; i >= 0; i--) {
-            if (estaNoObj(est.objectos[i], pos)) {
+            if (estaNoObj(est.objectos[i], pos, 0, est.canvas)) {
                 est.objectoSeleccionado = est.objectos[i];
                 if (eObjectoMovel(est.objectos[i])) est.offsetMover = { x: pos.x - est.objectos[i].x, y: pos.y - est.objectos[i].y };
                 else est.offsetMover = { x: pos.x - est.objectos[i].pontos[0].x, y: pos.y - est.objectos[i].pontos[0].y };
@@ -1581,7 +1593,7 @@ function apagarNaPosicao(canvasId, pos, pointerType) {
     let alterado = false;
     const seguintes = [];
     est.objectos.forEach(objecto => {
-        if (!estaNoObj(objecto, pos, margem)) {
+        if (!estaNoObj(objecto, pos, margem, est.canvas)) {
             seguintes.push(objecto);
             return;
         }
@@ -1611,22 +1623,26 @@ function redesenhar(canvasId) {
 
 function desenharSimbolo(ctx, obj) {
     ctx.save();
-    const t = obj.tamanho || 1;
+    const t = escalaFiguraCampo(ctx.canvas) * (obj.tamanho || 1);
+    const espessura = Math.max(1.5, 3 * t);
     if (obj.tipo === 'jogador_ataque') {
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, 22 * t, 0, Math.PI * 2); ctx.fillStyle = '#e35b19'; ctx.fill(); ctx.strokeStyle = '#9f3510'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, 22 * t, 0, Math.PI * 2); ctx.fillStyle = '#e35b19'; ctx.fill(); ctx.strokeStyle = '#9f3510'; ctx.lineWidth = espessura; ctx.stroke();
         ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(16 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero ?? '', obj.x, obj.y);
     } else if (obj.tipo === 'jogador_defesa') {
         const h = 25 * t; ctx.beginPath(); ctx.moveTo(obj.x, obj.y - h); ctx.lineTo(obj.x + h * 0.9, obj.y + h * 0.7); ctx.lineTo(obj.x - h * 0.9, obj.y + h * 0.7); ctx.closePath();
-        ctx.fillStyle = '#2563eb'; ctx.fill(); ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.fillStyle = '#2563eb'; ctx.fill(); ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = espessura; ctx.stroke();
         ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(15 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.numero ?? '', obj.x, obj.y + 3 * t);
     } else if (obj.tipo === 'cone') {
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, 14 * t, 0, Math.PI * 2); ctx.strokeStyle = '#f97316'; ctx.lineWidth = 3; ctx.stroke();
+        const altura = 18 * t;
+        const largura = 15 * t;
+        ctx.beginPath(); ctx.moveTo(obj.x, obj.y - altura * 0.62); ctx.lineTo(obj.x + largura * 0.5, obj.y + altura * 0.38); ctx.lineTo(obj.x - largura * 0.5, obj.y + altura * 0.38); ctx.closePath();
+        ctx.fillStyle = '#f97316'; ctx.fill(); ctx.strokeStyle = '#c2410c'; ctx.lineWidth = espessura; ctx.stroke();
     } else if (obj.tipo === 'bola') {
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, 14 * t, 0, Math.PI * 2); ctx.fillStyle = '#f97316'; ctx.fill(); ctx.strokeStyle = '#9a3412'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, 14 * t, 0, Math.PI * 2); ctx.fillStyle = '#f97316'; ctx.fill(); ctx.strokeStyle = '#9a3412'; ctx.lineWidth = Math.max(1.25, 2 * t); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(obj.x - 14 * t, obj.y); ctx.lineTo(obj.x + 14 * t, obj.y); ctx.strokeStyle = '#9a3412'; ctx.lineWidth = 1.5; ctx.stroke();
     } else if (obj.tipo === 'coach') {
-        const r = 22 * t; ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#111111'; ctx.lineWidth = 4; ctx.stroke();
-        ctx.beginPath(); ctx.arc(obj.x, obj.y, r * 0.75, 0, Math.PI * 2); ctx.strokeStyle = '#111111'; ctx.lineWidth = 1; ctx.stroke();
+        const r = 22 * t; ctx.beginPath(); ctx.arc(obj.x, obj.y, r, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#111111'; ctx.lineWidth = Math.max(1.75, 4 * t); ctx.stroke();
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, r * 0.75, 0, Math.PI * 2); ctx.strokeStyle = '#111111'; ctx.lineWidth = Math.max(1, t); ctx.stroke();
         ctx.fillStyle = '#111111'; ctx.font = `bold ${Math.round(17 * t)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('C', obj.x, obj.y);
     }
     ctx.restore();
@@ -1691,9 +1707,9 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
     ctx.restore();
 }
 
-function estaNoObj(obj, pos, margem = 0) {
+function estaNoObj(obj, pos, margem = 0, canvas = null) {
     const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
-    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x - obj.x, pos.y - obj.y) < 28 * (obj.tamanho || 1) + margem;
+    if (simbolos.includes(obj.tipo)) return Math.hypot(pos.x - obj.x, pos.y - obj.y) < raioFigura(canvas, obj) + 8 + margem;
     if (window.TacticalLegacy?.eRecorte(obj)) return window.TacticalLegacy.contemPonto(obj, pos);
     if (!obj.pontos || obj.pontos.length < 2) return false;
     for (let i = 0; i < obj.pontos.length - 1; i++) {
@@ -1709,7 +1725,7 @@ function estaNoObj(obj, pos, margem = 0) {
 function desenharSeleccao(ctx, obj) {
     const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
     ctx.save(); ctx.strokeStyle = '#0f766e'; ctx.lineWidth = 3; ctx.setLineDash([7, 5]);
-    if (simbolos.includes(obj.tipo)) { ctx.beginPath(); ctx.arc(obj.x, obj.y, 30 * (obj.tamanho || 1), 0, Math.PI * 2); ctx.stroke(); }
+    if (simbolos.includes(obj.tipo)) { ctx.beginPath(); ctx.arc(obj.x, obj.y, raioFigura(ctx.canvas, obj) + 6, 0, Math.PI * 2); ctx.stroke(); }
     else if (window.TacticalLegacy?.eRecorte(obj)) window.TacticalLegacy.desenharSeleccao(ctx, obj);
     else if (obj.pontos && obj.pontos.length >= 2) {
         ctx.beginPath(); ctx.moveTo(obj.pontos[0].x, obj.pontos[0].y); obj.pontos.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
