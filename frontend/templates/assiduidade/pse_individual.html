@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block titulo %}PSE individual — {{ equipa.nome }}{% endblock %}
+
+{% block conteudo %}
+<div class="pse-quick-page">
+    <header class="pse-quick-header">
+        <div>
+            <p class="ds-section-label">Registo rápido</p>
+            <h1>PSE individual</h1>
+            <p>Preenche o esforço percebido dos atletas no treino de hoje.</p>
+        </div>
+        <a href="/dashboard" class="ds-button ds-button-secondary">Voltar ao dashboard</a>
+    </header>
+
+    {% if sessoes_hoje %}
+    <section class="pse-quick-session">
+        <div>
+            <p class="pse-quick-eyebrow">Treino de hoje</p>
+            <h2>{{ sessao.data|data_pt }}{% if sessao.hora_inicio %} · {{ sessao.hora_inicio }}{% endif %}</h2>
+            <p>{{ sessao.local or 'Local por definir' }} · {{ total_preenchidos }}/{{ jogadores|length }} PSE preenchidas</p>
+        </div>
+        {% if sessoes_hoje|length > 1 %}
+        <form method="get" class="pse-quick-session-picker">
+            <label for="pse-sessao">Sessão</label>
+            <select id="pse-sessao" name="sessao_id" onchange="this.form.submit()">
+                {% for item in sessoes_hoje %}
+                <option value="{{ item.id }}" {% if item.id == sessao.id %}selected{% endif %}>{{ item.hora_inicio or 'Hora por definir' }} · {{ item.local or 'Local por definir' }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        {% endif %}
+    </section>
+
+    {% if jogadores %}
+    <form method="post" action="/assiduidade/sessoes/{{ sessao.id }}/pse" class="pse-quick-form">
+        <div class="pse-quick-instructions">
+            <strong>Como preencher</strong>
+            <span>Indica um valor entre 0 e 10 apenas para quem participou. Podes corrigir os valores e guardar novamente.</span>
+        </div>
+
+        <div class="pse-player-grid">
+            {% for jogador in jogadores %}
+            {% set registo = registos_dict.get(jogador.id) %}
+            <label class="pse-player-card" for="pse-{{ jogador.id }}">
+                <span class="pse-player-index">{{ loop.index }}</span>
+                <span class="pse-player-name">
+                    <strong>{{ jogador.nome }}</strong>
+                    {% if jogador.numero_camisola %}<small>#{{ jogador.numero_camisola }}</small>{% endif %}
+                </span>
+                <span class="pse-player-input">
+                    <span>PSE</span>
+                    <input id="pse-{{ jogador.id }}" name="rpe_{{ jogador.id }}" type="number" inputmode="decimal" min="0" max="10" step="0.5" value="{{ registo.rpe_individual if registo and registo.rpe_individual is not none else '' }}" placeholder="0–10">
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+
+        <div class="pse-quick-submit">
+            <span>As alterações ficam disponíveis no relatório da equipa.</span>
+            <button type="submit" class="ds-button ds-button-primary">Guardar PSE</button>
+        </div>
+    </form>
+    {% else %}
+    <div class="pse-quick-empty">
+        <strong>Não existem atletas ativos nesta equipa.</strong>
+        <p>Adiciona atletas ao plantel para poderes registar a PSE individual.</p>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="pse-quick-empty">
+        <strong>Não há treino planeado para hoje.</strong>
+        <p>Esta página abre sempre o treino do dia. Quando houver uma sessão ativa, os atletas aparecerão aqui automaticamente.</p>
+        <a href="/dashboard" class="ds-button ds-button-primary">Voltar ao dashboard</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -8,6 +8,7 @@ from models.jogador import Jogador, RegistoAntropometrico
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.utilizador import Utilizador
 from services.assiduidade_service import calcular_resumo_assiduidade
+import routers.assiduidade as assiduidade_router
 
 
 def _criar_contexto():
@@ -220,6 +221,58 @@ def test_formulario_guarda_estado_detalhado_e_mantem_presente(client_admin):
         assert segundo_registo.estado == "lesionada"
         assert segundo_registo.presente is False
         assert segundo_registo.rpe_individual is None
+    finally:
+        _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
+        db.close()
+
+
+def test_pse_rapida_abre_treino_do_dia_e_guarda_valores_individuais(client_admin, monkeypatch):
+    db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id = _criar_contexto()
+    sessao_id = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.id == macro_id
+    ).first().id
+
+    class DataDoTreino:
+        @classmethod
+        def today(cls):
+            return date(2037, 1, 6)
+
+        @classmethod
+        def fromisoformat(cls, valor):
+            return date.fromisoformat(valor)
+
+    monkeypatch.setattr(assiduidade_router, "date", DataDoTreino)
+    try:
+        pagina = client_admin.get(f"/assiduidade/equipas/{equipa_id}/pse")
+        assert pagina.status_code == 200
+        assert "PSE individual" in pagina.text
+        assert "Treino de hoje" in pagina.text
+        assert f'name="rpe_{jogadora_id}"' in pagina.text
+
+        resposta = client_admin.post(
+            f"/assiduidade/sessoes/{sessao_id}/pse",
+            data={f"rpe_{jogadora_id}": "8,5", f"rpe_{segunda_jogadora_id}": ""},
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        registo = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao_id,
+            RegistoAssiduidade.jogador_id == jogadora_id,
+        ).one()
+        assert registo.rpe_individual == 8.5
+
+        resposta = client_admin.post(
+            f"/assiduidade/sessoes/{sessao_id}/pse",
+            data={f"rpe_{jogadora_id}": "9"},
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        db.expire_all()
+        registo = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao_id,
+            RegistoAssiduidade.jogador_id == jogadora_id,
+        ).one()
+        assert registo.rpe_individual == 9
     finally:
         _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
         db.close()

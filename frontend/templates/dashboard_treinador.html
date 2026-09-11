@@ -22,6 +22,7 @@
         </div>
         <div class="ds-action-bar shrink-0">
             <a href="/assiduidade/equipas/{{ item.equipa.id }}/registar" class="ds-button ds-button-secondary ds-button-sm">Presenças</a>
+            {% if utilizador.perfil.value == 'staff' %}<a href="/assiduidade/equipas/{{ item.equipa.id }}/pse" class="ds-button ds-button-primary ds-button-sm">PSE de hoje</a>{% endif %}
             <a href="/equipas/{{ item.equipa.id }}/resumo" class="ds-button ds-button-primary">Abrir equipa</a>
         </div>
     </div>

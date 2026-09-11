@@ -133,6 +133,124 @@ def abrir_folha_assiduidade_equipa(
     return RedirectResponse(url=destino, status_code=303)
 
 
+def _sessoes_do_dia(db: Session, equipa_id: int, dia: date):
+    """Obtém apenas treinos activos da equipa na data indicada."""
+    return (
+        db.query(SessaoTreino)
+        .join(Microciclo, SessaoTreino.microciclo_id == Microciclo.id)
+        .join(Mesociclo, Microciclo.mesociclo_id == Mesociclo.id)
+        .join(Macrociclo, Mesociclo.macrociclo_id == Macrociclo.id)
+        .filter(
+            Macrociclo.equipa_id == equipa_id,
+            SessaoTreino.data == dia,
+            SessaoTreino.e_jogo.is_(False),
+            SessaoTreino.ativa.is_(True),
+        )
+        .order_by(SessaoTreino.hora_inicio.asc(), SessaoTreino.id.asc())
+        .all()
+    )
+
+
+@router.get("/equipas/{equipa_id}/pse", response_class=HTMLResponse)
+def pagina_pse_individual(
+    equipa_id: int,
+    request: Request,
+    sessao_id: int | None = None,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Abre o preenchimento rápido da PSE para o treino de hoje."""
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    sessoes_hoje = _sessoes_do_dia(db, equipa_id, date.today())
+    sessao = next((item for item in sessoes_hoje if item.id == sessao_id), None) if sessao_id else None
+    if sessao is None and sessoes_hoje:
+        sessao = sessoes_hoje[0]
+
+    jogadores = []
+    registos_dict = {}
+    total_preenchidos = 0
+    if sessao:
+        jogadores, _ = _jogadores_folha_assiduidade(db, equipa, sessao.id)
+        registos = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao.id,
+        ).all()
+        registos_dict = {registo.jogador_id: registo for registo in registos}
+        total_preenchidos = sum(
+            1 for registo in registos if registo.rpe_individual is not None
+        )
+
+    return templates.TemplateResponse(request, "assiduidade/pse_individual.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "sessao": sessao,
+        "sessoes_hoje": sessoes_hoje,
+        "jogadores": jogadores,
+        "registos_dict": registos_dict,
+        "total_preenchidos": total_preenchidos,
+        "data_hoje": date.today(),
+    })
+
+
+@router.post("/sessoes/{sessao_id}/pse")
+async def guardar_pse_individual(
+    sessao_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Guarda apenas as PSE preenchidas na folha rápida do staff."""
+    sessao = db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
+    if not sessao:
+        return RedirectResponse(url="/dashboard", status_code=303)
+    equipa = sessao.microciclo.mesociclo.macrociclo.equipa
+    verificar_ou_negar_equipa(utilizador, equipa.id, db)
+
+    dados = await request.form()
+    jogadores, _ = _jogadores_folha_assiduidade(db, equipa, sessao_id)
+    registos = db.query(RegistoAssiduidade).filter(
+        RegistoAssiduidade.sessao_id == sessao_id,
+    ).all()
+    registos_por_jogador = {registo.jogador_id: registo for registo in registos}
+
+    try:
+        valores = []
+        for jogador in jogadores:
+            campo = f"rpe_{jogador.id}"
+            if campo not in dados:
+                continue
+            valor = dados.get(campo)
+            rpe = _normalizar_rpe_individual(valor) if str(valor or "").strip() else None
+            valores.append((jogador, rpe))
+    except ValueError as erro:
+        set_flash(request, str(erro), "error")
+        return RedirectResponse(url=f"/assiduidade/equipas/{equipa.id}/pse", status_code=303)
+
+    for jogador, rpe in valores:
+        registo = registos_por_jogador.get(jogador.id)
+        if not registo and rpe is not None:
+            registo = RegistoAssiduidade(
+                sessao_id=sessao_id,
+                jogador_id=jogador.id,
+                clube_id=equipa.clube_id,
+                presente=True,
+                estado="presente",
+            )
+            db.add(registo)
+        if registo:
+            registo.rpe_individual = rpe
+            if rpe is not None:
+                registo.presente = True
+                registo.estado = "presente"
+
+    db.commit()
+    set_flash(request, "PSE individual guardada com sucesso.")
+    return RedirectResponse(url=f"/assiduidade/equipas/{equipa.id}/pse?sessao_id={sessao_id}", status_code=303)
+
+
 @router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
 def relatorio_assiduidade_equipa(
     equipa_id: int,
