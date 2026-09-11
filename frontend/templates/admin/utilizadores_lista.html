@@ -1,17 +1,18 @@
 {% extends "base.html" %}
 
-{% block titulo %}Administração — Utilizadores{% endblock %}
+{% block titulo %}Administração - Utilizadores{% endblock %}
 
 {% block conteudo %}
 
-<div class="flex items-center justify-between mb-6">
+<div class="ds-page-header">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800">Utilizadores</h1>
-        <p class="text-gray-500 mt-1">Gerir contas de acesso à plataforma</p>
+        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Contas e acessos</p>
+        <h1 class="mt-1">Utilizadores</h1>
+        <p>Gere perfis, equipas atribuídas e estado de acesso à plataforma.</p>
     </div>
     <a href="/admin/utilizadores/novo"
-       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
-        + Novo Utilizador
+       class="ds-button ds-button-primary">
+        Criar utilizador
     </a>
 </div>
 
@@ -38,8 +39,8 @@
                 <td class="px-4 py-3 text-gray-600">{{ u.username }}</td>
                 <td class="px-4 py-3 text-gray-600">{{ u.email }}</td>
                 <td class="px-4 py-3">
-                    <span class="inline-block bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full">
-                        {{ 'Fisioterapeuta' if u.perfil.value == 'fisioterapeuta' else u.perfil.value }}
+                    <span class="inline-block rounded-full px-2.5 py-1 text-xs font-bold {% if u.perfil.value == 'fisioterapeuta' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+                        {{ 'Fisioterapeuta' if u.perfil.value == 'fisioterapeuta' else ('Staff da equipa' if u.perfil.value == 'staff' else u.perfil.value|capitalize) }}
                     </span>
                 </td>
                 <td class="px-4 py-3 text-gray-600">
@@ -53,7 +54,9 @@
                     {% if u.perfil.value in ['staff', 'fisioterapeuta'] %}{{ u.equipas_staff | map(attribute='nome') | join(', ') or 'Sem equipas atribuídas' }}{% else %}—{% endif %}
                 </td>
                 <td class="px-4 py-3">
-                    {% if u.ativo %}
+                    {% if u.deve_alterar_password %}
+                    <span class="inline-block rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">Primeiro acesso</span>
+                    {% elif u.ativo %}
                     <span class="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
                         Ativo
                     </span>

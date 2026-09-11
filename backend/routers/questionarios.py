@@ -224,6 +224,12 @@ def _sincronizar_aplicacoes_automaticas(
             AplicacaoQuestionario.data >= hoje,
         ).all()
         for aplicacao in automaticas:
+            # A aplicação deve apresentar o nome do questionário, não o rótulo
+            # técnico da regra automática (por exemplo, "Diário").
+            if aplicacao.titulo in {"Diário", "Diario"}:
+                aplicacao.titulo = None
+                alterado = True
+        for aplicacao in automaticas:
             if aplicacao.data not in eventos_por_data and not aplicacao.submissoes:
                 db.delete(aplicacao)
                 alterado = True
@@ -243,9 +249,7 @@ def _sincronizar_aplicacoes_automaticas(
                 questionario_id=questionario.id,
                 sessao_treino_id=sessao.id if sessao else None,
                 data=data_evento,
-                titulo=("Diário" if regra == "diario" else REGRAS_APLICACAO[regra].replace(
-                    "Sempre que há um ", ""
-                ).replace(" nesse dia", "").capitalize()),
+                titulo=None,
                 permite_multiplas=False,
                 automatica=True,
             ))
@@ -908,10 +912,11 @@ def questionarios_disponiveis(
     aplicacoes = db.query(AplicacaoQuestionario).options(
         joinedload(AplicacaoQuestionario.questionario),
         selectinload(AplicacaoQuestionario.submissoes),
-    ).filter(
+    ).join(AplicacaoQuestionario.questionario).filter(
         AplicacaoQuestionario.equipa_id == jogador.equipa_id,
         AplicacaoQuestionario.ativa.is_(True),
         AplicacaoQuestionario.data >= date.today() - timedelta(days=30),
+        QuestionarioPersonalizado.ativo.is_(True),
     ).order_by(AplicacaoQuestionario.data.desc()).all() if jogador and jogador.equipa_id else []
     return templates.TemplateResponse(request, "questionarios/disponiveis.html", {
         "utilizador": utilizador,
@@ -932,7 +937,10 @@ def responder_questionario(
     aplicacao = db.query(AplicacaoQuestionario).options(
         joinedload(AplicacaoQuestionario.questionario).selectinload(QuestionarioPersonalizado.perguntas),
         selectinload(AplicacaoQuestionario.submissoes).selectinload(SubmissaoQuestionario.respostas),
-    ).filter(AplicacaoQuestionario.id == aplicacao_id).first()
+    ).join(AplicacaoQuestionario.questionario).filter(
+        AplicacaoQuestionario.id == aplicacao_id,
+        QuestionarioPersonalizado.ativo.is_(True),
+    ).first()
     if not aplicacao or not jogador or aplicacao.equipa_id != jogador.equipa_id or not aplicacao.ativa:
         set_flash(request, "Este questionário não está disponível para a tua equipa.", "error")
         return RedirectResponse("/questionarios/disponiveis", status_code=303)
@@ -961,7 +969,10 @@ async def guardar_resposta_personalizada(
     jogador = db.query(Jogador).filter(Jogador.id == utilizador.jogador_id).first()
     aplicacao = db.query(AplicacaoQuestionario).options(
         joinedload(AplicacaoQuestionario.questionario).selectinload(QuestionarioPersonalizado.perguntas)
-    ).filter(AplicacaoQuestionario.id == aplicacao_id).first()
+    ).join(AplicacaoQuestionario.questionario).filter(
+        AplicacaoQuestionario.id == aplicacao_id,
+        QuestionarioPersonalizado.ativo.is_(True),
+    ).first()
     if not aplicacao or not jogador or aplicacao.equipa_id != jogador.equipa_id or not aplicacao.ativa:
         return RedirectResponse("/questionarios/disponiveis", status_code=303)
     if aplicacao.data > date.today():

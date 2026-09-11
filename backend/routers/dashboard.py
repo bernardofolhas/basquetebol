@@ -32,7 +32,7 @@ def dashboard(
     if utilizador.perfil.value == "superadministrador" and not getattr(request.state, "clube_atual", None):
         return RedirectResponse(url="/superadmin/clubes", status_code=303)
     if utilizador.perfil.value == "atleta":
-        return RedirectResponse(url="/questionarios/diario", status_code=303)
+        return RedirectResponse(url="/questionarios/disponiveis", status_code=303)
     if utilizador.perfil.value == "fisioterapeuta":
         contexto = get_dashboard_fisioterapeuta(db, utilizador)
         return templates.TemplateResponse(request, "dashboard_fisioterapeuta.html", contexto)

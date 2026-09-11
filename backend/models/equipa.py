@@ -33,8 +33,8 @@ class Equipa(Base):
     questionario_matinal_ativo = Column(
         Boolean,
         nullable=False,
-        default=True,
-        server_default="true",
+        default=False,
+        server_default="false",
     )
 
     # Relação com treinadores — uma equipa pode ter vários treinadores

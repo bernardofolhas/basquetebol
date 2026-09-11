@@ -172,12 +172,23 @@ def actualizar_estrutura_questionarios() -> None:
         colunas_equipas = {coluna["name"] for coluna in inspector.get_columns("equipas")}
         if "questionario_matinal_ativo" not in colunas_equipas:
             with engine.begin() as ligacao:
-                default = "TRUE" if engine.dialect.name == "postgresql" else "1"
+                default = "FALSE" if engine.dialect.name == "postgresql" else "0"
                 ligacao.execute(text(
                     "ALTER TABLE equipas ADD COLUMN questionario_matinal_ativo "
                     f"BOOLEAN NOT NULL DEFAULT {default}"
                 ))
             logger.info("Estado do Questionário Matinal adicionado às equipas.")
+        else:
+            # O questionário diário legado deixou de ser criado/ativado por defeito.
+            with engine.begin() as ligacao:
+                if engine.dialect.name == "postgresql":
+                    ligacao.execute(text(
+                        "ALTER TABLE equipas ALTER COLUMN questionario_matinal_ativo SET DEFAULT FALSE"
+                    ))
+                ligacao.execute(text(
+                    "UPDATE equipas SET questionario_matinal_ativo = FALSE "
+                    "WHERE questionario_matinal_ativo = TRUE"
+                ))
     if not inspector.has_table("utilizadores"):
         return
     colunas = {coluna["name"] for coluna in inspector.get_columns("utilizadores")}

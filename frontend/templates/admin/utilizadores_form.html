@@ -1,137 +1,138 @@
 {% extends "base.html" %}
 
 {% if modo == "editar" %}
-    {% set titulo_pagina = "Editar Utilizador" %}
+    {% set titulo_pagina = "Editar utilizador" %}
     {% set acao_form = "/admin/utilizadores/" ~ utilizador_editar.id ~ "/editar" %}
 {% else %}
-    {% set titulo_pagina = "Novo Utilizador" %}
+    {% set titulo_pagina = "Novo utilizador" %}
     {% set acao_form = "/admin/utilizadores/novo" %}
 {% endif %}
 
 {% block titulo %}{{ titulo_pagina }}{% endblock %}
 
 {% block conteudo %}
+<header class="ds-page-header max-w-5xl">
+    <div>
+        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Contas e acessos</p>
+        <h1 class="mt-1">{{ titulo_pagina }}</h1>
+        <p>Define o perfil primeiro para apresentarmos apenas as associações necessárias.</p>
+    </div>
+    <a href="/admin/utilizadores" class="ds-button ds-button-secondary">Voltar aos utilizadores</a>
+</header>
 
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-800">{{ titulo_pagina }}</h1>
-</div>
-
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 max-w-2xl">
+<form method="POST" action="{{ acao_form }}" class="max-w-5xl space-y-5">
     {% if erro %}
-    <div class="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-4">
+    <div role="alert" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
         {{ erro }}
     </div>
     {% endif %}
 
-    <form method="POST" action="{{ acao_form }}">
-
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
-            <input type="text" name="nome" required
-                   value="{{ utilizador_editar.nome if modo == 'editar' else '' }}"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+    <section class="ds-panel overflow-hidden">
+        <div class="ds-panel-header">
+            <div><h2 class="ds-panel-title">Perfil e acesso</h2><p class="mt-1 text-sm text-slate-500">O perfil determina as páginas e os dados disponíveis.</p></div>
         </div>
-
-        <div class="grid grid-cols-2 gap-4">
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Username *</label>
-                <input type="text" name="username" required
-                       value="{{ utilizador_editar.username if modo == 'editar' else '' }}"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-            </div>
-
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Password {% if modo != "editar" %}*{% endif %}
-                </label>
-                <input type="password" name="password" {% if modo != "editar" %}required{% endif %}
-                       placeholder="{% if modo == 'editar' %}Deixa vazio para manter a atual{% endif %}"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-            </div>
-        </div>
-
-        <div id="equipas-staff" class="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Equipas atribuídas</label>
-            <p class="mb-2 text-xs text-slate-500">A conta só vê as equipas selecionadas. O fisioterapeuta pode trabalhar todos os dados dessas equipas.</p>
-            <select name="equipa_ids" multiple size="{{ [equipas|length, 6]|min }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-                {% set equipas_staff_ids = utilizador_editar.equipas_staff | map(attribute='id') | list if modo == 'editar' else [] %}
-                {% for equipa_item in equipas %}
-                <option value="{{ equipa_item.id }}" {% if equipa_item.id in equipas_staff_ids %}selected{% endif %}>{{ equipa_item.nome }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-            <input type="email" name="email" required
-                   value="{{ utilizador_editar.email if modo == 'editar' else '' }}"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Perfil *</label>
-                <select name="perfil" required
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+        <div class="ds-panel-body grid gap-5 md:grid-cols-2">
+            <div>
+                <label for="perfil-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Perfil *</label>
+                <select id="perfil-conta" name="perfil" required class="ds-input">
                     <option value="">Seleciona um perfil</option>
                     {% for p in perfis %}
-                    <option value="{{ p.value }}"
-                        {% if modo == "editar" and utilizador_editar.perfil.value == p.value %}selected{% endif %}>
+                    <option value="{{ p.value }}" {% if modo == "editar" and utilizador_editar.perfil.value == p.value %}selected{% endif %}>
                         {{ 'Staff da equipa' if p.value == 'staff' else ('Fisioterapeuta' if p.value == 'fisioterapeuta' else p.value|capitalize) }}
                     </option>
                     {% endfor %}
                 </select>
             </div>
+            {% if modo == "editar" %}
+            <div>
+                <label for="estado-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Estado</label>
+                <select id="estado-conta" name="ativo" class="ds-input">
+                    <option value="true" {% if utilizador_editar.ativo %}selected{% endif %}>Ativo</option>
+                    <option value="false" {% if not utilizador_editar.ativo %}selected{% endif %}>Inativo</option>
+                </select>
+            </div>
+            {% endif %}
 
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Treinador associado</label>
-                <select name="treinador_id"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            <div id="explicacao-fisio" hidden class="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <p class="font-bold text-emerald-950">Acesso de fisioterapeuta</p>
+                <p class="mt-1 text-sm leading-6 text-emerald-800">A página inicial destaca respostas aos questionários, alertas de bem-estar, carga semanal e treino físico. A conta fica limitada às equipas escolhidas e deverá alterar a palavra-passe no primeiro acesso.</p>
+            </div>
+
+            <div id="equipas-staff" hidden class="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <label for="equipas-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Equipas atribuídas <span id="equipas-obrigatorias" hidden>*</span></label>
+                <p class="mb-3 text-sm text-slate-500">A conta só poderá consultar e editar informação das equipas selecionadas. Usa Ctrl ou Cmd para selecionar várias.</p>
+                <select id="equipas-conta" name="equipa_ids" multiple size="{{ [[equipas|length, 6]|min, 3]|max }}" class="ds-input min-h-36">
+                    {% set equipas_staff_ids = utilizador_editar.equipas_staff | map(attribute='id') | list if modo == 'editar' else [] %}
+                    {% for equipa_item in equipas %}
+                    <option value="{{ equipa_item.id }}" {% if equipa_item.id in equipas_staff_ids %}selected{% endif %}>{{ equipa_item.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div id="treinador-associado" hidden class="md:col-span-2">
+                <label for="treinador-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Treinador associado</label>
+                <select id="treinador-conta" name="treinador_id" class="ds-input">
                     <option value="">Nenhum</option>
                     {% for treinador in treinadores %}
-                    <option value="{{ treinador.id }}"
-                        {% if modo == "editar" and utilizador_editar.treinador_id == treinador.id %}selected{% endif %}>
-                        {{ treinador.nome }}
-                    </option>
+                    <option value="{{ treinador.id }}" {% if modo == "editar" and utilizador_editar.treinador_id == treinador.id %}selected{% endif %}>{{ treinador.nome }}</option>
                     {% endfor %}
                 </select>
             </div>
         </div>
+    </section>
 
-        {% if modo == "editar" %}
-        <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-            <select name="ativo"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-                <option value="true" {% if utilizador_editar.ativo %}selected{% endif %}>Ativo</option>
-                <option value="false" {% if not utilizador_editar.ativo %}selected{% endif %}>Inativo</option>
-            </select>
+    <section class="ds-panel overflow-hidden">
+        <div class="ds-panel-header">
+            <div><h2 class="ds-panel-title">Dados da conta</h2><p class="mt-1 text-sm text-slate-500">Dados usados para iniciar sessão e recuperar o acesso.</p></div>
         </div>
-        {% endif %}
-
-        <div class="flex gap-3">
-            <button type="submit"
-                    class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
-                {% if modo == "editar" %}Guardar Alterações{% else %}Criar Utilizador{% endif %}
-            </button>
-
-            <a href="/admin/utilizadores"
-               class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition">
-                Cancelar
-            </a>
+        <div class="ds-panel-body grid gap-5 md:grid-cols-2">
+            <div class="md:col-span-2">
+                <label for="nome-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Nome completo *</label>
+                <input id="nome-conta" type="text" name="nome" required value="{{ utilizador_editar.nome if modo == 'editar' else '' }}" class="ds-input">
+            </div>
+            <div>
+                <label for="username-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Nome de utilizador *</label>
+                <input id="username-conta" type="text" name="username" required autocomplete="username" value="{{ utilizador_editar.username if modo == 'editar' else '' }}" class="ds-input">
+            </div>
+            <div>
+                <label for="email-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Email *</label>
+                <input id="email-conta" type="email" name="email" required value="{{ utilizador_editar.email if modo == 'editar' else '' }}" class="ds-input">
+            </div>
+            <div class="md:col-span-2">
+                <label for="password-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Palavra-passe {% if modo != "editar" %}*{% endif %}</label>
+                <input id="password-conta" type="password" name="password" {% if modo != "editar" %}required{% endif %} autocomplete="new-password" placeholder="{% if modo == 'editar' %}Deixa vazio para manter a palavra-passe atual{% endif %}" class="ds-input">
+                {% if modo != "editar" %}<p class="mt-2 text-xs text-slate-500">As contas de fisioterapeuta terão de escolher uma nova palavra-passe no primeiro acesso.</p>{% endif %}
+            </div>
         </div>
-    </form>
-</div>
+    </section>
+
+    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <a href="/admin/utilizadores" class="ds-button ds-button-secondary">Cancelar</a>
+        <button type="submit" class="ds-button ds-button-primary">{% if modo == "editar" %}Guardar alterações{% else %}Criar utilizador{% endif %}</button>
+    </div>
+</form>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const perfil = document.querySelector('select[name="perfil"]');
-    const equipasStaff = document.getElementById('equipas-staff');
-    const atualizar = () => { equipasStaff.hidden = !['staff', 'fisioterapeuta'].includes(perfil.value); };
-    perfil.addEventListener('change', atualizar);
-    atualizar();
+document.addEventListener("DOMContentLoaded", function () {
+    const perfil = document.getElementById("perfil-conta");
+    const equipas = document.getElementById("equipas-staff");
+    const seletorEquipas = document.getElementById("equipas-conta");
+    const equipasObrigatorias = document.getElementById("equipas-obrigatorias");
+    const treinador = document.getElementById("treinador-associado");
+    const explicacaoFisio = document.getElementById("explicacao-fisio");
+
+    function atualizarCamposDoPerfil() {
+        const eFisio = perfil.value === "fisioterapeuta";
+        const eStaff = perfil.value === "staff";
+        equipas.hidden = !(eFisio || eStaff);
+        treinador.hidden = perfil.value !== "treinador";
+        explicacaoFisio.hidden = !eFisio;
+        equipasObrigatorias.hidden = !eFisio;
+        seletorEquipas.required = eFisio;
+    }
+
+    perfil.addEventListener("change", atualizarCamposDoPerfil);
+    atualizarCamposDoPerfil();
 });
 </script>
-
 {% endblock %}

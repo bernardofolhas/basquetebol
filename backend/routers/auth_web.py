@@ -72,7 +72,7 @@ async def processar_login(
         request=request,
     )
     db.commit()
-    destino = "/questionarios/diario" if utilizador.perfil.value == "atleta" else "/dashboard"
+    destino = "/questionarios/disponiveis" if utilizador.perfil.value == "atleta" else "/dashboard"
     return RedirectResponse(url=destino, status_code=303)
 
 

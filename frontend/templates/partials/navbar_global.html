@@ -31,7 +31,6 @@
         <div class="sidebar-pages w-80">
           <p class="ds-dropdown-title">Área do atleta</p>
           {{ menu_link('/questionarios/disponiveis', 'Questionários disponíveis', 'Responder aos pedidos da equipa técnica', p == '/questionarios/disponiveis' or p.startswith('/questionarios/responder')) }}
-          {{ menu_link('/questionarios/diario', 'Questionário Matinal', 'Registar esforço, dor e recuperação', p == '/questionarios/diario') }}
           {{ menu_link('/questionarios/historico', 'O meu histórico', 'Consultar respostas anteriores', p == '/questionarios/historico') }}
         </div>
       </section>
@@ -168,7 +167,7 @@
       </section>
       {% endif %}
 
-      {% if perfil in ['administrador', 'coordenador', 'secretaria', 'staff', 'superadministrador'] %}
+      {% if perfil in ['administrador', 'coordenador', 'secretaria', 'staff', 'fisioterapeuta', 'superadministrador'] %}
       <section class="sidebar-group ds-nav-order-gestao">
         <h2 class="sidebar-heading {% if p.startswith('/jogadores') or p.startswith('/treinadores') or p.startswith('/secretaria') or p.startswith('/admin') or p.startswith('/administracao') %}is-active{% endif %}">Gestão </h2>
         <div class="sidebar-pages right-0 w-80">
@@ -176,7 +175,7 @@
           <div class="sidebar-page-list">
             {{ menu_link('/jogadores', 'Atletas', 'Fichas e processos') }}
             {% if perfil in ['administrador', 'coordenador', 'superadministrador'] %}{{ menu_link('/treinadores', 'Treinadores', 'Equipa técnica') }}{% endif %}
-            {{ menu_link('/secretaria/pendencias', 'Secretaria', 'Documentos e validades') }}
+            {% if perfil != 'fisioterapeuta' %}{{ menu_link('/secretaria/pendencias', 'Secretaria', 'Documentos e validades') }}{% endif %}
             {% if perfil == 'administrador' %}
             {{ menu_link('/admin/utilizadores', 'Utilizadores', 'Contas e acessos') }}
             {{ menu_link('/admin/auditoria', 'Auditoria', 'Histórico de operações') }}

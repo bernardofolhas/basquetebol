@@ -48,7 +48,7 @@ class ClubeContextoMiddleware(BaseHTTPMiddleware):
                             "/login", "/minha-conta", "/minha-conta/alterar-password", "/logout", "/service-worker.js",
                         }
                         if not permitido:
-                            return RedirectResponse("/questionarios/diario", status_code=303)
+                            return RedirectResponse("/questionarios/disponiveis", status_code=303)
                 finally:
                     db.close()
             return await call_next(request)

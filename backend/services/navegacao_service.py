@@ -88,6 +88,15 @@ def _acoes_rapidas(utilizador, equipas: list) -> list[dict]:
             "link": "/secretaria/pendencias",
             "icone": "secretaria",
         }]
+    if perfil == "fisioterapeuta":
+        if not equipas:
+            return []
+        equipa = equipas[0]
+        return [
+            {"label": "Ver questionários", "descricao": equipa.nome, "link": f"/questionarios/equipas/{equipa.id}", "icone": "atividade"},
+            {"label": "Analisar equipa", "descricao": equipa.nome, "link": f"/analise/equipas/{equipa.id}", "icone": "treino"},
+            {"label": "Registos físicos", "descricao": equipa.nome, "link": f"/fisico/equipas/{equipa.id}", "icone": "jogador"},
+        ]
     acoes = [
         {"label": "Abrir calendário", "descricao": "Ver a operação do clube", "link": "/calendario", "icone": "calendario"},
     ]
@@ -110,7 +119,7 @@ def obter_contexto_navegacao(db, utilizador, clube_atual=None) -> dict:
     """Devolve apenas contexto permitido para a barra global."""
     if utilizador.perfil == PerfilEnum.atleta:
         return {
-            "dashboard_url": "/questionarios/diario",
+            "dashboard_url": "/questionarios/disponiveis",
             "equipas": [], "pendencias": [], "total_pendencias": 0,
             "total_urgentes": 0, "acoes_rapidas": [],
             "notificacoes": [], "total_notificacoes": 0,

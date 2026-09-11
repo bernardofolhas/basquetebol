@@ -21,6 +21,8 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     conta_id = None
     try:
+        db.query(Equipa).filter_by(id=equipa_id).update({"questionario_matinal_ativo": True})
+        db.commit()
         selecao = client_admin.get(f"/questionarios/equipas/{equipa_id}")
         assert selecao.status_code == 200
         assert "Escolher questionário" in selecao.text
@@ -46,7 +48,7 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
             follow_redirects=False,
         )
         assert login.status_code == 303
-        assert login.headers["location"] == "/questionarios/diario"
+        assert login.headers["location"] == "/questionarios/disponiveis"
         primeiro_acesso = cliente_atleta.get("/questionarios/diario", follow_redirects=False)
         assert primeiro_acesso.status_code == 303
         assert primeiro_acesso.headers["location"] == "/minha-conta"
@@ -55,7 +57,7 @@ def test_conta_atleta_questionario_e_painel_tecnico(client_admin):
         db.commit()
         area_interna = cliente_atleta.get("/jogadores", follow_redirects=False)
         assert area_interna.status_code == 303
-        assert area_interna.headers["location"] == "/questionarios/diario"
+        assert area_interna.headers["location"] == "/questionarios/disponiveis"
         questionario = cliente_atleta.get("/questionarios/diario")
         assert questionario.status_code == 200
         assert "Perceção subjetiva de esforço" in questionario.text
@@ -139,6 +141,7 @@ def test_elimina_questionario_matinal_sem_apagar_historico(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
         equipa = db.query(Equipa).filter_by(id=equipa_id).one()
+        equipa.questionario_matinal_ativo = True
         db.add(RespostaQuestionarioDiario(
             clube_id=equipa.clube_id,
             jogador_id=jogador_id,
@@ -186,6 +189,8 @@ def test_elimina_questionario_matinal_sem_apagar_historico(client_admin):
 def test_cria_questionario_aplica_a_treino_e_recolhe_resultados(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
+        db.query(Equipa).filter_by(id=equipa_id).update({"questionario_matinal_ativo": True})
+        db.commit()
         construtor = client_admin.get(f"/questionarios/equipas/{equipa_id}/novo?modelo=pse-pos-treino")
         assert construtor.status_code == 200
         assert "Perceção subjetiva de esforço - Pós-treino" in construtor.text
@@ -455,6 +460,8 @@ def test_regras_automaticas_seguem_calendario_sem_duplicar(client_admin):
                 automatica=True,
             ).all()
             assert [item.data for item in aplicacoes] == [data_esperada]
+            if regra == "diario":
+                assert aplicacoes[0].titulo is None
 
         client_admin.get(f"/questionarios/equipas/{equipa_id}")
         client_admin.get(f"/questionarios/equipas/{equipa_id}")

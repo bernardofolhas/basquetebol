@@ -45,6 +45,31 @@ def _equipas_staff_selecionadas(db: Session, equipa_ids: list[str], clube_id: in
     return equipas
 
 
+def _validar_atribuicoes_utilizador(
+    db: Session,
+    perfil: PerfilEnum,
+    equipa_ids: list[str],
+    treinador_id: str,
+    clube_id: int | None,
+) -> tuple[list[Equipa], int | None]:
+    """Valida e normaliza as ligações específicas de cada perfil."""
+    equipas = (
+        _equipas_staff_selecionadas(db, equipa_ids, clube_id)
+        if perfil in {PerfilEnum.staff, PerfilEnum.fisioterapeuta}
+        else []
+    )
+    if perfil == PerfilEnum.fisioterapeuta and not equipas:
+        raise ValueError("Seleciona pelo menos uma equipa para a conta de fisioterapeuta.")
+
+    treinador_associado = None
+    if perfil == PerfilEnum.treinador and treinador_id:
+        treinador = db.query(Treinador).filter(Treinador.id == int(treinador_id)).first()
+        if not treinador or treinador.clube_id != clube_id:
+            raise ValueError("Seleciona um treinador do teu clube.")
+        treinador_associado = treinador.id
+    return equipas, treinador_associado
+
+
 @router.get("/auditoria", response_class=HTMLResponse)
 def listar_auditoria(
     request: Request,
@@ -137,7 +162,9 @@ async def criar_utilizador(
 
     try:
         perfil_enum = PerfilEnum(perfil)
-        equipas_staff = _equipas_staff_selecionadas(db, equipa_ids, utilizador.clube_id) if perfil_enum in {PerfilEnum.staff, PerfilEnum.fisioterapeuta} else []
+        equipas_staff, treinador_associado = _validar_atribuicoes_utilizador(
+            db, perfil_enum, equipa_ids, treinador_id, utilizador.clube_id
+        )
     except ValueError as erro:
         return templates.TemplateResponse(request, "admin/utilizadores_form.html", _contexto_formulario_utilizador(db, utilizador, erro=str(erro)))
 
@@ -147,7 +174,8 @@ async def criar_utilizador(
         nome=nome,
         email=email,
         perfil=perfil_enum,
-        treinador_id=int(treinador_id) if treinador_id else None,
+        treinador_id=treinador_associado,
+        deve_alterar_password=perfil_enum == PerfilEnum.fisioterapeuta,
     )
     novo_utilizador.equipas_staff = equipas_staff
 
@@ -208,7 +236,9 @@ async def editar_utilizador(
 
     try:
         perfil_enum = PerfilEnum(perfil)
-        equipas_staff = _equipas_staff_selecionadas(db, equipa_ids, admin.clube_id) if perfil_enum in {PerfilEnum.staff, PerfilEnum.fisioterapeuta} else []
+        equipas_staff, treinador_associado = _validar_atribuicoes_utilizador(
+            db, perfil_enum, equipa_ids, treinador_id, admin.clube_id
+        )
     except ValueError as erro:
         return templates.TemplateResponse(request, "admin/utilizadores_form.html", _contexto_formulario_utilizador(db, admin, utilizador_editar, str(erro), "editar"))
 
@@ -217,7 +247,7 @@ async def editar_utilizador(
     utilizador_editar.email = email
     utilizador_editar.perfil = perfil_enum
     utilizador_editar.ativo = (ativo == "true")
-    utilizador_editar.treinador_id = int(treinador_id) if treinador_id else None
+    utilizador_editar.treinador_id = treinador_associado
     utilizador_editar.equipas_staff = equipas_staff
 
     if password and password.strip():

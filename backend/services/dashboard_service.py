@@ -477,9 +477,11 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None):
         AplicacaoQuestionario.ativa.is_(True),
     ).all()
     respostas_personalizadas = sum(len(aplicacao.submissoes or []) for aplicacao in aplicacoes)
-    respostas_personalizadas_hoje = sum(
-        len(aplicacao.submissoes or []) for aplicacao in aplicacoes if aplicacao.data == hoje
-    )
+    submissoes_personalizadas_hoje = [
+        submissao
+        for aplicacao in aplicacoes if aplicacao.data == hoje
+        for submissao in (aplicacao.submissoes or [])
+    ]
 
     respostas_diarias = db.query(RespostaQuestionarioDiario).join(Jogador).filter(
         Jogador.equipa_id == equipa.id,
@@ -510,15 +512,21 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None):
     minutos_fisicos = sum((sessao.min_fisicos or sessao.volume_minutos or 0) for sessao in sessoes_fisicas)
     rpes = [sessao.intensidade_rpe for sessao in sessoes_equipa if sessao.intensidade_rpe is not None]
 
+    atletas_que_responderam_hoje = {
+        resposta.jogador_id for resposta in respostas_hoje
+    } | {
+        submissao.jogador_id for submissao in submissoes_personalizadas_hoje
+    }
+
     return {
         "equipa": equipa,
         "inicio_semana": inicio_semana,
         "fim_semana": fim_semana,
         "questionarios": questionarios,
-        "respostas_hoje": len(respostas_hoje) + respostas_personalizadas_hoje,
+        "respostas_hoje": len(atletas_que_responderam_hoje),
         "respostas_semana": len(respostas_diarias) + respostas_personalizadas,
         "atletas_ativos": atletas_ativos,
-        "taxa_resposta": round(((len(respostas_hoje) + respostas_personalizadas_hoje) / atletas_ativos) * 100) if atletas_ativos else 0,
+        "taxa_resposta": round((len(atletas_que_responderam_hoje) / atletas_ativos) * 100) if atletas_ativos else 0,
         "alertas": alertas,
         "ultima_resposta_por_jogador": list(ultima_resposta_por_jogador.values()),
         "sessoes_semana": sessoes_equipa,
