@@ -247,7 +247,8 @@ def test_pse_rapida_abre_treino_do_dia_e_guarda_valores_individuais(client_admin
         assert pagina.status_code == 200
         assert "PSE individual" in pagina.text
         assert "Treino de hoje" in pagina.text
-        assert f'name="rpe_{jogadora_id}"' in pagina.text
+        assert f'<option value="{jogadora_id}"' in pagina.text
+        assert 'id="pse-entry-dialog"' in pagina.text
 
         resposta = client_admin.post(
             f"/assiduidade/sessoes/{sessao_id}/pse",

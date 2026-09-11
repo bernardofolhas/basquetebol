@@ -911,18 +911,30 @@ table tbody tr:hover { background:#fafbfd; }
 .pse-quick-form { overflow:hidden;border:1px solid var(--border-soft);border-radius:var(--radius-panel);background:#fff;box-shadow:var(--shadow-card); }
 .pse-quick-instructions { display:flex;align-items:baseline;gap:.7rem;border-bottom:1px solid var(--border-soft);background:var(--surface-subtle);padding:.85rem 1rem;color:var(--text-muted);font-size:.72rem;line-height:1.45; }
 .pse-quick-instructions strong { flex:none;color:var(--text-main);font-size:.75rem;font-weight:850; }
-.pse-player-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;padding:1rem; }
-.pse-player-card { display:grid;grid-template-columns:2.15rem minmax(0,1fr) auto;align-items:center;gap:.7rem;min-width:0;border:1px solid var(--border-soft);border-radius:.85rem;background:#fff;padding:.7rem .75rem;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s; }
-.pse-player-card:focus-within { border-color:var(--clube-primary);background:var(--clube-primary-surface);box-shadow:0 0 0 3px color-mix(in srgb,var(--clube-primary) 12%,transparent); }
-.pse-player-index { display:grid;width:2rem;height:2rem;place-items:center;border-radius:50%;background:var(--surface-muted);color:var(--text-muted);font-size:.72rem;font-weight:850; }
-.pse-player-name { display:flex;min-width:0;flex-direction:column;gap:.12rem; }
-.pse-player-name strong { overflow:hidden;color:var(--text-main);font-size:.78rem;font-weight:800;text-overflow:ellipsis;white-space:nowrap; }
-.pse-player-name small { color:var(--text-muted);font-size:.65rem;font-weight:700; }
-.pse-player-input { display:flex;align-items:center;gap:.35rem; }
-.pse-player-input>span { color:var(--clube-primary-dark);font-size:.62rem;font-weight:850;letter-spacing:.06em; }
-.pse-player-input input { width:4.5rem!important;height:2.6rem;padding:.35rem .45rem!important;text-align:center;font-size:1rem!important;font-weight:850; }
+.pse-quick-entry { display:grid;gap:.35rem;border-bottom:1px solid var(--border-soft);padding:1rem; }
+.pse-quick-entry label { color:var(--text-main);font-size:.75rem;font-weight:850; }
+.pse-quick-entry select { width:100%;height:3rem;font-size:.9rem;font-weight:750; }
+.pse-quick-entry-hint { color:var(--text-muted);font-size:.68rem; }
+.pse-player-status-list { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem;padding:1rem; }
+.pse-player-status-row { display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-width:0;border:1px solid var(--border-soft);border-radius:.7rem;background:var(--surface-subtle);padding:.6rem .7rem; }
+.pse-player-status-name { overflow:hidden;color:var(--text-main);font-size:.74rem;font-weight:750;text-overflow:ellipsis;white-space:nowrap; }
+.pse-player-status-name small { color:var(--text-muted);font-size:.64rem;font-weight:700; }
+.pse-player-status-row>strong { color:var(--clube-primary-dark);font-size:.8rem;font-weight:850; }
+.pse-player-status-row>span { flex:none;color:var(--text-muted);font-size:.64rem;font-weight:650; }
 .pse-quick-submit { display:flex;align-items:center;justify-content:space-between;gap:1rem;border-top:1px solid var(--border-soft);background:var(--surface-subtle);padding:.85rem 1rem; }
 .pse-quick-submit span { color:var(--text-muted);font-size:.7rem; }
+.pse-entry-dialog { width:min(92vw,25rem);margin:auto;border:0;border-radius:1.15rem;background:#fff;padding:0;box-shadow:var(--shadow-raised); }
+.pse-entry-dialog::backdrop { background:rgb(15 23 42 / .5);backdrop-filter:blur(3px); }
+.pse-entry-dialog-shell { overflow:hidden; }
+.pse-entry-dialog header { display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--border-soft);background:var(--surface-subtle);padding:1rem; }
+.pse-entry-dialog header p { color:var(--clube-primary-dark);font-size:.62rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase; }
+.pse-entry-dialog header h2 { margin-top:.2rem;color:var(--text-main);font-size:1rem;font-weight:850; }
+.pse-entry-dialog header button { display:grid;width:2rem;height:2rem;place-items:center;border:1px solid var(--border-soft);border-radius:50%;background:#fff;color:var(--text-muted);font-size:1.2rem; }
+.pse-entry-dialog-body { display:grid;gap:.45rem;padding:1.15rem 1rem; }
+.pse-entry-dialog-body label { color:var(--text-main);font-size:.78rem;font-weight:800; }
+.pse-entry-dialog-body input { width:100%!important;height:3.75rem;padding:.35rem!important;text-align:center;font-size:1.55rem!important;font-weight:850; }
+.pse-entry-dialog-body p { color:var(--text-muted);font-size:.68rem;text-align:center; }
+.pse-entry-dialog footer { display:flex;justify-content:flex-end;border-top:1px solid var(--border-soft);padding:.75rem 1rem; }
 .pse-quick-empty { display:grid;justify-items:center;gap:.45rem;border:1px dashed var(--border-strong);border-radius:var(--radius-panel);background:#fff;padding:3rem 1.25rem;text-align:center;box-shadow:var(--shadow-card); }
 .pse-quick-empty strong { color:var(--text-main);font-size:1rem;font-weight:850; }
 .pse-quick-empty p { max-width:32rem;color:var(--text-muted);font-size:.8rem;line-height:1.5; }
@@ -933,11 +945,8 @@ table tbody tr:hover { background:#fafbfd; }
     .pse-quick-session { align-items:stretch;flex-direction:column;gap:.75rem; }
     .pse-quick-session-picker { min-width:0; }
     .pse-quick-instructions { align-items:flex-start;flex-direction:column;gap:.15rem; }
-    .pse-player-grid { grid-template-columns:minmax(0,1fr);padding:.75rem; }
-    .pse-player-card { grid-template-columns:2.15rem minmax(0,1fr) auto;min-height:4.2rem;padding:.75rem; }
-    .pse-player-input input { width:4.9rem!important;height:2.9rem; }
-    .pse-quick-submit { position:sticky;bottom:0;z-index:2;align-items:stretch;flex-direction:column;gap:.55rem;padding:.75rem;box-shadow:0 -8px 18px rgb(15 23 42 / .07); }
-    .pse-quick-submit .ds-button { width:100%; }
+    .pse-player-status-list { grid-template-columns:minmax(0,1fr);padding:.75rem; }
+    .pse-quick-submit { padding:.7rem .75rem; }
 }
 .ds-attendance-heading h1 { margin:.15rem 0;color:#182230;font-size:clamp(1.45rem,2.5vw,2rem);font-weight:850;letter-spacing:-.035em; }
 .ds-attendance-heading>div>p:last-child { color:#667085;font-size:.82rem; }

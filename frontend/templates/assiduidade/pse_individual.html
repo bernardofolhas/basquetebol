@@ -33,33 +33,52 @@
     </section>
 
     {% if jogadores %}
-    <form method="post" action="/assiduidade/sessoes/{{ sessao.id }}/pse" class="pse-quick-form">
+    <form id="pse-quick-form" method="post" action="/assiduidade/sessoes/{{ sessao.id }}/pse" class="pse-quick-form">
         <div class="pse-quick-instructions">
             <strong>Como preencher</strong>
-            <span>Indica um valor entre 0 e 10 apenas para quem participou. Podes corrigir os valores e guardar novamente.</span>
+            <span>Escolhe o atleta, indica o valor entre 0 e 10 e pressiona Enter para guardar automaticamente.</span>
         </div>
 
-        <div class="pse-player-grid">
+        <div class="pse-quick-entry">
+            <label for="pse-player-select">Atleta</label>
+            <select id="pse-player-select" aria-label="Selecionar atleta para preencher PSE">
+                <option value="">Selecionar atleta</option>
+                {% for jogador in jogadores %}
+                {% set registo = registos_dict.get(jogador.id) %}
+                <option value="{{ jogador.id }}" data-current-pse="{{ registo.rpe_individual if registo and registo.rpe_individual is not none else '' }}">{{ jogador.nome }}{% if jogador.numero_camisola %} · #{{ jogador.numero_camisola }}{% endif %}</option>
+                {% endfor %}
+            </select>
+            <span class="pse-quick-entry-hint">Ao selecionar, abre o preenchimento rápido.</span>
+        </div>
+
+        <div class="pse-player-status-list" aria-label="Estado das PSE dos atletas">
             {% for jogador in jogadores %}
             {% set registo = registos_dict.get(jogador.id) %}
-            <label class="pse-player-card" for="pse-{{ jogador.id }}">
-                <span class="pse-player-index">{{ loop.index }}</span>
-                <span class="pse-player-name">
-                    <strong>{{ jogador.nome }}</strong>
-                    {% if jogador.numero_camisola %}<small>#{{ jogador.numero_camisola }}</small>{% endif %}
-                </span>
-                <span class="pse-player-input">
-                    <span>PSE</span>
-                    <input id="pse-{{ jogador.id }}" name="rpe_{{ jogador.id }}" type="number" inputmode="decimal" min="0" max="10" step="0.5" value="{{ registo.rpe_individual if registo and registo.rpe_individual is not none else '' }}" placeholder="0–10">
-                </span>
-            </label>
+            <div class="pse-player-status-row">
+                <span class="pse-player-status-name">{{ jogador.nome }}{% if jogador.numero_camisola %} <small>#{{ jogador.numero_camisola }}</small>{% endif %}</span>
+                {% if registo and registo.rpe_individual is not none %}<strong>{{ registo.rpe_individual }}</strong>{% else %}<span>Por preencher</span>{% endif %}
+            </div>
             {% endfor %}
         </div>
 
         <div class="pse-quick-submit">
-            <span>As alterações ficam disponíveis no relatório da equipa.</span>
-            <button type="submit" class="ds-button ds-button-primary">Guardar PSE</button>
+            <span>As respostas ficam disponíveis no relatório da equipa.</span>
         </div>
+
+        <dialog id="pse-entry-dialog" class="pse-entry-dialog" aria-labelledby="pse-entry-title">
+            <div class="pse-entry-dialog-shell">
+                <header>
+                    <div><p>PSE individual</p><h2 id="pse-entry-title">Seleciona um atleta</h2></div>
+                    <button type="button" id="pse-entry-close" aria-label="Fechar">×</button>
+                </header>
+                <div class="pse-entry-dialog-body">
+                    <label for="pse-entry-value">Esforço percebido (0–10)</label>
+                    <input id="pse-entry-value" type="number" inputmode="decimal" min="0" max="10" step="0.5" placeholder="0–10" enterkeyhint="done" autocomplete="off">
+                    <p>Pressiona Enter para guardar.</p>
+                </div>
+                <footer><button type="submit" class="ds-button ds-button-primary">Guardar PSE</button></footer>
+            </div>
+        </dialog>
     </form>
     {% else %}
     <div class="pse-quick-empty">
@@ -75,4 +94,54 @@
     </div>
     {% endif %}
 </div>
+<script>
+(() => {
+    const select = document.getElementById('pse-player-select');
+    const dialog = document.getElementById('pse-entry-dialog');
+    const title = document.getElementById('pse-entry-title');
+    const input = document.getElementById('pse-entry-value');
+    const close = document.getElementById('pse-entry-close');
+    const form = document.getElementById('pse-quick-form');
+    if (!select || !dialog || !title || !input || !form) return;
+
+    function abrirEntrada() {
+        const option = select.selectedOptions[0];
+        if (!option || !option.value) return;
+        title.textContent = option.textContent;
+        input.name = 'rpe_' + option.value;
+        input.value = option.dataset.currentPse || '';
+        dialog.showModal();
+        window.setTimeout(() => input.focus(), 50);
+    }
+
+    select.addEventListener('change', abrirEntrada);
+    select.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            abrirEntrada();
+        }
+    });
+    input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            form.requestSubmit();
+        }
+    });
+    close?.addEventListener('click', () => {
+        dialog.close();
+        select.value = '';
+        select.focus();
+    });
+    dialog.addEventListener('cancel', () => {
+        select.value = '';
+    });
+    form.addEventListener('submit', event => {
+        if (!input.name || !select.value) {
+            event.preventDefault();
+            return;
+        }
+        input.disabled = false;
+    });
+})();
+</script>
 {% endblock %}
