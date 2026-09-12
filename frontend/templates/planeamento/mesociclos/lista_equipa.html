@@ -27,21 +27,24 @@
 {% endif %}
 
 {% if mesociclos %}
-<div class="grid gap-4 lg:grid-cols-2">
+<div class="space-y-4" data-cycle-list="mesociclos">
     {% for meso in mesociclos %}
-    <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">Mesociclo {{ meso.numero }}</span>
-                    <span class="text-xs font-medium text-slate-500">Macro {{ meso.macrociclo.numero }}</span>
+    <article class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm transition hover:shadow-md" data-cycle-card="mesociclo" data-cycle-number="{{ meso.numero }}">
+        <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="rounded-full bg-indigo-600 px-3 py-1 text-sm font-bold text-white">Meso {{ meso.numero }}</span>
+                    <span class="text-sm text-gray-500">{{ meso.data_inicio|data_pt }} → {{ meso.data_fim|data_pt }}</span>
                 </div>
-                <p class="mt-3 font-semibold text-slate-900">{{ meso.data_inicio|data_pt }} a {{ meso.data_fim|data_pt }}</p>
-                <p class="mt-1 text-sm text-slate-500">{{ meso.microciclos|length }} microciclo(s)</p>
+                <div class="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-400">
+                    <span>Macro {{ meso.macrociclo.numero }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{{ meso.microciclos|length }} microciclo(s)</span>
+                </div>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <a href="/planeamento/mesociclos/{{ meso.id }}" class="rounded-xl bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600">Abrir</a>
-                <a href="/planeamento/mesociclos/{{ meso.id }}/editar" class="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Editar</a>
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                <a href="/planeamento/mesociclos/{{ meso.id }}" class="text-sm font-medium text-orange-500 hover:text-orange-600">Ver →</a>
+                <a href="/planeamento/mesociclos/{{ meso.id }}/editar" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Editar</a>
             </div>
         </div>
     </article>

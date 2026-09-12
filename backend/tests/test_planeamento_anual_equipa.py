@@ -109,6 +109,18 @@ def test_treinador_gere_anual_da_equipa_e_hierarquia_integrada():
         )
         db.add(micro)
         db.flush()
+        meso_seguinte = Mesociclo(
+            clube_id=clube.id, numero=2, data_inicio=date(2026, 10, 1),
+            data_fim=date(2026, 10, 31), macrociclo_id=macro.id,
+        )
+        db.add(meso_seguinte)
+        db.flush()
+        micro_seguinte = Microciclo(
+            clube_id=clube.id, numero=2, data_inicio=date(2026, 10, 5),
+            data_fim=date(2026, 10, 11), mesociclo_id=meso_seguinte.id,
+        )
+        db.add(micro_seguinte)
+        db.flush()
         sessao = SessaoTreino(
             clube_id=clube.id, data=date(2026, 9, 8), microciclo_id=micro.id,
             hora_inicio="18:00", hora_fim="19:30",
@@ -120,6 +132,16 @@ def test_treinador_gere_anual_da_equipa_e_hierarquia_integrada():
         db.commit()
         assert plano.sessao.microciclo.mesociclo.macrociclo.planeamento_anual_equipa.id == anual_equipa.id
         assert anual_equipa.planeamento_clube_anual.id == anual_clube.id
+
+        pagina_mesos = cliente.get(f"/planeamento/equipas/{equipa.id}/mesociclos")
+        assert pagina_mesos.status_code == 200
+        assert 'data-cycle-list="mesociclos"' in pagina_mesos.text
+        assert pagina_mesos.text.index('data-cycle-number="1"') < pagina_mesos.text.index('data-cycle-number="2"')
+
+        pagina_micros = cliente.get(f"/planeamento/equipas/{equipa.id}/microciclos")
+        assert pagina_micros.status_code == 200
+        assert 'data-cycle-list="microciclos"' in pagina_micros.text
+        assert pagina_micros.text.index('data-cycle-number="1"') < pagina_micros.text.index('data-cycle-number="2"')
 
         bloqueio = cliente.get(f"/planeamento/equipas/{equipa_externa.id}/anuais", follow_redirects=False)
         assert bloqueio.status_code in (302, 303)

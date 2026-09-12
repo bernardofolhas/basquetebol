@@ -1272,7 +1272,7 @@ def listar_macrociclos(equipa_id: int, request: Request, db: Session = Depends(g
 
     macrociclos = db.query(Macrociclo).filter(
         Macrociclo.equipa_id == equipa_id,
-    ).order_by(Macrociclo.data_inicio.desc(), Macrociclo.numero.desc()).all()
+    ).order_by(Macrociclo.numero.asc(), Macrociclo.data_inicio.asc(), Macrociclo.id.asc()).all()
     return templates.TemplateResponse(request, "planeamento/macrociclos/lista.html", {
         "utilizador": utilizador,
         "equipa": equipa,
@@ -1295,10 +1295,15 @@ def listar_mesociclos_equipa(
 
     macrociclos = db.query(Macrociclo).filter(
         Macrociclo.equipa_id == equipa_id,
-    ).order_by(Macrociclo.data_inicio.desc(), Macrociclo.numero.desc()).all()
+    ).order_by(Macrociclo.numero.asc(), Macrociclo.data_inicio.asc(), Macrociclo.id.asc()).all()
     mesociclos = db.query(Mesociclo).join(Macrociclo).filter(
         Macrociclo.equipa_id == equipa_id,
-    ).order_by(Mesociclo.data_inicio.desc(), Mesociclo.numero.desc()).all()
+    ).order_by(
+        Macrociclo.numero.asc(),
+        Mesociclo.numero.asc(),
+        Mesociclo.data_inicio.asc(),
+        Mesociclo.id.asc(),
+    ).all()
     return templates.TemplateResponse(request, "planeamento/mesociclos/lista_equipa.html", {
         "utilizador": utilizador,
         "equipa": equipa,
@@ -1322,10 +1327,21 @@ def listar_microciclos_equipa(
 
     mesociclos = db.query(Mesociclo).join(Macrociclo).filter(
         Macrociclo.equipa_id == equipa_id,
-    ).order_by(Mesociclo.data_inicio.desc(), Mesociclo.numero.desc()).all()
+    ).order_by(
+        Macrociclo.numero.asc(),
+        Mesociclo.numero.asc(),
+        Mesociclo.data_inicio.asc(),
+        Mesociclo.id.asc(),
+    ).all()
     microciclos = db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(
         Macrociclo.equipa_id == equipa_id,
-    ).order_by(Microciclo.data_inicio.desc(), Microciclo.numero.desc()).all()
+    ).order_by(
+        Macrociclo.numero.asc(),
+        Mesociclo.numero.asc(),
+        Microciclo.numero.asc(),
+        Microciclo.data_inicio.asc(),
+        Microciclo.id.asc(),
+    ).all()
     return templates.TemplateResponse(request, "planeamento/microciclos/lista_equipa.html", {
         "utilizador": utilizador,
         "equipa": equipa,
