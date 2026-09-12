@@ -12,6 +12,10 @@
     "Voltar à equipa"
 ) }}
 
+<div class="mb-6 flex justify-end">
+    <a href="/exportacoes/equipas/{{ equipa.id }}/planeamento" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Selecionar para exportar</a>
+</div>
+
 <div class="mb-6 rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-900">
     Cada plano está associado a uma sessão de treino. Para criar uma nova sessão, abre os <a href="/planeamento/equipas/{{ equipa.id }}/microciclos" class="font-bold underline">microciclos</a>; para preparar o conteúdo, usa diretamente a lista abaixo.
 </div>

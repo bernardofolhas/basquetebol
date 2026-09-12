@@ -12,6 +12,10 @@
     "Voltar à equipa"
 ) }}
 
+<div class="mb-6 flex justify-end">
+    <a href="/exportacoes/equipas/{{ equipa.id }}/planeamento" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Selecionar para exportar</a>
+</div>
+
 {% if mesociclos %}
 <details class="mb-6 rounded-2xl border border-orange-100 bg-orange-50 p-4">
     <summary class="cursor-pointer font-semibold text-orange-900">Criar um microciclo</summary>

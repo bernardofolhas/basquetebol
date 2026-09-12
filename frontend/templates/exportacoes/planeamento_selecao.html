@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "partials/equipa_contexto.html" import equipa_contexto %}
+
+{% block titulo %}Exportar planeamento - {{ equipa.nome }}{% endblock %}
+{% block conteudo %}
+{{ equipa_contexto(
+    equipa,
+    "Exportar planeamento",
+    "Seleciona livremente macrociclos, mesociclos, microciclos e treinos.",
+    "planeamento",
+    "/planeamento/equipas/" ~ equipa.id ~ "/macrociclos",
+    "Voltar ao planeamento"
+) }}
+
+<form method="POST" action="/exportacoes/equipas/{{ equipa.id }}/planeamento" id="form-exportacao-planeamento" class="space-y-6">
+    <input type="hidden" name="_csrf" value="{{ request.session.get('_csrf', '') }}">
+
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Exportação múltipla</p>
+                <h2 class="mt-1 text-xl font-bold text-slate-900">Escolhe os documentos</h2>
+                <p class="mt-1 text-sm text-slate-500">Podes combinar documentos de níveis diferentes na mesma exportação.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" data-select-all class="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Selecionar tudo</button>
+                <button type="button" data-clear-all class="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Limpar seleção</button>
+            </div>
+        </div>
+    </div>
+
+    {% set secoes = [
+        ('macros', 'Macrociclos', macrociclos),
+        ('mesos', 'Mesociclos', mesociclos),
+        ('micros', 'Microciclos', microciclos),
+        ('treinos', 'Treinos', treinos)
+    ] %}
+    {% for chave, titulo, elementos in secoes %}
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" data-export-section="{{ chave }}">
+        <div class="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
+            <div>
+                <h2 class="font-bold text-slate-900">{{ titulo }}</h2>
+                <p class="text-xs text-slate-500">{{ elementos|length }} disponível(eis)</p>
+            </div>
+            {% if elementos %}<button type="button" data-select-section="{{ chave }}" class="text-sm font-semibold text-orange-600 hover:text-orange-700">Selecionar secção</button>{% endif %}
+        </div>
+        {% if elementos %}
+        <div class="divide-y divide-slate-100">
+            {% for item in elementos %}
+            {% if chave == 'macros' %}
+                {% set valor = 'macro:' ~ item.id %}
+                {% set nome = 'Macrociclo ' ~ item.numero %}
+                {% set datas = (item.data_inicio|data_pt) ~ ' → ' ~ (item.data_fim|data_pt) %}
+                {% set detalhe = (item.mesociclos|length) ~ ' mesociclo(s)' %}
+            {% elif chave == 'mesos' %}
+                {% set valor = 'meso:' ~ item.id %}
+                {% set nome = 'Mesociclo ' ~ item.numero %}
+                {% set datas = (item.data_inicio|data_pt) ~ ' → ' ~ (item.data_fim|data_pt) %}
+                {% set detalhe = 'Macro ' ~ item.macrociclo.numero ~ ' · ' ~ (item.microciclos|length) ~ ' microciclo(s)' %}
+            {% elif chave == 'micros' %}
+                {% set valor = 'micro:' ~ item.id %}
+                {% set nome = 'Microciclo ' ~ item.numero %}
+                {% set datas = (item.data_inicio|data_pt) ~ ' → ' ~ (item.data_fim|data_pt) %}
+                {% set detalhe = 'Macro ' ~ item.mesociclo.macrociclo.numero ~ ' · Meso ' ~ item.mesociclo.numero %}
+            {% else %}
+                {% set valor = 'treino:' ~ item.id %}
+                {% set nome = ('Treino físico ' if (item.tipo_treino or 'normal') == 'fisico' else 'Treino ') ~ (item.numero_treino or 'sem número') %}
+                {% set datas = item.data|data_pt %}
+                {% set detalhe = 'Micro ' ~ item.microciclo.numero ~ (' · ' ~ item.hora_inicio if item.hora_inicio else '') %}
+            {% endif %}
+            <label class="group flex cursor-pointer items-center gap-4 px-5 py-4 transition hover:bg-orange-50/50">
+                <input type="checkbox" name="itens" value="{{ valor }}" class="h-5 w-5 shrink-0 rounded border-slate-300 text-orange-600 focus:ring-orange-500" data-export-item>
+                <span class="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                    <span class="block font-semibold text-slate-900">{{ nome }}</span>
+                    <span class="mt-1 block text-sm text-slate-500 sm:mt-0 sm:text-right">{{ datas }} <span class="text-slate-300">·</span> {{ detalhe }}</span>
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="px-5 py-6 text-sm text-slate-400">Sem documentos neste nível.</p>
+        {% endif %}
+    </section>
+    {% endfor %}
+
+    <div class="sticky bottom-4 z-20 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <p class="text-sm font-semibold text-slate-700"><span data-selected-count>0</span> documento(s) selecionado(s)</p>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700">
+                    <input type="radio" name="formato" value="pdf" checked class="text-orange-600 focus:ring-orange-500">
+                    Um PDF único
+                </label>
+                <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700">
+                    <input type="radio" name="formato" value="zip" class="text-orange-600 focus:ring-orange-500">
+                    Pasta ZIP, PDFs separados
+                </label>
+                <button type="submit" disabled class="rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300" data-export-submit>Exportar seleção</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+(() => {
+    const form = document.getElementById('form-exportacao-planeamento');
+    if (!form) return;
+    const items = [...form.querySelectorAll('[data-export-item]')];
+    const count = form.querySelector('[data-selected-count]');
+    const submit = form.querySelector('[data-export-submit]');
+    const update = () => {
+        const total = items.filter((item) => item.checked).length;
+        count.textContent = total;
+        submit.disabled = total === 0;
+    };
+    items.forEach((item) => item.addEventListener('change', update));
+    form.querySelector('[data-select-all]')?.addEventListener('click', () => {
+        items.forEach((item) => { item.checked = true; });
+        update();
+    });
+    form.querySelector('[data-clear-all]')?.addEventListener('click', () => {
+        items.forEach((item) => { item.checked = false; });
+        update();
+    });
+    form.querySelectorAll('[data-select-section]').forEach((button) => {
+        button.addEventListener('click', () => {
+            form.querySelectorAll(`[data-export-section="${button.dataset.selectSection}"] [data-export-item]`).forEach((item) => { item.checked = true; });
+            update();
+        });
+    });
+    update();
+})();
+</script>
+{% endblock %}

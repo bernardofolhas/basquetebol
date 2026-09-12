@@ -16,7 +16,11 @@
 ) }}
 
 <!-- Botão para criar novo macrociclo -->
-<div class="flex justify-end mb-6">
+<div class="mb-6 flex flex-wrap justify-end gap-2">
+    <a href="/exportacoes/equipas/{{ equipa.id }}/planeamento"
+       class="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50">
+        Selecionar para exportar
+    </a>
     <a href="/planeamento/equipas/{{ equipa.id }}/macrociclos/novo"
        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition">
         + Novo Macrociclo

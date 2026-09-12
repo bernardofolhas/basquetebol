@@ -1,5 +1,9 @@
 from datetime import date
+from io import BytesIO
 from uuid import uuid4
+from zipfile import ZipFile
+
+from pypdf import PdfReader
 
 from auth import encriptar_password
 from database import SessionLocal
@@ -153,6 +157,34 @@ def test_treinador_gere_anual_da_equipa_e_hierarquia_integrada():
         assert pagina_treinos.status_code == 200
         assert "data-training-list" in pagina_treinos.text
         assert pagina_treinos.text.index('data-training-card-number="1"') < pagina_treinos.text.index('data-training-card-number="2"')
+
+        pagina_exportacao = cliente.get(f"/exportacoes/equipas/{equipa.id}/planeamento")
+        assert pagina_exportacao.status_code == 200
+        assert f'value="macro:{macro.id}"' in pagina_exportacao.text
+        assert f'value="meso:{meso.id}"' in pagina_exportacao.text
+        assert f'value="micro:{micro.id}"' in pagina_exportacao.text
+        assert f'value="treino:{sessao.id}"' in pagina_exportacao.text
+        assert "Um PDF único" in pagina_exportacao.text
+        assert "Pasta ZIP, PDFs separados" in pagina_exportacao.text
+
+        exportacao_zip = cliente.post(
+            f"/exportacoes/equipas/{equipa.id}/planeamento",
+            data={"itens": [f"micro:{micro.id}", f"treino:{sessao.id}"], "formato": "zip"},
+        )
+        assert exportacao_zip.status_code == 200
+        assert exportacao_zip.headers["content-type"] == "application/zip"
+        with ZipFile(BytesIO(exportacao_zip.content)) as arquivo:
+            assert len(arquivo.namelist()) == 2
+            assert arquivo.namelist()[0].endswith("Microciclo_1.pdf")
+            assert arquivo.namelist()[1].endswith("Treino_2.pdf")
+
+        exportacao_pdf = cliente.post(
+            f"/exportacoes/equipas/{equipa.id}/planeamento",
+            data={"itens": [f"meso:{meso.id}", f"treino:{sessao.id}"], "formato": "pdf"},
+        )
+        assert exportacao_pdf.status_code == 200
+        assert exportacao_pdf.headers["content-type"] == "application/pdf"
+        assert len(PdfReader(BytesIO(exportacao_pdf.content)).pages) >= 2
 
         bloqueio = cliente.get(f"/planeamento/equipas/{equipa_externa.id}/anuais", follow_redirects=False)
         assert bloqueio.status_code in (302, 303)

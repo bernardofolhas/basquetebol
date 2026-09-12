@@ -8,16 +8,19 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+from pypdf import PdfReader, PdfWriter
 from sqlalchemy import and_, or_, select
 from sqlalchemy.inspection import inspect as sa_inspect
 from sqlalchemy.orm import Session
+from template_config import Jinja2Templates
 
-from auth_deps import exigir_coordenacao, exigir_operacao_desportiva, verificar_ou_negar_equipa
+from auth_deps import exigir_autenticacao, exigir_coordenacao, exigir_operacao_desportiva, verificar_ou_negar_equipa
 from database import get_db
+from flash import set_flash
 from models.avaliacao import AvaliacaoJogador, ParametroAvaliacao
 from models.assiduidade import RegistoAssiduidade
 from models.atividade import Atividade
@@ -53,12 +56,14 @@ from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.treinador import Treinador, treinador_equipa
 from models.treino import BibliotecoExercicio, BlocoTreino, ExercicioPlano, ImportacaoPlanoTreino, PlanoTreino
 from models.utilizador import Utilizador
-from paths import STATIC_DIR
+from paths import STATIC_DIR, TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
 from services.fotografia_jogador_service import caminho_fotografia
 from services.identidade_clube_service import caminho_ficheiro_logo
+from services.pdf_service import content_disposition_pdf
 
 router = APIRouter(prefix="/exportacoes", tags=["exportacoes"])
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 COLUNAS_SENSIVEIS = {"utilizadores": {"password_hash", "sessao_versao"}}
 LIMITE_TEXTO_EXCEL = 32_000
@@ -77,6 +82,170 @@ def _valor_serializavel(valor):
     if isinstance(valor, (date, datetime)):
         return valor.isoformat()
     return getattr(valor, "value", str(valor))
+
+
+def _juntar_pdfs(documentos: list[tuple[str, bytes]]) -> bytes:
+    escritor = PdfWriter()
+    for _, conteudo in documentos:
+        leitor = PdfReader(BytesIO(conteudo))
+        for pagina in leitor.pages:
+            escritor.add_page(pagina)
+    destino = BytesIO()
+    escritor.write(destino)
+    return destino.getvalue()
+
+
+def _arquivar_pdfs(documentos: list[tuple[str, bytes]]) -> bytes:
+    destino = BytesIO()
+    with ZipFile(destino, "w", ZIP_DEFLATED) as arquivo:
+        for indice, (nome, conteudo) in enumerate(documentos, start=1):
+            arquivo.writestr(f"{indice:02d}_{_nome_seguro(nome, 'documento')}.pdf", conteudo)
+    return destino.getvalue()
+
+
+def _gerar_pdf_planeamento_selecionado(
+    tipo: str,
+    item_id: int,
+    equipa_id: int,
+    request: Request,
+    db: Session,
+    utilizador,
+) -> tuple[str, bytes]:
+    # As rotas individuais continuam a ser a fonte única dos dados e do design de cada PDF.
+    from routers.planeamento import exportar_pdf_macrociclo, exportar_pdf_mesociclo, exportar_pdf_microciclo
+    from routers.treino import exportar_pdf_plano
+
+    if tipo == "macro":
+        item = db.query(Macrociclo).filter(Macrociclo.id == item_id, Macrociclo.equipa_id == equipa_id).first()
+        if not item:
+            raise HTTPException(status_code=400, detail="Macrociclo inválido para esta equipa.")
+        resposta = exportar_pdf_macrociclo(item.id, request, db, utilizador)
+        nome = f"Macrociclo {item.numero}"
+    elif tipo == "meso":
+        item = db.query(Mesociclo).join(Macrociclo).filter(
+            Mesociclo.id == item_id,
+            Macrociclo.equipa_id == equipa_id,
+        ).first()
+        if not item:
+            raise HTTPException(status_code=400, detail="Mesociclo inválido para esta equipa.")
+        resposta = exportar_pdf_mesociclo(item.id, request, db, utilizador)
+        nome = f"Mesociclo {item.numero}"
+    elif tipo == "micro":
+        item = db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Microciclo.id == item_id,
+            Macrociclo.equipa_id == equipa_id,
+        ).first()
+        if not item:
+            raise HTTPException(status_code=400, detail="Microciclo inválido para esta equipa.")
+        resposta = exportar_pdf_microciclo(item.id, request, db, utilizador)
+        nome = f"Microciclo {item.numero}"
+    elif tipo == "treino":
+        item = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            SessaoTreino.id == item_id,
+            Macrociclo.equipa_id == equipa_id,
+            SessaoTreino.ativa.is_(True),
+            SessaoTreino.e_jogo.is_(False),
+        ).first()
+        if not item:
+            raise HTTPException(status_code=400, detail="Treino inválido para esta equipa.")
+        resposta = exportar_pdf_plano(item.id, request, db, utilizador)
+        prefixo = "Treino físico" if (item.tipo_treino or "normal") == "fisico" else "Treino"
+        nome = f"{prefixo} {item.numero_treino}" if item.numero_treino is not None else prefixo
+    else:
+        raise HTTPException(status_code=400, detail="Tipo de documento inválido.")
+
+    if not isinstance(resposta, Response) or resposta.media_type != "application/pdf":
+        raise HTTPException(status_code=400, detail=f"Não foi possível gerar {nome}.")
+    return nome, bytes(resposta.body)
+
+
+@router.get("/equipas/{equipa_id}/planeamento", response_class=HTMLResponse)
+def selecionar_exportacao_planeamento(
+    equipa_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse("/equipas", status_code=303)
+
+    macros = db.query(Macrociclo).filter(Macrociclo.equipa_id == equipa_id).order_by(
+        Macrociclo.numero.asc(), Macrociclo.data_inicio.asc(), Macrociclo.id.asc(),
+    ).all()
+    mesos = db.query(Mesociclo).join(Macrociclo).filter(Macrociclo.equipa_id == equipa_id).order_by(
+        Macrociclo.numero.asc(), Mesociclo.numero.asc(), Mesociclo.data_inicio.asc(), Mesociclo.id.asc(),
+    ).all()
+    micros = db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(Macrociclo.equipa_id == equipa_id).order_by(
+        Microciclo.numero.asc(), Microciclo.data_inicio.asc(), Microciclo.id.asc(),
+    ).all()
+    treinos = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+        Macrociclo.equipa_id == equipa_id,
+        SessaoTreino.ativa.is_(True),
+        SessaoTreino.e_jogo.is_(False),
+    ).order_by(
+        SessaoTreino.tipo_treino.asc(), SessaoTreino.numero_treino.asc(),
+        SessaoTreino.data.asc(), SessaoTreino.hora_inicio.asc(), SessaoTreino.id.asc(),
+    ).all()
+    return templates.TemplateResponse(request, "exportacoes/planeamento_selecao.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "macrociclos": macros,
+        "mesociclos": mesos,
+        "microciclos": micros,
+        "treinos": treinos,
+    })
+
+
+@router.post("/equipas/{equipa_id}/planeamento")
+def exportar_planeamento_selecionado(
+    equipa_id: int,
+    request: Request,
+    itens: list[str] = Form([]),
+    formato: str = Form("pdf"),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse("/equipas", status_code=303)
+    if not itens:
+        set_flash(request, "Seleciona pelo menos um documento para exportar.", "error")
+        return RedirectResponse(f"/exportacoes/equipas/{equipa_id}/planeamento", status_code=303)
+    if len(itens) > 80:
+        raise HTTPException(status_code=400, detail="Seleciona no máximo 80 documentos de cada vez.")
+    if formato not in {"pdf", "zip"}:
+        raise HTTPException(status_code=400, detail="Formato de exportação inválido.")
+
+    documentos: list[tuple[str, bytes]] = []
+    vistos: set[tuple[str, int]] = set()
+    for valor in itens:
+        try:
+            tipo, id_texto = valor.split(":", 1)
+            chave = (tipo, int(id_texto))
+        except (AttributeError, TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Seleção de documentos inválida.")
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        documentos.append(_gerar_pdf_planeamento_selecionado(
+            chave[0], chave[1], equipa_id, request, db, utilizador,
+        ))
+
+    nome_base = f"Planeamento {equipa.nome}"
+    if formato == "zip":
+        return Response(
+            _arquivar_pdfs(documentos),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{_nome_seguro(nome_base)}.zip"'},
+        )
+    return Response(
+        _juntar_pdfs(documentos),
+        media_type="application/pdf",
+        headers={"Content-Disposition": content_disposition_pdf(nome_base)},
+    )
 
 
 def _valor_excel(valor):
