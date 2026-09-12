@@ -166,6 +166,8 @@ def test_treinador_gere_anual_da_equipa_e_hierarquia_integrada():
         assert f'value="treino:{sessao.id}"' in pagina_exportacao.text
         assert "Um PDF único" in pagina_exportacao.text
         assert "Pasta ZIP, PDFs separados" in pagina_exportacao.text
+        assert 'name="csrf_token"' in pagina_exportacao.text
+        assert 'name="_csrf"' not in pagina_exportacao.text
 
         exportacao_zip = cliente.post(
             f"/exportacoes/equipas/{equipa.id}/planeamento",
