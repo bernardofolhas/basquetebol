@@ -9,7 +9,8 @@
         <canvas id="grafico-volume"></canvas>
     </div>
     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 class="font-semibold text-gray-700 mb-4">Intensidade RPE por treino</h2>
+        <h2 class="font-semibold text-gray-700 mb-1">Intensidade por treino</h2>
+        <p class="mb-4 text-xs text-slate-500">Compara a RPE planeada com a média comunicada pelos atletas.</p>
         <canvas id="grafico-rpe"></canvas>
     </div>
 </div>
@@ -99,10 +100,32 @@
         <p data-balanco-volume class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.volume_total }}</p>
     </div>
     <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-        <p class="text-xs uppercase tracking-[0.2em] text-slate-600">Media RPE</p>
+        <p class="text-xs uppercase tracking-[0.2em] text-slate-600">RPE planeada</p>
         <p data-balanco-rpe class="mt-3 text-3xl font-bold text-gray-900">{{ balanco.media_rpe }}</p>
     </div>
 </div>
+
+<section data-workspace-panel="micro:carga" role="tabpanel" class="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="border-b border-slate-100 px-5 py-4">
+        <p class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Dados pós-treino</p>
+        <h2 class="mt-1 text-lg font-bold text-slate-900">Intensidade e carga reais</h2>
+        <p class="mt-1 text-sm text-slate-500">Calculadas com a RPE individual recolhida após cada treino.</p>
+    </div>
+    <div class="grid grid-cols-2 gap-px bg-slate-100 lg:grid-cols-4">
+        <div class="bg-white p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">RPE real média</p><p class="mt-2 text-2xl font-black text-emerald-700">{{ analise_carga_real.intensidade_real if analise_carga_real.intensidade_real is not none else '—' }}</p></div>
+        <div class="bg-white p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Carga real</p><p class="mt-2 text-2xl font-black text-slate-900">{{ analise_carga_real.carga_real if analise_carga_real.carga_real is not none else '—' }}</p><p class="mt-1 text-xs text-slate-500">min × RPE</p></div>
+        <div class="bg-white p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Desvio da carga</p><p class="mt-2 text-2xl font-black {% if analise_carga_real.desvio_carga is not none and analise_carga_real.desvio_carga > 0 %}text-amber-600{% else %}text-slate-900{% endif %}">{{ ('+' if analise_carga_real.desvio_carga is not none and analise_carga_real.desvio_carga > 0 else '') ~ analise_carga_real.desvio_carga if analise_carga_real.desvio_carga is not none else '—' }}</p><p class="mt-1 text-xs text-slate-500">face às sessões comparáveis</p></div>
+        <div class="bg-white p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Cobertura</p><p class="mt-2 text-2xl font-black text-slate-900">{{ analise_carga_real.cobertura }}%</p><p class="mt-1 text-xs text-slate-500">{{ analise_carga_real.sessoes_com_rpe }}/{{ analise_carga_real.sessoes_total }} treinos · {{ analise_carga_real.respostas }} respostas</p></div>
+    </div>
+    {% if analise_carga_real.linhas %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left text-sm">
+            <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-5 py-3">Treino</th><th class="px-4 py-3">Volume</th><th class="px-4 py-3">RPE planeada</th><th class="px-4 py-3">RPE real</th><th class="px-4 py-3">Carga real</th><th class="px-5 py-3 text-right">Respostas</th></tr></thead>
+            <tbody class="divide-y divide-slate-100">{% for linha in analise_carga_real.linhas %}<tr><td class="px-5 py-3 font-semibold text-slate-800"><a href="/treino/sessoes/{{ linha.sessao.id }}" class="hover:text-emerald-700">{{ linha.sessao.data|data_pt }}{% if linha.sessao.numero_treino %} · Treino {{ linha.sessao.numero_treino }}{% endif %}</a></td><td class="px-4 py-3 text-slate-600">{{ linha.volume }} min</td><td class="px-4 py-3 text-slate-600">{{ linha.rpe_planeada if linha.rpe_planeada is not none else '—' }}</td><td class="px-4 py-3 font-bold text-emerald-700">{{ linha.rpe_real if linha.rpe_real is not none else '—' }}</td><td class="px-4 py-3 font-semibold text-slate-800">{{ linha.carga_real if linha.carga_real is not none else '—' }}</td><td class="px-5 py-3 text-right text-slate-500">{{ linha.respostas }}</td></tr>{% endfor %}</tbody>
+        </table>
+    </div>
+    {% endif %}
+</section>
 
 {% if objetivos_superiores.macrociclo or objetivos_superiores.mesociclo or objetivos_por_categoria %}
 <details data-workspace-panel="micro:objetivos" role="tabpanel" class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 mb-6 group">
@@ -355,6 +378,7 @@
 
     // Dados de RPE — intensidade de cada sessão
     let rpes = {{ dados_graficos.rpes | tojson }};
+    const rpesReais = {{ dados_graficos.rpes_reais | tojson }};
 
     // ─────────────────────────────
     // GRÁFICO DE VOLUME (barras)
@@ -413,7 +437,7 @@
         data: {
             labels: labels,
             datasets: [{
-                label: 'RPE',
+                label: 'RPE planeada',
                 data: rpes,
                 // Cor da linha
                 borderColor: 'rgba(59, 130, 246, 1)',
@@ -427,14 +451,23 @@
                 // Tamanho dos pontos na linha
                 pointRadius: 5,
                 pointBackgroundColor: 'rgba(59, 130, 246, 1)'
+            }, {
+                label: 'RPE real',
+                data: rpesReais,
+                borderColor: 'rgba(5, 150, 105, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 3,
+                tension: 0.3,
+                fill: false,
+                spanGaps: false,
+                pointRadius: 5,
+                pointBackgroundColor: 'rgba(5, 150, 105, 1)'
             }]
         },
         options: {
             responsive: true,
             plugins: {
-                legend: {
-                    display: false
-                }
+                legend: { display: true, position: 'bottom' }
             },
             scales: {
                 y: {

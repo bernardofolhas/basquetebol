@@ -475,7 +475,6 @@ def _media(valores) -> float | None:
 def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
     """Resume respostas reais e carga da equipa num período selecionável."""
     from models.jogador import Jogador
-    from models.assiduidade import RegistoAssiduidade
     from models.planeamento import SessaoTreino
     from models.questionario import (
         AplicacaoQuestionario,
@@ -485,7 +484,7 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
         RespostaQuestionarioDiario,
         SubmissaoQuestionario,
     )
-    from services.assiduidade_service import calcular_pse_real
+    from services.carga_real_service import analisar_carga_sessoes
     from sqlalchemy.orm import joinedload, selectinload
 
     hoje = hoje or date.today()
@@ -509,15 +508,7 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
         except AttributeError:
             continue
 
-    registos_pse_por_sessao = defaultdict(list)
-    sessao_ids = [sessao.id for sessao in sessoes_equipa]
-    if sessao_ids:
-        registos_pse = db.query(RegistoAssiduidade).filter(
-            RegistoAssiduidade.sessao_id.in_(sessao_ids),
-            RegistoAssiduidade.rpe_individual.isnot(None),
-        ).all()
-        for registo in registos_pse:
-            registos_pse_por_sessao[registo.sessao_id].append(registo)
+    analise_carga_real = analisar_carga_sessoes(db, sessoes_equipa)
 
     questionarios = db.query(QuestionarioPersonalizado).filter(
         QuestionarioPersonalizado.equipa_id == equipa.id,
@@ -643,12 +634,10 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
 
     for sessao in sessoes_equipa:
         dia = sessao.data
-        pse_real = calcular_pse_real(registos_pse_por_sessao[sessao.id])
+        linha_carga = analise_carga_real["por_sessao"].get(sessao.id, {})
+        pse_real = linha_carga.get("rpe_real")
         sessao.pse_real = pse_real
-        sessao.carga_real = (
-            round((sessao.volume_minutos or 0) * pse_real, 1)
-            if pse_real is not None else None
-        )
+        sessao.carga_real = linha_carga.get("carga_real")
         if pse_real is not None:
             valores_por_indicador["rpe_real"][dia].append(pse_real)
             valores_por_indicador["carga_real"][dia].append(sessao.carga_real)
@@ -722,14 +711,6 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
         (sessao.volume_minutos or 0) * (sessao.intensidade_rpe or 0)
         for sessao in sessoes_equipa
     )
-    cargas_reais = [
-        sessao.carga_real for sessao in sessoes_equipa
-        if sessao.carga_real is not None
-    ]
-    rpes_reais = [
-        sessao.pse_real for sessao in sessoes_equipa
-        if sessao.pse_real is not None
-    ]
     sessoes_fisicas = [
         sessao for sessao in sessoes_equipa
         if (sessao.tipo_treino or "").lower() == "fisico" or (sessao.min_fisicos or 0) > 0
@@ -767,12 +748,12 @@ def obter_resumo_fisioterapia(db, equipa, hoje=None, dias=7, metrica="rpe"):
         "sessoes_fisicas": sessoes_fisicas,
         "volume_total": volume_total,
         "carga_total": round(carga_total),
-        "carga_total_real": round(sum(cargas_reais), 1) if cargas_reais else None,
-        "pse_respostas": sum(len(registos) for registos in registos_pse_por_sessao.values()),
+        "carga_total_real": analise_carga_real["carga_real"],
+        "pse_respostas": analise_carga_real["respostas"],
         "minutos_fisicos": minutos_fisicos,
         "media_rpe": _media(rpes_planeados) or 0,
         "media_rpe_planeado": _media(rpes_planeados),
-        "media_rpe_real": _media(rpes_reais),
+        "media_rpe_real": analise_carga_real["intensidade_real"],
         "media_rpe_atletas": _media([
             valor for valores in valores_por_indicador["rpe"].values() for valor in valores
         ]),

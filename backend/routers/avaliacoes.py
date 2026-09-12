@@ -16,6 +16,7 @@ from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from paths import TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
 from services.avaliacao_service import dados_dashboard_avaliacoes
+from services.carga_real_service import analisar_carga_jogador
 from template_config import Jinja2Templates
 
 
@@ -491,6 +492,7 @@ def detalhe_jogador(
         "totais_categoria": totais_categoria,
         "categorias": CATEGORIAS,
         "dados_dashboard": dados_dashboard_avaliacoes(avaliacoes),
+        "carga_real": analisar_carga_jogador(db, jogador.id),
         "jogadores_dashboard": [{"id": jogador.id, "nome": jogador.nome}],
         "parametros_dashboard": [
             {

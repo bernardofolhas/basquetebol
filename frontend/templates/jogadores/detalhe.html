@@ -50,7 +50,7 @@
         {% endif %}
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-5">
         <div class="rounded-xl border border-white bg-white p-4 shadow-sm">
             <p class="text-xs uppercase tracking-wide text-gray-400">Assiduidade</p>
             <p class="text-3xl font-bold mt-2 {% if evolucao.assiduidade.percentagem >= 75 %}text-green-600{% elif evolucao.assiduidade.percentagem >= 50 %}text-amber-600{% else %}text-red-600{% endif %}">{{ evolucao.assiduidade.percentagem }}%</p>
@@ -87,7 +87,21 @@
             {% endif %}
             <a href="/fisico/jogadores/{{ jogador.id }}" class="inline-block mt-3 text-sm font-medium text-orange-600 hover:underline">Histórico de testes →</a>
         </div>
+
+        <div class="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-emerald-700">Intensidade real</p>
+            <div class="mt-2 flex items-end justify-between gap-3"><p class="text-3xl font-black text-slate-900">{{ evolucao.carga_real.intensidade_media if evolucao.carga_real.intensidade_media is not none else '—' }}</p><span class="pb-1 text-xs font-semibold text-slate-400">RPE média</span></div>
+            <p class="mt-2 text-sm text-slate-600"><strong class="text-slate-900">{{ evolucao.carga_real.carga_total if evolucao.carga_real.carga_total is not none else '—' }}</strong> de carga individual acumulada</p>
+            <p class="mt-1 text-xs text-slate-400">{{ evolucao.carga_real.respostas }} treino(s) com RPE pós-treino</p>
+        </div>
     </div>
+
+    {% if evolucao.carga_real.historico %}
+    <div class="mt-5 overflow-hidden rounded-xl border border-emerald-100 bg-white">
+        <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3"><div><h3 class="font-bold text-slate-900">Carga real por treino</h3><p class="text-xs text-slate-500">Carga individual = duração do treino × RPE comunicada pelo atleta.</p></div><span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Última RPE {{ evolucao.carga_real.ultima_rpe }}</span></div>
+        <div class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-2.5">Treino</th><th class="px-4 py-2.5">Duração</th><th class="px-4 py-2.5">RPE real</th><th class="px-4 py-2.5 text-right">Carga real</th></tr></thead><tbody class="divide-y divide-slate-100">{% for linha in evolucao.carga_real.historico %}<tr><td class="px-4 py-3 font-semibold text-slate-800"><a href="/treino/sessoes/{{ linha.sessao.id }}" class="hover:text-emerald-700">{{ linha.sessao.data|data_pt }}{% if linha.sessao.numero_treino %} · Treino {{ linha.sessao.numero_treino }}{% endif %}</a></td><td class="px-4 py-3 text-slate-600">{{ linha.volume }} min</td><td class="px-4 py-3 font-bold text-emerald-700">{{ linha.rpe }}</td><td class="px-4 py-3 text-right font-bold text-slate-900">{{ linha.carga }}</td></tr>{% endfor %}</tbody></table></div>
+    </div>
+    {% endif %}
 </section>
 
 <section data-workspace-panel="jogador:analise" role="tabpanel">

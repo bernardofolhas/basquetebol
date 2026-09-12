@@ -28,6 +28,7 @@ from services.pdf_service import renderizar_pdf
 from services.desenho_service import imagem_estatica_data_uri
 from services.fotografia_jogador_service import apagar_fotografia, caminho_fotografia, guardar_fotografia
 from services.questionarios_service import criar_acesso_atleta
+from services.carga_real_service import analisar_carga_jogador
 
 router = APIRouter(prefix="/jogadores")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -330,6 +331,7 @@ def detalhe_jogador(
         "testes_recentes": testes[:5],
         "teste_recente": testes[0] if testes else None,
         "avaliacoes": dados_dashboard_avaliacoes(avaliacoes),
+        "carga_real": analisar_carga_jogador(db, jogador_id),
     }
 
     return templates.TemplateResponse(request, "jogadores/detalhe.html", {

@@ -76,6 +76,7 @@ from services.conteudos_sessao_service import (
     categorias_conteudo_para_ui,
     construir_visao_semanal_conteudos,
 )
+from services.carga_real_service import analisar_carga_sessoes
 
 # prefix="/planeamento" significa que todas as rotas deste router
 # começam com /planeamento — ex: /planeamento/macrociclos
@@ -1721,14 +1722,24 @@ def detalhe_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_
     chart_labels = []
     chart_volume = []
     chart_rpe = []
+    chart_rpe_real = []
+    analise_carga_micros = {}
     for micro in microciclos:
         sessoes_ativas = [s for s in micro.sessoes if s.ativa]
+        analise_micro = analisar_carga_sessoes(db, sessoes_ativas)
+        analise_carga_micros[micro.id] = analise_micro
         volume = sum(s.volume_minutos or 0 for s in sessoes_ativas)
         rpelist = [s.intensidade_rpe for s in sessoes_ativas if s.intensidade_rpe is not None]
         rpe = round(sum(rpelist) / len(rpelist), 1) if rpelist else 0
         chart_labels.append(f"Micro {micro.numero}")
         chart_volume.append(volume)
         chart_rpe.append(rpe)
+        chart_rpe_real.append(analise_micro["intensidade_real"])
+
+    analise_carga_real = analisar_carga_sessoes(
+        db,
+        [sessao for micro in microciclos for sessao in micro.sessoes],
+    )
 
     # Calendário: semanas cobrindo o intervalo do mesociclo
     cal_start = mesociclo.data_inicio - timedelta(days=mesociclo.data_inicio.weekday())
@@ -1792,6 +1803,9 @@ def detalhe_mesociclo(meso_id: int, request: Request, db: Session = Depends(get_
         "chart_labels": json.dumps(chart_labels),
         "chart_volume": json.dumps(chart_volume),
         "chart_rpe": json.dumps(chart_rpe),
+        "chart_rpe_real": json.dumps(chart_rpe_real),
+        "analise_carga_real": analise_carga_real,
+        "analise_carga_micros": analise_carga_micros,
         "equipa_id": equipa_id,
         "dashboard_planeamento": dashboard_planeamento,
         "objetivos_por_categoria": objetivos_por_categoria(mesociclo),
@@ -2196,6 +2210,11 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
     sessoes_ativas = [sessao for sessao in sessoes if sessao.ativa]
     calendario_semanal = _construir_calendario_microciclo(sessoes_ativas)
     balanco, dados_graficos = _calcular_balanco_microciclo(sessoes_ativas)
+    analise_carga_real = analisar_carga_sessoes(db, sessoes_ativas)
+    dados_graficos["rpes_reais"] = [
+        analise_carga_real["por_sessao"].get(sessao.id, {}).get("rpe_real")
+        for sessao in _ordenar_sessoes_microciclo(sessoes_ativas)
+    ]
     sugestoes_conteudos = obter_sugestoes_conteudos_microciclo(db, microciclo)
     db.commit()
 
@@ -2248,6 +2267,7 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
         "aviso_divergencia_atribuicao": aviso_divergencia_atribuicao,
         # Passamos o balanço para o template
         "balanco": balanco,
+        "analise_carga_real": analise_carga_real,
         "dashboard_planeamento": obter_dashboard_planeamento_equipa(
             db,
             equipa_id,

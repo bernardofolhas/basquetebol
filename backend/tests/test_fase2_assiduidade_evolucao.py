@@ -8,6 +8,7 @@ from models.jogador import Jogador, RegistoAntropometrico
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.utilizador import Utilizador
 from services.assiduidade_service import calcular_pse_real, calcular_resumo_assiduidade
+from services.carga_real_service import analisar_carga_jogador, analisar_carga_sessoes
 import routers.assiduidade as assiduidade_router
 
 
@@ -52,6 +53,8 @@ def _criar_contexto():
         hora_fim="19:30",
         estado="executada",
         ativa=True,
+        volume_minutos=90,
+        intensidade_rpe=6,
         microciclo=micro,
     )
     db.add_all([equipa, jogadora, segunda_jogadora, macro, meso, micro, sessao])
@@ -131,6 +134,28 @@ def test_calcula_estados_detalhados_sem_perder_compatibilidade_booleana():
     assert resumo["rpe_registados"] == 2
 
 
+def test_rpe_pos_treino_alimenta_carga_real_dos_ciclos_e_do_atleta():
+    db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+
+        ciclo = analisar_carga_sessoes(db, [sessao])
+        atleta = analisar_carga_jogador(db, jogadora_id)
+
+        assert ciclo["intensidade_real"] == 7.5
+        assert ciclo["carga_real"] == 675
+        assert ciclo["carga_planeada_comparavel"] == 540
+        assert ciclo["desvio_carga"] == 135
+        assert ciclo["cobertura"] == 100
+        assert atleta["intensidade_media"] == 7.5
+        assert atleta["carga_total"] == 675
+    finally:
+        _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
+        db.close()
+
+
 def test_dispensa_nao_e_falta_nem_reduz_a_percentagem_de_presencas():
     resumo = calcular_resumo_assiduidade([
         RegistoAssiduidade(presente=True, estado="presente"),
@@ -179,6 +204,24 @@ def test_relatorio_assiduidade_e_ficha_evolucao_respondem_com_pdf(client_admin):
         assert detalhe.status_code == 200
         assert "Ficha de evolução" in detalhe.text
         assert "Sprint 20m" in detalhe.text
+        assert "Intensidade real" in detalhe.text
+        assert "Carga real por treino" in detalhe.text
+
+        micro = db.query(Microciclo).join(Mesociclo).join(Macrociclo).filter(Macrociclo.id == macro_id).one()
+        pagina_micro = client_admin.get(f"/planeamento/microciclos/{micro.id}")
+        assert pagina_micro.status_code == 200
+        assert "Intensidade e carga reais" in pagina_micro.text
+        assert "RPE real média" in pagina_micro.text
+
+        pagina_meso = client_admin.get(f"/planeamento/mesociclos/{micro.mesociclo_id}")
+        assert pagina_meso.status_code == 200
+        assert "Intensidade real do mesociclo" in pagina_meso.text
+        assert 'data-workspace-tab="carga"' in pagina_meso.text
+
+        analise_atleta = client_admin.get(f"/analise/jogadores/{jogadora_id}")
+        assert analise_atleta.status_code == 200
+        assert "Intensidade real dos treinos" in analise_atleta.text
+        assert "Carga acumulada" in analise_atleta.text
 
         ficha_pdf = client_admin.get(f"/jogadores/{jogadora_id}/evolucao/pdf")
         assert ficha_pdf.status_code == 200
