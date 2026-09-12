@@ -2,7 +2,7 @@
 {% block titulo %}{{ questionario.nome }}{% endblock %}
 {% block estilos_extra %}<style>.questionnaire-tab[aria-selected="true"]{color:var(--clube-primary-dark);border-color:var(--clube-primary);background:#fff}.questionnaire-panel[hidden]{display:none}</style>{% endblock %}
 {% block conteudo %}
-<div class="space-y-6" data-questionnaire-dashboard>
+<div class="space-y-6" data-questionnaire-dashboard data-customizable-dashboard data-dashboard-key="questionario-{{ questionario.id }}">
   <header class="flex flex-wrap items-end justify-between gap-5 rounded-[28px] bg-slate-900 px-7 py-7 text-white shadow-xl">
     <div><p class="text-xs font-extrabold uppercase tracking-[.2em] text-emerald-300">Dashboard do questionário</p><h1 class="mt-2 text-3xl font-extrabold">{{ questionario.nome }}</h1><p class="mt-2 text-sm text-slate-300">{{ equipa.nome }} · {{ questionario.descricao or 'Acompanhamento dos atletas.' }}</p></div>
     <div class="flex flex-wrap items-center gap-3"><a href="/questionarios/equipas/{{ equipa.id }}" class="rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-slate-900">Todos os questionários</a><a href="/questionarios/modelos/{{ questionario.id }}/editar" class="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white">Editar questionário</a><button type="button" onclick="document.getElementById('eliminar-questionario').showModal()" class="rounded-xl border border-red-300/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-100">Eliminar</button><div class="rounded-2xl bg-white/10 px-5 py-4 text-right"><strong class="text-3xl">{{ atletas_atuais|length }}/{{ jogadores|length }}</strong><p class="text-xs text-slate-300">responderam{% if aplicacao_atual %} à última aplicação{% endif %}</p></div></div>

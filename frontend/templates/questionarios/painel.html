@@ -2,7 +2,7 @@
 {% block titulo %}Questionário Matinal · {{ equipa.nome }}{% endblock %}
 {% block estilos_extra %}<style>.questionnaire-tab[aria-selected="true"]{color:var(--clube-primary-dark);border-color:var(--clube-primary);background:#fff}.questionnaire-panel[hidden]{display:none}</style>{% endblock %}
 {% block conteudo %}
-<div class="space-y-6" data-questionnaire-dashboard>
+<div class="space-y-6" data-questionnaire-dashboard data-customizable-dashboard data-dashboard-key="questionario-matinal-{{ equipa.id }}">
   <header class="flex flex-wrap items-end justify-between gap-5 rounded-[28px] bg-slate-900 px-7 py-7 text-white shadow-xl">
     <div><p class="text-xs font-extrabold uppercase tracking-[.2em] text-emerald-300">Dashboard do questionário</p><h1 class="mt-2 text-3xl font-extrabold">Questionário Matinal</h1><p class="mt-2 text-sm text-slate-300">{{ equipa.nome }} · disponibilidade, respostas e alertas de hoje</p></div>
     <div class="flex flex-wrap items-center gap-3"><a href="/questionarios/equipas/{{ equipa.id }}" class="rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-slate-900">Todos os questionários</a><a href="/questionarios/equipas/{{ equipa.id }}/novo?modelo=acompanhamento-diario-original" class="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white">Editar questionário</a><button type="button" onclick="document.getElementById('eliminar-matinal').showModal()" class="rounded-xl border border-red-300/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-100">Eliminar questionário</button><div class="rounded-2xl bg-white/10 px-5 py-4 text-right"><strong class="text-3xl">{{ respondidos }}/{{ total }}</strong><p class="text-xs text-slate-300">responderam hoje</p></div></div>

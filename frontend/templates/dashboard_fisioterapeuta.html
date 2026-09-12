@@ -3,6 +3,7 @@
 {% block titulo %}Dashboard do fisioterapeuta{% endblock %}
 
 {% block conteudo %}
+<div data-customizable-dashboard data-dashboard-key="inicio-fisioterapeuta">
 <header class="mb-6 overflow-hidden rounded-3xl bg-slate-950 text-white shadow-xl">
     <div class="flex flex-col justify-between gap-5 px-6 py-7 sm:px-8 lg:flex-row lg:items-end">
         <div>
@@ -164,4 +165,5 @@
 {% else %}
 <div class="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center"><h2 class="text-xl font-black text-slate-900">Sem equipas atribuídas</h2><p class="mt-2 text-sm text-slate-500">Pede ao administrador do clube para associar uma ou mais equipas a esta conta.</p></div>
 {% endif %}
+</div>
 {% endblock %}

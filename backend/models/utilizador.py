@@ -1,5 +1,5 @@
 
-from sqlalchemy import Column, Integer, String, Boolean, Enum, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, Boolean, Enum, ForeignKey, Table, Text
 from sqlalchemy.orm import relationship
 from database import Base
 import enum
@@ -40,6 +40,7 @@ class Utilizador(Base):
     clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=True, index=True)
     deve_alterar_password = Column(Boolean, nullable=False, default=False)
     sessao_versao = Column(Integer, nullable=False, default=0, server_default="0")
+    preferencias_dashboard = Column(Text, nullable=True)
 
     # Ligação opcional ao treinador
     treinador_id = Column(Integer, ForeignKey("treinadores.id"), nullable=True)

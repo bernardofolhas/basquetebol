@@ -3,6 +3,7 @@
 {% block titulo %}Estatísticas - {{ equipa.nome }}{% endblock %}
 {% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260903-4">{% endblock %}
 {% block conteudo %}
+<div data-customizable-dashboard data-dashboard-key="estatisticas-equipa-{{ equipa.id }}">
 {% call equipa_contexto(equipa, "Estatísticas", "Registo de jogo, box scores e evolução competitiva.", "acao", "/equipas/" ~ equipa.id ~ "/resumo", "Voltar à equipa") %}
   <a href="/jogos/equipas/{{ equipa.id }}" class="ds-button ds-button-secondary">Calendário de jogos</a>
 {% endcall %}
@@ -40,4 +41,5 @@
   {% else %}<div class="ds-empty">Ainda não existem jogos nesta equipa.</div>{% endfor %}
   </div>
 </section>
+</div>
 {% endblock %}

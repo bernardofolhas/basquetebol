@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Resultados · {{ aplicacao.questionario.nome }}{% endblock %}
 {% block conteudo %}
-<div class="space-y-6">
+<div class="space-y-6" data-customizable-dashboard data-dashboard-key="resultados-questionario-{{ aplicacao.id }}">
   <header class="flex flex-wrap items-end justify-between gap-5 rounded-[28px] bg-slate-900 px-7 py-7 text-white shadow-xl">
     <div>
       <p class="text-xs font-extrabold uppercase tracking-[.2em] text-emerald-300">{{ aplicacao.data|data_pt }} · {{ equipa.nome }}</p>

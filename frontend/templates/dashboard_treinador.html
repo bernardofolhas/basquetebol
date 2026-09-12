@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Dashboard — Treinador{% endblock %}
 {% block conteudo %}
+<div data-customizable-dashboard data-dashboard-key="inicio-treinador">
 
 <div class="ds-page-header">
     <div><p class="ds-section-label">O meu trabalho</p><h1 class="mt-1">Olá, {{ utilizador.nome }}</h1>
@@ -100,4 +101,5 @@
 {% include "partials/painel_operacional_compacto.html" %}
 {% endif %}
 
+</div>
 {% endblock %}

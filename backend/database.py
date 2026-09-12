@@ -165,6 +165,26 @@ def actualizar_estrutura_perfis() -> None:
             logger.info("Perfil 'atleta' adicionado ao enum da base de dados.")
 
 
+def actualizar_estrutura_preferencias_dashboard() -> None:
+    """Adiciona preferências de visualização por utilizador em instalações existentes."""
+    inspector = inspect(engine)
+    if not inspector.has_table("utilizadores"):
+        return
+    colunas = {coluna["name"] for coluna in inspector.get_columns("utilizadores")}
+    if "preferencias_dashboard" in colunas:
+        return
+    with engine.begin() as ligacao:
+        if engine.dialect.name == "postgresql":
+            ligacao.execute(text(
+                "ALTER TABLE utilizadores ADD COLUMN IF NOT EXISTS preferencias_dashboard TEXT NULL"
+            ))
+        else:
+            ligacao.execute(text(
+                "ALTER TABLE utilizadores ADD COLUMN preferencias_dashboard TEXT NULL"
+            ))
+    logger.info("Preferências personalizadas dos dashboards adicionadas aos utilizadores.")
+
+
 def actualizar_estrutura_questionarios() -> None:
     """Mantém contas, questionários e regras automáticas compatíveis sem Alembic automático."""
     inspector = inspect(engine)

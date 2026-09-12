@@ -1,5 +1,8 @@
+import json
+import re
+
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from template_config import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -20,6 +23,52 @@ from services.dashboard_service import (
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+CHAVE_DASHBOARD_RE = re.compile(r"^[a-z0-9:_-]{1,80}$")
+CHAVE_WIDGET_RE = re.compile(r"^[a-z0-9:_-]{1,100}$")
+
+
+@router.post("/dashboard/preferencias")
+async def guardar_preferencias_dashboard(
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Guarda os blocos ocultos de um dashboard para o utilizador autenticado."""
+    try:
+        dados = await request.json()
+    except (ValueError, json.JSONDecodeError):
+        return JSONResponse({"sucesso": False, "erro": "Configuração inválida."}, status_code=400)
+
+    chave = str(dados.get("dashboard") or "").strip().lower()
+    ocultos_recebidos = dados.get("ocultos", [])
+    if not CHAVE_DASHBOARD_RE.fullmatch(chave) or not isinstance(ocultos_recebidos, list):
+        return JSONResponse({"sucesso": False, "erro": "Configuração inválida."}, status_code=422)
+
+    ocultos = []
+    for valor in ocultos_recebidos[:100]:
+        widget = str(valor or "").strip().lower()
+        if CHAVE_WIDGET_RE.fullmatch(widget) and widget not in ocultos:
+            ocultos.append(widget)
+
+    try:
+        preferencias = json.loads(utilizador.preferencias_dashboard or "{}")
+    except (TypeError, ValueError):
+        preferencias = {}
+    if not isinstance(preferencias, dict):
+        preferencias = {}
+
+    if ocultos:
+        preferencias[chave] = ocultos
+    else:
+        preferencias.pop(chave, None)
+    utilizador.preferencias_dashboard = json.dumps(
+        preferencias,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    db.commit()
+    return JSONResponse({"sucesso": True, "dashboard": chave, "ocultos": ocultos})
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
