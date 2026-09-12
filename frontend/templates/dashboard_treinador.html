@@ -7,10 +7,6 @@
     <p>Próximos compromissos e acesso direto às tuas equipas.</p></div>
 </div>
 
-{% if utilizador.perfil.value != 'staff' %}
-{% include "partials/painel_operacional.html" %}
-{% endif %}
-
 <!-- Equipas -->
 {% if dados_equipas %}
 {% for item in dados_equipas %}
@@ -98,6 +94,10 @@
     <strong>Ainda não tens equipas associadas.</strong>
     <p>Contacta o administrador para associar uma equipa à tua conta.</p>
 </div>
+{% endif %}
+
+{% if utilizador.perfil.value != 'staff' %}
+{% include "partials/painel_operacional_compacto.html" %}
 {% endif %}
 
 {% endblock %}
