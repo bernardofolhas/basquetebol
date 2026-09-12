@@ -92,3 +92,12 @@ test('the individual edit button opens a populated content dialog', () => {
   assert.equal(title.textContent, 'Editar conteúdo');
   assert.equal(submit.textContent, 'Guardar alterações');
 });
+
+test('content deletion rebuilds the map instead of mutating table rowspans', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../static/js/mapa-conteudos.js'), 'utf8');
+  const deletionHandler = source.match(/function registarBotaoEliminacao\(botao\) \{[\s\S]*?\n        \}/);
+
+  assert.ok(deletionHandler, 'deletion handler must exist');
+  assert.match(deletionHandler[0], /await atualizarMapaSemRecarregar\(resultado\.mensagem\)/);
+  assert.doesNotMatch(deletionHandler[0], /\.remove\(\)|rowSpan|eliminarLinhaDoMapa/);
+});
