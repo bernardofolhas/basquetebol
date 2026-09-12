@@ -123,9 +123,15 @@ def test_treinador_gere_anual_da_equipa_e_hierarquia_integrada():
         db.flush()
         sessao = SessaoTreino(
             clube_id=clube.id, data=date(2026, 9, 8), microciclo_id=micro.id,
-            hora_inicio="18:00", hora_fim="19:30",
+            hora_inicio="18:00", hora_fim="19:30", numero_treino=2,
         )
         db.add(sessao)
+        db.flush()
+        sessao_anterior = SessaoTreino(
+            clube_id=clube.id, data=date(2026, 9, 7), microciclo_id=micro.id,
+            hora_inicio="18:00", hora_fim="19:30", numero_treino=1,
+        )
+        db.add(sessao_anterior)
         db.flush()
         plano = PlanoTreino(clube_id=clube.id, sessao_id=sessao.id, objectivos="Treino integrado")
         db.add(plano)
@@ -142,6 +148,11 @@ def test_treinador_gere_anual_da_equipa_e_hierarquia_integrada():
         assert pagina_micros.status_code == 200
         assert 'data-cycle-list="microciclos"' in pagina_micros.text
         assert pagina_micros.text.index('data-cycle-number="1"') < pagina_micros.text.index('data-cycle-number="2"')
+
+        pagina_treinos = cliente.get(f"/treino/equipas/{equipa.id}/planos")
+        assert pagina_treinos.status_code == 200
+        assert "data-training-list" in pagina_treinos.text
+        assert pagina_treinos.text.index('data-training-card-number="1"') < pagina_treinos.text.index('data-training-card-number="2"')
 
         bloqueio = cliente.get(f"/planeamento/equipas/{equipa_externa.id}/anuais", follow_redirects=False)
         assert bloqueio.status_code in (302, 303)

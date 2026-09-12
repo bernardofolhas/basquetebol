@@ -562,7 +562,14 @@ def listar_planos_treino_equipa(
         Macrociclo.equipa_id == equipa_id,
         SessaoTreino.ativa.is_(True),
         SessaoTreino.e_jogo.is_(False),
-    ).order_by(SessaoTreino.data.desc(), SessaoTreino.hora_inicio.desc()).all()
+    ).order_by(
+        Macrociclo.planeamento_anual_equipa_id.asc(),
+        SessaoTreino.tipo_treino.asc(),
+        SessaoTreino.numero_treino.asc(),
+        SessaoTreino.data.asc(),
+        SessaoTreino.hora_inicio.asc(),
+        SessaoTreino.id.asc(),
+    ).all()
     return templates.TemplateResponse(request, "treino/lista_equipa.html", {
         "utilizador": utilizador,
         "equipa": equipa,
