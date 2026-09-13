@@ -68,6 +68,36 @@ def test_hora_do_novo_exercicio_continua_a_sequencia_do_plano(client_admin):
         db.close()
 
 
+def test_adicionar_exercicio_aparece_imediatamente_depois_dos_cartoes(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        for nome in ("Primeiro exercício", "Último exercício"):
+            resposta = client_admin.post(
+                f"/treino/planos/{plano.id}/exercicios",
+                data={"nome": nome, "minutos": "10"},
+                follow_redirects=False,
+            )
+            assert resposta.status_code == 303
+
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert pagina.status_code == 200
+        ultimo_cartao = pagina.text.rfind('<article id="exercicio-')
+        fluxo_adicionar = pagina.text.index('data-training-add-flow')
+        botao_adicionar = pagina.text.index('data-training-add><span', fluxo_adicionar)
+        painel_adicionar = pagina.text.index('id="training-add-panel"', botao_adicionar)
+        assert ultimo_cartao < fluxo_adicionar < botao_adicionar < painel_adicionar
+        assert pagina.text.count('aria-controls="training-add-panel"') == 1
+        assert pagina.text.count('id="form_adicionar_exercicio"') == 1
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_alterar_horario_da_sessao_recalcula_horas_dos_exercicios(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:

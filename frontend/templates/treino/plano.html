@@ -365,7 +365,6 @@
 
         <div data-workspace-panel="treino:exercicios" role="tabpanel" class="training-exercise-toolbar rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
             <div class="training-toolbar-actions">
-                <button type="button" class="ds-button ds-button-primary" aria-controls="training-add-panel" aria-expanded="false" data-training-add><span aria-hidden="true">+</span> Adicionar exercício</button>
                 <label><input type="checkbox" data-training-block-mode> Planear por blocos</label>
             </div>
             <p class="training-reorder-status" data-training-reorder-status aria-live="polite">Arraste a pega de um exercício para alterar a sequência; os horários são recalculados automaticamente.</p>
@@ -376,8 +375,8 @@
             {% if not total_exercicios %}<p class="training-empty">Adiciona o primeiro exercício para começar.</p>{% endif %}
         </div>
 
-        <div data-workspace-panel="treino:exercicios" role="tabpanel">
-        <section id="training-add-panel" hidden class="mt-6 rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+        {% macro painel_adicionar_exercicio() %}
+        <section id="training-add-panel" hidden class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h2 class="text-xl font-semibold text-gray-800">Adicionar exercício</h2>
@@ -443,7 +442,7 @@
                 </div>
             </form>
         </section>
-        </div>
+        {% endmacro %}
 
         <div data-workspace-panel="treino:exercicios" role="tabpanel" class="mt-6 space-y-4">
             {% for bloco_ui in blocos_ui %}
@@ -605,6 +604,13 @@
                 </div>
             </details>
             {% endfor %}
+
+            <div class="space-y-4" data-training-add-flow>
+                <div class="flex justify-start">
+                    <button type="button" class="ds-button ds-button-primary" aria-controls="training-add-panel" aria-expanded="false" data-training-add><span aria-hidden="true">+</span> Adicionar exercício</button>
+                </div>
+                {{ painel_adicionar_exercicio() }}
+            </div>
         </div>
 
         <div data-workspace-panel="treino:reflexao" role="tabpanel" class="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
