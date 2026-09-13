@@ -606,10 +606,10 @@
             {% endfor %}
 
             <div class="space-y-4" data-training-add-flow>
-                <div class="flex justify-start">
-                    <button type="button" class="ds-button ds-button-primary" aria-controls="training-add-panel" aria-expanded="false" data-training-add><span aria-hidden="true">+</span> Adicionar exercício</button>
-                </div>
                 {{ painel_adicionar_exercicio() }}
+                <div class="training-add-divider">
+                    <button type="button" class="training-add-trigger" aria-controls="training-add-panel" aria-expanded="false" aria-label="Adicionar exercício" title="Adicionar exercício" data-training-add><span aria-hidden="true">+</span></button>
+                </div>
             </div>
         </div>
 

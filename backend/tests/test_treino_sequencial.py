@@ -88,9 +88,11 @@ def test_adicionar_exercicio_aparece_imediatamente_depois_dos_cartoes(client_adm
         assert pagina.status_code == 200
         ultimo_cartao = pagina.text.rfind('<article id="exercicio-')
         fluxo_adicionar = pagina.text.index('data-training-add-flow')
-        botao_adicionar = pagina.text.index('data-training-add><span', fluxo_adicionar)
-        painel_adicionar = pagina.text.index('id="training-add-panel"', botao_adicionar)
-        assert ultimo_cartao < fluxo_adicionar < botao_adicionar < painel_adicionar
+        painel_adicionar = pagina.text.index('id="training-add-panel"', fluxo_adicionar)
+        separador_adicionar = pagina.text.index('class="training-add-divider"', painel_adicionar)
+        botao_adicionar = pagina.text.index('data-training-add><span', separador_adicionar)
+        assert ultimo_cartao < fluxo_adicionar < painel_adicionar < separador_adicionar < botao_adicionar
+        assert 'class="training-add-trigger"' in pagina.text[separador_adicionar:botao_adicionar]
         assert pagina.text.count('aria-controls="training-add-panel"') == 1
         assert pagina.text.count('id="form_adicionar_exercicio"') == 1
     finally:
