@@ -88,8 +88,14 @@
     </form>
 {% endcall %}
 
-<details class="training-guidance" aria-label="Conteúdos sugeridos pelo microciclo">
-    <summary>Conteúdos previstos pelo microciclo <span>{{ conteudos_previstos.total_minutos }} min</span></summary>
+{% macro menu_conteudos_previstos() %}
+<details class="training-guidance-menu" aria-label="Conteúdos previstos para a sessão de treino">
+    <summary>
+        <span>Conteúdos previstos</span>
+        <strong>{{ conteudos_previstos.total_minutos }} min</strong>
+        <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5.5 7.5 4.5 4.5 4.5-4.5"/></svg>
+    </summary>
+    <div class="training-guidance-popover">
     <div class="training-guidance-header">
         <p>{{ conteudos_previstos.total_minutos }}{% if conteudos_previstos.limite_minutos is not none %}/{{ conteudos_previstos.limite_minutos }}{% endif %} min previstos nesta sessão</p>
         <a href="/planeamento/microciclos/{{ sessao.microciclo_id }}#conteudos-microciclo" class="ds-quiet-link">Abrir microciclo {{ sessao.microciclo.numero }} →</a>
@@ -133,9 +139,12 @@
         </div>
     </details>
     {% endif %}
+    </div>
 </details>
+{% endmacro %}
 
 <nav class="ds-workspace-tabs" data-workspace-tabs="treino" data-workspace-always-default="true" data-workspace-default="{% if importacao_ativa and not modo_edicao_importacao %}dados-importados{% else %}exercicios{% endif %}" aria-label="Áreas do plano de treino">
+    <div class="training-tabs-inner">
     <div class="ds-workspace-tabs-list" role="tablist">
         {% if importacao_ativa and not modo_edicao_importacao %}
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="dados-importados">Dados e setores</button>
@@ -146,6 +155,8 @@
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="reflexao">Reflexão</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resumo">Resumo</button>
         {% endif %}
+    </div>
+    {{ menu_conteudos_previstos() }}
     </div>
 </nav>
 

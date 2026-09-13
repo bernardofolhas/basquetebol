@@ -100,6 +100,25 @@ def test_adicionar_exercicio_aparece_imediatamente_depois_dos_cartoes(client_adm
         db.close()
 
 
+def test_conteudos_previstos_estao_no_cabecalho_fixo(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert pagina.status_code == 200
+        inicio_cabecalho = pagina.text.index('<nav class="ds-workspace-tabs"')
+        fim_cabecalho = pagina.text.index('</nav>', inicio_cabecalho)
+        menu = pagina.text.index('class="training-guidance-menu"', inicio_cabecalho, fim_cabecalho)
+        assert pagina.text.index('Conteúdos previstos', menu, fim_cabecalho) > menu
+        assert pagina.text.index('class="training-guidance-popover"', menu, fim_cabecalho) > menu
+        assert pagina.text.count('class="training-guidance-menu"') == 1
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_alterar_horario_da_sessao_recalcula_horas_dos_exercicios(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
