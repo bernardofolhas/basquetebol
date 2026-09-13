@@ -854,9 +854,9 @@ table tbody tr:hover { background:#fafbfd; }
 .training-guidance-menu>summary { display:flex;min-height:2.35rem;cursor:pointer;list-style:none;align-items:center;gap:.5rem;border:1px solid var(--border-strong);border-radius:.55rem;background:#fff;padding:.5rem .72rem;color:var(--text-main);font-size:.75rem;font-weight:750;white-space:nowrap;transition:border-color .15s,box-shadow .15s,color .15s; }
 .training-guidance-menu>summary::-webkit-details-marker { display:none; }
 .training-guidance-menu>summary strong { color:var(--clube-primary);font-size:.7rem; }
-.training-guidance-menu>summary svg { width:.9rem;height:.9rem;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8;transition:transform .18s ease; }
+.training-guidance-chevron { display:inline-grid;width:.9rem;height:.9rem;place-items:center;font-size:1rem;font-weight:800;line-height:.65;transition:transform .18s ease; }
 .training-guidance-menu[open]>summary { border-color:var(--clube-primary-border);color:var(--clube-primary-dark);box-shadow:0 0 0 3px var(--clube-primary-soft); }
-.training-guidance-menu[open]>summary svg { transform:rotate(180deg); }
+.training-guidance-menu[open]>summary .training-guidance-chevron { transform:rotate(180deg); }
 .training-guidance-popover { position:absolute;top:calc(100% + .5rem);right:0;z-index:45;width:min(52rem,calc(100vw - 2rem));max-height:min(70vh,38rem);overflow-y:auto;border:1px solid var(--border-soft);border-radius:1rem;background:#fff;box-shadow:0 20px 50px rgb(15 23 42 / .18); }
 .training-toolbar-actions { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem; }
 .training-toolbar-actions label { display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:var(--text-muted); }

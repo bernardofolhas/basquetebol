@@ -113,6 +113,8 @@ def test_conteudos_previstos_estao_no_cabecalho_fixo(client_admin):
         menu = pagina.text.index('class="training-guidance-menu"', inicio_cabecalho, fim_cabecalho)
         assert pagina.text.index('Conteúdos previstos', menu, fim_cabecalho) > menu
         assert pagina.text.index('class="training-guidance-popover"', menu, fim_cabecalho) > menu
+        assert pagina.text.index('class="training-guidance-chevron"', menu, fim_cabecalho) > menu
+        assert '<svg' not in pagina.text[menu:fim_cabecalho]
         assert pagina.text.count('class="training-guidance-menu"') == 1
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
