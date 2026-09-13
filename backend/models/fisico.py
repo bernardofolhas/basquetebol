@@ -3,9 +3,24 @@
 # Testes de condição física e planeamento físico por equipa
 # ─────────────────────────────────────────────────────────────
 
-from sqlalchemy import Column, Integer, String, Date, Float, Text, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Date, Float, Text, ForeignKey
 from sqlalchemy.orm import backref, relationship
 from database import Base
+
+
+class DefinicaoTesteFisico(Base):
+    """Teste reutilizável disponível no catálogo do clube."""
+
+    __tablename__ = "definicoes_testes_fisicos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    nome = Column(String, nullable=False)
+    lateralidade = Column(String, nullable=False, default="bilateral")
+    unidade_total = Column(String, nullable=True)
+    unidade_esquerda = Column(String, nullable=True)
+    unidade_direita = Column(String, nullable=True)
+    ativo = Column(Boolean, nullable=False, default=True)
 
 
 class TesteFisico(Base):
@@ -22,6 +37,20 @@ class TesteFisico(Base):
     # Resultado numérico e unidade
     resultado = Column(Float, nullable=True)      # Ex: 18.5
     unidade = Column(String, nullable=True)       # Ex: "nível", "segundos", "cm"
+    resultado_esquerdo = Column(Float, nullable=True)
+    resultado_direito = Column(Float, nullable=True)
+    unidade_esquerda = Column(String, nullable=True)
+    unidade_direita = Column(String, nullable=True)
+    assimetria_percentual = Column(Float, nullable=True)
+    lateralidade = Column(String, nullable=False, default="bilateral")
+    medicao_id = Column(String(36), nullable=True, index=True)
+    definicao_id = Column(
+        Integer,
+        ForeignKey("definicoes_testes_fisicos.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    definicao = relationship("DefinicaoTesteFisico", backref="resultados")
 
     # Observações
     observacoes = Column(Text, nullable=True)

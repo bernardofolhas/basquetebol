@@ -185,6 +185,36 @@ def actualizar_estrutura_preferencias_dashboard() -> None:
     logger.info("Preferências personalizadas dos dashboards adicionadas aos utilizadores.")
 
 
+def actualizar_estrutura_testes_fisicos() -> None:
+    """Atualiza instalações existentes para o catálogo e testes unilaterais."""
+    inspector = inspect(engine)
+    if not inspector.has_table("testes_fisicos"):
+        return
+    colunas = {coluna["name"] for coluna in inspector.get_columns("testes_fisicos")}
+    tipos = {
+        "resultado_esquerdo": "FLOAT NULL",
+        "resultado_direito": "FLOAT NULL",
+        "unidade_esquerda": "VARCHAR NULL",
+        "unidade_direita": "VARCHAR NULL",
+        "assimetria_percentual": "FLOAT NULL",
+        "lateralidade": "VARCHAR NOT NULL DEFAULT 'bilateral'",
+        "medicao_id": "VARCHAR(36) NULL",
+        "definicao_id": "INTEGER NULL REFERENCES definicoes_testes_fisicos(id) ON DELETE SET NULL",
+    }
+    with engine.begin() as ligacao:
+        for nome, tipo in tipos.items():
+            if nome not in colunas:
+                prefixo = "IF NOT EXISTS " if engine.dialect.name == "postgresql" else ""
+                ligacao.execute(text(f"ALTER TABLE testes_fisicos ADD COLUMN {prefixo}{nome} {tipo}"))
+        if engine.dialect.name == "postgresql":
+            ligacao.execute(text("CREATE INDEX IF NOT EXISTS ix_testes_fisicos_medicao_id ON testes_fisicos (medicao_id)"))
+            ligacao.execute(text("CREATE INDEX IF NOT EXISTS ix_testes_fisicos_definicao_id ON testes_fisicos (definicao_id)"))
+        else:
+            ligacao.execute(text("CREATE INDEX IF NOT EXISTS ix_testes_fisicos_medicao_id ON testes_fisicos (medicao_id)"))
+            ligacao.execute(text("CREATE INDEX IF NOT EXISTS ix_testes_fisicos_definicao_id ON testes_fisicos (definicao_id)"))
+    logger.info("Estrutura do catálogo de testes físicos verificada.")
+
+
 def actualizar_estrutura_questionarios() -> None:
     """Mantém contas, questionários e regras automáticas compatíveis sem Alembic automático."""
     inspector = inspect(engine)

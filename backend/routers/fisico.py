@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -9,7 +10,7 @@ from auth_deps import exigir_autenticacao, verificar_ou_negar_equipa
 from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
-from models.fisico import PlaneamentoFisico, TesteFisico
+from models.fisico import DefinicaoTesteFisico, PlaneamentoFisico, TesteFisico
 from models.jogador import Jogador
 from paths import TEMPLATES_DIR
 
@@ -26,6 +27,76 @@ def _pode_editar_fisico(utilizador) -> bool:
 def _resultado_numerico(valor: str) -> float | None:
     valor = (valor or "").strip().replace(",", ".")
     return float(valor) if valor else None
+
+
+def _lateralidade(valor: str) -> str:
+    return "unilateral" if (valor or "").strip().lower() == "unilateral" else "bilateral"
+
+
+def _calcular_assimetria(esquerdo: float | None, direito: float | None) -> float | None:
+    if esquerdo is None or direito is None:
+        return None
+    referencia = max(abs(esquerdo), abs(direito))
+    return round(abs(esquerdo - direito) / referencia * 100, 2) if referencia else 0.0
+
+
+def _obter_ou_criar_definicao(
+    db: Session,
+    clube_id: int,
+    nome: str,
+    lateralidade: str = "bilateral",
+    unidade_total: str | None = None,
+    unidade_esquerda: str | None = None,
+    unidade_direita: str | None = None,
+) -> DefinicaoTesteFisico:
+    definicao = db.query(DefinicaoTesteFisico).filter(
+        DefinicaoTesteFisico.clube_id == clube_id,
+        DefinicaoTesteFisico.nome.ilike(nome.strip()),
+    ).first()
+    if definicao:
+        return definicao
+    definicao = DefinicaoTesteFisico(
+        clube_id=clube_id,
+        nome=nome.strip(),
+        lateralidade=_lateralidade(lateralidade),
+        unidade_total=(unidade_total or "").strip() or None,
+        unidade_esquerda=(unidade_esquerda or "").strip() or None,
+        unidade_direita=(unidade_direita or "").strip() or None,
+    )
+    db.add(definicao)
+    db.flush()
+    return definicao
+
+
+def _sincronizar_catalogo_legado(db: Session, equipa: Equipa) -> list[DefinicaoTesteFisico]:
+    """Transforma nomes de testes antigos em definições reutilizáveis."""
+    definicoes = db.query(DefinicaoTesteFisico).filter(
+        DefinicaoTesteFisico.clube_id == equipa.clube_id,
+        DefinicaoTesteFisico.ativo.is_(True),
+    ).order_by(DefinicaoTesteFisico.nome).all()
+    por_nome = {item.nome.strip().casefold(): item for item in definicoes}
+    legados = db.query(TesteFisico).join(Jogador).filter(
+        Jogador.equipa_id == equipa.id,
+        TesteFisico.definicao_id.is_(None),
+    ).all()
+    alterado = False
+    for teste in legados:
+        chave = teste.tipo_teste.strip().casefold()
+        definicao = por_nome.get(chave)
+        if not definicao:
+            definicao = _obter_ou_criar_definicao(
+                db, equipa.clube_id, teste.tipo_teste,
+                unidade_total=teste.unidade,
+            )
+            definicoes.append(definicao)
+            por_nome[chave] = definicao
+        teste.definicao_id = definicao.id
+        teste.lateralidade = definicao.lateralidade
+        teste.medicao_id = teste.medicao_id or f"legado-{teste.id}"
+        alterado = True
+    if alterado:
+        db.commit()
+    return sorted(definicoes, key=lambda item: item.nome.casefold())
 
 
 @router.get("/jogadores/{jogador_id}", response_class=HTMLResponse)
@@ -95,6 +166,8 @@ async def adicionar_teste(
         unidade=unidade.strip() or None,
         observacoes=observacoes.strip() or None,
         jogador_id=jogador_id,
+        definicao=_obter_ou_criar_definicao(db, jogador.clube_id, tipo_teste, unidade_total=unidade),
+        medicao_id=str(uuid4()),
     ))
     db.commit()
     set_flash(request, f"Teste '{tipo_teste}' adicionado.")
@@ -122,14 +195,35 @@ def planeamento_equipa(
         Jogador.equipa_id == equipa_id,
         Jogador.ativo.is_(True),
     ).order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome).all()
+    definicoes = _sincronizar_catalogo_legado(db, equipa)
     testes = db.query(TesteFisico).join(Jogador).filter(
         Jogador.equipa_id == equipa_id,
-    ).order_by(TesteFisico.data.desc(), TesteFisico.id.desc()).limit(60).all()
-    tipos_testes = []
-    for teste in testes:
-        sugestao = (teste.tipo_teste, teste.unidade or "")
-        if sugestao not in tipos_testes:
-            tipos_testes.append(sugestao)
+    ).order_by(TesteFisico.data.desc(), TesteFisico.id.desc()).all()
+    testes_por_definicao = []
+    for definicao in definicoes:
+        resultados = [teste for teste in testes if teste.definicao_id == definicao.id]
+        if not resultados:
+            continue
+        testes_por_definicao.append({
+            "definicao": definicao,
+            "resultados": resultados,
+            "medicoes": len({teste.medicao_id or f"legado-{teste.id}" for teste in resultados}),
+            "atletas": len({teste.jogador_id for teste in resultados}),
+            "ultima_data": max(teste.data for teste in resultados),
+        })
+    dados_analise = [{
+        "id": teste.id,
+        "definicao_id": teste.definicao_id,
+        "teste": teste.tipo_teste,
+        "data": teste.data.isoformat(),
+        "jogador_id": teste.jogador_id,
+        "jogador": teste.jogador.nome,
+        "resultado": teste.resultado,
+        "esquerdo": teste.resultado_esquerdo,
+        "direito": teste.resultado_direito,
+        "assimetria": teste.assimetria_percentual,
+        "unidade": teste.unidade,
+    } for teste in testes]
 
     return templates.TemplateResponse(request, "fisico/planeamento.html", {
         "utilizador": utilizador,
@@ -137,7 +231,9 @@ def planeamento_equipa(
         "planeamentos": planeamentos,
         "jogadores": jogadores,
         "testes": testes,
-        "tipos_testes": tipos_testes,
+        "definicoes_testes": definicoes,
+        "testes_por_definicao": testes_por_definicao,
+        "dados_analise": dados_analise,
         "vista": request.query_params.get("vista", "testes"),
         "pode_editar": _pode_editar_fisico(utilizador),
         "hoje": date.today(),
@@ -167,15 +263,36 @@ async def criar_testes_equipa(
         return RedirectResponse(url=f"/fisico/equipas/{equipa_id}#testes-fisicos", status_code=303)
 
     tipo_teste = str(form.get("tipo_teste") or "").strip()
-    unidade = str(form.get("unidade") or "").strip() or None
+    definicao_id = str(form.get("definicao_id") or "").strip()
     observacoes = str(form.get("observacoes") or "").strip() or None
     try:
         jogadores_ids = {int(valor) for valor in form.getlist("jogador_ids")}
     except (TypeError, ValueError):
         jogadores_ids = set()
-    if not tipo_teste or not jogadores_ids:
+    definicao = None
+    if definicao_id.isdigit():
+        definicao = db.query(DefinicaoTesteFisico).filter(
+            DefinicaoTesteFisico.id == int(definicao_id),
+            DefinicaoTesteFisico.clube_id == equipa.clube_id,
+            DefinicaoTesteFisico.ativo.is_(True),
+        ).first()
+    if not definicao and not tipo_teste:
+        set_flash(request, "Seleciona um teste do catálogo ou cria um novo.", "erro")
+        return RedirectResponse(url=f"/fisico/equipas/{equipa_id}#testes-fisicos", status_code=303)
+    if not jogadores_ids:
         set_flash(request, "Indica o tipo de teste e seleciona pelo menos um atleta.", "erro")
         return RedirectResponse(url=f"/fisico/equipas/{equipa_id}#testes-fisicos", status_code=303)
+
+    if not definicao:
+        definicao = _obter_ou_criar_definicao(
+            db,
+            equipa.clube_id,
+            tipo_teste,
+            str(form.get("lateralidade") or "bilateral"),
+            str(form.get("unidade_total") or form.get("unidade") or ""),
+            str(form.get("unidade_esquerda") or ""),
+            str(form.get("unidade_direita") or ""),
+        )
 
     jogadores = db.query(Jogador).filter(
         Jogador.equipa_id == equipa_id,
@@ -187,15 +304,29 @@ async def criar_testes_equipa(
         return RedirectResponse(url=f"/fisico/equipas/{equipa_id}#testes-fisicos", status_code=303)
 
     novos_testes = []
+    medicao_id = str(uuid4())
     try:
         for jogador in jogadores:
+            esquerdo = _resultado_numerico(str(form.get(f"resultado_esquerdo_{jogador.id}") or ""))
+            direito = _resultado_numerico(str(form.get(f"resultado_direito_{jogador.id}") or ""))
+            assimetria = _resultado_numerico(str(form.get(f"assimetria_{jogador.id}") or ""))
+            if assimetria is None:
+                assimetria = _calcular_assimetria(esquerdo, direito)
             novos_testes.append(TesteFisico(
                 clube_id=equipa.clube_id,
                 jogador_id=jogador.id,
                 data=data_teste,
-                tipo_teste=tipo_teste,
+                tipo_teste=definicao.nome,
                 resultado=_resultado_numerico(str(form.get(f"resultado_{jogador.id}") or "")),
-                unidade=unidade,
+                unidade=definicao.unidade_total,
+                resultado_esquerdo=esquerdo,
+                resultado_direito=direito,
+                unidade_esquerda=definicao.unidade_esquerda,
+                unidade_direita=definicao.unidade_direita,
+                assimetria_percentual=assimetria,
+                lateralidade=definicao.lateralidade,
+                medicao_id=medicao_id,
+                definicao_id=definicao.id,
                 observacoes=observacoes,
             ))
     except ValueError:
@@ -204,7 +335,7 @@ async def criar_testes_equipa(
 
     db.add_all(novos_testes)
     db.commit()
-    set_flash(request, f"Teste físico registado para {len(novos_testes)} atleta(s).")
+    set_flash(request, f"Teste '{definicao.nome}' registado para {len(novos_testes)} atleta(s).")
     return RedirectResponse(url=f"/fisico/equipas/{equipa_id}#testes-fisicos", status_code=303)
 
 

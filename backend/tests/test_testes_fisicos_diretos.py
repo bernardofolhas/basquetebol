@@ -2,7 +2,7 @@ from datetime import date
 
 from database import SessionLocal
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
-from models.fisico import PlaneamentoFisico, TesteFisico as ModeloTesteFisico
+from models.fisico import DefinicaoTesteFisico, PlaneamentoFisico, TesteFisico as ModeloTesteFisico
 from models.jogador import Jogador
 from models.utilizador import Utilizador
 
@@ -121,3 +121,60 @@ def test_planeamento_fisico_continua_disponivel_como_opcao(client_admin):
         assert plano.clube_id
     finally:
         _limpar(db, equipa_id)
+
+
+def test_teste_unilateral_fica_no_catalogo_e_reutiliza_definicao(client_admin):
+    db, equipa_id, jogadores_ids = _criar_equipa()
+    nome = f"Hop unilateral equipa {equipa_id}"
+    try:
+        resposta = client_admin.post(
+            f"/fisico/equipas/{equipa_id}/testes",
+            data={
+                "data": "2042-04-10",
+                "tipo_teste": nome,
+                "lateralidade": "unilateral",
+                "unidade_total": "cm",
+                "unidade_esquerda": "N",
+                "unidade_direita": "kg",
+                "jogador_ids": str(jogadores_ids[0]),
+                f"resultado_{jogadores_ids[0]}": "110",
+                f"resultado_esquerdo_{jogadores_ids[0]}": "120",
+                f"resultado_direito_{jogadores_ids[0]}": "100",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        definicao = db.query(DefinicaoTesteFisico).filter_by(nome=nome).one()
+        primeiro = db.query(ModeloTesteFisico).filter_by(definicao_id=definicao.id).one()
+        assert (definicao.lateralidade, definicao.unidade_total) == ("unilateral", "cm")
+        assert (definicao.unidade_esquerda, definicao.unidade_direita) == ("N", "kg")
+        assert primeiro.assimetria_percentual == 16.67
+
+        client_admin.post(
+            f"/fisico/equipas/{equipa_id}/testes",
+            data={
+                "data": "2042-05-10",
+                "definicao_id": str(definicao.id),
+                "jogador_ids": str(jogadores_ids[0]),
+                f"resultado_esquerdo_{jogadores_ids[0]}": "125",
+                f"resultado_direito_{jogadores_ids[0]}": "115",
+                f"assimetria_{jogadores_ids[0]}": "7,5",
+            },
+            follow_redirects=False,
+        )
+        assert db.query(DefinicaoTesteFisico).filter_by(nome=nome).count() == 1
+        assert db.query(ModeloTesteFisico).filter_by(definicao_id=definicao.id).count() == 2
+        assert db.query(ModeloTesteFisico).filter_by(definicao_id=definicao.id, assimetria_percentual=7.5).count() == 1
+
+        pagina = client_admin.get(f"/fisico/equipas/{equipa_id}")
+        assert pagina.text.count(f'data-physical-test-card="{definicao.id}"') == 1
+        assert "data-filter-sort" in pagina.text
+        analise = client_admin.get(f"/fisico/equipas/{equipa_id}?vista=analise")
+        assert 'data-dashboard-key="preparacao-fisica-analise"' in analise.text
+        assert "Jogadores selecionados" in analise.text
+    finally:
+        _limpar(db, equipa_id)
+        definicao = db.query(DefinicaoTesteFisico).filter_by(nome=nome).first()
+        if definicao:
+            db.delete(definicao)
+            db.commit()
