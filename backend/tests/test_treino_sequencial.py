@@ -246,6 +246,25 @@ def test_biblioteca_recebe_novo_exercicio_e_reutilizacao_fica_independente(clien
             clube_id=plano.clube_id,
         ).count()
 
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={
+                "biblioteca_id": str(base.id),
+                "origem_biblioteca": "biblioteca",
+                "nome": nome_original,
+                "categoria": "TID",
+                "minutos": "10",
+                "organizacao": "Adaptacao apenas no plano",
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        assert db.query(BibliotecoExercicio).filter_by(
+            clube_id=plano.clube_id,
+        ).count() == total_biblioteca_antes_da_copia
+        db.refresh(base)
+        assert (base.categoria, base.organizacao) == ("TIO", "Organizacao original")
+
         nome_copia = f"Copia adaptada {macro_id}"
         resposta = client_admin.post(
             f"/treino/planos/{plano.id}/exercicios",
@@ -269,11 +288,14 @@ def test_biblioteca_recebe_novo_exercicio_e_reutilizacao_fica_independente(clien
         )
         assert db.query(BibliotecoExercicio).filter_by(
             clube_id=plano.clube_id,
-        ).count() == total_biblioteca_antes_da_copia
-        assert db.query(BibliotecoExercicio).filter_by(
+        ).count() == total_biblioteca_antes_da_copia + 1
+        variante = db.query(BibliotecoExercicio).filter_by(
             clube_id=plano.clube_id,
             nome=nome_copia,
-        ).count() == 0
+        ).one()
+        assert (variante.categoria, variante.organizacao, variante.coaching_points) == (
+            "TCO", "Organizacao so deste treino", "Coaching so deste treino"
+        )
         copia = db.query(ExercicioPlano).filter_by(plano_id=plano.id, nome=nome_copia).one()
         assert (copia.categoria, copia.minutos, copia.organizacao, copia.coaching_points) == (
             "TCO", 20, "Organizacao so deste treino", "Coaching so deste treino"
@@ -303,7 +325,7 @@ def test_biblioteca_recebe_novo_exercicio_e_reutilizacao_fica_independente(clien
         ).count() == 0
         assert db.query(BibliotecoExercicio).filter_by(
             clube_id=plano.clube_id,
-        ).count() == total_biblioteca_antes_da_copia
+        ).count() == total_biblioteca_antes_da_copia + 1
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()

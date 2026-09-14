@@ -26,7 +26,8 @@
 <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ erro }}</div>
 {% endif %}
 
-<nav class="ds-workspace-tabs" data-workspace-tabs="equipa" data-workspace-default="atividade" aria-label="Áreas do resumo da equipa">
+<div data-customizable-dashboard data-dashboard-key="resumo-equipa-{{ equipa.id }}">
+<nav class="ds-workspace-tabs" data-workspace-tabs="equipa" data-workspace-default="atividade" aria-label="Áreas do resumo da equipa" data-dashboard-fixed>
     <div class="ds-workspace-tabs-list" role="tablist">
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="atividade">Atividade</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="equipa">Informação da equipa</button>
@@ -35,7 +36,7 @@
 </nav>
 
 <div class="contents">
-    <section data-workspace-panel="equipa:atividade" role="tabpanel" class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
+    <section data-workspace-panel="equipa:atividade" role="tabpanel" data-dashboard-widget="proxima-atividade" data-dashboard-label="Próxima atividade" class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
         <div class="flex flex-col items-start justify-between gap-4 sm:flex-row">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-orange-500">A seguir</p>
@@ -71,7 +72,7 @@
         {% endif %}
     </section>
 
-    <section data-workspace-panel="equipa:equipa" role="tabpanel" class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+    <section data-workspace-panel="equipa:equipa" role="tabpanel" data-dashboard-widget="informacao-equipa" data-dashboard-label="Informação da equipa" class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-widest text-gray-400">Identificação</p>
         <h2 class="mt-1 text-lg font-bold text-gray-800">Informação da equipa</h2>
         <dl class="mt-5 space-y-4 text-sm">
@@ -83,7 +84,7 @@
     </section>
 </div>
 
-<section data-workspace-panel="equipa:logistica" role="tabpanel" class="rounded-2xl border border-sky-100 bg-white shadow-sm">
+<section data-workspace-panel="equipa:logistica" role="tabpanel" data-dashboard-widget="logistica-semanal" data-dashboard-label="Logística semanal" class="rounded-2xl border border-sky-100 bg-white shadow-sm">
     <div class="border-b border-sky-100 px-6 py-4">
         <p class="text-xs font-semibold uppercase tracking-widest text-sky-600">Consulta logística</p>
         <h2 class="mt-1 font-bold text-gray-800">Semana prevista pelo clube</h2>
@@ -107,7 +108,7 @@
 </section>
 
 {% if agenda_proxima|length > 1 %}
-<section data-workspace-panel="equipa:atividade" role="tabpanel" class="mt-6 rounded-2xl border border-gray-100 bg-white shadow-sm">
+<section data-workspace-panel="equipa:atividade" role="tabpanel" data-dashboard-widget="agenda-proxima" data-dashboard-label="Próximos 14 dias" class="mt-6 rounded-2xl border border-gray-100 bg-white shadow-sm">
     <div class="border-b border-gray-100 px-6 py-4">
         <h2 class="font-bold text-gray-800">Próximos 14 dias</h2>
         <p class="mt-1 text-sm text-gray-500">Treinos, jogos e atividades ordenados cronologicamente.</p>
@@ -126,4 +127,5 @@
     </div>
 </section>
 {% endif %}
+</div>
 {% endblock %}

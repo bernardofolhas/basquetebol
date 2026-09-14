@@ -1420,8 +1420,13 @@ async def adicionar_exercicio(
 
     nome_norm = nome.strip() if nome else None
     guardado_na_biblioteca = False
-    # Um exercício criado de raiz entra uma vez na biblioteca. Uma escolha da
-    # biblioteca é apenas uma cópia para este plano e nunca escreve no original.
+    nova_variante_da_biblioteca = bool(
+        biblioteca
+        and nome_norm
+        and nome_norm.casefold() != (biblioteca.nome or "").strip().casefold()
+    )
+    # Um exercício criado de raiz entra uma vez na biblioteca. Uma cópia mantém
+    # o original intacto; se receber outro título, passa a ser uma nova variante.
     if nome_norm and not biblioteca and not copia_da_biblioteca:
         existente = db.query(BibliotecoExercicio).filter(
             BibliotecoExercicio.clube_id == plano.clube_id,
@@ -1436,12 +1441,25 @@ async def adicionar_exercicio(
                 coaching_points=coaching_points or None,
             ))
             guardado_na_biblioteca = True
+    elif nova_variante_da_biblioteca:
+        db.add(BibliotecoExercicio(
+            clube_id=plano.clube_id,
+            nome=nome_norm,
+            categoria=categoria or None,
+            organizacao=organizacao or None,
+            coaching_points=coaching_points or None,
+            desenho=biblioteca.desenho,
+            desenho_campo_completo=biblioteca.desenho_campo_completo,
+        ))
+        guardado_na_biblioteca = True
 
     db.flush()
     sincronizar_minutos_categorias(plano, db)
     db.commit()
 
-    if biblioteca_solicitada:
+    if nova_variante_da_biblioteca:
+        set_flash(request, "Exercício adicionado ao plano e guardado como novo exercício na biblioteca.", "success")
+    elif biblioteca_solicitada:
         set_flash(request, "Cópia adicionada ao plano. O exercício da biblioteca ficou inalterado.", "success")
     elif guardado_na_biblioteca:
         set_flash(request, "Exercício adicionado ao plano e guardado automaticamente na biblioteca.", "success")

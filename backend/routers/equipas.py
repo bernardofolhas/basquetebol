@@ -151,8 +151,17 @@ async def criar_equipa(
     return RedirectResponse(url="/equipas", status_code=303)
 
 
-@router.get("/{equipa_id}/resumo", response_class=HTMLResponse)
 @router.get("/{equipa_id}", response_class=HTMLResponse)
+def abrir_equipa(
+    equipa_id: int,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    return RedirectResponse(url=f"/equipas/{equipa_id}/resumo", status_code=303)
+
+
+@router.get("/{equipa_id}/resumo", response_class=HTMLResponse)
 def detalhe_equipa(
     equipa_id: int,
     request: Request,
@@ -347,7 +356,7 @@ async def editar_equipa(
 
     db.commit()
     set_flash(request, f"Equipa '{nome}' atualizada com sucesso.")
-    return RedirectResponse(url=f"/equipas/{equipa_id}", status_code=303)
+    return RedirectResponse(url=f"/equipas/{equipa_id}/resumo", status_code=303)
 
 
 @router.post("/{equipa_id}/apagar")

@@ -234,13 +234,20 @@ def test_interface_e_urls_respeitam_os_perfis(contexto_permissoes):
 def test_painel_equipa_simplificado_e_isolamento_entre_clubes(contexto_permissoes):
     dados = contexto_permissoes
     administrador = _cliente_autenticado(dados["credenciais"]["administrador"])
-    painel = administrador.get(f"/equipas/{dados['equipa_id']}")
+    entrada = administrador.get(f"/equipas/{dados['equipa_id']}", follow_redirects=False)
+    assert entrada.status_code == 303
+    assert entrada.headers["location"] == f"/equipas/{dados['equipa_id']}/resumo"
+    painel = administrador.get(f"/equipas/{dados['equipa_id']}/resumo")
     assert painel.status_code == 200
     assert "Plantel associado à equipa" not in painel.text
     assert "Equipa técnica atualmente ligada" not in painel.text
     assert "Eventos Globais" not in painel.text
     assert "Atalhos" not in painel.text
     assert "Próxima atividade" in painel.text
+    assert f'data-dashboard-key="resumo-equipa-{dados["equipa_id"]}"' in painel.text
+    assert 'data-dashboard-widget="proxima-atividade"' in painel.text
+    assert 'data-dashboard-widget="informacao-equipa"' in painel.text
+    assert 'data-dashboard-widget="logistica-semanal"' in painel.text
 
     externo = administrador.get(
         f"/planeamento-clube/mensal/{dados['mensal_externo_id']}",
