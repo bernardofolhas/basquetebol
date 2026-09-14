@@ -26,14 +26,35 @@
   .ds-eval-choice[hidden]{display:none!important}
   .ds-eval-choice:has(input:checked){border-color:var(--clube-primary);background:var(--clube-primary-surface);box-shadow:0 0 0 1px var(--clube-primary-soft)}
   .ds-eval-choice input{width:1.05rem;height:1.05rem;accent-color:var(--clube-primary)}
+  .ds-eval-player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:.75rem}
+  .ds-eval-player-card{position:relative;display:flex;aspect-ratio:1/1;min-width:0;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;border:1px solid #e2e8f0;border-radius:20px;background:#fff;padding:.8rem;text-align:center;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+  .ds-eval-player-card:hover{transform:translateY(-2px);border-color:#cbd5e1;box-shadow:0 10px 24px rgba(15,23,42,.08)}
+  .ds-eval-player-card:has(input:checked){border-color:var(--clube-primary);background:var(--clube-primary-surface);box-shadow:0 0 0 2px var(--clube-primary-soft)}
+  .ds-eval-player-card[hidden]{display:none!important}
+  .ds-eval-player-card>input{position:absolute;right:.7rem;top:.7rem;width:1.05rem;height:1.05rem;accent-color:var(--clube-primary)}
+  .ds-eval-player-photo{height:4.5rem;width:4.5rem;flex-shrink:0;overflow:hidden;border-radius:18px;background:#f1f5f9;box-shadow:0 0 0 1px rgba(148,163,184,.24)}
+  .ds-eval-player-photo img{height:100%;width:100%;object-fit:cover}
+  .ds-eval-player-photo span{display:flex;height:100%;align-items:center;justify-content:center;color:#94a3b8;font-size:1.35rem;font-weight:900}
   .ds-eval-primary{display:inline-flex;min-height:44px;align-items:center;justify-content:center;border-radius:13px;background:var(--clube-primary);padding:.7rem 1.2rem;color:var(--clube-on-primary);font-size:.875rem;font-weight:800;transition:.15s ease}
   .ds-eval-primary:hover{filter:brightness(.92)}.ds-eval-primary:disabled{cursor:not-allowed;opacity:.55}
   .ds-eval-dialog{width:min(92vw,580px);border:0;border-radius:26px;padding:0;box-shadow:0 24px 70px rgba(15,23,42,.3)}.ds-eval-dialog::backdrop{background:rgba(15,23,42,.5)}
-  .ds-eval-matrix-player{overflow:hidden;border:1px solid #e2e8f0;border-radius:20px;background:#fff}
-  .ds-eval-value-row{display:grid;grid-template-columns:minmax(170px,1fr) minmax(120px,180px);align-items:center;gap:1rem;border-top:1px solid #f1f5f9;padding:.8rem 1rem}
+  .ds-eval-matrix{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:1rem}
+  .ds-eval-matrix-player{display:flex;aspect-ratio:1/1;min-height:0;overflow:hidden;flex-direction:column;border:1px solid #e2e8f0;border-radius:22px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.045)}
+  .ds-eval-matrix-header{display:flex;flex-shrink:0;align-items:center;gap:.7rem;background:#f8fafc;padding:.65rem .8rem}
+  .ds-eval-matrix-photo{height:2.8rem;width:2.8rem;flex-shrink:0;overflow:hidden;border-radius:13px;background:#fff;box-shadow:0 0 0 1px #e2e8f0}
+  .ds-eval-matrix-photo img{height:100%;width:100%;object-fit:cover}
+  .ds-eval-matrix-photo span{display:flex;height:100%;align-items:center;justify-content:center;color:#64748b;font-size:.9rem;font-weight:900}
+  .ds-eval-matrix-values{min-height:0;flex:1;overflow-y:auto}
+  .ds-eval-value-row{display:grid;width:100%;grid-template-columns:minmax(0,1fr) 58px;align-items:center;gap:.65rem;border-top:1px solid #f1f5f9;padding:.46rem .7rem;text-align:left;transition:background .15s ease}
+  .ds-eval-value-row:hover{background:#f8fafc}
   .ds-eval-value-row:first-child{border-top:0}
+  .ds-eval-value-badge{display:grid;min-height:35px;place-items:center;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#94a3b8;font-size:.9rem;font-weight:900}
+  .ds-eval-value-row.has-value .ds-eval-value-badge{border-color:var(--clube-primary);background:var(--clube-primary-surface);color:var(--clube-primary-dark)}
+  .ds-eval-scale-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}
+  .ds-eval-scale-option{display:grid;min-height:58px;place-items:center;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#0f172a;font-size:1.1rem;font-weight:900;transition:.15s ease}
+  .ds-eval-scale-option:hover,.ds-eval-scale-option.is-selected{border-color:var(--clube-primary);background:var(--clube-primary);color:var(--clube-on-primary);box-shadow:0 8px 18px var(--clube-primary-soft)}
   #eval-success{position:fixed;right:1rem;bottom:1rem;z-index:80;max-width:360px;border-radius:16px;background:#064e3b;padding:.85rem 1rem;color:#fff;font-size:.875rem;font-weight:700;box-shadow:0 18px 45px rgba(15,23,42,.3)}
-  @media(max-width:640px){.ds-eval-shell{margin:0 -.15rem}.ds-eval-card{border-radius:19px}.ds-eval-value-row{grid-template-columns:1fr;padding:.75rem}.ds-eval-value-row .ds-eval-input{font-size:16px}.ds-eval-choice{min-height:50px}.ds-eval-footer{position:sticky;bottom:.5rem;z-index:10;border:1px solid #e2e8f0;border-radius:17px;background:rgba(255,255,255,.94);padding:.6rem;box-shadow:0 12px 35px rgba(15,23,42,.16);backdrop-filter:blur(10px)}}
+  @media(max-width:640px){.ds-eval-shell{margin:0 -.15rem}.ds-eval-card{border-radius:19px}.ds-eval-player-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}.ds-eval-player-card{border-radius:17px;padding:.65rem}.ds-eval-player-photo{height:4rem;width:4rem}.ds-eval-matrix{grid-template-columns:1fr}.ds-eval-value-row .ds-eval-input{font-size:16px}.ds-eval-choice{min-height:50px}.ds-eval-footer{position:sticky;bottom:.5rem;z-index:10;border:1px solid #e2e8f0;border-radius:17px;background:rgba(255,255,255,.94);padding:.6rem;box-shadow:0 12px 35px rgba(15,23,42,.16);backdrop-filter:blur(10px)}}
 </style>
 
 <div class="ds-eval-shell">
@@ -56,12 +77,12 @@
       <section class="ds-eval-card p-5 sm:p-6">
         <div class="flex items-center justify-between gap-3"><div><p class="text-xs font-black uppercase tracking-[.14em] text-slate-400">Atletas</p><h2 class="mt-1 font-black text-slate-900">Selecionar plantel</h2></div><button type="button" data-select-all="players" class="text-xs font-bold text-[var(--clube-primary-dark)]">Selecionar todos</button></div>
         <input type="search" data-filter="players" placeholder="Pesquisar atleta" class="ds-eval-input mt-4">
-        <div id="player-options" class="mt-3 max-h-[410px] space-y-2 overflow-y-auto pr-1">
+        <div id="player-options" class="ds-eval-player-grid mt-3 max-h-[410px] overflow-y-auto pr-1">
         {% for jogador in jogadores %}
-          <label class="ds-eval-choice" data-option="players" data-search="{{ jogador.nome|lower }}" data-player-selection="{{ jogador.id }}">
-            <input type="checkbox" value="{{ jogador.id }}" data-player-name="{{ jogador.nome }}" data-player-number="{{ jogador.numero_camisola or '' }}" {% if jogador.id in jogadores_selecionados %}checked{% endif %}>
-            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-black text-slate-600">{{ jogador.numero_camisola or jogador.nome[:1] }}</span>
-            <span class="min-w-0"><strong class="block truncate text-sm text-slate-800">{{ jogador.nome }}</strong><small class="text-slate-400">{{ jogador.posicao or equipa.nome }}</small></span>
+          <label class="ds-eval-player-card" data-option="players" data-search="{{ jogador.nome|lower }}" data-player-selection="{{ jogador.id }}">
+            <input type="checkbox" value="{{ jogador.id }}" data-player-name="{{ jogador.nome }}" data-player-number="{{ jogador.numero_camisola or '' }}" data-player-photo="{{ jogador.fotografia or '' }}" {% if jogador.id in jogadores_selecionados %}checked{% endif %}>
+            <span class="ds-eval-player-photo">{% if jogador.fotografia %}<img src="{{ jogador.fotografia }}" alt="Fotografia de {{ jogador.nome }}">{% else %}<span>{{ jogador.numero_camisola or jogador.nome[:1]|upper }}</span>{% endif %}</span>
+            <span class="mt-2 min-w-0 max-w-full"><strong class="block truncate text-sm text-slate-800">{{ jogador.nome }}</strong><small class="block truncate text-xs text-slate-400">{{ jogador.posicao or equipa.nome }}</small></span>
           </label>
         {% else %}<p class="py-8 text-center text-sm text-slate-500">Esta equipa ainda não tem atletas ativos.</p>{% endfor %}
         </div>
@@ -99,7 +120,7 @@
       <input type="hidden" name="data" id="form-date">
       {% if sessao %}<input type="hidden" name="sessao_id" value="{{ sessao.id }}">{% endif %}
       <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="text-xl font-black text-slate-900">Preencher avaliações</h2><p class="text-sm text-slate-500">Os campos podem ficar vazios quando um parâmetro não foi observado.</p></div><button id="back-to-selection" type="button" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Alterar seleção</button></div>
-      <div id="evaluation-matrix" class="space-y-4"></div>
+      <div id="evaluation-matrix" class="ds-eval-matrix"></div>
       <div class="ds-eval-footer mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p class="text-sm text-slate-500">Guarda todos os atletas e critérios numa única ação.</p><button id="save-evaluation" class="ds-eval-primary">Guardar avaliações</button></div>
     </form>
   </section>
@@ -121,6 +142,20 @@
   </form>
 </dialog>
 
+<dialog id="dialog-evaluation-value" class="ds-eval-dialog">
+  <div class="p-6 sm:p-7">
+    <div class="flex items-start justify-between gap-4">
+      <div><p id="value-dialog-player" class="text-xs font-black uppercase tracking-[.16em] text-[var(--clube-primary-dark)]"></p><h2 id="value-dialog-parameter" class="mt-1 text-xl font-black text-slate-900">Selecionar avaliação</h2><p id="value-dialog-help" class="mt-1 text-sm text-slate-500"></p></div>
+      <button type="button" data-close-value-dialog class="rounded-full p-2 text-slate-400 hover:bg-slate-100" aria-label="Fechar">X</button>
+    </div>
+    <div id="value-scale-options" class="ds-eval-scale-grid mt-6"></div>
+    <form id="custom-value-form" class="mt-5 border-t border-slate-100 pt-4">
+      <label><span class="mb-1 block text-sm font-bold text-slate-700">Outro valor</span><span class="flex gap-2"><input id="custom-value-input" type="number" inputmode="decimal" step="any" class="ds-eval-input" placeholder="Introduzir valor"><button class="ds-eval-primary shrink-0">Aplicar</button></span></label>
+    </form>
+    <button type="button" id="clear-evaluation-value" class="mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50">Deixar sem avaliação</button>
+  </div>
+</dialog>
+
 <div id="eval-success" hidden role="status"></div>
 
 <script>
@@ -131,6 +166,10 @@
   const step2 = document.getElementById('eval-step-2');
   const matrix = document.getElementById('evaluation-matrix');
   const dateInput = document.getElementById('evaluation-date');
+  const valueDialog = document.getElementById('dialog-evaluation-value');
+  const scaleOptions = document.getElementById('value-scale-options');
+  const customValueInput = document.getElementById('custom-value-input');
+  let activeValueInput = null;
 
   const checked = kind => [...document.querySelectorAll(`[data-option="${kind}"] input:checked`)];
   function updateSummary() {
@@ -160,11 +199,69 @@
     const current = existing[key] ?? '';
     const unit = escapeHTML(parameter.dataset.unit);
     const parameterName = escapeHTML(parameter.dataset.parameterName);
-    const wrapper = document.createElement('label');
-    wrapper.className = 'ds-eval-value-row';
-    wrapper.innerHTML = `<span><strong class="block text-sm text-slate-800">${parameterName}</strong><small class="text-xs text-slate-400">${parameter.dataset.category === 'fisica' ? `${parameter.dataset.min} a ${parameter.dataset.max} ${unit}` : 'Escala 0 a 5'}</small></span><span class="relative"><input class="ds-eval-input pr-12 text-right font-bold" type="number" inputmode="decimal" step="${parameter.dataset.category === 'fisica' ? 'any' : '0.5'}" min="${parameter.dataset.category === 'fisica' ? parameter.dataset.min : 0}" max="${parameter.dataset.category === 'fisica' ? parameter.dataset.max : 5}" name="valor_${player.value}_${parameter.value}" value="${current}" placeholder="-"><small class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">${unit}</small></span>`;
+    const wrapper = document.createElement('button');
+    wrapper.type = 'button';
+    wrapper.className = `ds-eval-value-row${current !== '' ? ' has-value' : ''}`;
+    wrapper.dataset.openEvaluationValue = '';
+    wrapper.innerHTML = `<span class="min-w-0"><strong class="block truncate text-sm text-slate-800">${parameterName}</strong><small class="block truncate text-xs text-slate-400">${parameter.dataset.category === 'fisica' ? `${parameter.dataset.min} a ${parameter.dataset.max} ${unit}` : 'Escala 0 a 5'}</small></span><span class="ds-eval-value-badge" data-value-badge>${current !== '' ? `${escapeHTML(current)}${unit ? ` ${unit}` : ''}` : '-'}</span><input type="hidden" name="valor_${player.value}_${parameter.value}" value="${escapeHTML(current)}" data-value-player="${escapeHTML(player.dataset.playerName)}" data-value-parameter="${parameterName}" data-value-category="${escapeHTML(parameter.dataset.category)}" data-value-min="${escapeHTML(parameter.dataset.min)}" data-value-max="${escapeHTML(parameter.dataset.max)}" data-value-unit="${unit}">`;
     return wrapper;
   }
+
+  function setEvaluationValue(value) {
+    if (!activeValueInput) return;
+    const normalized = value === '' ? '' : String(Number(value));
+    activeValueInput.value = normalized;
+    const row = activeValueInput.closest('[data-open-evaluation-value]');
+    const unit = activeValueInput.dataset.valueUnit;
+    row.classList.toggle('has-value', normalized !== '');
+    row.querySelector('[data-value-badge]').textContent = normalized === '' ? '-' : `${normalized}${unit ? ` ${unit}` : ''}`;
+    valueDialog.close();
+  }
+
+  function openValueDialog(input) {
+    activeValueInput = input;
+    const isPhysical = input.dataset.valueCategory === 'fisica';
+    const minimum = Number(isPhysical ? input.dataset.valueMin : 0);
+    const maximum = Number(isPhysical ? input.dataset.valueMax : 5);
+    document.getElementById('value-dialog-player').textContent = input.dataset.valuePlayer;
+    document.getElementById('value-dialog-parameter').textContent = input.dataset.valueParameter;
+    document.getElementById('value-dialog-help').textContent = isPhysical
+      ? `Seleciona um valor ou introduz a medição entre ${minimum} e ${maximum}${input.dataset.valueUnit ? ` ${input.dataset.valueUnit}` : ''}.`
+      : 'Toca num número da escala para preencher imediatamente.';
+    customValueInput.min = minimum;
+    customValueInput.max = maximum;
+    customValueInput.value = input.value;
+    scaleOptions.replaceChildren();
+    let values = [0, 1, 2, 3, 4, 5];
+    if (isPhysical) {
+      const first = Math.ceil(minimum);
+      const last = Math.floor(maximum);
+      values = last - first <= 10
+        ? Array.from({length: Math.max(0, last - first + 1)}, (_, index) => first + index)
+        : [minimum, maximum];
+    }
+    values.forEach(value => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = `ds-eval-scale-option${String(value) === input.value ? ' is-selected' : ''}`;
+      option.textContent = `${value}${input.dataset.valueUnit ? ` ${input.dataset.valueUnit}` : ''}`;
+      option.addEventListener('click', () => setEvaluationValue(value));
+      scaleOptions.appendChild(option);
+    });
+    valueDialog.showModal();
+  }
+
+  matrix.addEventListener('click', event => {
+    const row = event.target.closest('[data-open-evaluation-value]');
+    if (row) openValueDialog(row.querySelector('input[name^="valor_"]'));
+  });
+  document.querySelector('[data-close-value-dialog]').addEventListener('click', () => valueDialog.close());
+  document.getElementById('clear-evaluation-value').addEventListener('click', () => setEvaluationValue(''));
+  document.getElementById('custom-value-form').addEventListener('submit', event => {
+    event.preventDefault();
+    if (!customValueInput.reportValidity() || customValueInput.value === '') return;
+    setEvaluationValue(customValueInput.value);
+  });
 
   document.getElementById('continue-evaluation').addEventListener('click', () => {
     const players = checked('players');
@@ -175,8 +272,13 @@
     players.forEach(player => {
       const card = document.createElement('article');
       card.className = 'ds-eval-matrix-player';
-      card.innerHTML = `<input type="hidden" name="jogador_ids" value="${player.value}"><header class="flex items-center gap-3 bg-slate-50 px-4 py-3"><span class="grid h-9 w-9 place-items-center rounded-full bg-white text-xs font-black text-slate-600 shadow-sm">${escapeHTML(player.dataset.playerNumber || player.dataset.playerName.slice(0,1))}</span><div><h3 class="font-black text-slate-900">${escapeHTML(player.dataset.playerName)}</h3><p class="text-xs text-slate-400">${parameters.length} parâmetro(s)</p></div></header>`;
-      parameters.forEach(parameter => card.appendChild(valueInput(player, parameter)));
+      const playerMarker = escapeHTML(player.dataset.playerNumber || player.dataset.playerName.slice(0,1));
+      const playerPhoto = player.dataset.playerPhoto
+        ? `<img src="${escapeHTML(player.dataset.playerPhoto)}" alt="Fotografia de ${escapeHTML(player.dataset.playerName)}">`
+        : `<span>${playerMarker}</span>`;
+      card.innerHTML = `<input type="hidden" name="jogador_ids" value="${player.value}"><header class="ds-eval-matrix-header"><span class="ds-eval-matrix-photo">${playerPhoto}</span><div class="min-w-0"><h3 class="truncate font-black text-slate-900">${escapeHTML(player.dataset.playerName)}</h3><p class="text-xs text-slate-400">${parameters.length} parâmetro(s) · toca para avaliar</p></div></header><div class="ds-eval-matrix-values"></div>`;
+      const values = card.querySelector('.ds-eval-matrix-values');
+      parameters.forEach(parameter => values.appendChild(valueInput(player, parameter)));
       matrix.appendChild(card);
     });
     parameters.forEach(parameter => {
@@ -232,7 +334,7 @@
     const button = form.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
-      const response = await fetch(form.action, {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}});
+      const response = await fetch(form.action, {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''}});
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.message || 'Não foi possível eliminar o parâmetro.');
       document.querySelector(`[data-parameter-option-row="${form.dataset.deleteEvaluationParameter}"]`)?.remove();

@@ -367,6 +367,12 @@ def test_sessao_e_plano_de_treino_expoem_acesso_a_avaliacao(client_admin):
         assert pagina.status_code == 200
         assert "Associada ao treino 1" in pagina.text
         assert "data-step-indicator" in pagina.text
+        assert "ds-eval-player-card" in pagina.text
+        assert "data-player-photo" in pagina.text
+        assert 'id="dialog-evaluation-value"' in pagina.text
+        assert "ds-eval-scale-option" in pagina.text
+        assert "Toca num número da escala" in pagina.text
+        assert "X-CSRF-Token" in pagina.text
 
         plano = client_admin.get(f"/treino/sessoes/{sessao_id}")
         assert plano.status_code == 200

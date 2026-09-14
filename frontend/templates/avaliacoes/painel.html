@@ -277,7 +277,7 @@
     const button = form.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
-      const response = await fetch(form.action, {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}});
+      const response = await fetch(form.action, {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''}});
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.message || 'Não foi possível eliminar o parâmetro.');
       document.getElementById(`parametro-${form.dataset.deleteParameterForm}`)?.remove();
