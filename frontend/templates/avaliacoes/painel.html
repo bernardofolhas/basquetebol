@@ -165,7 +165,7 @@
       {% for parametro in parametros_por_categoria[categoria] %}
         <div class="ds-parameter-row" id="parametro-{{ parametro.id }}">
           <div class="min-w-0"><p class="truncate text-sm font-semibold text-slate-800">{{ parametro.nome }}</p><p class="text-xs text-slate-400">{% if parametro.categoria == 'fisica' %}{{ '%g'|format(parametro.valor_minimo) }} a {{ '%g'|format(parametro.valor_maximo) }} {{ parametro.unidade or '' }}{% else %}Escala de observação{% endif %}</p></div>
-          {% if pode_editar %}<div class="flex shrink-0 gap-1"><button type="button" onclick="document.getElementById('dialog-editar-{{ parametro.id }}').showModal()" class="rounded-lg px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100">Editar</button><button type="button" data-delete-parameter="{{ parametro.id }}" class="rounded-lg px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50">Remover</button></div>{% endif %}
+          {% if pode_editar %}<div class="flex shrink-0 gap-1"><button type="button" onclick="document.getElementById('dialog-editar-{{ parametro.id }}').showModal()" class="rounded-lg px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100">Editar</button><form method="POST" action="/analise/parametros/{{ parametro.id }}/eliminar" data-delete-parameter-form="{{ parametro.id }}" onsubmit="return confirm('Eliminar este parâmetro das próximas avaliações? O histórico já registado será preservado.')"><button type="submit" class="rounded-lg px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50">Eliminar</button></form></div>{% endif %}
         </div>
       {% else %}<p class="py-5 text-sm text-slate-400">Sem parâmetros nesta categoria.</p>{% endfor %}
       </div>
@@ -271,12 +271,20 @@
     }
   });
 
-  document.querySelectorAll('[data-delete-parameter]').forEach(button => button.addEventListener('click', async () => {
-    if (!confirm('Remover este parâmetro das próximas avaliações? O histórico será preservado.')) return;
-    const response = await fetch(`/analise/parametros/${button.dataset.deleteParameter}/eliminar`, {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}});
-    const result = await response.json();
-    if (result.ok) document.getElementById(`parametro-${button.dataset.deleteParameter}`)?.remove();
-    else alert(result.message || 'Não foi possível remover o parâmetro.');
+  document.querySelectorAll('[data-delete-parameter-form]').forEach(form => form.addEventListener('submit', async event => {
+    if (event.defaultPrevented) return;
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      const response = await fetch(form.action, {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}});
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.message || 'Não foi possível eliminar o parâmetro.');
+      document.getElementById(`parametro-${form.dataset.deleteParameterForm}`)?.remove();
+    } catch (error) {
+      alert(error.message || 'Não foi possível eliminar o parâmetro.');
+      button.disabled = false;
+    }
   }));
 })();
 </script>

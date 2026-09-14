@@ -193,6 +193,11 @@ def test_avaliacao_multipla_guarda_e_atualiza_valores_da_sessao(client_admin):
         assert resposta.status_code == 200
         assert resposta.json()["ok"] is True
         assert db.query(AvaliacaoJogador).filter(AvaliacaoJogador.sessao_id == sessao_id).count() == 2
+        presencas = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao_id,
+        ).all()
+        assert len(presencas) == 2
+        assert all(item.presente and item.estado == "presente" for item in presencas)
 
         resposta = client_admin.post(
             f"/analise/equipas/{equipa_id}/registar",
@@ -224,6 +229,40 @@ def test_avaliacao_multipla_guarda_e_atualiza_valores_da_sessao(client_admin):
         assert ficha.status_code == 200
         assert 'data-workspace-tab="analise"' in ficha.text
         assert "Abrir histórico analítico completo" in ficha.text
+    finally:
+        _limpar_contexto(db, equipa_id, [jogadora_1_id, jogadora_2_id], macro_id)
+        db.close()
+
+
+def test_avaliacao_de_treino_preseleciona_apenas_atletas_presentes(client_admin):
+    db, equipa_id, jogadora_1_id, jogadora_2_id, macro_id, sessao_id = _criar_contexto()
+    try:
+        clube_id = db.query(Equipa.clube_id).filter(Equipa.id == equipa_id).scalar()
+        db.add_all([
+            RegistoAssiduidade(
+                clube_id=clube_id,
+                sessao_id=sessao_id,
+                jogador_id=jogadora_1_id,
+                presente=True,
+                estado="presente",
+            ),
+            RegistoAssiduidade(
+                clube_id=clube_id,
+                sessao_id=sessao_id,
+                jogador_id=jogadora_2_id,
+                presente=False,
+                estado="ausente",
+            ),
+        ])
+        db.commit()
+
+        resposta = client_admin.get(f"/analise/equipas/{equipa_id}/registar?sessao_id={sessao_id}")
+        assert resposta.status_code == 200
+        primeira = resposta.text.split(f'data-player-selection="{jogadora_1_id}"', 1)[1].split("</label>", 1)[0]
+        segunda = resposta.text.split(f'data-player-selection="{jogadora_2_id}"', 1)[1].split("</label>", 1)[0]
+        assert "checked" in primeira
+        assert "checked" not in segunda
+        assert "1 atleta(s) presente(s) foram pré-selecionados" in resposta.text
     finally:
         _limpar_contexto(db, equipa_id, [jogadora_1_id, jogadora_2_id], macro_id)
         db.close()
@@ -303,6 +342,19 @@ def test_parametro_fisico_tem_unidade_e_limites_editaveis(client_admin):
         assert 'id="form-novo-parametro"' in painel.text
         assert "data-parameter-submit" in painel.text
         assert "data-parameter-feedback" in painel.text
+
+        eliminar = client_admin.post(
+            f"/analise/parametros/{parametro.id}/eliminar",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert eliminar.status_code == 200
+        assert eliminar.json()["ok"] is True
+        db.refresh(parametro)
+        assert parametro.ativo is False
+
+        pagina_avaliacao = client_admin.get(f"/analise/equipas/{equipa_id}/registar")
+        assert f'data-parameter-option-row="{parametro.id}"' not in pagina_avaliacao.text
+        assert "data-delete-evaluation-parameter" in pagina_avaliacao.text
     finally:
         _limpar_contexto(db, equipa_id, [jogadora_1_id, jogadora_2_id], macro_id)
         db.close()

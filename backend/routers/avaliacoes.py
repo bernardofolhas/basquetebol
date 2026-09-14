@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from auth_deps import exigir_operacao_desportiva, verificar_ou_negar_equipa
 from database import get_db
 from flash import set_flash
+from models.assiduidade import RegistoAssiduidade
 from models.avaliacao import AvaliacaoJogador, ParametroAvaliacao
 from models.equipa import Equipa
 from models.fisico import TesteFisico
@@ -17,6 +18,7 @@ from paths import TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
 from services.avaliacao_service import dados_dashboard_avaliacoes
 from services.analise_global_equipa_service import construir_analise_global_equipa
+from services.assiduidade_service import estado_para_presenca
 from services.carga_real_service import analisar_carga_jogador
 from template_config import Jinja2Templates
 
@@ -207,10 +209,14 @@ def registar_avaliacoes(
         ParametroAvaliacao.ativo.is_(True),
     ).order_by(ParametroAvaliacao.categoria, ParametroAvaliacao.ordem, ParametroAvaliacao.nome).all()
     existentes = []
+    registos_assiduidade = []
     if sessao:
         existentes = db.query(AvaliacaoJogador).filter(
             AvaliacaoJogador.equipa_id == equipa.id,
             AvaliacaoJogador.sessao_id == sessao.id,
+        ).all()
+        registos_assiduidade = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao.id,
         ).all()
     elif data_avaliacao:
         existentes = db.query(AvaliacaoJogador).filter(
@@ -234,7 +240,19 @@ def registar_avaliacoes(
         "valores_existentes": {
             f"{item.jogador_id}:{item.parametro_id}": item.valor for item in existentes
         },
-        "jogadores_selecionados": {item.jogador_id for item in existentes},
+        "jogadores_selecionados": (
+            {
+                item.jogador_id for item in registos_assiduidade
+                if estado_para_presenca(item.estado, item.presente)
+            }
+            if registos_assiduidade
+            else {item.jogador_id for item in existentes}
+        ),
+        "assiduidade_registada": bool(registos_assiduidade),
+        "presentes_preselecionados": sum(
+            estado_para_presenca(item.estado, item.presente)
+            for item in registos_assiduidade
+        ),
         "parametros_selecionados": {item.parametro_id for item in existentes},
     })
 
@@ -301,6 +319,22 @@ async def guardar_avaliacoes(
     if not valores:
         return _resposta_erro(request, "Preenche pelo menos um valor antes de guardar.")
 
+    assiduidade_criada = 0
+    if sessao_id:
+        registos_assiduidade = db.query(RegistoAssiduidade).filter(
+            RegistoAssiduidade.sessao_id == sessao_id,
+        ).all()
+        if not registos_assiduidade:
+            for jogador in jogadores:
+                db.add(RegistoAssiduidade(
+                    clube_id=equipa.clube_id,
+                    sessao_id=sessao_id,
+                    jogador_id=jogador.id,
+                    presente=True,
+                    estado="presente",
+                ))
+                assiduidade_criada += 1
+
     for jogador, parametro, valor in valores:
         consulta = db.query(AvaliacaoJogador).filter(
             AvaliacaoJogador.equipa_id == equipa.id,
@@ -333,6 +367,8 @@ async def guardar_avaliacoes(
     )
     db.commit()
     mensagem = f"{len(valores)} avaliação(ões) guardada(s)."
+    if assiduidade_criada:
+        mensagem += f" {assiduidade_criada} presença(s) registada(s) automaticamente."
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JSONResponse({"ok": True, "message": mensagem, "redirect": f"/analise/equipas/{equipa.id}"})
     set_flash(request, mensagem)
@@ -432,7 +468,7 @@ async def editar_parametro(
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JSONResponse({"ok": True, "message": "Parâmetro atualizado."})
     set_flash(request, "Parâmetro atualizado.")
-    return RedirectResponse(f"/analise/equipas/{parametro.equipa_id}", status_code=303)
+    return RedirectResponse(f"/analise/equipas/{parametro.equipa_id}#parametros", status_code=303)
 
 
 @router.post("/parametros/{parametro_id}/eliminar")
@@ -454,7 +490,7 @@ def eliminar_parametro(
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JSONResponse({"ok": True, "message": "Parâmetro removido."})
     set_flash(request, "Parâmetro removido.")
-    return RedirectResponse(f"/analise/equipas/{parametro.equipa_id}", status_code=303)
+    return RedirectResponse(f"/analise/equipas/{parametro.equipa_id}#parametros", status_code=303)
 
 
 @router.get("/jogadores/{jogador_id}", response_class=HTMLResponse)
