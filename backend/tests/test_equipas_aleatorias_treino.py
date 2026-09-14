@@ -40,8 +40,10 @@ def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_adm
         assert pagina.status_code == 200
         assert "Atletas previstos" in pagina.text
         assert "Formar equipas" in pagina.text
-        assert 'id="training-expected-dialog"' in pagina.text
-        assert 'id="training-teams-dialog"' in pagina.text
+        assert 'data-workspace-tab="atletas"' in pagina.text
+        assert 'data-workspace-tab="equipas"' in pagina.text
+        assert 'data-workspace-panel="treino:atletas"' in pagina.text
+        assert 'data-workspace-panel="treino:equipas"' in pagina.text
         plano = db.query(PlanoTreino).filter(PlanoTreino.sessao_id == sessao.id).one()
 
         previstos = client_admin.post(

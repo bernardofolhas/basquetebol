@@ -178,16 +178,6 @@
       if (!details.open) return;
       root.querySelectorAll('[data-training-dropdown]').forEach(other => { if (other !== details) other.open = false; });
     }));
-    root.querySelectorAll('[data-open-training-dialog]').forEach(button => button.addEventListener('click', () => {
-      const dialog = document.getElementById(button.dataset.openTrainingDialog);
-      if (dialog?.showModal) dialog.showModal();
-    }));
-    root.querySelectorAll('.training-organization-dialog').forEach(dialog => {
-      dialog.querySelector('[data-close-training-dialog]')?.addEventListener('click', () => dialog.close());
-      dialog.addEventListener('click', event => {
-        if (event.target === dialog) dialog.close();
-      });
-    });
     teamSize?.addEventListener('change', updateRule);
     postCount?.addEventListener('change', updateRule);
     root.querySelector('[data-toggle-all-expected]')?.addEventListener('click', () => {

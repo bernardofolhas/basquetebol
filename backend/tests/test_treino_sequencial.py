@@ -116,8 +116,12 @@ def test_conteudos_previstos_estao_no_cabecalho_fixo(client_admin):
         assert pagina.text.index('class="training-guidance-chevron"', menu, fim_cabecalho) > menu
         assert '<svg' not in pagina.text[menu:fim_cabecalho]
         assert pagina.text.count('class="training-guidance-menu"') == 1
-        assert 'data-open-training-dialog="training-expected-dialog"' in pagina.text
-        assert 'data-open-training-dialog="training-teams-dialog"' in pagina.text
+        assert 'data-workspace-tab="atletas"' in pagina.text[inicio_cabecalho:fim_cabecalho]
+        assert 'data-workspace-tab="equipas"' in pagina.text[inicio_cabecalho:fim_cabecalho]
+        assert 'data-workspace-panel="treino:atletas"' in pagina.text
+        assert 'data-workspace-panel="treino:equipas"' in pagina.text
+        assert 'id="training-expected-dialog"' not in pagina.text
+        assert 'id="training-teams-dialog"' not in pagina.text
         assert "Atletas previstos" in pagina.text
         assert "Formar equipas" in pagina.text
     finally:
