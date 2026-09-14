@@ -183,6 +183,17 @@ def test_visao_e_graficos_incluem_treinos_manuais_e_atribuidos():
     assert dados_graficos["rpes"] == [5.0, 7.0]
 
 
+def test_cabecalho_semanal_liga_ao_plano_e_mostra_balanco_e_sugestoes():
+    raiz_projeto = Path(__file__).resolve().parents[2]
+    template = raiz_projeto / "frontend" / "templates" / "planeamento" / "microciclos" / "detalhe.html"
+    conteudo = template.read_text(encoding="utf-8")
+
+    assert 'href="/treino/sessoes/{{ treino.sessao_id }}"' in conteudo
+    assert "{{ treino.minutos_atribuidos }}/{{ treino.minutos_limite" in conteudo
+    assert 'class="training-guidance-menu"' in conteudo
+    assert "Sugestões da semana" in conteudo
+
+
 def test_pdf_completo_do_microciclo_prioriza_carga_sem_detalhe_repetido():
     raiz_projeto = Path(__file__).resolve().parents[2]
     template = raiz_projeto / "frontend" / "templates" / "planeamento" / "microciclos" / "pdf.html"
