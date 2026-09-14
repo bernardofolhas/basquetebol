@@ -19,7 +19,7 @@ from auth_deps import AcessoNegado, exigir_autenticacao
 from database import get_db
 from flash import set_flash
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
-from models.equipa import Equipa
+from models.equipa import Equipa, EscalaoEnum
 from models.assiduidade import ConvocacaoAssiduidade, RegistoAssiduidade
 from models.jogador import Jogador, RegistoAntropometrico
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
@@ -112,6 +112,27 @@ def _atletas_disponiveis_plano(db: Session, equipa: Equipa, sessao_id: int) -> l
     )
     ids_plantel = {jogador.id for jogador in plantel}
     return plantel + [jogador for jogador in convocados if jogador.id not in ids_plantel]
+
+
+def _atletas_sub18_convocaveis(db: Session, equipa: Equipa, sessao_id: int) -> list[Jogador]:
+    convocados_ids = db.query(ConvocacaoAssiduidade.jogador_id).filter(
+        ConvocacaoAssiduidade.sessao_id == sessao_id,
+        ConvocacaoAssiduidade.clube_id == equipa.clube_id,
+    )
+    return (
+        db.query(Jogador)
+        .join(Equipa, Jogador.equipa_id == Equipa.id)
+        .filter(
+            Jogador.clube_id == equipa.clube_id,
+            Jogador.ativo.is_(True),
+            Jogador.equipa_id != equipa.id,
+            Equipa.escalao == EscalaoEnum.sub18,
+            Equipa.genero == equipa.genero,
+            ~Jogador.id.in_(convocados_ids),
+        )
+        .order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome)
+        .all()
+    )
 
 
 def _dados_atletas_plano(db: Session, equipa: Equipa, sessao_id: int) -> list[dict]:
@@ -818,6 +839,7 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "prioridades_microciclo": prioridades_microciclo,
         "hora_sugerida_exercicio": _hora_sugerida_exercicio(sessao, list(plano.exercicios)),
         "atletas_treino": atletas_treino,
+        "atletas_sub18_convocaveis": _atletas_sub18_convocaveis(db, equipa, sessao.id),
         "atletas_previstos_ids": atletas_previstos_ids,
         "equipas_treino_estado": equipas_treino_estado,
     })
@@ -856,6 +878,57 @@ async def guardar_atletas_previstos(
         "sucesso": True,
         "mensagem": f"{len(ids)} atleta(s) previsto(s) guardado(s).",
         "jogador_ids": ids,
+    })
+
+
+@router.post("/planos/{plano_id}/convocar-sub18")
+async def convocar_atletas_sub18(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
+    plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+    if not plano:
+        return JSONResponse({"sucesso": False, "erro": "Plano de treino não encontrado."}, status_code=404)
+    try:
+        dados = await request.json()
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JSONResponse({"sucesso": False, "erro": "A convocatória enviada não é válida."}, status_code=400)
+    ids = dados.get("jogador_ids") if isinstance(dados, dict) else None
+    if not isinstance(ids, list) or not ids or any(isinstance(valor, bool) or not isinstance(valor, int) for valor in ids):
+        return JSONResponse({"sucesso": False, "erro": "Seleciona pelo menos um atleta Sub-18."}, status_code=422)
+
+    equipa = plano.sessao.microciclo.mesociclo.macrociclo.equipa
+    convocaveis = {jogador.id: jogador for jogador in _atletas_sub18_convocaveis(db, equipa, plano.sessao_id)}
+    if len(ids) != len(set(ids)) or not set(ids).issubset(convocaveis):
+        return JSONResponse({"sucesso": False, "erro": "A seleção contém atletas Sub-18 indisponíveis."}, status_code=422)
+
+    anteriores = None if plano.atletas_previstos is None else _carregar_json(plano.atletas_previstos, [])
+    for jogador_id in ids:
+        db.add(ConvocacaoAssiduidade(
+            clube_id=equipa.clube_id,
+            sessao_id=plano.sessao_id,
+            jogador_id=jogador_id,
+        ))
+    db.flush()
+    atletas = _dados_atletas_plano(db, equipa, plano.sessao_id)
+    if anteriores is None:
+        previstos_ids = [atleta["id"] for atleta in atletas]
+    else:
+        previstos_ids = _ids_atletas_previstos(plano, atletas)
+        previstos_ids.extend(jogador_id for jogador_id in ids if jogador_id not in previstos_ids)
+        plano.atletas_previstos = json.dumps(previstos_ids)
+    plano.equipas_aleatorias = None
+    _marcar_sessao_como_alterada_manual(plano.sessao)
+    db.commit()
+    adicionados = [atleta for atleta in atletas if atleta["id"] in ids]
+    return JSONResponse({
+        "sucesso": True,
+        "mensagem": f"{len(adicionados)} atleta(s) Sub-18 convocado(s) e selecionado(s).",
+        "adicionados": adicionados,
+        "jogador_ids": previstos_ids,
     })
 
 

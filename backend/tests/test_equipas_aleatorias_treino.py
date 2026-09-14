@@ -4,6 +4,9 @@ from types import SimpleNamespace
 
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.treino import PlanoTreino
+from models.assiduidade import ConvocacaoAssiduidade
+from models.equipa import Equipa, EscalaoEnum
+from models.jogador import Jogador
 from services.equipas_treino_service import gerar_equipas_equilibradas
 from test_fase2_assiduidade_evolucao import _criar_contexto, _limpar_contexto
 from routers.treino import _estado_equipas_guardado
@@ -45,6 +48,65 @@ def test_estado_antigo_e_convertido_no_primeiro_agrupamento():
     assert estado["grupos"][0]["id"] == 1
     assert estado["grupos"][0]["tamanho"] == 2
     assert estado["grupos"][0]["equipas"][0]["slots"] == [1, 2]
+
+
+def test_plano_convoca_sub18_e_adiciona_aos_atletas_previstos_sem_refresh(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    equipa_sub18 = None
+    convocado = None
+    try:
+        equipa = db.query(Equipa).filter(Equipa.id == equipa_id).one()
+        equipa_sub18 = Equipa(
+            clube_id=equipa.clube_id,
+            nome="Sub-18 de apoio",
+            escalao=EscalaoEnum.sub18,
+            genero=equipa.genero,
+        )
+        convocado = Jogador(
+            clube_id=equipa.clube_id,
+            nome="Atleta Sub-18 Convocado",
+            numero_camisola=18,
+            equipa=equipa_sub18,
+        )
+        db.add_all([equipa_sub18, convocado])
+        db.commit()
+        convocado_id = convocado.id
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert pagina.status_code == 200
+        assert "Convocar atletas Sub-18" in pagina.text
+        assert "Atleta Sub-18 Convocado" in pagina.text
+        plano = db.query(PlanoTreino).filter(PlanoTreino.sessao_id == sessao.id).one()
+
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/convocar-sub18",
+            json={"jogador_ids": [convocado_id]},
+        )
+        assert resposta.status_code == 200
+        assert resposta.json()["jogador_ids"][-1] == convocado_id
+        assert resposta.json()["adicionados"][0]["nome"] == "Atleta Sub-18 Convocado"
+        assert db.query(ConvocacaoAssiduidade).filter_by(
+            sessao_id=sessao.id,
+            jogador_id=convocado_id,
+        ).count() == 1
+
+        pagina_atualizada = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert "Convocado · Sub-18 de apoio" in pagina_atualizada.text
+        assert f'data-sub18-option="{convocado_id}"' not in pagina_atualizada.text
+    finally:
+        if convocado is not None:
+            db.query(ConvocacaoAssiduidade).filter(
+                ConvocacaoAssiduidade.jogador_id == convocado.id,
+            ).delete(synchronize_session=False)
+            db.delete(convocado)
+        if equipa_sub18 is not None:
+            db.delete(equipa_sub18)
+        db.commit()
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
 
 
 def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_admin):

@@ -7,7 +7,7 @@
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
 <script src="/static/js/tactical-ink-recognizer.js?v=20260910-2"></script>
-<script src="/static/js/training-teams.js?v=20260914-4" defer></script>
+<script src="/static/js/training-teams.js?v=20260914-5" defer></script>
 <div class="training-workspace" data-training-plan="{{ plano.id }}" data-training-session-start="{{ sessao.hora_inicio or plano.hora_inicio or '' }}" data-training-reorder-url="/treino/planos/{{ plano.id }}/exercicios/reordenar">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
@@ -178,6 +178,21 @@
             <span><strong data-expected-player-count>{{ atletas_previstos_ids|length }}</strong> atletas selecionados</span>
             <button type="button" class="ds-quiet-link" data-toggle-all-expected>Selecionar todos</button>
         </div>
+        <section class="training-sub18-callup">
+            <header><div><span>Reforços para esta sessão</span><h3>Convocar atletas Sub-18</h3><p>Os atletas convocados ficam automaticamente previstos e disponíveis nas presenças e avaliações deste treino.</p></div><strong data-sub18-available-count>{{ atletas_sub18_convocaveis|length }}</strong></header>
+            <div class="training-sub18-options" data-sub18-options>
+                {% for atleta in atletas_sub18_convocaveis %}
+                <label class="training-sub18-option" data-sub18-option="{{ atleta.id }}">
+                    <input type="checkbox" value="{{ atleta.id }}">
+                    <span class="training-expected-avatar">{% if atleta.fotografia %}<img src="{{ atleta.fotografia }}" alt="Fotografia de {{ atleta.nome }}">{% else %}{{ atleta.numero_camisola or atleta.nome[:1]|upper }}{% endif %}</span>
+                    <span><b>{{ atleta.nome }}</b><small>{{ atleta.equipa.nome }}</small></span>
+                </label>
+                {% else %}
+                <p class="training-team-empty" data-sub18-empty>Não existem atletas Sub-18 disponíveis para convocar.</p>
+                {% endfor %}
+            </div>
+            <footer><span data-sub18-status>Seleciona os atletas Sub-18 que vão participar neste treino.</span><button type="button" class="ds-button ds-button-secondary" data-callup-sub18>Convocar selecionados</button></footer>
+        </section>
         <div class="training-organization-body">
             <div class="training-expected-grid" data-expected-player-options>
                 {% for atleta in atletas_treino %}

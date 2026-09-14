@@ -873,6 +873,20 @@ table tbody tr:hover { background:#fafbfd; }
 .training-organization-total span { color:var(--text-muted);font-size:.65rem;font-weight:750; }
 .training-organization-toolbar { display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--border-soft);padding:.7rem 1.25rem;color:var(--text-muted);font-size:.72rem; }
 .training-organization-toolbar strong { color:var(--text-main); }
+.training-sub18-callup { margin:1rem;border:1px solid var(--clube-primary-border);border-radius:1rem;background:var(--clube-primary-surface); }
+.training-sub18-callup>header { display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:.9rem 1rem; }
+.training-sub18-callup>header span { color:var(--clube-primary-dark);font-size:.58rem;font-weight:850;letter-spacing:.09em;text-transform:uppercase; }
+.training-sub18-callup>header h3 { margin:.15rem 0;color:var(--text-main);font-size:.9rem;font-weight:850; }
+.training-sub18-callup>header p { color:var(--text-muted);font-size:.7rem;line-height:1.4; }
+.training-sub18-callup>header>strong { display:grid;min-width:1.7rem;height:1.7rem;place-items:center;border-radius:999px;background:var(--clube-primary);color:var(--clube-on-primary);font-size:.68rem; }
+.training-sub18-options { display:grid;grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:.5rem;border-top:1px solid var(--clube-primary-border);padding:.75rem; }
+.training-sub18-option { display:flex;min-width:0;cursor:pointer;align-items:center;gap:.55rem;border:1px solid var(--border-soft);border-radius:.75rem;background:#fff;padding:.5rem; }
+.training-sub18-option:has(input:checked) { border-color:var(--clube-primary);box-shadow:0 0 0 2px var(--clube-primary-soft); }
+.training-sub18-option input { width:1rem;height:1rem;flex:none;accent-color:var(--clube-primary); }
+.training-sub18-option b,.training-sub18-option small { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.training-sub18-option b { color:var(--text-main);font-size:.75rem; }
+.training-sub18-option small { margin-top:.1rem;color:var(--text-muted);font-size:.63rem; }
+.training-sub18-callup>footer { display:flex;align-items:center;justify-content:space-between;gap:1rem;border-top:1px solid var(--clube-primary-border);padding:.7rem .8rem .7rem 1rem;color:var(--text-muted);font-size:.68rem;font-weight:650; }
 .training-organization-body { min-height:0; }
 .training-expected-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));gap:.55rem;padding:1rem; }
 .training-expected-player { display:flex;min-width:0;cursor:pointer;align-items:center;gap:.65rem;border:1px solid var(--border-soft);border-radius:.75rem;padding:.55rem;background:#fff;transition:border-color .15s,background .15s,box-shadow .15s; }
@@ -967,6 +981,9 @@ table tbody tr:hover { background:#fafbfd; }
     .training-organization-head p { font-size:.7rem; }
     .training-organization-total { min-width:auto;flex-direction:column;gap:0;padding:.45rem .6rem; }
     .training-organization-toolbar { padding:.65rem 1rem; }
+    .training-sub18-callup { margin:.75rem; }
+    .training-sub18-callup>header,.training-sub18-callup>footer { align-items:stretch;flex-direction:column; }
+    .training-sub18-options { grid-template-columns:1fr; }
     .training-expected-grid { grid-template-columns:1fr;padding:.75rem; }
     .training-team-controls { grid-template-columns:1fr 1fr;padding:.75rem; }
     .training-team-controls p { grid-column:1/-1; }

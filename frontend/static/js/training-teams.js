@@ -222,6 +222,43 @@
       const check = boxes.some(box => !box.checked);
       boxes.forEach(box => { box.checked = check; });
     });
+    root.querySelector('[data-callup-sub18]')?.addEventListener('click', async event => {
+      const button = event.currentTarget;
+      const selected = [...root.querySelectorAll('[data-sub18-option] input:checked')];
+      const ids = selected.map(input => Number(input.value));
+      const status = root.querySelector('[data-sub18-status]');
+      if (!ids.length) {
+        setStatus(status, 'Seleciona pelo menos um atleta Sub-18.', true);
+        return;
+      }
+      button.disabled = true;
+      setStatus(status, 'A convocar atletas...');
+      try {
+        const payload = await post(`/treino/planos/${data.plano_id}/convocar-sub18`, {jogador_ids:ids});
+        expectedIds = payload.jogador_ids;
+        state = {grupos: []};
+        const expectedRoot = root.querySelector('[data-expected-player-options]');
+        (payload.adicionados || []).forEach(player => {
+          players.set(Number(player.id), player);
+          if (!expectedRoot?.querySelector(`input[value="${player.id}"]`)) {
+            expectedRoot?.insertAdjacentHTML('beforeend', `<label class="training-expected-player"><input type="checkbox" value="${player.id}" checked>${avatar(player)}<span class="min-w-0"><b>${escapeHTML(player.nome)}</b><small>Convocado · ${escapeHTML(player.equipa)}</small></span></label>`);
+          }
+          root.querySelector(`[data-sub18-option="${player.id}"]`)?.remove();
+        });
+        root.querySelectorAll('[data-expected-player-options] input').forEach(input => { input.checked = expectedIds.includes(Number(input.value)); });
+        const remaining = root.querySelectorAll('[data-sub18-option]').length;
+        updateCounters('[data-sub18-available-count]', remaining);
+        if (!remaining && !root.querySelector('[data-sub18-empty]')) {
+          root.querySelector('[data-sub18-options]')?.insertAdjacentHTML('beforeend', '<p class="training-team-empty" data-sub18-empty>Não existem atletas Sub-18 disponíveis para convocar.</p>');
+        }
+        updateCounters('[data-expected-player-count]', expectedIds.length);
+        renderGroups();
+        setStatus(status, payload.mensagem);
+        setStatus(expectedStatus, 'A convocatória foi incluída nos atletas previstos.');
+        setStatus(teamStatus, 'A lista de atletas mudou. Cria novamente os agrupamentos.');
+      } catch (error) { setStatus(status, error.message, true); }
+      finally { button.disabled = false; }
+    });
     root.querySelector('[data-save-expected]')?.addEventListener('click', async event => {
       const button = event.currentTarget;
       const ids = [...root.querySelectorAll('[data-expected-player-options] input:checked')].map(input => Number(input.value));
