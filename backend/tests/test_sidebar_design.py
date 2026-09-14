@@ -58,3 +58,18 @@ def test_sidebar_sem_equipa_da_acesso_direto_a_planeamento_e_analise():
     assert '/analise/equipas/7' in html
     assert 'Ações rápidas' not in html
     assert 'Escolhe a equipa que queres analisar.' in html
+
+
+def test_sidebar_usa_seccoes_recolhiveis_com_estado_persistente():
+    raiz = Path(__file__).resolve().parents[2]
+    navbar = (raiz / 'frontend' / 'templates' / 'partials' / 'navbar_global.html').read_text(encoding='utf-8')
+    javascript = (raiz / 'frontend' / 'static' / 'js' / 'sidebar.js').read_text(encoding='utf-8')
+    estilos = (raiz / 'frontend' / 'static' / 'css' / 'sidebar.css').read_text(encoding='utf-8')
+
+    for seccao in ('equipa', 'planeamento', 'acao', 'analise', 'gestao', 'acoes-rapidas'):
+        assert f'data-sidebar-section="{seccao}"' in navbar
+    assert navbar.count('class="sidebar-section-chevron"') >= 6
+    assert "localStorage.getItem('sidebar-open-section')" in javascript
+    assert "if (other !== group) other.open = false" in javascript
+    assert "candidates[0].link.closest('details[data-sidebar-section]')" in javascript
+    assert '.sidebar-group[open]>.sidebar-heading .sidebar-section-chevron' in estilos

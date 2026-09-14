@@ -55,6 +55,24 @@
     if (candidates[0]?.score) {
         candidates[0].link.classList.add('is-active'); candidates[0].link.setAttribute('aria-current', 'page');
     }
+    const groups = Array.from(sidebar.querySelectorAll('details[data-sidebar-section]'));
+    const activeGroup = candidates[0]?.score
+        ? candidates[0].link.closest('details[data-sidebar-section]')
+        : sidebar.querySelector('details[data-sidebar-section] > summary.is-active')?.parentElement;
+    let storedGroup = '';
+    try { storedGroup = localStorage.getItem('sidebar-open-section') || ''; } catch (_) {}
+    const initialGroup = activeGroup?.dataset.sidebarSection || storedGroup;
+    groups.forEach(group => { group.open = group.dataset.sidebarSection === initialGroup; });
+    groups.forEach(group => {
+        group.addEventListener('toggle', () => {
+            if (group.open) {
+                groups.forEach(other => { if (other !== group) other.open = false; });
+                try { localStorage.setItem('sidebar-open-section', group.dataset.sidebarSection); } catch (_) {}
+            } else if (!groups.some(other => other.open)) {
+                try { localStorage.removeItem('sidebar-open-section'); } catch (_) {}
+            }
+        });
+    });
     sidebar.querySelectorAll('a').forEach(link => {
         link.addEventListener('click', () => { if (mobile.matches) setHidden(true, false); });
     });

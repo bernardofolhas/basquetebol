@@ -26,30 +26,30 @@
       <a href="{{ nav.dashboard_url|default('/dashboard') }}" class="sidebar-heading {% if p == '/dashboard' %}is-active{% endif %}">Início</a>
 
       {% if perfil == 'atleta' %}
-      <section class="sidebar-group">
-        <h2 class="sidebar-heading {% if p.startswith('/questionarios') %}is-active{% endif %}">Acompanhamento</h2>
+      <details class="sidebar-group" data-sidebar-section="acompanhamento">
+        <summary class="sidebar-heading {% if p.startswith('/questionarios') %}is-active{% endif %}"><span>Acompanhamento</span><span class="sidebar-section-chevron" aria-hidden="true">⌄</span></summary>
         <div class="sidebar-pages w-80">
           <p class="ds-dropdown-title">Área do atleta</p>
           {{ menu_link('/questionarios/disponiveis', 'Questionários disponíveis', 'Responder aos pedidos da equipa técnica', p == '/questionarios/disponiveis' or p.startswith('/questionarios/responder')) }}
           {{ menu_link('/questionarios/historico', 'O meu histórico', 'Consultar respostas anteriores', p == '/questionarios/historico') }}
         </div>
-      </section>
+      </details>
       {% elif modo_plataforma %}
-      <section class="sidebar-group ds-nav-order-equipa">
-        <h2 class="sidebar-heading {% if p.startswith('/superadmin') %}is-active{% endif %}">Plataforma </h2>
+      <details class="sidebar-group ds-nav-order-equipa" data-sidebar-section="plataforma">
+        <summary class="sidebar-heading {% if p.startswith('/superadmin') %}is-active{% endif %}"><span>Plataforma</span><span class="sidebar-section-chevron" aria-hidden="true">⌄</span></summary>
         <div class="sidebar-pages w-[22rem]">
           <p class="ds-dropdown-title">Gestão global</p>
           {{ menu_link('/superadmin/clubes', 'Clubes', 'Configuração e identidade', p.startswith('/superadmin/clubes')) }}
           {{ menu_link('/superadmin/utilizadores', 'Utilizadores', 'Contas e recuperação', p.startswith('/superadmin/utilizadores')) }}
           {{ menu_link('/superadmin/clubes/novo', 'Criar clube', 'Adicionar organização') }}
         </div>
-      </section>
+      </details>
       {% else %}
       {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta', 'superadministrador'] %}
-      <section class="sidebar-group ds-nav-order-equipa">
-        <h2 class="sidebar-heading {% if not equipa_contexto_id and p.startswith('/equipas') %}is-active{% endif %}">
-          <span>Equipa</span>
-        </h2>
+      <details class="sidebar-group ds-nav-order-equipa" data-sidebar-section="equipa">
+        <summary class="sidebar-heading {% if not equipa_contexto_id and p.startswith('/equipas') %}is-active{% endif %}">
+          <span>Equipa</span><span class="sidebar-section-chevron" aria-hidden="true">⌄</span>
+        </summary>
         <div class="sidebar-pages w-[22rem]">
           <p class="ds-dropdown-title">{{ 'Mudar de equipa' if equipa_contexto_id else 'Selecionar equipa' }}</p>
           <div>
@@ -66,11 +66,11 @@
           </div>
           {% endif %}
         </div>
-      </section>
+      </details>
 
 
-      <section class="sidebar-group ds-nav-order-planeamento">
-        <h2 class="sidebar-heading {% if p.startswith('/planeamento') or p.startswith('/fisico/equipas') %}is-active{% endif %}">Planeamento </h2>
+      <details class="sidebar-group ds-nav-order-planeamento" data-sidebar-section="planeamento">
+        <summary class="sidebar-heading {% if p.startswith('/planeamento') or p.startswith('/fisico/equipas') %}is-active{% endif %}"><span>Planeamento</span><span class="sidebar-section-chevron" aria-hidden="true">⌄</span></summary>
         <div class="sidebar-pages w-[23rem]">
           {% if equipa_contexto_id %}
           <p class="ds-dropdown-title">Planeamento · {{ equipa_contexto_nome }}</p>
@@ -100,11 +100,11 @@
           </div>
           {% endif %}
         </div>
-      </section>
+      </details>
       {% endif %}
 
-      <section class="sidebar-group ds-nav-order-acao">
-        <h2 class="sidebar-heading {% if p.startswith('/treino') or p.startswith('/jogos') or p.startswith('/estatisticas') or p.startswith('/assiduidade') or p.startswith('/calendario') or p.startswith('/biblioteca') or p.startswith('/planeamento-clube/espacos') %}is-active{% endif %}">Ação </h2>
+      <details class="sidebar-group ds-nav-order-acao" data-sidebar-section="acao">
+        <summary class="sidebar-heading {% if p.startswith('/treino') or p.startswith('/jogos') or p.startswith('/estatisticas') or p.startswith('/assiduidade') or p.startswith('/calendario') or p.startswith('/biblioteca') or p.startswith('/planeamento-clube/espacos') %}is-active{% endif %}"><span>Ação</span><span class="sidebar-section-chevron" aria-hidden="true">⌄</span></summary>
         <div class="sidebar-pages w-[24rem]">
           <p class="ds-dropdown-title">Treino e competição{% if equipa_contexto_nome %} · {{ equipa_contexto_nome }}{% endif %}</p>
           {% if equipa_contexto_id %}
@@ -134,11 +134,11 @@
           {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta', 'superadministrador'] %}{{ menu_link('/biblioteca', 'Biblioteca de exercícios', 'Pesquisar e reutilizar') }}{% endif %}
         </div>
-      </section>
+      </details>
 
       {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta', 'superadministrador'] %}
-      <section class="sidebar-group ds-nav-order-analise">
-        <h2 class="sidebar-heading {% if p.startswith('/analise') or p.startswith('/fisico/jogadores') or p.startswith('/scouting') or p.startswith('/questionarios') or p.startswith('/dashboard/clube/carga') or p.startswith('/dashboard/clube/executado') %}is-active{% endif %}">Análise </h2>
+      <details class="sidebar-group ds-nav-order-analise" data-sidebar-section="analise">
+        <summary class="sidebar-heading {% if p.startswith('/analise') or p.startswith('/fisico/jogadores') or p.startswith('/scouting') or p.startswith('/questionarios') or p.startswith('/dashboard/clube/carga') or p.startswith('/dashboard/clube/executado') %}is-active{% endif %}"><span>Análise</span><span class="sidebar-section-chevron" aria-hidden="true">⌄</span></summary>
         <div class="sidebar-pages w-[25rem]">
           <p class="ds-dropdown-title">Análise integrada · {{ equipa_contexto_nome }}</p>
           {% if equipa_contexto_id %}
@@ -164,12 +164,12 @@
           </div>
           {% endif %}
         </div>
-      </section>
+      </details>
       {% endif %}
 
       {% if perfil in ['administrador', 'coordenador', 'secretaria', 'staff', 'fisioterapeuta', 'superadministrador'] %}
-      <section class="sidebar-group ds-nav-order-gestao">
-        <h2 class="sidebar-heading {% if p.startswith('/jogadores') or p.startswith('/treinadores') or p.startswith('/secretaria') or p.startswith('/admin') or p.startswith('/administracao') %}is-active{% endif %}">Gestão </h2>
+      <details class="sidebar-group ds-nav-order-gestao" data-sidebar-section="gestao">
+        <summary class="sidebar-heading {% if p.startswith('/jogadores') or p.startswith('/treinadores') or p.startswith('/secretaria') or p.startswith('/admin') or p.startswith('/administracao') %}is-active{% endif %}"><span>Gestão</span><span class="sidebar-section-chevron" aria-hidden="true">⌄</span></summary>
         <div class="sidebar-pages right-0 w-80">
           <p class="ds-dropdown-title">Gestão do clube</p>
           <div class="sidebar-page-list">
@@ -183,16 +183,16 @@
           </div>
           {% if perfil == 'superadministrador' and request.state.clube_atual %}<form method="POST" action="/superadmin/sair-suporte" class="border-t border-slate-100 p-2"><button class="ds-header-link w-full text-amber-800">Sair do apoio ao clube</button></form>{% endif %}
         </div>
-      </section>
+      </details>
       {% endif %}
       {% endif %}
     </div>
 
 
     {% if not modo_plataforma and nav.acoes_rapidas|default([]) %}
-    <section class="sidebar-group"><h2>Ações rápidas</h2>
+    <details class="sidebar-group" data-sidebar-section="acoes-rapidas"><summary class="sidebar-heading"><span>Ações rápidas</span><span class="sidebar-section-chevron" aria-hidden="true">⌄</span></summary>
       {% for acao in nav.acoes_rapidas|default([]) %}<a class="sidebar-link" href="{{ acao.link }}">{{ acao.label }}</a>{% endfor %}
-    </section>
+    </details>
     {% endif %}
   </nav>
   <footer class="sidebar-account">
@@ -214,4 +214,4 @@
     </dialog>
     {% endif %}
 
-<script src="/static/js/sidebar.js?v=20260909-1"></script>
+<script src="/static/js/sidebar.js?v=20260914-collapse-1"></script>

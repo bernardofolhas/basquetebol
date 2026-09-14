@@ -13,16 +13,20 @@ body.sidebar-hidden #app-sidebar { display:none; }
 .sidebar-search input { min-width:0;width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:.6rem;font-size:.8rem; }
 .sidebar-search button { padding:.4rem; }
 #app-sidebar .sidebar-sections { display:flex;flex-direction:column;gap:.4rem; }
-#app-sidebar .sidebar-group { margin-top:.8rem;order:initial; }
-#app-sidebar h2 { padding:.5rem .6rem .35rem;font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#8993a3;background:none;border:0; }
+#app-sidebar .sidebar-group { margin-top:.25rem;order:initial; }
+#app-sidebar .sidebar-group>summary { display:flex;min-height:42px;cursor:pointer;list-style:none;align-items:center;justify-content:space-between;gap:.75rem;width:100%;border-radius:8px;padding:.6rem .65rem;color:#435168;font-size:.78rem;font-weight:800;letter-spacing:.025em;transition:background-color .15s,color .15s; }
+#app-sidebar .sidebar-group>summary::-webkit-details-marker { display:none; }
+#app-sidebar .sidebar-section-chevron { display:inline-grid;width:1.1rem;height:1.1rem;flex:none;place-items:center;color:#94a3b8;font-size:1rem;line-height:1;transition:transform .18s ease,color .15s; }
+#app-sidebar .sidebar-group[open]>.sidebar-heading .sidebar-section-chevron { transform:rotate(180deg);color:var(--clube-primary); }
+#app-sidebar .sidebar-group[open]>.sidebar-pages,#app-sidebar .sidebar-group[open]>.sidebar-link { animation:sidebar-section-reveal .16s ease-out; }
 #app-sidebar .sidebar-pages { position:static;width:100%;padding:0;border:0;box-shadow:none; }
 #app-sidebar .sidebar-page-list { display:block; }
 #app-sidebar .sidebar-link,#app-sidebar a.sidebar-heading { display:flex;align-items:center;gap:.45rem;width:100%;padding:.6rem .65rem;border-radius:8px;color:#435168;font-size:.8rem;font-weight:650;line-height:1.4; }
-#app-sidebar .sidebar-link:hover,#app-sidebar a.sidebar-heading:hover,#app-sidebar a.is-active { background:var(--clube-primary-surface);color:var(--clube-primary-dark); }
+#app-sidebar .sidebar-link:hover,#app-sidebar a.sidebar-heading:hover,#app-sidebar .sidebar-group>summary:hover,#app-sidebar a.is-active,#app-sidebar .sidebar-group>summary.is-active { background:var(--clube-primary-surface);color:var(--clube-primary-dark); }
 #app-sidebar .sidebar-link small { display:none; }
 .sidebar-hint { padding:.3rem .65rem .6rem;font-size:.75rem;line-height:1.5;color:#64748b; }
 #app-sidebar a[aria-current="page"] { box-shadow:inset 3px 0 var(--clube-primary);font-weight:800; }
-#app-sidebar :is(a,button,input):focus-visible,.sidebar-toggle:focus-visible { outline:2px solid var(--clube-primary);outline-offset:2px; }
+#app-sidebar :is(a,button,input,summary):focus-visible,.sidebar-toggle:focus-visible { outline:2px solid var(--clube-primary);outline-offset:2px; }
 #app-sidebar .ds-dropdown-title,#app-sidebar .ds-dropdown-label { display:none; }
 #app-sidebar .ds-dropdown-section { margin-top:.3rem;padding:.2rem 0;border:0; }
 #app-sidebar .ds-team-switcher { max-height:none;overflow:visible; }
@@ -42,14 +46,16 @@ body.sidebar-hidden #app-sidebar { display:none; }
 body.sidebar-hidden .sidebar-toggle { display:flex; }
 #sidebar-overlay { position:fixed;inset:0;background:#0f172a66;z-index:55; }
 #sidebar-overlay[hidden] { display:none; }
+@keyframes sidebar-section-reveal { from { opacity:0;transform:translateY(-3px); } to { opacity:1;transform:translateY(0); } }
 @media(max-width:900px) {
   body #conteudo-principal { margin-left:0;padding-top:4.5rem; }
   #app-sidebar { width:min(300px,88vw);box-shadow:10px 0 40px #0f172a22; }
   .sidebar-toggle { display:flex; }
   body.sidebar-mobile-open { overflow:hidden; }
   .sidebar-search input { font-size:16px; }
-  #app-sidebar .sidebar-link,#app-sidebar a.sidebar-heading { min-height:44px; }
+  #app-sidebar .sidebar-link,#app-sidebar a.sidebar-heading,#app-sidebar .sidebar-group>summary { min-height:44px; }
 }
+@media(prefers-reduced-motion:reduce) { #app-sidebar .sidebar-section-chevron,#app-sidebar .sidebar-group[open]>.sidebar-pages,#app-sidebar .sidebar-group[open]>.sidebar-link { animation:none;transition:none; } }
 @media print {
   #app-sidebar,.sidebar-toggle,#sidebar-overlay { display:none!important; }
   body #conteudo-principal { margin:0;padding-top:0; }
