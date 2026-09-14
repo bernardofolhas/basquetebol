@@ -1,7 +1,7 @@
 from datetime import date
 
 from database import SessionLocal
-from models.assiduidade import RegistoAssiduidade
+from models.assiduidade import ConvocacaoAssiduidade, RegistoAssiduidade
 from models.avaliacao import AvaliacaoJogador, ParametroAvaliacao
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.estatistica import EventoEstatistica
@@ -264,6 +264,86 @@ def test_avaliacao_de_treino_preseleciona_apenas_atletas_presentes(client_admin)
         assert "checked" not in segunda
         assert "1 atleta(s) presente(s) foram pré-selecionados" in resposta.text
     finally:
+        _limpar_contexto(db, equipa_id, [jogadora_1_id, jogadora_2_id], macro_id)
+        db.close()
+
+
+def test_avaliacao_de_treino_inclui_e_guarda_convocado_de_outro_escalao(client_admin):
+    db, equipa_id, jogadora_1_id, jogadora_2_id, macro_id, sessao_id = _criar_contexto()
+    outra_equipa = None
+    convocada = None
+    try:
+        equipa = db.query(Equipa).filter(Equipa.id == equipa_id).one()
+        outra_equipa = Equipa(
+            clube_id=equipa.clube_id,
+            nome="Sub-16 Convocadas Avaliação",
+            escalao=EscalaoEnum.sub16,
+            genero=GeneroEnum.feminino,
+        )
+        convocada = Jogador(
+            clube_id=equipa.clube_id,
+            equipa=outra_equipa,
+            nome="Carolina Convocada Avaliação",
+            numero_camisola=12,
+        )
+        db.add_all([outra_equipa, convocada])
+        db.flush()
+        db.add(ConvocacaoAssiduidade(
+            clube_id=equipa.clube_id,
+            sessao_id=sessao_id,
+            jogador_id=convocada.id,
+        ))
+        db.commit()
+        convocada_id = convocada.id
+
+        pagina = client_admin.get(f"/analise/equipas/{equipa_id}/registar?sessao_id={sessao_id}")
+        assert pagina.status_code == 200
+        assert f'data-player-selection="{convocada_id}"' in pagina.text
+        assert "Carolina Convocada Avaliação" in pagina.text
+        assert "Convocado · Sub-16 Convocadas Avaliação" in pagina.text
+
+        pagina_sem_sessao = client_admin.get(f"/analise/equipas/{equipa_id}/registar")
+        assert pagina_sem_sessao.status_code == 200
+        assert f'data-player-selection="{convocada_id}"' not in pagina_sem_sessao.text
+
+        parametro = db.query(ParametroAvaliacao).filter(
+            ParametroAvaliacao.equipa_id == equipa_id,
+            ParametroAvaliacao.categoria == "tecnica",
+        ).first()
+        resposta = client_admin.post(
+            f"/analise/equipas/{equipa_id}/registar",
+            data={
+                "data": "2041-01-09",
+                "sessao_id": str(sessao_id),
+                "jogador_ids": str(convocada_id),
+                "parametro_ids": str(parametro.id),
+                f"valor_{convocada_id}_{parametro.id}": "4",
+            },
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resposta.status_code == 200
+        assert resposta.json()["ok"] is True
+        avaliacao = db.query(AvaliacaoJogador).filter(
+            AvaliacaoJogador.equipa_id == equipa_id,
+            AvaliacaoJogador.sessao_id == sessao_id,
+            AvaliacaoJogador.jogador_id == convocada_id,
+        ).one()
+        assert avaliacao.valor == 4
+    finally:
+        if convocada is not None:
+            db.query(ConvocacaoAssiduidade).filter(
+                ConvocacaoAssiduidade.jogador_id == convocada.id,
+            ).delete(synchronize_session=False)
+            db.query(RegistoAssiduidade).filter(
+                RegistoAssiduidade.jogador_id == convocada.id,
+            ).delete(synchronize_session=False)
+            db.query(AvaliacaoJogador).filter(
+                AvaliacaoJogador.jogador_id == convocada.id,
+            ).delete(synchronize_session=False)
+            db.delete(convocada)
+        if outra_equipa is not None:
+            db.delete(outra_equipa)
+        db.commit()
         _limpar_contexto(db, equipa_id, [jogadora_1_id, jogadora_2_id], macro_id)
         db.close()
 

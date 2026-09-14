@@ -79,10 +79,10 @@
         <input type="search" data-filter="players" placeholder="Pesquisar atleta" class="ds-eval-input mt-4">
         <div id="player-options" class="ds-eval-player-grid mt-3 max-h-[410px] overflow-y-auto pr-1">
         {% for jogador in jogadores %}
-          <label class="ds-eval-player-card" data-option="players" data-search="{{ jogador.nome|lower }}" data-player-selection="{{ jogador.id }}">
+          <label class="ds-eval-player-card" data-option="players" data-search="{{ jogador.nome|lower }}{% if jogador.id in jogadores_convocados_ids %} {{ jogador.equipa.nome|lower }} convocado{% endif %}" data-player-selection="{{ jogador.id }}">
             <input type="checkbox" value="{{ jogador.id }}" data-player-name="{{ jogador.nome }}" data-player-number="{{ jogador.numero_camisola or '' }}" data-player-photo="{{ jogador.fotografia or '' }}" {% if jogador.id in jogadores_selecionados %}checked{% endif %}>
             <span class="ds-eval-player-photo">{% if jogador.fotografia %}<img src="{{ jogador.fotografia }}" alt="Fotografia de {{ jogador.nome }}">{% else %}<span>{{ jogador.numero_camisola or jogador.nome[:1]|upper }}</span>{% endif %}</span>
-            <span class="mt-2 min-w-0 max-w-full"><strong class="block truncate text-sm text-slate-800">{{ jogador.nome }}</strong><small class="block truncate text-xs text-slate-400">{{ jogador.posicao or equipa.nome }}</small></span>
+            <span class="mt-2 min-w-0 max-w-full"><strong class="block truncate text-sm text-slate-800">{{ jogador.nome }}</strong>{% if jogador.id in jogadores_convocados_ids %}<small class="block truncate text-xs font-bold text-[var(--clube-primary-dark)]">Convocado · {{ jogador.equipa.nome }}</small>{% else %}<small class="block truncate text-xs text-slate-400">{{ jogador.posicao or equipa.nome }}</small>{% endif %}</span>
           </label>
         {% else %}<p class="py-8 text-center text-sm text-slate-500">Esta equipa ainda não tem atletas ativos.</p>{% endfor %}
         </div>

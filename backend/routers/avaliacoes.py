@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from auth_deps import exigir_operacao_desportiva, verificar_ou_negar_equipa
 from database import get_db
 from flash import set_flash
-from models.assiduidade import RegistoAssiduidade
+from models.assiduidade import ConvocacaoAssiduidade, RegistoAssiduidade
 from models.avaliacao import AvaliacaoJogador, ParametroAvaliacao
 from models.equipa import Equipa
 from models.fisico import TesteFisico
@@ -78,6 +78,37 @@ def _equipa_id_da_sessao(db: Session, sessao_id: int) -> int | None:
     ).join(
         Macrociclo, Mesociclo.macrociclo_id == Macrociclo.id
     ).filter(SessaoTreino.id == sessao_id).scalar()
+
+
+def _jogadores_disponiveis_na_avaliacao(
+    db: Session,
+    equipa: Equipa,
+    sessao_id: int | None,
+) -> tuple[list[Jogador], set[int]]:
+    """Inclui os convocados externos apenas na avaliação da sessão respetiva."""
+    plantel = db.query(Jogador).filter(
+        Jogador.equipa_id == equipa.id,
+        Jogador.clube_id == equipa.clube_id,
+        Jogador.ativo.is_(True),
+    ).order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome).all()
+    if sessao_id is None:
+        return plantel, set()
+
+    convocados = (
+        db.query(Jogador)
+        .join(ConvocacaoAssiduidade, ConvocacaoAssiduidade.jogador_id == Jogador.id)
+        .filter(
+            ConvocacaoAssiduidade.sessao_id == sessao_id,
+            ConvocacaoAssiduidade.clube_id == equipa.clube_id,
+            Jogador.clube_id == equipa.clube_id,
+            Jogador.ativo.is_(True),
+        )
+        .order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome)
+        .all()
+    )
+    ids_plantel = {jogador.id for jogador in plantel}
+    convocados_externos = [jogador for jogador in convocados if jogador.id not in ids_plantel]
+    return plantel + convocados_externos, {jogador.id for jogador in convocados_externos}
 
 
 def _normalizar_numero(valor) -> float:
@@ -200,10 +231,9 @@ def registar_avaliacoes(
             return _resposta_erro(request, "A sessão não pertence a esta equipa.", 403)
         sessao = db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).first()
 
-    jogadores = db.query(Jogador).filter(
-        Jogador.equipa_id == equipa.id,
-        Jogador.ativo.is_(True),
-    ).order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome).all()
+    jogadores, jogadores_convocados_ids = _jogadores_disponiveis_na_avaliacao(
+        db, equipa, sessao.id if sessao else None,
+    )
     parametros = db.query(ParametroAvaliacao).filter(
         ParametroAvaliacao.equipa_id == equipa.id,
         ParametroAvaliacao.ativo.is_(True),
@@ -229,6 +259,7 @@ def registar_avaliacoes(
         "utilizador": utilizador,
         "equipa": equipa,
         "jogadores": jogadores,
+        "jogadores_convocados_ids": jogadores_convocados_ids,
         "parametros": parametros,
         "parametros_por_categoria": {
             categoria: [item for item in parametros if item.categoria == categoria]
@@ -285,11 +316,9 @@ async def guardar_avaliacoes(
     if sessao_id and _equipa_id_da_sessao(db, sessao_id) != equipa.id:
         return _resposta_erro(request, "A sessão não pertence a esta equipa.", 403)
 
-    jogadores = db.query(Jogador).filter(
-        Jogador.id.in_(jogador_ids),
-        Jogador.equipa_id == equipa.id,
-        Jogador.ativo.is_(True),
-    ).all()
+    jogadores_disponiveis, _ = _jogadores_disponiveis_na_avaliacao(db, equipa, sessao_id)
+    jogadores_por_id = {jogador.id: jogador for jogador in jogadores_disponiveis}
+    jogadores = [jogadores_por_id[jogador_id] for jogador_id in jogador_ids if jogador_id in jogadores_por_id]
     parametros = db.query(ParametroAvaliacao).filter(
         ParametroAvaliacao.id.in_(parametro_ids),
         ParametroAvaliacao.equipa_id == equipa.id,
