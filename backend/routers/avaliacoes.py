@@ -16,6 +16,7 @@ from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from paths import TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
 from services.avaliacao_service import dados_dashboard_avaliacoes
+from services.analise_global_equipa_service import construir_analise_global_equipa
 from services.carga_real_service import analisar_carga_jogador
 from template_config import Jinja2Templates
 
@@ -171,6 +172,7 @@ def painel_equipa(
             }
             for parametro in parametros
         ],
+        "analise_global": construir_analise_global_equipa(db, equipa, jogadores),
     })
 
 

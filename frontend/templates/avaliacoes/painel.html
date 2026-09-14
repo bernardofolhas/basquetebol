@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Análise de Desempenho - {{ equipa.nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/analysis-dashboard.css?v=20260903-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/analysis-dashboard.css?v=20260903-1"><link rel="stylesheet" href="/static/css/team-global-analysis.css?v=20260914-1">{% endblock %}
 {% block conteudo %}
 
 {% call equipa_contexto(
     equipa,
-    "Análise de Desempenho",
-    "Momento de análise integrada: dimensão técnica, tática, física e psicológica.",
+    "Mapa global de análise",
+    "Treino, disponibilidade, competição e desempenho reunidos numa única leitura.",
     "analise",
     "/equipas/" ~ equipa.id ~ "/resumo",
     "Voltar à equipa"
@@ -36,16 +36,92 @@
 </style>
 
 <nav class="ds-analysis-tabs mb-5" aria-label="Áreas da análise">
-  <button type="button" class="ds-analysis-tab is-active" data-analysis-tab="dashboard">Dashboard</button>
-  <button type="button" class="ds-analysis-tab" data-analysis-tab="resumo">Resumo por atleta</button>
-  <button type="button" class="ds-analysis-tab" data-analysis-tab="parametros">Parâmetros</button>
-  <button type="button" class="ds-analysis-tab" data-analysis-tab="historico">Histórico</button>
+  <button type="button" class="ds-analysis-tab is-active" data-analysis-tab="global">Análise global</button>
+  <button type="button" class="ds-analysis-tab" data-analysis-tab="conteudos">Categorias / exercícios</button>
+  <button type="button" class="ds-analysis-tab" data-analysis-tab="presencas">Presenças / PSE</button>
+  <button type="button" class="ds-analysis-tab" data-analysis-tab="convocatorias">Convocatórias</button>
+  <button type="button" class="ds-analysis-tab" data-analysis-tab="estatisticas">Estatísticas de jogo</button>
 </nav>
 
-<section class="ds-analysis-panel" data-analysis-panel="dashboard">
+<section class="ds-analysis-panel team-analysis-space" data-analysis-panel="global" data-customizable-dashboard data-dashboard-key="analise-global-{{ equipa.id }}">
+  <div class="team-analysis-kpis" data-dashboard-widget="resumo-global" data-dashboard-label="Resumo global">
+    <article><span>Treinos analisados</span><strong>{{ analise_global.global.treinos }}</strong><small>{{ analise_global.global.minutos }} min planeados</small></article>
+    <article><span>Presença média</span><strong>{{ analise_global.global.taxa_presenca }}%</strong><small>Registos de assiduidade</small></article>
+    <article><span>PSE média</span><strong>{{ analise_global.global.rpe_medio if analise_global.global.rpe_medio is not none else '—' }}</strong><small>Intensidade sentida</small></article>
+    <article><span>Jogos</span><strong>{{ analise_global.global.jogos }}</strong><small>{% if analise_global.global.jogos_concluidos %}{{ analise_global.global.vitorias }} vitórias em {{ analise_global.global.jogos_concluidos }}{% else %}Sem resultados fechados{% endif %}</small></article>
+  </div>
+  <div class="team-analysis-section-heading" data-dashboard-fixed>
+    <div><span>Leitura integrada</span><h2>Desempenho da equipa</h2><p>Cruza as avaliações técnicas, táticas, físicas e psicológicas.</p></div>
+    <div class="team-analysis-actions">
+      <button type="button" data-open-analysis="resumo">Resumo por atleta</button>
+      <button type="button" data-open-analysis="historico">Histórico</button>
+      {% if pode_editar %}<button type="button" data-open-analysis="parametros">Parâmetros</button>{% endif %}
+    </div>
+  </div>
+  <div data-dashboard-widget="desempenho-avaliado" data-dashboard-label="Desempenho avaliado">
   {% set dashboard_id = 'analise-equipa-' ~ equipa.id %}
   {% set jogador_fixo_id = none %}
   {% include "partials/dashboard_analise.html" %}
+  </div>
+</section>
+
+<section class="ds-analysis-panel team-analysis-space" data-analysis-panel="conteudos" data-customizable-dashboard data-dashboard-key="analise-conteudos-{{ equipa.id }}" hidden>
+  <div class="team-analysis-kpis" data-dashboard-widget="indicadores-conteudos" data-dashboard-label="Indicadores de conteúdos">
+    <article><span>Tempo analisado</span><strong>{{ analise_global.global.minutos }}</strong><small>minutos planeados</small></article>
+    <article><span>Exercícios inseridos</span><strong>{{ analise_global.total_exercicios }}</strong><small>em {{ analise_global.global.treinos }} treinos</small></article>
+    <article><span>Exercícios diferentes</span><strong>{{ analise_global.exercicios|length }}</strong><small>títulos utilizados</small></article>
+  </div>
+  <div class="team-analysis-grid">
+    <article class="team-analysis-card" data-dashboard-widget="tempo-categorias" data-dashboard-label="Tempo por categoria">
+      <header><span>Distribuição</span><h2>Tempo por categoria</h2><p>Peso de cada componente no tempo planeado.</p></header>
+      {% if analise_global.global.minutos %}<div class="team-analysis-bars">
+        {% for categoria in analise_global.categorias %}{% if categoria.minutos %}
+        <div class="team-analysis-bar"><div><strong>{{ categoria.sigla }}</strong><span>{{ categoria.label }}</span><b>{{ categoria.minutos }} min · {{ categoria.percentagem }}%</b></div><i><span style="width:{{ categoria.percentagem }}%"></span></i></div>
+        {% endif %}{% endfor %}
+      </div>{% else %}<div class="team-analysis-empty"><strong>Sem tempos para analisar</strong><span>Os conteúdos e exercícios planeados surgirão aqui automaticamente.</span></div>{% endif %}
+    </article>
+    <article class="team-analysis-card team-analysis-card-wide" data-dashboard-widget="exercicios-utilizados" data-dashboard-label="Exercícios utilizados">
+      <header><span>Utilização</span><h2>Exercícios planeados</h2><p>Compara frequência e minutos acumulados.</p></header>
+      {% if analise_global.exercicios %}<div class="team-analysis-table-wrap"><table class="team-analysis-table"><thead><tr><th>Exercício</th><th>Categoria</th><th>Utilizações</th><th>Média</th><th>Total</th></tr></thead><tbody>{% for exercicio in analise_global.exercicios %}<tr><td><strong>{{ exercicio.nome }}</strong></td><td><span class="team-analysis-tag">{{ exercicio.sigla }}</span></td><td>{{ exercicio.utilizacoes }}</td><td>{{ exercicio.media_minutos }} min</td><td><strong>{{ exercicio.minutos }} min</strong></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="team-analysis-empty"><strong>Ainda não existem exercícios planeados</strong><span>Ao preencher os planos de treino, a utilização aparecerá nesta lista.</span></div>{% endif %}
+    </article>
+  </div>
+</section>
+
+<section class="ds-analysis-panel team-analysis-space" data-analysis-panel="presencas" data-customizable-dashboard data-dashboard-key="analise-presencas-{{ equipa.id }}" hidden>
+  <div class="team-analysis-kpis" data-dashboard-widget="indicadores-presencas" data-dashboard-label="Indicadores de presença e PSE">
+    <article><span>Presença média</span><strong>{{ analise_global.presencas.taxa }}%</strong><small>{{ analise_global.presencas.presentes }} presenças</small></article>
+    <article><span>Registos</span><strong>{{ analise_global.presencas.registos }}</strong><small>assiduidade recolhida</small></article>
+    <article><span>PSE média</span><strong>{{ analise_global.presencas.rpe_medio if analise_global.presencas.rpe_medio is not none else '—' }}</strong><small>{{ analise_global.presencas.respostas_rpe }} respostas</small></article>
+  </div>
+  <article class="team-analysis-card" data-dashboard-widget="presencas-atletas" data-dashboard-label="Presenças e PSE por atleta">
+    <header><span>Disponibilidade</span><h2>Presenças e PSE por atleta</h2><p>Acompanha participação e intensidade real sentida.</p></header>
+    {% if analise_global.presencas.registos %}<div class="team-analysis-table-wrap"><table class="team-analysis-table"><thead><tr><th>Atleta</th><th>Presenças</th><th>Taxa</th><th>PSE média</th><th>Respostas PSE</th></tr></thead><tbody>{% for item in analise_global.presencas.jogadores %}<tr><td><a href="/jogadores/{{ item.jogador.id }}"><strong>{{ item.jogador.nome }}</strong></a></td><td>{{ item.presencas }} / {{ item.total }}</td><td><strong>{{ item.taxa }}%</strong></td><td>{{ item.rpe_medio if item.rpe_medio is not none else '—' }}</td><td>{{ item.respostas_rpe }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="team-analysis-empty"><strong>Sem presenças registadas</strong><span>Os dados surgem aqui depois de preencher a assiduidade dos treinos.</span></div>{% endif %}
+  </article>
+</section>
+
+<section class="ds-analysis-panel team-analysis-space" data-analysis-panel="convocatorias" data-customizable-dashboard data-dashboard-key="analise-convocatorias-{{ equipa.id }}" hidden>
+  <div class="team-analysis-kpis" data-dashboard-widget="indicadores-convocatorias" data-dashboard-label="Indicadores de convocatórias">
+    <article><span>Jogos com convocatória</span><strong>{{ analise_global.convocatorias.jogos_com_convocatoria }}</strong><small>de {{ analise_global.convocatorias.jogos|length }} jogos</small></article>
+    <article><span>Total de chamadas</span><strong>{{ analise_global.convocatorias.total }}</strong><small>convocações registadas</small></article>
+    <article><span>Média por jogo</span><strong>{{ analise_global.convocatorias.media }}</strong><small>atletas convocados</small></article>
+  </div>
+  <div class="team-analysis-grid">
+    <article class="team-analysis-card" data-dashboard-widget="ranking-convocatorias" data-dashboard-label="Convocatórias por atleta"><header><span>Participação competitiva</span><h2>Convocatórias por atleta</h2></header>{% if analise_global.convocatorias.total %}<div class="team-analysis-ranking">{% for item in analise_global.convocatorias.jogadores %}{% if item.total %}<div><span>{{ loop.index }}</span><strong>{{ item.jogador.nome }}</strong><b>{{ item.total }}</b></div>{% endif %}{% endfor %}</div>{% else %}<div class="team-analysis-empty"><strong>Sem convocatórias</strong><span>As convocatórias dos jogos aparecerão aqui.</span></div>{% endif %}</article>
+    <article class="team-analysis-card team-analysis-card-wide" data-dashboard-widget="jogos-convocados" data-dashboard-label="Convocatórias por jogo"><header><span>Jogos</span><h2>Convocatórias recentes</h2></header>{% if analise_global.convocatorias.jogos %}<div class="team-analysis-list">{% for jogo in analise_global.convocatorias.jogos[:8] %}<a href="/jogos/{{ jogo.id }}"><div><strong>{{ jogo.adversario }}</strong><span>{{ jogo.data|data_pt }} · {{ 'Casa' if jogo.em_casa else 'Fora' }}</span></div><b>{{ jogo.convocados|length }} atletas</b></a>{% endfor %}</div>{% else %}<div class="team-analysis-empty"><strong>Sem jogos no calendário</strong><span>Cria os jogos para acompanhar as convocatórias.</span></div>{% endif %}</article>
+  </div>
+</section>
+
+<section class="ds-analysis-panel team-analysis-space" data-analysis-panel="estatisticas" data-customizable-dashboard data-dashboard-key="analise-estatisticas-{{ equipa.id }}" hidden>
+  <div class="team-analysis-kpis" data-dashboard-widget="indicadores-estatisticas" data-dashboard-label="Indicadores de jogo">
+    <article><span>Jogos com dados</span><strong>{{ analise_global.estatisticas.jogos_com_dados }}</strong><small>{{ analise_global.estatisticas.eventos }} eventos válidos</small></article>
+    <article><span>Pontos marcados</span><strong>{{ analise_global.estatisticas.totais.get('pts', 0) }}</strong><small>eventos da equipa</small></article>
+    <article><span>Assistências</span><strong>{{ analise_global.estatisticas.totais.get('ast', 0) }}</strong><small>total acumulado</small></article>
+    <article><span>Balanço</span><strong>{{ analise_global.estatisticas.vitorias }}–{{ analise_global.estatisticas.derrotas }}</strong><small>{{ analise_global.estatisticas.jogos_concluidos }} resultados</small></article>
+  </div>
+  <div class="team-analysis-grid">
+    <article class="team-analysis-card team-analysis-card-wide" data-dashboard-widget="estatisticas-atletas" data-dashboard-label="Estatísticas por atleta"><header><span>Box score acumulado</span><h2>Desempenho dos atletas</h2></header>{% if analise_global.estatisticas.jogadores %}<div class="team-analysis-table-wrap"><table class="team-analysis-table"><thead><tr><th>Atleta</th><th>PTS</th><th>AST</th><th>RO</th><th>RD</th><th>STL</th><th>TO</th><th>EFF</th></tr></thead><tbody>{% for item in analise_global.estatisticas.jogadores %}<tr><td><strong>{{ item.jogador.nome }}</strong></td><td><strong>{{ item.pts }}</strong></td><td>{{ item.ast }}</td><td>{{ item.ro }}</td><td>{{ item.rd }}</td><td>{{ item.stl }}</td><td>{{ item.to }}</td><td><strong>{{ item.eff }}</strong></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="team-analysis-empty"><strong>Sem estatísticas registadas</strong><span>Importa ou regista as ações dos jogos para construir esta análise.</span></div>{% endif %}</article>
+    <article class="team-analysis-card" data-dashboard-widget="resultados-recentes" data-dashboard-label="Resultados recentes"><header><span>Competição</span><h2>Resultados recentes</h2></header>{% if analise_global.estatisticas.jogos %}<div class="team-analysis-list">{% for jogo in analise_global.estatisticas.jogos[:8] %}<a href="/estatisticas/jogos/{{ jogo.id }}"><div><strong>{{ jogo.adversario }}</strong><span>{{ jogo.data|data_pt }} · {{ jogo.competicao or 'Jogo' }}</span></div><b>{% if jogo.pontos_nos is not none %}{{ jogo.pontos_nos }}–{{ jogo.pontos_adversario }}{% else %}Por disputar{% endif %}</b></a>{% endfor %}</div>{% else %}<div class="team-analysis-empty"><strong>Sem jogos no calendário</strong><span>Os resultados aparecerão aqui.</span></div>{% endif %}</article>
+  </div>
 </section>
 
 <section class="ds-analysis-panel" data-analysis-panel="resumo" hidden>
@@ -147,13 +223,20 @@
 (() => {
   const tabs = document.querySelectorAll('[data-analysis-tab]');
   const panels = document.querySelectorAll('[data-analysis-panel]');
-  tabs.forEach(tab => tab.addEventListener('click', () => {
+  function openPanel(name, updateHash = true) {
+    const tab = document.querySelector(`[data-analysis-tab="${name}"]`);
+    const panel = document.querySelector(`[data-analysis-panel="${name}"]`);
+    if (!panel) return;
     tabs.forEach(item => item.classList.toggle('is-active', item === tab));
-    panels.forEach(panel => panel.hidden = panel.dataset.analysisPanel !== tab.dataset.analysisTab);
-    history.replaceState(null, '', `#${tab.dataset.analysisTab}`);
-  }));
-  const initial = location.hash.slice(1);
-  if (initial) document.querySelector(`[data-analysis-tab="${initial}"]`)?.click();
+    tabs.forEach(item => item.setAttribute('aria-selected', item === tab ? 'true' : 'false'));
+    panels.forEach(item => item.hidden = item !== panel);
+    if (updateHash) history.replaceState(null, '', `#${name}`);
+    window.scrollTo({top: Math.max(0, document.querySelector('.ds-analysis-tabs').offsetTop - 90), behavior: 'smooth'});
+  }
+  tabs.forEach(tab => tab.addEventListener('click', () => openPanel(tab.dataset.analysisTab)));
+  document.querySelectorAll('[data-open-analysis]').forEach(button => button.addEventListener('click', () => openPanel(button.dataset.openAnalysis)));
+  const initial = location.hash.slice(1) || 'global';
+  openPanel(initial === 'dashboard' ? 'global' : initial, false);
 
   document.querySelectorAll('[data-delete-parameter]').forEach(button => button.addEventListener('click', async () => {
     if (!confirm('Remover este parâmetro das próximas avaliações? O histórico será preservado.')) return;

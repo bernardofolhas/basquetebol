@@ -1,10 +1,14 @@
 from datetime import date
 
 from database import SessionLocal
+from models.assiduidade import RegistoAssiduidade
 from models.avaliacao import AvaliacaoJogador, ParametroAvaliacao
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
+from models.estatistica import EventoEstatistica
+from models.jogo import Convocado, Jogo
 from models.jogador import Jogador
-from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
+from models.planeamento import ConteudoSessaoTreino, Macrociclo, Mesociclo, Microciclo, SessaoTreino
+from models.treino import ExercicioPlano, PlanoTreino
 from models.utilizador import Utilizador
 
 
@@ -74,8 +78,12 @@ def test_painel_cria_parametros_base_e_apresenta_area_de_analise(client_admin):
     try:
         resposta = client_admin.get(f"/analise/equipas/{equipa_id}")
         assert resposta.status_code == 200
-        assert "Análise de Desempenho" in resposta.text
-        assert "dimensão técnica, tática, física e psicológica" in resposta.text
+        assert "Mapa global de análise" in resposta.text
+        assert "Treino, disponibilidade, competição e desempenho" in resposta.text
+        assert "Categorias / exercícios" in resposta.text
+        assert "Presenças / PSE" in resposta.text
+        assert "Convocatórias" in resposta.text
+        assert "Estatísticas de jogo" in resposta.text
         assert "Observatório de desempenho" in resposta.text
         assert "data-analysis-period" in resposta.text
         assert "Matriz de parâmetros" in resposta.text
@@ -83,6 +91,81 @@ def test_painel_cria_parametros_base_e_apresenta_area_de_analise(client_admin):
         assert "Ana Avaliação" in resposta.text
         assert db.query(ParametroAvaliacao).filter(ParametroAvaliacao.equipa_id == equipa_id).count() == 15
     finally:
+        _limpar_contexto(db, equipa_id, [jogadora_1_id, jogadora_2_id], macro_id)
+        db.close()
+
+
+def test_mapa_global_agrega_treino_presenca_convocatoria_e_estatisticas(client_admin):
+    db, equipa_id, jogadora_1_id, jogadora_2_id, macro_id, sessao_id = _criar_contexto()
+    jogo_id = None
+    try:
+        equipa = db.query(Equipa).filter(Equipa.id == equipa_id).one()
+        sessao = db.query(SessaoTreino).filter(SessaoTreino.id == sessao_id).one()
+        plano = PlanoTreino(clube_id=equipa.clube_id, sessao=sessao, hora_inicio="18:00")
+        plano.exercicios.append(ExercicioPlano(
+            clube_id=equipa.clube_id,
+            nome="Finalização em vantagem",
+            categoria="TIO",
+            minutos=20,
+            ordem=1,
+        ))
+        sessao.conteudos.append(ConteudoSessaoTreino(
+            categoria="tecnica_individual_ofensiva",
+            descricao="Finalização",
+            minutos=20,
+            ordem=1,
+        ))
+        db.add(RegistoAssiduidade(
+            clube_id=equipa.clube_id,
+            sessao=sessao,
+            jogador_id=jogadora_1_id,
+            presente=True,
+            estado="presente",
+            rpe_individual=7,
+        ))
+        jogo = Jogo(
+            clube_id=equipa.clube_id,
+            equipa_id=equipa_id,
+            data=date(2041, 1, 12),
+            adversario="Equipa Adversária",
+            em_casa=True,
+            pontos_nos=70,
+            pontos_adversario=60,
+        )
+        jogo.convocados.append(Convocado(
+            clube_id=equipa.clube_id,
+            jogador_id=jogadora_1_id,
+        ))
+        db.add_all([plano, jogo])
+        db.flush()
+        jogo_id = jogo.id
+        db.add(EventoEstatistica(
+            client_uid=f"teste-analise-global-{equipa_id}",
+            clube_id=equipa.clube_id,
+            equipa_id=equipa_id,
+            jogo_id=jogo.id,
+            jogador_id=jogadora_1_id,
+            lado="equipa",
+            tipo="tres_c",
+            periodo=1,
+        ))
+        db.commit()
+
+        resposta = client_admin.get(f"/analise/equipas/{equipa_id}")
+        assert resposta.status_code == 200
+        assert "Finalização em vantagem" in resposta.text
+        assert "20 min · 100.0%" in resposta.text
+        assert "7.0" in resposta.text
+        assert "Equipa Adversária" in resposta.text
+        assert "Pontos marcados" in resposta.text
+        assert ">3<" in resposta.text
+    finally:
+        if jogo_id:
+            db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).delete(synchronize_session=False)
+            jogo = db.query(Jogo).filter(Jogo.id == jogo_id).first()
+            if jogo:
+                db.delete(jogo)
+        db.commit()
         _limpar_contexto(db, equipa_id, [jogadora_1_id, jogadora_2_id], macro_id)
         db.close()
 
