@@ -298,13 +298,14 @@
 
   document.getElementById('evaluation-form').addEventListener('submit', async event => {
     event.preventDefault();
+    const form = event.currentTarget;
     const button = document.getElementById('save-evaluation');
     button.disabled = true; button.textContent = 'A guardar...';
     try {
-      const response = await fetch(event.currentTarget.action, {method: 'POST', body: new FormData(event.currentTarget), headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      const response = await fetch(form.action, {method: 'POST', body: new FormData(form), headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''}});
       const result = await response.json();
-      if (!result.ok) throw new Error(result.message || 'Não foi possível guardar.');
-      event.currentTarget.querySelectorAll('input[name^="valor_"]').forEach(input => { existing[input.name.replace('valor_', '').replace('_', ':')] = input.value; });
+      if (!response.ok || !result.ok) throw new Error(result.message || result.erro || 'Não foi possível guardar.');
+      form.querySelectorAll('input[name^="valor_"]').forEach(input => { existing[input.name.replace('valor_', '').replace('_', ':')] = input.value; });
       const toast = document.getElementById('eval-success'); toast.textContent = result.message; toast.hidden = false;
       setTimeout(() => toast.hidden = true, 3500);
       button.textContent = 'Avaliações guardadas';

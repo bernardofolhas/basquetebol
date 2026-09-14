@@ -373,6 +373,8 @@ def test_sessao_e_plano_de_treino_expoem_acesso_a_avaliacao(client_admin):
         assert "ds-eval-scale-option" in pagina.text
         assert "Toca num número da escala" in pagina.text
         assert "X-CSRF-Token" in pagina.text
+        assert "const form = event.currentTarget" in pagina.text
+        assert "event.currentTarget.querySelectorAll('input[name^=\"valor_\"]')" not in pagina.text
 
         plano = client_admin.get(f"/treino/sessoes/{sessao_id}")
         assert plano.status_code == 200
