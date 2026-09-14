@@ -7,6 +7,7 @@
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
 <script src="/static/js/tactical-ink-recognizer.js?v=20260910-2"></script>
+<script src="/static/js/training-teams.js?v=20260914-1" defer></script>
 <div class="training-workspace" data-training-plan="{{ plano.id }}" data-training-session-start="{{ sessao.hora_inicio or plano.hora_inicio or '' }}" data-training-reorder-url="/treino/planos/{{ plano.id }}/exercicios/reordenar">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
@@ -31,6 +32,64 @@
         <button type="button" onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ campo.numero }})" class="rounded-lg bg-orange-500 px-3 py-1 text-xs font-medium text-white transition hover:bg-orange-600">Guardar desenho</button>
     </div>
 </div>
+{% endmacro %}
+
+{% macro menu_atletas_previstos() %}
+<details class="training-guidance-menu" data-training-dropdown aria-label="Atletas previstos para a sessão de treino">
+    <summary>
+        <i class="training-menu-symbol" aria-hidden="true">A</i>
+        <span>Atletas previstos</span>
+        <strong data-expected-player-count>{{ atletas_previstos_ids|length }}</strong>
+        <span class="training-guidance-chevron" aria-hidden="true">⌄</span>
+    </summary>
+    <div class="training-guidance-popover training-players-popover">
+        <header class="training-guidance-header">
+            <div><b>Quem está previsto no treino?</b><p>Esta seleção será usada para formar as equipas.</p></div>
+            <button type="button" class="ds-quiet-link" data-toggle-all-expected>Selecionar todos</button>
+        </header>
+        <div class="training-expected-grid" data-expected-player-options>
+            {% for atleta in atletas_treino %}
+            <label class="training-expected-player">
+                <input type="checkbox" value="{{ atleta.id }}" {% if atleta.id in atletas_previstos_ids %}checked{% endif %}>
+                <span class="training-expected-avatar">{% if atleta.fotografia %}<img src="{{ atleta.fotografia }}" alt="Fotografia de {{ atleta.nome }}">{% else %}{{ atleta.numero or atleta.nome[:1]|upper }}{% endif %}</span>
+                <span class="min-w-0"><b>{{ atleta.nome }}</b><small>{% if atleta.convocado %}Convocado · {{ atleta.equipa }}{% else %}{{ atleta.posicao or atleta.equipa }}{% endif %}</small></span>
+            </label>
+            {% else %}
+            <p class="training-team-empty">Não existem atletas ativos disponíveis.</p>
+            {% endfor %}
+        </div>
+        <footer class="training-team-footer">
+            <span data-expected-status>Seleciona os atletas esperados nesta sessão.</span>
+            <button type="button" class="ds-button ds-button-primary" data-save-expected>Guardar atletas previstos</button>
+        </footer>
+    </div>
+</details>
+{% endmacro %}
+
+{% macro menu_equipas_aleatorias() %}
+<details class="training-guidance-menu" data-training-dropdown aria-label="Criar equipas aleatórias">
+    <summary>
+        <i class="training-menu-symbol" aria-hidden="true">E</i>
+        <span>Equipas aleatórias</span>
+        <strong data-random-team-count>{{ equipas_treino_estado.equipas|length if equipas_treino_estado else 0 }}</strong>
+        <span class="training-guidance-chevron" aria-hidden="true">⌄</span>
+    </summary>
+    <div class="training-guidance-popover training-teams-popover">
+        <header class="training-guidance-header">
+            <div><b>Formar equipas equilibradas</b><p>Os postes têm prioridade; quando faltam, entram os atletas mais altos.</p></div>
+        </header>
+        <div class="training-team-controls">
+            <label><span>Jogadores por equipa</span><select data-team-size><option value="2">Equipas de 2</option><option value="3">Equipas de 3</option><option value="4">Equipas de 4</option><option value="5">Equipas de 5</option></select></label>
+            <label data-post-count-wrap hidden><span>Grandes por equipa</span><select data-post-count><option value="1">1 poste/grande</option><option value="2">2 postes/grandes</option></select></label>
+            <p data-team-rule>Sem restrição de posição.</p>
+            <button type="button" class="ds-button ds-button-primary" data-generate-teams>Gerar equipas</button>
+        </div>
+        <div class="training-random-teams" data-random-teams></div>
+        <footer class="training-team-footer">
+            <span data-team-status>{% if equipas_treino_estado %}Arrasta os atletas para ajustar as equipas.{% else %}Seleciona os atletas previstos e gera as equipas.{% endif %}</span>
+        </footer>
+    </div>
+</details>
 {% endmacro %}
 
 {% macro campo_previsualizacao(ex_id, campo) %}
@@ -91,6 +150,7 @@
 {% macro menu_conteudos_previstos() %}
 <details class="training-guidance-menu" aria-label="Conteúdos previstos para a sessão de treino">
     <summary>
+        <i class="training-menu-symbol" aria-hidden="true">C</i>
         <span>Conteúdos previstos</span>
         <strong>{{ conteudos_previstos.total_minutos }} min</strong>
         <span class="training-guidance-chevron" aria-hidden="true">⌄</span>
@@ -156,9 +216,15 @@
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resumo">Resumo</button>
         {% endif %}
     </div>
-    {{ menu_conteudos_previstos() }}
+    <div class="training-tabs-tools">
+        {{ menu_atletas_previstos() }}
+        {{ menu_equipas_aleatorias() }}
+        {{ menu_conteudos_previstos() }}
+    </div>
     </div>
 </nav>
+
+<script type="application/json" id="training-team-data">{{ {"plano_id": plano.id, "atletas": atletas_treino, "previstos_ids": atletas_previstos_ids, "estado": equipas_treino_estado}|tojson }}</script>
 
 <dialog id="modal-importar-plano" class="w-[min(92vw,620px)] rounded-[28px] p-0 shadow-2xl backdrop:bg-slate-950/45">
     <div class="p-6 sm:p-8">

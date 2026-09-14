@@ -215,6 +215,23 @@ def actualizar_estrutura_testes_fisicos() -> None:
     logger.info("Estrutura do catálogo de testes físicos verificada.")
 
 
+def actualizar_estrutura_equipas_treino() -> None:
+    """Adiciona a organização de atletas e equipas a planos existentes."""
+    inspector = inspect(engine)
+    if not inspector.has_table("planos_treino"):
+        return
+    colunas = {coluna["name"] for coluna in inspector.get_columns("planos_treino")}
+    with engine.begin() as ligacao:
+        for nome in ("atletas_previstos", "equipas_aleatorias"):
+            if nome in colunas:
+                continue
+            prefixo = "IF NOT EXISTS " if engine.dialect.name == "postgresql" else ""
+            ligacao.execute(text(
+                f"ALTER TABLE planos_treino ADD COLUMN {prefixo}{nome} TEXT NULL"
+            ))
+    logger.info("Estrutura de atletas previstos e equipas de treino verificada.")
+
+
 def actualizar_estrutura_questionarios() -> None:
     """Mantém contas, questionários e regras automáticas compatíveis sem Alembic automático."""
     inspector = inspect(engine)

@@ -38,6 +38,10 @@ class PlanoTreino(Base):
     # Reflexão após o treino
     reflexao = Column(Text, nullable=True)
 
+    # Organização operacional da sessão, mantida separada do conteúdo técnico.
+    atletas_previstos = Column(Text, nullable=True)
+    equipas_aleatorias = Column(Text, nullable=True)
+
     # relationship — uselist=False indica relação um-para-um
     sessao = relationship("SessaoTreino", back_populates="plano_treino", uselist=False)
 

@@ -49,6 +49,7 @@ from database import (
     actualizar_estrutura_assiduidade,
     actualizar_estrutura_campos_desenho,
     actualizar_estrutura_estatisticas,
+    actualizar_estrutura_equipas_treino,
     actualizar_estrutura_staff,
     actualizar_estrutura_jogadores,
     actualizar_estrutura_perfis,
@@ -125,6 +126,7 @@ try:
     actualizar_estrutura_perfis()
     actualizar_estrutura_preferencias_dashboard()
     actualizar_estrutura_testes_fisicos()
+    actualizar_estrutura_equipas_treino()
     actualizar_estrutura_questionarios()
     actualizar_estrutura_staff()
     actualizar_estrutura_planeamento_clube()

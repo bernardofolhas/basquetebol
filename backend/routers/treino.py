@@ -20,7 +20,8 @@ from database import get_db
 from flash import set_flash
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
 from models.equipa import Equipa
-from models.assiduidade import RegistoAssiduidade
+from models.assiduidade import ConvocacaoAssiduidade, RegistoAssiduidade
+from models.jogador import Jogador, RegistoAntropometrico
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.planeamento_clube import EventoPlaneamentoClube
 from models.treino import (
@@ -39,6 +40,7 @@ from services.desenho_service import (
 )
 from services.conteudos_sessao_service import construir_sugestoes_plano_treino
 from services.horarios_exercicios import recalcular_horas_exercicios
+from services.equipas_treino_service import gerar_equipas_equilibradas, jogador_e_interior
 from services.assiduidade_service import calcular_pse_real
 from services.mapa_conteudos_service import obter_sugestoes_conteudos_microciclo
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
@@ -80,6 +82,105 @@ def _configuracao_campo(numero: int) -> tuple[str, str, str]:
     nome_tipo = "Campo meio" if tipo == "meio" else "Campo completo"
     label = nome_tipo if indice_tipo == 1 else f"{nome_tipo} {indice_tipo}"
     return tipo, label, IMAGENS_CAMPO[tipo]
+
+
+def _carregar_json(valor: str | None, predefinido):
+    try:
+        dados = json.loads(valor) if valor else predefinido
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return predefinido
+    return dados
+
+
+def _atletas_disponiveis_plano(db: Session, equipa: Equipa, sessao_id: int) -> list[Jogador]:
+    plantel = db.query(Jogador).filter(
+        Jogador.equipa_id == equipa.id,
+        Jogador.clube_id == equipa.clube_id,
+        Jogador.ativo.is_(True),
+    ).order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome).all()
+    convocados = (
+        db.query(Jogador)
+        .join(ConvocacaoAssiduidade, ConvocacaoAssiduidade.jogador_id == Jogador.id)
+        .filter(
+            ConvocacaoAssiduidade.sessao_id == sessao_id,
+            ConvocacaoAssiduidade.clube_id == equipa.clube_id,
+            Jogador.clube_id == equipa.clube_id,
+            Jogador.ativo.is_(True),
+        )
+        .order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome)
+        .all()
+    )
+    ids_plantel = {jogador.id for jogador in plantel}
+    return plantel + [jogador for jogador in convocados if jogador.id not in ids_plantel]
+
+
+def _dados_atletas_plano(db: Session, equipa: Equipa, sessao_id: int) -> list[dict]:
+    jogadores = _atletas_disponiveis_plano(db, equipa, sessao_id)
+    ids = [jogador.id for jogador in jogadores]
+    alturas = {}
+    if ids:
+        registos = db.query(RegistoAntropometrico).filter(
+            RegistoAntropometrico.jogador_id.in_(ids),
+        ).order_by(RegistoAntropometrico.data.desc(), RegistoAntropometrico.id.desc()).all()
+        for registo in registos:
+            if registo.jogador_id in alturas or registo.altura is None:
+                continue
+            try:
+                alturas[registo.jogador_id] = float(registo.altura)
+            except (TypeError, ValueError):
+                continue
+    return [
+        {
+            "id": jogador.id,
+            "nome": jogador.nome,
+            "numero": jogador.numero_camisola,
+            "fotografia": jogador.fotografia,
+            "posicao": jogador.posicao,
+            "equipa": jogador.equipa.nome if jogador.equipa else "Sem equipa",
+            "convocado": jogador.equipa_id != equipa.id,
+            "altura": alturas.get(jogador.id),
+            "interior": jogador_e_interior(jogador.posicao),
+        }
+        for jogador in jogadores
+    ]
+
+
+def _ids_atletas_previstos(plano: PlanoTreino, atletas: list[dict]) -> list[int]:
+    disponiveis = {int(atleta["id"]) for atleta in atletas}
+    if plano.atletas_previstos is None:
+        return [int(atleta["id"]) for atleta in atletas]
+    dados = _carregar_json(plano.atletas_previstos, [])
+    if not isinstance(dados, list):
+        return []
+    return [int(valor) for valor in dados if isinstance(valor, int) and not isinstance(valor, bool) and valor in disponiveis]
+
+
+def _estado_equipas_guardado(plano: PlanoTreino, atletas_previstos_ids: list[int]) -> dict | None:
+    estado = _carregar_json(plano.equipas_aleatorias, None)
+    if not isinstance(estado, dict) or not isinstance(estado.get("equipas"), list):
+        return None
+    permitidos = set(atletas_previstos_ids)
+    usados = set()
+    equipas = []
+    for indice, equipa in enumerate(estado["equipas"]):
+        if not isinstance(equipa, dict) or not isinstance(equipa.get("slots"), list):
+            continue
+        slots = []
+        for valor in equipa["slots"]:
+            if valor is None:
+                slots.append(None)
+            elif isinstance(valor, int) and not isinstance(valor, bool) and valor in permitidos and valor not in usados:
+                slots.append(valor)
+                usados.add(valor)
+        equipas.append({"nome": f"Equipa {indice + 1}", "slots": slots})
+    if not equipas or usados != permitidos:
+        return None
+    return {
+        "tamanho": estado.get("tamanho", 3),
+        "postes_por_equipa": estado.get("postes_por_equipa", 1),
+        "grandes_ids": [valor for valor in estado.get("grandes_ids", []) if valor in permitidos],
+        "equipas": equipas,
+    }
 
 
 def _proximo_numero_campo(tipo: str, slots: list[int]) -> int:
@@ -635,6 +736,9 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         item for item in prioridades_microciclo["itens"]
         if item["nome"].strip().casefold() not in nomes_previstos
     ]
+    atletas_treino = _dados_atletas_plano(db, equipa, sessao.id)
+    atletas_previstos_ids = _ids_atletas_previstos(plano, atletas_treino)
+    equipas_treino_estado = _estado_equipas_guardado(plano, atletas_previstos_ids)
     return templates.TemplateResponse(request, "treino/plano.html", {
         "utilizador": utilizador,
         "sessao": sessao,
@@ -662,7 +766,125 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "conteudos_previstos": conteudos_previstos,
         "prioridades_microciclo": prioridades_microciclo,
         "hora_sugerida_exercicio": _hora_sugerida_exercicio(sessao, list(plano.exercicios)),
+        "atletas_treino": atletas_treino,
+        "atletas_previstos_ids": atletas_previstos_ids,
+        "equipas_treino_estado": equipas_treino_estado,
     })
+
+
+@router.post("/planos/{plano_id}/atletas-previstos")
+async def guardar_atletas_previstos(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
+    plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+    if not plano:
+        return JSONResponse({"sucesso": False, "erro": "Plano de treino não encontrado."}, status_code=404)
+    try:
+        dados = await request.json()
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JSONResponse({"sucesso": False, "erro": "A seleção enviada não é válida."}, status_code=400)
+    ids = dados.get("jogador_ids") if isinstance(dados, dict) else None
+    if not isinstance(ids, list) or any(isinstance(valor, bool) or not isinstance(valor, int) for valor in ids):
+        return JSONResponse({"sucesso": False, "erro": "A seleção enviada não é válida."}, status_code=422)
+    if len(ids) != len(set(ids)):
+        return JSONResponse({"sucesso": False, "erro": "Cada atleta só pode ser selecionado uma vez."}, status_code=422)
+
+    equipa = plano.sessao.microciclo.mesociclo.macrociclo.equipa
+    disponiveis = {atleta["id"] for atleta in _dados_atletas_plano(db, equipa, plano.sessao_id)}
+    if not set(ids).issubset(disponiveis):
+        return JSONResponse({"sucesso": False, "erro": "A seleção contém atletas indisponíveis para este treino."}, status_code=403)
+    plano.atletas_previstos = json.dumps(ids)
+    plano.equipas_aleatorias = None
+    _marcar_sessao_como_alterada_manual(plano.sessao)
+    db.commit()
+    return JSONResponse({
+        "sucesso": True,
+        "mensagem": f"{len(ids)} atleta(s) previsto(s) guardado(s).",
+        "jogador_ids": ids,
+    })
+
+
+@router.post("/planos/{plano_id}/equipas-aleatorias/gerar")
+async def gerar_equipas_aleatorias(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
+    plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+    if not plano:
+        return JSONResponse({"sucesso": False, "erro": "Plano de treino não encontrado."}, status_code=404)
+    try:
+        dados = await request.json()
+        tamanho = int(dados.get("tamanho"))
+        postes = int(dados.get("postes_por_equipa", 1))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JSONResponse({"sucesso": False, "erro": "Escolhe uma configuração válida."}, status_code=422)
+
+    equipa = plano.sessao.microciclo.mesociclo.macrociclo.equipa
+    atletas = _dados_atletas_plano(db, equipa, plano.sessao_id)
+    previstos = set(_ids_atletas_previstos(plano, atletas))
+    selecionados = [atleta for atleta in atletas if atleta["id"] in previstos]
+    try:
+        estado = gerar_equipas_equilibradas(selecionados, tamanho, postes)
+    except ValueError as erro:
+        return JSONResponse({"sucesso": False, "erro": str(erro)}, status_code=422)
+    plano.equipas_aleatorias = json.dumps(estado, ensure_ascii=False)
+    _marcar_sessao_como_alterada_manual(plano.sessao)
+    db.commit()
+    return JSONResponse({"sucesso": True, "mensagem": "Equipas geradas.", "estado": estado})
+
+
+@router.post("/planos/{plano_id}/equipas-aleatorias")
+async def guardar_organizacao_equipas(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
+    plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+    if not plano:
+        return JSONResponse({"sucesso": False, "erro": "Plano de treino não encontrado."}, status_code=404)
+    try:
+        dados = await request.json()
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JSONResponse({"sucesso": False, "erro": "A organização enviada não é válida."}, status_code=400)
+    equipas_recebidas = dados.get("equipas") if isinstance(dados, dict) else None
+    if not isinstance(equipas_recebidas, list) or not equipas_recebidas:
+        return JSONResponse({"sucesso": False, "erro": "A organização enviada não é válida."}, status_code=422)
+
+    equipa = plano.sessao.microciclo.mesociclo.macrociclo.equipa
+    atletas = _dados_atletas_plano(db, equipa, plano.sessao_id)
+    previstos = set(_ids_atletas_previstos(plano, atletas))
+    recebidos = []
+    equipas = []
+    for indice, slots in enumerate(equipas_recebidas):
+        if not isinstance(slots, list) or any(
+            valor is not None and (isinstance(valor, bool) or not isinstance(valor, int)) for valor in slots
+        ):
+            return JSONResponse({"sucesso": False, "erro": "Uma das equipas contém dados inválidos."}, status_code=422)
+        recebidos.extend(valor for valor in slots if valor is not None)
+        equipas.append({"nome": f"Equipa {indice + 1}", "slots": slots})
+    if len(recebidos) != len(set(recebidos)) or set(recebidos) != previstos:
+        return JSONResponse({"sucesso": False, "erro": "Todos os atletas previstos devem aparecer uma única vez."}, status_code=422)
+
+    estado_atual = _estado_equipas_guardado(plano, list(previstos)) or {}
+    estado = {
+        "tamanho": estado_atual.get("tamanho", 3),
+        "postes_por_equipa": estado_atual.get("postes_por_equipa", 1),
+        "grandes_ids": estado_atual.get("grandes_ids", []),
+        "equipas": equipas,
+    }
+    plano.equipas_aleatorias = json.dumps(estado, ensure_ascii=False)
+    _marcar_sessao_como_alterada_manual(plano.sessao)
+    db.commit()
+    return JSONResponse({"sucesso": True, "mensagem": "Organização das equipas guardada.", "estado": estado})
 
 
 @router.post("/planos/{plano_id}/importacoes")
