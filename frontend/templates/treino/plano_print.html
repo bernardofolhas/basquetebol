@@ -96,6 +96,24 @@
         .reflection h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 8px; }
         .reflection p { white-space: pre-line; line-height: 1.5; }
 
+        .training-teams-page { break-before: page; page-break-before: always; padding-top: 3mm; }
+        .training-teams-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 10mm; border-bottom: 2px solid var(--pdf-primary); padding: 0 1mm 4mm; }
+        .training-teams-heading small { display: block; color: var(--pdf-primary); font-size: 8px; font-weight: bold; letter-spacing: .14em; text-transform: uppercase; }
+        .training-teams-heading h2 { margin-top: 1.5mm; color: #111827; font-size: 18px; line-height: 1; }
+        .training-teams-heading p { max-width: 80mm; color: #64748b; font-size: 9px; line-height: 1.35; text-align: right; }
+        .training-teams-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5mm; margin-top: 5mm; }
+        .training-team-card { overflow: hidden; border: .5px solid #d7dde5; border-radius: 2.5mm; break-inside: avoid; page-break-inside: avoid; }
+        .training-team-card header { display: flex; align-items: center; justify-content: space-between; background: var(--pdf-primary); color: var(--pdf-on-primary); padding: 3mm 3.5mm; }
+        .training-team-card header h3 { font-size: 11px; }
+        .training-team-card header span { font-size: 8px; opacity: .9; }
+        .training-team-list { list-style: none; }
+        .training-team-list li { display: grid; grid-template-columns: 8mm minmax(0, 1fr) auto; min-height: 11mm; align-items: center; gap: 2.5mm; border-top: .5px solid #e5e7eb; padding: 2mm 3mm; }
+        .training-team-list li:first-child { border-top: 0; }
+        .training-team-number { display: grid; width: 7mm; height: 7mm; place-items: center; border-radius: 50%; background: var(--pdf-secondary); color: var(--pdf-on-secondary); font-size: 8px; font-weight: bold; }
+        .training-team-player-name { color: #111827; font-size: 9px; font-weight: bold; }
+        .training-team-role { border-radius: 99px; background: #f1f5f9; padding: 1.2mm 2mm; color: #475569; font-size: 7px; font-weight: bold; }
+        .training-team-vacancy-print { color: #94a3b8; font-size: 9px; font-style: italic; }
+
         .footer { position: running(page-footer); width: 100%; padding-top: 2mm; border-top: 1px solid #d1d5db; text-align: center; color: #6b7280; font-size: 8px; }
         .club-mark { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: bold; }
         .club-mark img { width: 34px; height: 34px; object-fit: contain; }
@@ -212,6 +230,37 @@
             <p>{{ plano.reflexao }}</p>
         </div>{% endif %}
     </div>
+
+    {% if equipas_treino %}
+    <section class="training-teams-page">
+        <header class="training-teams-heading">
+            <div><small>Organização da sessão</small><h2>Equipas do treino</h2></div>
+            <p>Composição definida no plano de treino. As vagas mantêm os lugares deixados livres durante a organização.</p>
+        </header>
+        <div class="training-teams-grid">
+            {% for grupo in equipas_treino %}
+            <article class="training-team-card">
+                <header><h3>{{ grupo.nome }}</h3><span>{{ grupo.slots|selectattr('atleta')|list|length }} atleta(s)</span></header>
+                <ol class="training-team-list">
+                    {% for slot in grupo.slots %}
+                    <li>
+                        {% if slot.atleta %}
+                        <span class="training-team-number">{{ slot.atleta.numero or loop.index }}</span>
+                        <span class="training-team-player-name">{{ slot.atleta.nome }}</span>
+                        {% if slot.grande %}<span class="training-team-role">Poste / grande</span>{% endif %}
+                        {% else %}
+                        <span class="training-team-number">{{ loop.index }}</span>
+                        <span class="training-team-vacancy-print">Lugar por preencher</span>
+                        <span></span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ol>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
 
 </div>
 

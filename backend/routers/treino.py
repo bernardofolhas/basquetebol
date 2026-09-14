@@ -183,6 +183,27 @@ def _estado_equipas_guardado(plano: PlanoTreino, atletas_previstos_ids: list[int
     }
 
 
+def _equipas_para_impressao(db: Session, equipa: Equipa, plano: PlanoTreino | None) -> list[dict]:
+    """Resolve os atletas das equipas guardadas sem alterar a organização do treino."""
+    if not plano:
+        return []
+    atletas = _dados_atletas_plano(db, equipa, plano.sessao_id)
+    previstos_ids = _ids_atletas_previstos(plano, atletas)
+    estado = _estado_equipas_guardado(plano, previstos_ids)
+    if not estado:
+        return []
+    por_id = {int(atleta["id"]): atleta for atleta in atletas}
+    grandes = set(estado.get("grandes_ids", []))
+    resultado = []
+    for indice, grupo in enumerate(estado["equipas"]):
+        slots = []
+        for jogador_id in grupo["slots"]:
+            atleta = por_id.get(jogador_id) if jogador_id is not None else None
+            slots.append({"atleta": atleta, "grande": jogador_id in grandes if atleta else False})
+        resultado.append({"nome": grupo.get("nome") or f"Equipa {indice + 1}", "slots": slots})
+    return resultado
+
+
 def _proximo_numero_campo(tipo: str, slots: list[int]) -> int:
     numero = 1 if tipo == "meio" else 2
     while numero in slots:
@@ -295,7 +316,7 @@ def _construir_resumo_blocos(plano: PlanoTreino | None) -> list[dict]:
     return resumo
 
 
-def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador) -> dict:
+def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador, db: Session | None = None) -> dict:
     """Prepara uma ficha estável para HTML de impressão e WeasyPrint."""
     caminho_campo_meio = STATIC_DIR / "campos" / "campo_meio.png"
     caminho_campo_completo = STATIC_DIR / "campos" / "campo_completo.png"
@@ -338,6 +359,7 @@ def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador) -> dic
         "campo_completo_data_uri": imagem_estatica_data_uri(caminho_campo_completo),
         "identidade": getattr(request.state, "identidade_clube", {}),
         "nome_treinador": nome_treinador or utilizador.nome,
+        "equipas_treino": _equipas_para_impressao(db, equipa, plano) if db else [],
     }
 
 
@@ -2064,7 +2086,7 @@ def imprimir_plano_treino(sessao_id: int, request: Request, db: Session = Depend
     return templates.TemplateResponse(
         request,
         "treino/plano_print.html",
-        _contexto_impressao_plano(request, sessao, equipa, plano, utilizador),
+        _contexto_impressao_plano(request, sessao, equipa, plano, utilizador, db),
     )
 
 
@@ -2085,7 +2107,7 @@ def exportar_pdf_plano(sessao_id: int, request: Request, db: Session = Depends(g
     equipa = sessao.microciclo.mesociclo.macrociclo.equipa
     plano = db.query(PlanoTreino).filter(PlanoTreino.sessao_id == sessao_id).first()
 
-    contexto_pdf = _contexto_impressao_plano(request, sessao, equipa, plano, utilizador)
+    contexto_pdf = _contexto_impressao_plano(request, sessao, equipa, plano, utilizador, db)
     contexto_pdf["modo_pdf"] = True
     pdf = renderizar_pdf(request, "treino/plano_print.html", contexto_pdf)
 

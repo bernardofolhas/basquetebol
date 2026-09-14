@@ -115,9 +115,11 @@ def test_conteudos_previstos_estao_no_cabecalho_fixo(client_admin):
         assert pagina.text.index('class="training-guidance-popover"', menu, fim_cabecalho) > menu
         assert pagina.text.index('class="training-guidance-chevron"', menu, fim_cabecalho) > menu
         assert '<svg' not in pagina.text[menu:fim_cabecalho]
-        assert pagina.text.count('class="training-guidance-menu"') == 3
+        assert pagina.text.count('class="training-guidance-menu"') == 1
+        assert 'data-open-training-dialog="training-expected-dialog"' in pagina.text
+        assert 'data-open-training-dialog="training-teams-dialog"' in pagina.text
         assert "Atletas previstos" in pagina.text
-        assert "Equipas aleatórias" in pagina.text
+        assert "Formar equipas" in pagina.text
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()

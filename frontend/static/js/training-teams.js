@@ -40,6 +40,10 @@
       element.style.color = error ? '#b42318' : '';
     }
 
+    function updateCounters(selector, value) {
+      root.querySelectorAll(selector).forEach(element => { element.textContent = value; });
+    }
+
     function updateRule() {
       const size = Number(teamSize?.value || 2);
       if (postWrap) postWrap.hidden = size !== 4;
@@ -51,8 +55,7 @@
     }
 
     function renderTeams() {
-      const count = root.querySelector('[data-random-team-count]');
-      if (count) count.textContent = state?.equipas?.length || 0;
+      updateCounters('[data-random-team-count]', state?.equipas?.length || 0);
       if (!teamRoot) return;
       if (!state?.equipas?.length) {
         teamRoot.innerHTML = '<p class="training-team-empty">Ainda não foram geradas equipas para este treino.</p>';
@@ -175,6 +178,16 @@
       if (!details.open) return;
       root.querySelectorAll('[data-training-dropdown]').forEach(other => { if (other !== details) other.open = false; });
     }));
+    root.querySelectorAll('[data-open-training-dialog]').forEach(button => button.addEventListener('click', () => {
+      const dialog = document.getElementById(button.dataset.openTrainingDialog);
+      if (dialog?.showModal) dialog.showModal();
+    }));
+    root.querySelectorAll('.training-organization-dialog').forEach(dialog => {
+      dialog.querySelector('[data-close-training-dialog]')?.addEventListener('click', () => dialog.close());
+      dialog.addEventListener('click', event => {
+        if (event.target === dialog) dialog.close();
+      });
+    });
     teamSize?.addEventListener('change', updateRule);
     postCount?.addEventListener('change', updateRule);
     root.querySelector('[data-toggle-all-expected]')?.addEventListener('click', () => {
@@ -192,8 +205,7 @@
         expectedIds = payload.jogador_ids;
         state = null;
         renderTeams();
-        const count = root.querySelector('[data-expected-player-count]');
-        if (count) count.textContent = expectedIds.length;
+        updateCounters('[data-expected-player-count]', expectedIds.length);
         setStatus(expectedStatus, payload.mensagem);
         setStatus(teamStatus, 'A seleção mudou. Gera novamente as equipas.');
       } catch (error) { setStatus(expectedStatus, error.message, true); }

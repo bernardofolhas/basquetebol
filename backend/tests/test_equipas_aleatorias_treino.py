@@ -39,7 +39,9 @@ def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_adm
         pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
         assert pagina.status_code == 200
         assert "Atletas previstos" in pagina.text
-        assert "Equipas aleatórias" in pagina.text
+        assert "Formar equipas" in pagina.text
+        assert 'id="training-expected-dialog"' in pagina.text
+        assert 'id="training-teams-dialog"' in pagina.text
         plano = db.query(PlanoTreino).filter(PlanoTreino.sessao_id == sessao.id).one()
 
         previstos = client_admin.post(
@@ -67,6 +69,18 @@ def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_adm
         db.expire_all()
         guardado = json.loads(db.query(PlanoTreino).filter(PlanoTreino.id == plano.id).one().equipas_aleatorias)
         assert guardado["equipas"][0]["slots"] == [jogador_id, None, outro_id]
+
+        impressao = client_admin.get(f"/treino/sessoes/{sessao.id}/print")
+        assert impressao.status_code == 200
+        assert "Equipas do treino" in impressao.text
+        assert "Equipa 1" in impressao.text
+        assert "Lugar por preencher" in impressao.text
+        assert impressao.text.index("Equipas do treino") > impressao.text.index('class="content"')
+
+        pdf = client_admin.get(f"/treino/sessoes/{sessao.id}/pdf")
+        assert pdf.status_code == 200
+        assert pdf.headers["content-type"].startswith("application/pdf")
+        assert pdf.content.startswith(b"%PDF")
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()
