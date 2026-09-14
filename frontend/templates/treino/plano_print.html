@@ -101,6 +101,10 @@
         .training-teams-heading small { display: block; color: var(--pdf-primary); font-size: 8px; font-weight: bold; letter-spacing: .14em; text-transform: uppercase; }
         .training-teams-heading h2 { margin-top: 1.5mm; color: #111827; font-size: 18px; line-height: 1; }
         .training-teams-heading p { max-width: 80mm; color: #64748b; font-size: 9px; line-height: 1.35; text-align: right; }
+        .training-team-set { margin-top: 5mm; }
+        .training-team-set-title { display: flex; align-items: baseline; justify-content: space-between; border-left: 3px solid var(--pdf-primary); background: #f8fafc; padding: 2.5mm 3mm; break-after: avoid; page-break-after: avoid; }
+        .training-team-set-title h3 { color: #111827; font-size: 11px; }
+        .training-team-set-title span { color: #64748b; font-size: 8px; font-weight: bold; }
         .training-teams-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5mm; margin-top: 5mm; }
         .training-team-card { overflow: hidden; border: .5px solid #d7dde5; border-radius: 2.5mm; break-inside: avoid; page-break-inside: avoid; }
         .training-team-card header { display: flex; align-items: center; justify-content: space-between; background: var(--pdf-primary); color: var(--pdf-on-primary); padding: 3mm 3.5mm; }
@@ -237,28 +241,33 @@
             <div><small>Organização da sessão</small><h2>Equipas do treino</h2></div>
             <p>Composição definida no plano de treino. As vagas mantêm os lugares deixados livres durante a organização.</p>
         </header>
-        <div class="training-teams-grid">
-            {% for grupo in equipas_treino %}
-            <article class="training-team-card">
-                <header><h3>{{ grupo.nome }}</h3><span>{{ grupo.slots|selectattr('atleta')|list|length }} atleta(s)</span></header>
-                <ol class="training-team-list">
-                    {% for slot in grupo.slots %}
-                    <li>
-                        {% if slot.atleta %}
-                        <span class="training-team-number">{{ slot.atleta.numero or loop.index }}</span>
-                        <span class="training-team-player-name">{{ slot.atleta.nome }}</span>
-                        {% if slot.grande %}<span class="training-team-role">Poste / grande</span>{% endif %}
-                        {% else %}
-                        <span class="training-team-number">{{ loop.index }}</span>
-                        <span class="training-team-vacancy-print">Lugar por preencher</span>
-                        <span></span>
-                        {% endif %}
-                    </li>
-                    {% endfor %}
-                </ol>
-            </article>
-            {% endfor %}
+        {% for agrupamento in equipas_treino %}
+        <div class="training-team-set">
+            <div class="training-team-set-title"><h3>{{ agrupamento.nome }}</h3><span>Equipas de {{ agrupamento.tamanho }}</span></div>
+            <div class="training-teams-grid">
+                {% for grupo in agrupamento.equipas %}
+                <article class="training-team-card">
+                    <header><h3>{{ grupo.nome }}</h3><span>{{ grupo.slots|selectattr('atleta')|list|length }} atleta(s)</span></header>
+                    <ol class="training-team-list">
+                        {% for slot in grupo.slots %}
+                        <li>
+                            {% if slot.atleta %}
+                            <span class="training-team-number">{{ slot.atleta.numero or loop.index }}</span>
+                            <span class="training-team-player-name">{{ slot.atleta.nome }}</span>
+                            {% if slot.grande %}<span class="training-team-role">Poste / grande</span>{% endif %}
+                            {% else %}
+                            <span class="training-team-number">{{ loop.index }}</span>
+                            <span class="training-team-vacancy-print">Lugar por preencher</span>
+                            <span></span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ol>
+                </article>
+                {% endfor %}
+            </div>
         </div>
+        {% endfor %}
     </section>
     {% endif %}
 

@@ -889,7 +889,16 @@ table tbody tr:hover { background:#fafbfd; }
 .training-team-controls label span { display:block;margin-bottom:.3rem;color:var(--text-soft);font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.055em; }
 .training-team-controls select { width:100%;min-height:2.55rem;padding:.45rem .65rem;font-size:.78rem; }
 .training-team-controls p { align-self:center;color:var(--text-muted);font-size:.72rem;line-height:1.4; }
+.training-team-groups { display:grid;gap:1rem;border-top:1px solid var(--border-soft);padding:1rem;background:var(--surface-subtle); }
+.training-team-group { overflow:hidden;border:1px solid var(--border-soft);border-radius:1rem;background:#fff;box-shadow:0 2px 8px rgb(15 23 42 / .04); }
+.training-team-group-head { display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--border-soft);padding:.75rem .9rem; }
+.training-team-group-head>div:first-child>span { color:var(--clube-primary-dark);font-size:.6rem;font-weight:850;letter-spacing:.09em;text-transform:uppercase; }
+.training-team-group-head h3 { margin-top:.18rem;color:var(--text-main);font-size:.88rem;font-weight:850; }
+.training-team-group-head>div:last-child { display:flex;align-items:center;gap:.75rem; }
+.training-group-delete { color:#b42318;font-size:.7rem;font-weight:750; }
+.training-group-delete:hover { text-decoration:underline; }
 .training-random-teams { display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.75rem;border-top:1px solid var(--border-soft);padding:1rem;background:var(--surface-subtle); }
+.training-team-group>.training-random-teams { border-top:0;background:#fff; }
 .training-random-team { min-width:0;border:1px solid var(--border-soft);border-radius:.9rem;background:#fff;padding:.65rem;transition:border-color .15s,box-shadow .15s; }
 .training-random-team.is-drop-target { border-color:var(--clube-primary);box-shadow:0 0 0 3px var(--clube-primary-soft); }
 .training-random-team header { display:flex;align-items:center;justify-content:space-between;padding:.15rem .15rem .55rem; }
@@ -962,6 +971,8 @@ table tbody tr:hover { background:#fafbfd; }
     .training-team-controls { grid-template-columns:1fr 1fr;padding:.75rem; }
     .training-team-controls p { grid-column:1/-1; }
     .training-team-controls button { grid-column:1/-1; }
+    .training-team-groups { padding:.75rem; }
+    .training-team-group-head { align-items:flex-start;flex-direction:column; }
     .training-random-teams { grid-template-columns:repeat(2,minmax(0,1fr));padding:.75rem; }
     .training-team-footer { align-items:stretch;flex-direction:column; }
     #training-add-panel input,#training-add-panel select,#training-add-panel textarea { font-size:16px; }

@@ -7,7 +7,7 @@
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
 <script src="/static/js/tactical-ink-recognizer.js?v=20260910-2"></script>
-<script src="/static/js/training-teams.js?v=20260914-3" defer></script>
+<script src="/static/js/training-teams.js?v=20260914-4" defer></script>
 <div class="training-workspace" data-training-plan="{{ plano.id }}" data-training-session-start="{{ sessao.hora_inicio or plano.hora_inicio or '' }}" data-training-reorder-url="/treino/planos/{{ plano.id }}/exercicios/reordenar">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
@@ -157,7 +157,7 @@
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="reflexao">Reflexão</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resumo">Resumo</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="atletas">Atletas previstos <span class="training-tab-count" data-expected-player-count>{{ atletas_previstos_ids|length }}</span></button>
-        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="equipas">Formar equipas <span class="training-tab-count" data-random-team-count>{{ equipas_treino_estado.equipas|length if equipas_treino_estado else 0 }}</span></button>
+        <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="equipas">Formar equipas <span class="training-tab-count" data-random-group-count>{{ equipas_treino_estado.grupos|length if equipas_treino_estado else 0 }}</span></button>
         {% endif %}
     </div>
     <div class="training-tabs-tools">
@@ -200,16 +200,16 @@
 <section data-workspace-panel="treino:equipas" role="tabpanel" class="training-organization-page training-teams-page">
         <header class="training-organization-head">
             <div><span>Organização da sessão</span><h2>Formar equipas</h2><p>Cria grupos equilibrados e arrasta os atletas para fazer os ajustes finais.</p></div>
-            <div class="training-organization-total"><strong data-random-team-count>{{ equipas_treino_estado.equipas|length if equipas_treino_estado else 0 }}</strong><span>equipas</span></div>
+            <div class="training-organization-total"><strong data-random-group-count>{{ equipas_treino_estado.grupos|length if equipas_treino_estado else 0 }}</strong><span>agrupamentos</span></div>
         </header>
         <div class="training-organization-body">
             <div class="training-team-controls">
                 <label><span>Jogadores por equipa</span><select data-team-size><option value="2">Equipas de 2</option><option value="3">Equipas de 3</option><option value="4">Equipas de 4</option><option value="5">Equipas de 5</option></select></label>
                 <label data-post-count-wrap hidden><span>Grandes por equipa</span><select data-post-count><option value="1">1 poste/grande</option><option value="2">2 postes/grandes</option></select></label>
                 <p data-team-rule>Sem restrição de posição.</p>
-                <button type="button" class="ds-button ds-button-primary" data-generate-teams>Gerar equipas</button>
+                <button type="button" class="ds-button ds-button-primary" data-generate-teams>Adicionar agrupamento</button>
             </div>
-            <div class="training-random-teams" data-random-teams></div>
+            <div class="training-team-groups" data-random-team-groups></div>
         </div>
         <footer class="training-team-footer training-organization-footer">
             <span data-team-status>{% if equipas_treino_estado %}Arrasta os atletas para ajustar as equipas. As alterações ficam guardadas automaticamente.{% else %}Seleciona os atletas previstos e gera as equipas.{% endif %}</span>

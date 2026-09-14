@@ -1,10 +1,12 @@
 import json
 import random
+from types import SimpleNamespace
 
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.treino import PlanoTreino
 from services.equipas_treino_service import gerar_equipas_equilibradas
 from test_fase2_assiduidade_evolucao import _criar_contexto, _limpar_contexto
+from routers.treino import _estado_equipas_guardado
 
 
 def _jogadores(total: int) -> list[dict]:
@@ -28,6 +30,21 @@ def test_distribuicao_absorve_excedentes_sem_criar_equipa_incompleta():
     assert len(equipas_de_quatro["grandes_ids"]) == 4
     for equipa in equipas_de_quatro["equipas"]:
         assert len(set(equipa["slots"]) & set(equipas_de_quatro["grandes_ids"])) == 2
+
+
+def test_estado_antigo_e_convertido_no_primeiro_agrupamento():
+    plano = SimpleNamespace(equipas_aleatorias=json.dumps({
+        "tamanho": 2,
+        "postes_por_equipa": 0,
+        "grandes_ids": [],
+        "equipas": [{"nome": "Equipa 1", "slots": [1, 2]}],
+    }))
+
+    estado = _estado_equipas_guardado(plano, [1, 2])
+
+    assert estado["grupos"][0]["id"] == 1
+    assert estado["grupos"][0]["tamanho"] == 2
+    assert estado["grupos"][0]["equipas"][0]["slots"] == [1, 2]
 
 
 def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_admin):
@@ -59,23 +76,41 @@ def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_adm
         )
         assert gerar.status_code == 200
         estado = gerar.json()["estado"]
-        assert len(estado["equipas"]) == 1
-        assert set(estado["equipas"][0]["slots"]) == {jogador_id, outro_id}
+        assert len(estado["grupos"]) == 1
+        primeiro_grupo = estado["grupos"][0]
+        assert primeiro_grupo["tamanho"] == 2
+        assert set(primeiro_grupo["equipas"][0]["slots"]) == {jogador_id, outro_id}
+
+        segundo = client_admin.post(
+            f"/treino/planos/{plano.id}/equipas-aleatorias/gerar",
+            json={"tamanho": 3, "postes_por_equipa": 1},
+        )
+        assert segundo.status_code == 200
+        estado = segundo.json()["estado"]
+        assert [grupo["tamanho"] for grupo in estado["grupos"]] == [2, 3]
+        assert all(
+            set(valor for equipa in grupo["equipas"] for valor in equipa["slots"] if valor is not None)
+            == {jogador_id, outro_id}
+            for grupo in estado["grupos"]
+        )
 
         reorganizar = client_admin.post(
             f"/treino/planos/{plano.id}/equipas-aleatorias",
-            json={"equipas": [[jogador_id, None, outro_id]]},
+            json={"grupo_id": primeiro_grupo["id"], "equipas": [[jogador_id, None, outro_id]]},
         )
         assert reorganizar.status_code == 200
-        assert reorganizar.json()["estado"]["equipas"][0]["slots"] == [jogador_id, None, outro_id]
+        assert reorganizar.json()["estado"]["grupos"][0]["equipas"][0]["slots"] == [jogador_id, None, outro_id]
         db.expire_all()
         guardado = json.loads(db.query(PlanoTreino).filter(PlanoTreino.id == plano.id).one().equipas_aleatorias)
-        assert guardado["equipas"][0]["slots"] == [jogador_id, None, outro_id]
+        assert guardado["grupos"][0]["equipas"][0]["slots"] == [jogador_id, None, outro_id]
+        assert len(guardado["grupos"]) == 2
 
         impressao = client_admin.get(f"/treino/sessoes/{sessao.id}/print")
         assert impressao.status_code == 200
         assert "Equipas do treino" in impressao.text
         assert "Equipa 1" in impressao.text
+        assert "Agrupamento 2" in impressao.text
+        assert "Equipas de 3" in impressao.text
         assert "Lugar por preencher" in impressao.text
         assert impressao.text.index("Equipas do treino") > impressao.text.index('class="content"')
 
@@ -83,6 +118,12 @@ def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_adm
         assert pdf.status_code == 200
         assert pdf.headers["content-type"].startswith("application/pdf")
         assert pdf.content.startswith(b"%PDF")
+
+        eliminar = client_admin.post(
+            f"/treino/planos/{plano.id}/equipas-aleatorias/{estado['grupos'][1]['id']}/eliminar"
+        )
+        assert eliminar.status_code == 200
+        assert len(eliminar.json()["estado"]["grupos"]) == 1
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()

@@ -7,10 +7,11 @@
     const data = JSON.parse(source.textContent || '{}');
     const players = new Map((data.atletas || []).map(player => [Number(player.id), player]));
     let expectedIds = (data.previstos_ids || []).map(Number);
-    let state = data.estado || null;
+    let state = data.estado || {grupos: []};
+    if (!Array.isArray(state.grupos)) state = state.equipas ? {grupos: [{id: 1, nome: 'Agrupamento 1', ...state}]} : {grupos: []};
     let drag = null;
     const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
-    const teamRoot = root.querySelector('[data-random-teams]');
+    const groupRoot = root.querySelector('[data-random-team-groups]');
     const teamStatus = root.querySelector('[data-team-status]');
     const expectedStatus = root.querySelector('[data-expected-status]');
     const teamSize = root.querySelector('[data-team-size]');
@@ -22,7 +23,7 @@
       ? `<span class="training-expected-avatar"><img src="${escapeHTML(player.fotografia)}" alt=""></span>`
       : `<span class="training-expected-avatar">${escapeHTML(player.numero || player.nome?.slice(0, 1) || '?')}</span>`;
 
-    async function post(path, body) {
+    async function post(path, body = {}) {
       const response = await fetch(path, {
         method: 'POST',
         headers: {'Accept':'application/json','Content-Type':'application/json','X-CSRF-Token':csrf()},
@@ -54,49 +55,61 @@
       else rule.textContent = 'Pelo menos 1 poste ou atleta mais alto por equipa.';
     }
 
-    function renderTeams() {
-      updateCounters('[data-random-team-count]', state?.equipas?.length || 0);
-      if (!teamRoot) return;
-      if (!state?.equipas?.length) {
-        teamRoot.innerHTML = '<p class="training-team-empty">Ainda não foram geradas equipas para este treino.</p>';
+    function renderGroups() {
+      updateCounters('[data-random-group-count]', state.grupos.length);
+      if (!groupRoot) return;
+      if (!state.grupos.length) {
+        groupRoot.innerHTML = '<p class="training-team-empty">Ainda não existem agrupamentos. Escolhe o número de jogadores e adiciona o primeiro.</p>';
         return;
       }
-      teamRoot.innerHTML = state.equipas.map((team, teamIndex) => {
-        const slots = (team.slots || []).map((playerId, slotIndex) => {
-          if (playerId === null) return `<div class="training-team-vacancy" data-team-slot-empty data-team-index="${teamIndex}" data-slot-index="${slotIndex}">+ Lugar vazio</div>`;
-          const player = players.get(Number(playerId));
-          if (!player) return '';
-          const role = state.grandes_ids?.includes(Number(playerId)) ? 'Poste/grande' : (player.posicao || player.equipa || 'Atleta');
-          return `<div class="training-team-player" draggable="true" tabindex="0" data-team-player="${playerId}" data-team-index="${teamIndex}" data-slot-index="${slotIndex}">${avatar(player)}<span class="min-w-0"><b>${escapeHTML(player.nome)}</b><small>${escapeHTML(role)}</small></span></div>`;
+      groupRoot.innerHTML = state.grupos.map((group, groupIndex) => {
+        const teams = (group.equipas || []).map((team, teamIndex) => {
+          const slots = (team.slots || []).map((playerId, slotIndex) => {
+            if (playerId === null) return `<div class="training-team-vacancy" data-team-slot-empty data-group-id="${group.id}" data-team-index="${teamIndex}" data-slot-index="${slotIndex}">+ Lugar vazio</div>`;
+            const player = players.get(Number(playerId));
+            if (!player) return '';
+            const role = group.grandes_ids?.includes(Number(playerId)) ? 'Poste/grande' : (player.posicao || player.equipa || 'Atleta');
+            return `<div class="training-team-player" draggable="true" tabindex="0" data-team-player="${playerId}" data-group-id="${group.id}" data-team-index="${teamIndex}" data-slot-index="${slotIndex}">${avatar(player)}<span class="min-w-0"><b>${escapeHTML(player.nome)}</b><small>${escapeHTML(role)}</small></span></div>`;
+          }).join('');
+          const total = (team.slots || []).filter(id => id !== null).length;
+          return `<section class="training-random-team" data-random-team="${teamIndex}" data-group-id="${group.id}"><header><b>${escapeHTML(team.nome || `Equipa ${teamIndex + 1}`)}</b><span>${total} atleta(s)</span></header><div class="training-team-slots">${slots}</div></section>`;
         }).join('');
-        const total = (team.slots || []).filter(id => id !== null).length;
-        return `<section class="training-random-team" data-random-team="${teamIndex}"><header><b>${escapeHTML(team.nome || `Equipa ${teamIndex + 1}`)}</b><span>${total} atleta(s)</span></header><div class="training-team-slots">${slots}</div></section>`;
+        const postLabel = group.tamanho === 4 ? ` · ${group.postes_por_equipa} grande(s)` : '';
+        return `<article class="training-team-group" data-team-group-card="${group.id}"><header class="training-team-group-head"><div><span>Agrupamento ${groupIndex + 1}</span><h3>Equipas de ${group.tamanho}${postLabel}</h3></div><div><button type="button" class="ds-quiet-link" data-regenerate-group="${group.id}">Gerar novamente</button><button type="button" class="training-group-delete" data-delete-group="${group.id}">Eliminar</button></div></header><div class="training-random-teams" data-team-group="${group.id}">${teams}</div></article>`;
       }).join('');
     }
 
-    function movePlayer(fromTeam, fromSlot, toTeam, toSlot = null) {
-      if (!state?.equipas?.[fromTeam] || !state.equipas[toTeam]) return false;
-      const playerId = state.equipas[fromTeam].slots[fromSlot];
+    function findGroup(groupId) {
+      return state.grupos.find(group => Number(group.id) === Number(groupId));
+    }
+
+    function movePlayer(groupId, fromTeam, fromSlot, toTeam, toSlot = null) {
+      const group = findGroup(groupId);
+      if (!group?.equipas?.[fromTeam] || !group.equipas[toTeam]) return false;
+      const playerId = group.equipas[fromTeam].slots[fromSlot];
       if (playerId === null || playerId === undefined) return false;
       if (fromTeam === toTeam && fromSlot === toSlot) return false;
-      state.equipas[fromTeam].slots[fromSlot] = null;
-      if (toSlot !== null && state.equipas[toTeam].slots[toSlot] === null) state.equipas[toTeam].slots[toSlot] = playerId;
-      else state.equipas[toTeam].slots.push(playerId);
+      group.equipas[fromTeam].slots[fromSlot] = null;
+      if (toSlot !== null && group.equipas[toTeam].slots[toSlot] === null) group.equipas[toTeam].slots[toSlot] = playerId;
+      else group.equipas[toTeam].slots.push(playerId);
       return true;
     }
 
-    async function saveTeams(previous) {
+    async function saveGroup(groupId, previous) {
+      const group = findGroup(groupId);
+      if (!group) return;
       setStatus(teamStatus, 'A guardar organização...');
       try {
         const payload = await post(`/treino/planos/${data.plano_id}/equipas-aleatorias`, {
-          equipas: state.equipas.map(team => team.slots),
+          grupo_id: Number(groupId),
+          equipas: group.equipas.map(team => team.slots),
         });
         state = payload.estado;
-        renderTeams();
+        renderGroups();
         setStatus(teamStatus, 'Organização guardada automaticamente.');
       } catch (error) {
         state = previous;
-        renderTeams();
+        renderGroups();
         setStatus(teamStatus, error.message, true);
       }
     }
@@ -107,47 +120,47 @@
     }
 
     function completeMove(target) {
-      if (!drag || !target) return;
+      if (!drag || !target || Number(target.dataset.groupId) !== drag.groupId) return;
       const previous = JSON.parse(JSON.stringify(state));
       const team = Number(target.dataset.teamIndex ?? target.dataset.randomTeam);
       const slot = target.matches('[data-team-slot-empty]') ? Number(target.dataset.slotIndex) : null;
-      if (movePlayer(drag.team, drag.slot, team, slot)) {
-        renderTeams();
-        saveTeams(previous);
+      if (movePlayer(drag.groupId, drag.team, drag.slot, team, slot)) {
+        renderGroups();
+        saveGroup(drag.groupId, previous);
       }
     }
 
-    teamRoot?.addEventListener('dragstart', event => {
+    groupRoot?.addEventListener('dragstart', event => {
       const item = event.target.closest('[data-team-player]');
       if (!item) return;
-      drag = {team:Number(item.dataset.teamIndex), slot:Number(item.dataset.slotIndex), pointer:false};
+      drag = {groupId:Number(item.dataset.groupId),team:Number(item.dataset.teamIndex),slot:Number(item.dataset.slotIndex),pointer:false};
       item.classList.add('is-dragging');
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', item.dataset.teamPlayer);
     });
-    teamRoot?.addEventListener('dragover', event => {
+    groupRoot?.addEventListener('dragover', event => {
       const target = event.target.closest('[data-team-slot-empty],[data-random-team]');
-      if (!target) return;
+      if (!target || Number(target.dataset.groupId) !== drag?.groupId) return;
       event.preventDefault();
-      teamRoot.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
+      groupRoot.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
       target.closest('[data-random-team]')?.classList.add('is-drop-target');
     });
-    teamRoot?.addEventListener('drop', event => {
+    groupRoot?.addEventListener('drop', event => {
       event.preventDefault();
       completeMove(event.target.closest('[data-team-slot-empty],[data-random-team]'));
       drag = null;
     });
-    teamRoot?.addEventListener('dragend', () => {
-      teamRoot.querySelectorAll('.is-dragging,.is-drop-target').forEach(item => item.classList.remove('is-dragging','is-drop-target'));
+    groupRoot?.addEventListener('dragend', () => {
+      groupRoot.querySelectorAll('.is-dragging,.is-drop-target').forEach(item => item.classList.remove('is-dragging','is-drop-target'));
       drag = null;
     });
 
-    teamRoot?.addEventListener('pointerdown', event => {
+    groupRoot?.addEventListener('pointerdown', event => {
       if (event.pointerType === 'mouse' || event.button !== 0) return;
       const item = event.target.closest('[data-team-player]');
       if (!item) return;
       event.preventDefault();
-      drag = {team:Number(item.dataset.teamIndex), slot:Number(item.dataset.slotIndex), pointer:true, id:event.pointerId, x:event.clientX, y:event.clientY, item, ghost:null};
+      drag = {groupId:Number(item.dataset.groupId),team:Number(item.dataset.teamIndex),slot:Number(item.dataset.slotIndex),pointer:true,id:event.pointerId,x:event.clientX,y:event.clientY,item,ghost:null};
       item.setPointerCapture?.(event.pointerId);
     });
     document.addEventListener('pointermove', event => {
@@ -162,8 +175,9 @@
       }
       drag.ghost.style.left = `${event.clientX}px`;
       drag.ghost.style.top = `${event.clientY}px`;
-      teamRoot.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
-      dropTargetAt(event.clientX, event.clientY)?.closest('[data-random-team]')?.classList.add('is-drop-target');
+      groupRoot.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
+      const target = dropTargetAt(event.clientX, event.clientY);
+      if (Number(target?.dataset.groupId) === drag.groupId) target.closest('[data-random-team]')?.classList.add('is-drop-target');
     }, {passive:false});
     document.addEventListener('pointerup', event => {
       if (!drag?.pointer || drag.id !== event.pointerId) return;
@@ -174,10 +188,33 @@
       drag = null;
     });
 
-    root.querySelectorAll('[data-training-dropdown]').forEach(details => details.addEventListener('toggle', () => {
-      if (!details.open) return;
-      root.querySelectorAll('[data-training-dropdown]').forEach(other => { if (other !== details) other.open = false; });
-    }));
+    groupRoot?.addEventListener('click', async event => {
+      const regenerate = event.target.closest('[data-regenerate-group]');
+      const remove = event.target.closest('[data-delete-group]');
+      if (regenerate) {
+        const group = findGroup(Number(regenerate.dataset.regenerateGroup));
+        if (!group) return;
+        regenerate.disabled = true;
+        setStatus(teamStatus, 'A gerar novamente este agrupamento...');
+        try {
+          const payload = await post(`/treino/planos/${data.plano_id}/equipas-aleatorias/gerar`, {grupo_id:group.id,tamanho:group.tamanho,postes_por_equipa:group.postes_por_equipa});
+          state = payload.estado;
+          renderGroups();
+          setStatus(teamStatus, 'Agrupamento atualizado.');
+        } catch (error) { setStatus(teamStatus, error.message, true); regenerate.disabled = false; }
+      }
+      if (remove) {
+        if (!window.confirm('Eliminar apenas este agrupamento de equipas?')) return;
+        remove.disabled = true;
+        try {
+          const payload = await post(`/treino/planos/${data.plano_id}/equipas-aleatorias/${remove.dataset.deleteGroup}/eliminar`);
+          state = payload.estado;
+          renderGroups();
+          setStatus(teamStatus, payload.mensagem);
+        } catch (error) { setStatus(teamStatus, error.message, true); remove.disabled = false; }
+      }
+    });
+
     teamSize?.addEventListener('change', updateRule);
     postCount?.addEventListener('change', updateRule);
     root.querySelector('[data-toggle-all-expected]')?.addEventListener('click', () => {
@@ -193,31 +230,29 @@
       try {
         const payload = await post(`/treino/planos/${data.plano_id}/atletas-previstos`, {jogador_ids:ids});
         expectedIds = payload.jogador_ids;
-        state = null;
-        renderTeams();
+        state = {grupos: []};
+        renderGroups();
         updateCounters('[data-expected-player-count]', expectedIds.length);
         setStatus(expectedStatus, payload.mensagem);
-        setStatus(teamStatus, 'A seleção mudou. Gera novamente as equipas.');
+        setStatus(teamStatus, 'A seleção mudou. Cria novamente os agrupamentos.');
       } catch (error) { setStatus(expectedStatus, error.message, true); }
       finally { button.disabled = false; }
     });
     root.querySelector('[data-generate-teams]')?.addEventListener('click', async event => {
       const button = event.currentTarget;
       button.disabled = true;
-      setStatus(teamStatus, 'A gerar equipas equilibradas...');
+      setStatus(teamStatus, 'A adicionar agrupamento...');
       try {
         const payload = await post(`/treino/planos/${data.plano_id}/equipas-aleatorias/gerar`, {tamanho:Number(teamSize.value),postes_por_equipa:Number(postCount?.value || 1)});
         state = payload.estado;
-        renderTeams();
-        setStatus(teamStatus, 'Equipas geradas e guardadas. Arrasta para ajustar.');
+        renderGroups();
+        setStatus(teamStatus, 'Agrupamento adicionado. Podes criar outro ou arrastar os atletas para ajustar.');
       } catch (error) { setStatus(teamStatus, error.message, true); }
       finally { button.disabled = false; }
     });
 
-    if (state?.tamanho && teamSize) teamSize.value = String(state.tamanho);
-    if (state?.postes_por_equipa && postCount) postCount.value = String(state.postes_por_equipa);
     updateRule();
-    renderTeams();
+    renderGroups();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);

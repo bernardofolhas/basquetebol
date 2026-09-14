@@ -157,30 +157,52 @@ def _ids_atletas_previstos(plano: PlanoTreino, atletas: list[dict]) -> list[int]
 
 def _estado_equipas_guardado(plano: PlanoTreino, atletas_previstos_ids: list[int]) -> dict | None:
     estado = _carregar_json(plano.equipas_aleatorias, None)
-    if not isinstance(estado, dict) or not isinstance(estado.get("equipas"), list):
+    if not isinstance(estado, dict):
         return None
     permitidos = set(atletas_previstos_ids)
-    usados = set()
-    equipas = []
-    for indice, equipa in enumerate(estado["equipas"]):
-        if not isinstance(equipa, dict) or not isinstance(equipa.get("slots"), list):
+    grupos_origem = estado.get("grupos")
+    if not isinstance(grupos_origem, list):
+        grupos_origem = [estado] if isinstance(estado.get("equipas"), list) else []
+    grupos = []
+    ids_usados = set()
+    for indice_grupo, grupo in enumerate(grupos_origem, start=1):
+        if not isinstance(grupo, dict) or not isinstance(grupo.get("equipas"), list):
             continue
-        slots = []
-        for valor in equipa["slots"]:
-            if valor is None:
-                slots.append(None)
-            elif isinstance(valor, int) and not isinstance(valor, bool) and valor in permitidos and valor not in usados:
-                slots.append(valor)
-                usados.add(valor)
-        equipas.append({"nome": f"Equipa {indice + 1}", "slots": slots})
-    if not equipas or usados != permitidos:
+        usados = set()
+        equipas = []
+        for indice_equipa, equipa in enumerate(grupo["equipas"], start=1):
+            if not isinstance(equipa, dict) or not isinstance(equipa.get("slots"), list):
+                continue
+            slots = []
+            for valor in equipa["slots"]:
+                if valor is None:
+                    slots.append(None)
+                elif isinstance(valor, int) and not isinstance(valor, bool) and valor in permitidos and valor not in usados:
+                    slots.append(valor)
+                    usados.add(valor)
+            equipas.append({"nome": f"Equipa {indice_equipa}", "slots": slots})
+        if not equipas or usados != permitidos:
+            continue
+        grupo_id = grupo.get("id")
+        if not isinstance(grupo_id, int) or isinstance(grupo_id, bool) or grupo_id < 1 or grupo_id in ids_usados:
+            grupo_id = indice_grupo
+            while grupo_id in ids_usados:
+                grupo_id += 1
+        ids_usados.add(grupo_id)
+        tamanho = grupo.get("tamanho", 3)
+        if tamanho not in {2, 3, 4, 5}:
+            tamanho = 3
+        grupos.append({
+            "id": grupo_id,
+            "nome": f"Agrupamento {len(grupos) + 1}",
+            "tamanho": tamanho,
+            "postes_por_equipa": grupo.get("postes_por_equipa", 1),
+            "grandes_ids": [valor for valor in grupo.get("grandes_ids", []) if valor in permitidos],
+            "equipas": equipas,
+        })
+    if not grupos:
         return None
-    return {
-        "tamanho": estado.get("tamanho", 3),
-        "postes_por_equipa": estado.get("postes_por_equipa", 1),
-        "grandes_ids": [valor for valor in estado.get("grandes_ids", []) if valor in permitidos],
-        "equipas": equipas,
-    }
+    return {"grupos": grupos}
 
 
 def _equipas_para_impressao(db: Session, equipa: Equipa, plano: PlanoTreino | None) -> list[dict]:
@@ -193,14 +215,21 @@ def _equipas_para_impressao(db: Session, equipa: Equipa, plano: PlanoTreino | No
     if not estado:
         return []
     por_id = {int(atleta["id"]): atleta for atleta in atletas}
-    grandes = set(estado.get("grandes_ids", []))
     resultado = []
-    for indice, grupo in enumerate(estado["equipas"]):
-        slots = []
-        for jogador_id in grupo["slots"]:
-            atleta = por_id.get(jogador_id) if jogador_id is not None else None
-            slots.append({"atleta": atleta, "grande": jogador_id in grandes if atleta else False})
-        resultado.append({"nome": grupo.get("nome") or f"Equipa {indice + 1}", "slots": slots})
+    for indice_grupo, grupo in enumerate(estado["grupos"], start=1):
+        grandes = set(grupo.get("grandes_ids", []))
+        equipas = []
+        for indice_equipa, equipa_guardada in enumerate(grupo["equipas"], start=1):
+            slots = []
+            for jogador_id in equipa_guardada["slots"]:
+                atleta = por_id.get(jogador_id) if jogador_id is not None else None
+                slots.append({"atleta": atleta, "grande": jogador_id in grandes if atleta else False})
+            equipas.append({"nome": equipa_guardada.get("nome") or f"Equipa {indice_equipa}", "slots": slots})
+        resultado.append({
+            "nome": grupo.get("nome") or f"Agrupamento {indice_grupo}",
+            "tamanho": grupo.get("tamanho", 3),
+            "equipas": equipas,
+        })
     return resultado
 
 
@@ -845,6 +874,7 @@ async def gerar_equipas_aleatorias(
         dados = await request.json()
         tamanho = int(dados.get("tamanho"))
         postes = int(dados.get("postes_por_equipa", 1))
+        grupo_id = int(dados["grupo_id"]) if dados.get("grupo_id") is not None else None
     except (TypeError, ValueError, json.JSONDecodeError):
         return JSONResponse({"sucesso": False, "erro": "Escolhe uma configuração válida."}, status_code=422)
 
@@ -853,13 +883,25 @@ async def gerar_equipas_aleatorias(
     previstos = set(_ids_atletas_previstos(plano, atletas))
     selecionados = [atleta for atleta in atletas if atleta["id"] in previstos]
     try:
-        estado = gerar_equipas_equilibradas(selecionados, tamanho, postes)
+        equipas_geradas = gerar_equipas_equilibradas(selecionados, tamanho, postes)
     except ValueError as erro:
         return JSONResponse({"sucesso": False, "erro": str(erro)}, status_code=422)
+    estado = _estado_equipas_guardado(plano, list(previstos)) or {"grupos": []}
+    grupos = estado["grupos"]
+    if grupo_id is None:
+        grupo_id = max((grupo["id"] for grupo in grupos), default=0) + 1
+        grupo = {"id": grupo_id, "nome": f"Agrupamento {len(grupos) + 1}", **equipas_geradas}
+        grupos.append(grupo)
+    else:
+        grupo_atual = next((grupo for grupo in grupos if grupo["id"] == grupo_id), None)
+        if not grupo_atual:
+            return JSONResponse({"sucesso": False, "erro": "Agrupamento não encontrado."}, status_code=404)
+        grupo = {"id": grupo_id, "nome": grupo_atual["nome"], **equipas_geradas}
+        grupos[grupos.index(grupo_atual)] = grupo
     plano.equipas_aleatorias = json.dumps(estado, ensure_ascii=False)
     _marcar_sessao_como_alterada_manual(plano.sessao)
     db.commit()
-    return JSONResponse({"sucesso": True, "mensagem": "Equipas geradas.", "estado": estado})
+    return JSONResponse({"sucesso": True, "mensagem": "Agrupamento gerado.", "grupo": grupo, "estado": estado})
 
 
 @router.post("/planos/{plano_id}/equipas-aleatorias")
@@ -896,17 +938,47 @@ async def guardar_organizacao_equipas(
     if len(recebidos) != len(set(recebidos)) or set(recebidos) != previstos:
         return JSONResponse({"sucesso": False, "erro": "Todos os atletas previstos devem aparecer uma única vez."}, status_code=422)
 
-    estado_atual = _estado_equipas_guardado(plano, list(previstos)) or {}
-    estado = {
-        "tamanho": estado_atual.get("tamanho", 3),
-        "postes_por_equipa": estado_atual.get("postes_por_equipa", 1),
-        "grandes_ids": estado_atual.get("grandes_ids", []),
-        "equipas": equipas,
-    }
+    estado = _estado_equipas_guardado(plano, list(previstos))
+    if not estado:
+        return JSONResponse({"sucesso": False, "erro": "Agrupamento não encontrado."}, status_code=404)
+    try:
+        grupo_id = int(dados.get("grupo_id")) if dados.get("grupo_id") is not None else estado["grupos"][0]["id"]
+    except (TypeError, ValueError):
+        return JSONResponse({"sucesso": False, "erro": "Agrupamento inválido."}, status_code=422)
+    grupo = next((item for item in estado["grupos"] if item["id"] == grupo_id), None)
+    if not grupo:
+        return JSONResponse({"sucesso": False, "erro": "Agrupamento não encontrado."}, status_code=404)
+    grupo["equipas"] = equipas
     plano.equipas_aleatorias = json.dumps(estado, ensure_ascii=False)
     _marcar_sessao_como_alterada_manual(plano.sessao)
     db.commit()
     return JSONResponse({"sucesso": True, "mensagem": "Organização das equipas guardada.", "estado": estado})
+
+
+@router.post("/planos/{plano_id}/equipas-aleatorias/{grupo_id}/eliminar")
+def eliminar_agrupamento_equipas(
+    plano_id: int,
+    grupo_id: int,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
+    plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+    if not plano:
+        return JSONResponse({"sucesso": False, "erro": "Plano de treino não encontrado."}, status_code=404)
+    equipa = plano.sessao.microciclo.mesociclo.macrociclo.equipa
+    atletas = _dados_atletas_plano(db, equipa, plano.sessao_id)
+    previstos = _ids_atletas_previstos(plano, atletas)
+    estado = _estado_equipas_guardado(plano, previstos)
+    if not estado or not any(grupo["id"] == grupo_id for grupo in estado["grupos"]):
+        return JSONResponse({"sucesso": False, "erro": "Agrupamento não encontrado."}, status_code=404)
+    estado["grupos"] = [grupo for grupo in estado["grupos"] if grupo["id"] != grupo_id]
+    for indice, grupo in enumerate(estado["grupos"], start=1):
+        grupo["nome"] = f"Agrupamento {indice}"
+    plano.equipas_aleatorias = json.dumps(estado, ensure_ascii=False) if estado["grupos"] else None
+    _marcar_sessao_como_alterada_manual(plano.sessao)
+    db.commit()
+    return JSONResponse({"sucesso": True, "mensagem": "Agrupamento eliminado.", "estado": estado})
 
 
 @router.post("/planos/{plano_id}/importacoes")
