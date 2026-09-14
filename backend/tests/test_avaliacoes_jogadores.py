@@ -281,6 +281,28 @@ def test_parametro_fisico_tem_unidade_e_limites_editaveis(client_admin):
         painel = client_admin.get(f"/analise/equipas/{equipa_id}#parametros")
         assert painel.status_code == 200
         assert "Sprint 20 m" in painel.text
+
+        resposta_normal = client_admin.post(
+            f"/analise/equipas/{equipa_id}/parametros",
+            data={
+                "nome": "Leitura sem bola",
+                "categoria": "tatica",
+                "valor_minimo": "0",
+                "valor_maximo": "5",
+            },
+            follow_redirects=False,
+        )
+        assert resposta_normal.status_code == 303
+        assert resposta_normal.headers["location"] == f"/analise/equipas/{equipa_id}#parametros"
+        assert db.query(ParametroAvaliacao).filter(
+            ParametroAvaliacao.equipa_id == equipa_id,
+            ParametroAvaliacao.nome == "Leitura sem bola",
+        ).count() == 1
+
+        painel = client_admin.get(f"/analise/equipas/{equipa_id}#parametros")
+        assert 'id="form-novo-parametro"' in painel.text
+        assert "data-parameter-submit" in painel.text
+        assert "data-parameter-feedback" in painel.text
     finally:
         _limpar_contexto(db, equipa_id, [jogadora_1_id, jogadora_2_id], macro_id)
         db.close()

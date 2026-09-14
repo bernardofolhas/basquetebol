@@ -190,7 +190,7 @@
 
 {% if pode_editar %}
 <dialog id="dialog-novo-parametro" class="ds-analysis-dialog">
-  <form method="POST" action="/analise/equipas/{{ equipa.id }}/parametros" class="p-6 sm:p-7">
+  <form id="form-novo-parametro" method="POST" action="/analise/equipas/{{ equipa.id }}/parametros" class="p-6 sm:p-7">
     <div class="flex items-start justify-between gap-4"><div><p class="text-xs font-bold uppercase tracking-[.16em] text-[var(--clube-primary-dark)]">Configuração</p><h2 class="mt-1 text-xl font-black text-slate-900">Novo parâmetro</h2></div><button type="button" onclick="this.closest('dialog').close()" class="rounded-full p-2 text-slate-400 hover:bg-slate-100" aria-label="Fechar">X</button></div>
     <div class="mt-6 grid gap-4 sm:grid-cols-2">
       <label class="sm:col-span-2"><span class="mb-1 block text-sm font-semibold text-slate-700">Nome</span><input name="nome" required class="ds-analysis-input" placeholder="Ex.: Defesa do bloqueio direto"></label>
@@ -200,7 +200,8 @@
       <label><span class="mb-1 block text-sm font-semibold text-slate-700">Máximo</span><input type="number" step="any" name="valor_maximo" value="5" class="ds-analysis-input"></label>
       <label class="sm:col-span-2"><span class="mb-1 block text-sm font-semibold text-slate-700">Descrição opcional</span><textarea name="descricao" rows="2" class="ds-analysis-input"></textarea></label>
     </div>
-    <div class="mt-6 flex justify-end gap-2"><button type="button" onclick="this.closest('dialog').close()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600">Cancelar</button><button class="rounded-xl bg-[var(--clube-primary)] px-5 py-2.5 text-sm font-bold text-[var(--clube-on-primary)]">Guardar parâmetro</button></div>
+    <p class="mt-4 min-h-5 text-sm font-semibold text-red-600" data-parameter-feedback role="status" aria-live="polite"></p>
+    <div class="mt-2 flex justify-end gap-2"><button type="button" onclick="this.closest('dialog').close()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600">Cancelar</button><button type="submit" class="rounded-xl bg-[var(--clube-primary)] px-5 py-2.5 text-sm font-bold text-[var(--clube-on-primary)]" data-parameter-submit>Guardar parâmetro</button></div>
   </form>
 </dialog>
 
@@ -237,6 +238,38 @@
   document.querySelectorAll('[data-open-analysis]').forEach(button => button.addEventListener('click', () => openPanel(button.dataset.openAnalysis)));
   const initial = location.hash.slice(1) || 'global';
   openPanel(initial === 'dashboard' ? 'global' : initial, false);
+
+  const newParameterForm = document.getElementById('form-novo-parametro');
+  newParameterForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!newParameterForm.reportValidity()) return;
+    const submit = newParameterForm.querySelector('[data-parameter-submit]');
+    const feedback = newParameterForm.querySelector('[data-parameter-feedback]');
+    const originalLabel = submit.textContent;
+    submit.disabled = true;
+    submit.textContent = 'A guardar…';
+    feedback.textContent = '';
+    try {
+      const response = await fetch(newParameterForm.action, {
+        method: 'POST',
+        body: new FormData(newParameterForm),
+        headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'},
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.message || 'Não foi possível criar o parâmetro.');
+      feedback.classList.remove('text-red-600');
+      feedback.classList.add('text-emerald-700');
+      feedback.textContent = 'Parâmetro criado. A atualizar a lista…';
+      history.replaceState(null, '', `${location.pathname}#parametros`);
+      window.location.reload();
+    } catch (error) {
+      feedback.classList.remove('text-emerald-700');
+      feedback.classList.add('text-red-600');
+      feedback.textContent = error.message || 'Não foi possível criar o parâmetro.';
+      submit.disabled = false;
+      submit.textContent = originalLabel;
+    }
+  });
 
   document.querySelectorAll('[data-delete-parameter]').forEach(button => button.addEventListener('click', async () => {
     if (!confirm('Remover este parâmetro das próximas avaliações? O histórico será preservado.')) return;

@@ -394,7 +394,7 @@ async def criar_parametro(
             },
         })
     set_flash(request, "Parâmetro criado.")
-    return RedirectResponse(f"/analise/equipas/{equipa.id}", status_code=303)
+    return RedirectResponse(f"/analise/equipas/{equipa.id}#parametros", status_code=303)
 
 
 @router.post("/parametros/{parametro_id}/editar")
