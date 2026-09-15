@@ -239,7 +239,7 @@
     <section class="training-teams-page">
         <header class="training-teams-heading">
             <div><small>Organização da sessão</small><h2>Equipas do treino</h2></div>
-            <p>Composição definida no plano de treino. As vagas mantêm os lugares deixados livres durante a organização.</p>
+            <p>Composição definida no plano de treino.</p>
         </header>
         {% for agrupamento in equipas_treino %}
         <div class="training-team-set">
@@ -249,17 +249,11 @@
                 <article class="training-team-card">
                     <header><h3>{{ grupo.nome }}</h3><span>{{ grupo.slots|selectattr('atleta')|list|length }} atleta(s)</span></header>
                     <ol class="training-team-list">
-                        {% for slot in grupo.slots %}
+                        {% for slot in grupo.slots if slot.atleta %}
                         <li>
-                            {% if slot.atleta %}
                             <span class="training-team-number">{{ slot.atleta.numero or loop.index }}</span>
                             <span class="training-team-player-name">{{ slot.atleta.nome }}</span>
                             {% if slot.grande %}<span class="training-team-role">Poste / grande</span>{% endif %}
-                            {% else %}
-                            <span class="training-team-number">{{ loop.index }}</span>
-                            <span class="training-team-vacancy-print">Lugar por preencher</span>
-                            <span></span>
-                            {% endif %}
                         </li>
                         {% endfor %}
                     </ol>

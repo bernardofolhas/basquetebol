@@ -27,9 +27,9 @@ def gerar_equipas_equilibradas(
     if not jogadores:
         raise ValueError("Seleciona pelo menos um atleta previsto.")
 
-    if tamanho_base == 4:
+    if tamanho_base in {4, 5}:
         postes_necessarios = 2 if postes_por_equipa == 2 else 1
-    elif tamanho_base in {3, 5}:
+    elif tamanho_base == 3:
         postes_necessarios = 1
     else:
         postes_necessarios = 0

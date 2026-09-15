@@ -27,12 +27,16 @@ def _jogadores(total: int) -> list[dict]:
 def test_distribuicao_absorve_excedentes_sem_criar_equipa_incompleta():
     equipas_de_tres = gerar_equipas_equilibradas(_jogadores(10), 3, gerador=random.Random(7))
     equipas_de_quatro = gerar_equipas_equilibradas(_jogadores(10), 4, 2, random.Random(7))
+    equipas_de_cinco = gerar_equipas_equilibradas(_jogadores(10), 5, 2, random.Random(7))
 
     assert [len(equipa["slots"]) for equipa in equipas_de_tres["equipas"]] == [3, 3, 4]
     assert [len(equipa["slots"]) for equipa in equipas_de_quatro["equipas"]] == [5, 5]
     assert len(equipas_de_quatro["grandes_ids"]) == 4
     for equipa in equipas_de_quatro["equipas"]:
         assert len(set(equipa["slots"]) & set(equipas_de_quatro["grandes_ids"])) == 2
+    assert len(equipas_de_cinco["grandes_ids"]) == 4
+    for equipa in equipas_de_cinco["equipas"]:
+        assert len(set(equipa["slots"]) & set(equipas_de_cinco["grandes_ids"])) == 2
 
 
 def test_estado_antigo_e_convertido_no_primeiro_agrupamento():
@@ -173,7 +177,8 @@ def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_adm
         assert "Equipa 1" in impressao.text
         assert "Agrupamento 2" in impressao.text
         assert "Equipas de 3" in impressao.text
-        assert "Lugar por preencher" in impressao.text
+        assert "Lugar por preencher" not in impressao.text
+        assert "Lugar vazio" not in impressao.text
         assert impressao.text.index("Equipas do treino") > impressao.text.index('class="content"')
 
         pdf = client_admin.get(f"/treino/sessoes/{sessao.id}/pdf")

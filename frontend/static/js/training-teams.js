@@ -47,11 +47,11 @@
 
     function updateRule() {
       const size = Number(teamSize?.value || 2);
-      if (postWrap) postWrap.hidden = size !== 4;
+      if (postWrap) postWrap.hidden = ![4, 5].includes(size);
       const rule = root.querySelector('[data-team-rule]');
       if (!rule) return;
       if (size === 2) rule.textContent = 'Sem restrição de posição.';
-      else if (size === 4) rule.textContent = `${postCount?.value || 1} poste(s) ou atleta(s) mais alto(s) por equipa.`;
+      else if (size === 4 || size === 5) rule.textContent = `${postCount?.value || 1} poste(s) ou atleta(s) mais alto(s) por equipa.`;
       else rule.textContent = 'Pelo menos 1 poste ou atleta mais alto por equipa.';
     }
 
@@ -65,7 +65,7 @@
       groupRoot.innerHTML = state.grupos.map((group, groupIndex) => {
         const teams = (group.equipas || []).map((team, teamIndex) => {
           const slots = (team.slots || []).map((playerId, slotIndex) => {
-            if (playerId === null) return `<div class="training-team-vacancy" data-team-slot-empty data-group-id="${group.id}" data-team-index="${teamIndex}" data-slot-index="${slotIndex}">+ Lugar vazio</div>`;
+            if (playerId === null) return '';
             const player = players.get(Number(playerId));
             if (!player) return '';
             const role = group.grandes_ids?.includes(Number(playerId)) ? 'Poste/grande' : (player.posicao || player.equipa || 'Atleta');
@@ -74,7 +74,7 @@
           const total = (team.slots || []).filter(id => id !== null).length;
           return `<section class="training-random-team" data-random-team="${teamIndex}" data-group-id="${group.id}"><header><b>${escapeHTML(team.nome || `Equipa ${teamIndex + 1}`)}</b><span>${total} atleta(s)</span></header><div class="training-team-slots">${slots}</div></section>`;
         }).join('');
-        const postLabel = group.tamanho === 4 ? ` · ${group.postes_por_equipa} grande(s)` : '';
+        const postLabel = [4, 5].includes(Number(group.tamanho)) ? ` · ${group.postes_por_equipa} grande(s)` : '';
         return `<article class="training-team-group" data-team-group-card="${group.id}"><header class="training-team-group-head"><div><span>Agrupamento ${groupIndex + 1}</span><h3>Equipas de ${group.tamanho}${postLabel}</h3></div><div><button type="button" class="ds-quiet-link" data-regenerate-group="${group.id}">Gerar novamente</button><button type="button" class="training-group-delete" data-delete-group="${group.id}">Eliminar</button></div></header><div class="training-random-teams" data-team-group="${group.id}">${teams}</div></article>`;
       }).join('');
     }
