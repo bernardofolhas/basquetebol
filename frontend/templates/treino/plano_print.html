@@ -113,10 +113,9 @@
         .training-team-list { list-style: none; }
         .training-team-list li { display: grid; grid-template-columns: 8mm minmax(0, 1fr) auto; min-height: 11mm; align-items: center; gap: 2.5mm; border-top: .5px solid #e5e7eb; padding: 2mm 3mm; }
         .training-team-list li:first-child { border-top: 0; }
-        .training-team-number { display: grid; width: 7mm; height: 7mm; place-items: center; border-radius: 50%; background: var(--pdf-secondary); color: var(--pdf-on-secondary); font-size: 8px; font-weight: bold; }
+        .training-team-number { display: flex; width: 7mm; height: 7mm; align-items: center; justify-content: center; border-radius: 50%; background: var(--pdf-secondary); color: var(--pdf-on-secondary); font-size: 8px; font-weight: bold; }
         .training-team-player-name { color: #111827; font-size: 9px; font-weight: bold; }
-        .training-team-role { border-radius: 99px; background: #f1f5f9; padding: 1.2mm 2mm; color: #475569; font-size: 7px; font-weight: bold; }
-        .training-team-vacancy-print { color: #94a3b8; font-size: 9px; font-style: italic; }
+        .training-team-role { color: #64748b; font-size: 7px; font-weight: 600; }
 
         .footer { position: running(page-footer); width: 100%; padding-top: 2mm; border-top: 1px solid #d1d5db; text-align: center; color: #6b7280; font-size: 8px; }
         .club-mark { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: bold; }
@@ -253,7 +252,7 @@
                         <li>
                             <span class="training-team-number">{{ slot.atleta.numero or loop.index }}</span>
                             <span class="training-team-player-name">{{ slot.atleta.nome }}</span>
-                            {% if slot.grande %}<span class="training-team-role">Poste / grande</span>{% endif %}
+                            {% if slot.posicao %}<span class="training-team-role">{{ slot.posicao }}</span>{% endif %}
                         </li>
                         {% endfor %}
                     </ol>

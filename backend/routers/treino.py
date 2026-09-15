@@ -40,7 +40,7 @@ from services.desenho_service import (
 )
 from services.conteudos_sessao_service import construir_sugestoes_plano_treino
 from services.horarios_exercicios import recalcular_horas_exercicios
-from services.equipas_treino_service import gerar_equipas_equilibradas, jogador_e_interior
+from services.equipas_treino_service import gerar_equipas_equilibradas, jogador_e_interior, posicao_agrupamento
 from services.assiduidade_service import calcular_pse_real
 from services.mapa_conteudos_service import obter_sugestoes_conteudos_microciclo
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
@@ -157,6 +157,7 @@ def _dados_atletas_plano(db: Session, equipa: Equipa, sessao_id: int) -> list[di
             "numero": jogador.numero_camisola,
             "fotografia": jogador.fotografia,
             "posicao": jogador.posicao,
+            "posicao_secundaria": jogador.posicao_secundaria,
             "equipa": jogador.equipa.nome if jogador.equipa else "Sem equipa",
             "convocado": jogador.equipa_id != equipa.id,
             "altura": alturas.get(jogador.id),
@@ -219,6 +220,13 @@ def _estado_equipas_guardado(plano: PlanoTreino, atletas_previstos_ids: list[int
             "tamanho": tamanho,
             "postes_por_equipa": grupo.get("postes_por_equipa", 1),
             "grandes_ids": [valor for valor in grupo.get("grandes_ids", []) if valor in permitidos],
+            "posicoes_ids": {
+                str(jogador_id): papel
+                for chave, papel in (grupo.get("posicoes_ids") or {}).items()
+                if isinstance(chave, str) and chave.isdigit()
+                for jogador_id in [int(chave)]
+                if jogador_id in permitidos and papel in {"Base", "Extremo", "Poste"}
+            } if isinstance(grupo.get("posicoes_ids"), dict) else {},
             "equipas": equipas,
         })
     if not grupos:
@@ -239,12 +247,16 @@ def _equipas_para_impressao(db: Session, equipa: Equipa, plano: PlanoTreino | No
     resultado = []
     for indice_grupo, grupo in enumerate(estado["grupos"], start=1):
         grandes = set(grupo.get("grandes_ids", []))
+        posicoes = grupo.get("posicoes_ids", {})
         equipas = []
         for indice_equipa, equipa_guardada in enumerate(grupo["equipas"], start=1):
             slots = []
             for jogador_id in equipa_guardada["slots"]:
                 atleta = por_id.get(jogador_id) if jogador_id is not None else None
-                slots.append({"atleta": atleta, "grande": jogador_id in grandes if atleta else False})
+                papel = posicoes.get(str(jogador_id)) if atleta else None
+                if atleta and not papel:
+                    papel = "Poste" if jogador_id in grandes else posicao_agrupamento(atleta["posicao"])
+                slots.append({"atleta": atleta, "posicao": papel})
             equipas.append({"nome": equipa_guardada.get("nome") or f"Equipa {indice_equipa}", "slots": slots})
         resultado.append({
             "nome": grupo.get("nome") or f"Agrupamento {indice_grupo}",
@@ -946,7 +958,7 @@ async def gerar_equipas_aleatorias(
     try:
         dados = await request.json()
         tamanho = int(dados.get("tamanho"))
-        postes = int(dados.get("postes_por_equipa", 1))
+        postes = int(dados.get("postes_por_equipa", 2 if tamanho == 5 else 1))
         grupo_id = int(dados["grupo_id"]) if dados.get("grupo_id") is not None else None
     except (TypeError, ValueError, json.JSONDecodeError):
         return JSONResponse({"sucesso": False, "erro": "Escolhe uma configuração válida."}, status_code=422)

@@ -7,7 +7,7 @@
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
 <script src="/static/js/tactical-ink-recognizer.js?v=20260910-2"></script>
-<script src="/static/js/training-teams.js?v=20260914-6" defer></script>
+<script src="/static/js/training-teams.js?v=20260915-1" defer></script>
 <div class="training-workspace" data-training-plan="{{ plano.id }}" data-training-session-start="{{ sessao.hora_inicio or plano.hora_inicio or '' }}" data-training-reorder-url="/treino/planos/{{ plano.id }}/exercicios/reordenar">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
@@ -199,7 +199,7 @@
                 <label class="training-expected-player">
                     <input type="checkbox" value="{{ atleta.id }}" {% if atleta.id in atletas_previstos_ids %}checked{% endif %}>
                     <span class="training-expected-avatar">{% if atleta.fotografia %}<img src="{{ atleta.fotografia }}" alt="Fotografia de {{ atleta.nome }}">{% else %}{{ atleta.numero or atleta.nome[:1]|upper }}{% endif %}</span>
-                    <span class="min-w-0"><b>{{ atleta.nome }}</b><small>{% if atleta.convocado %}Convocado · {{ atleta.equipa }}{% else %}{{ atleta.posicao or atleta.equipa }}{% endif %}</small></span>
+                    <span class="min-w-0"><b>{{ atleta.nome }}</b><small>{% if atleta.convocado %}Convocado · {{ atleta.equipa }}{% else %}{{ atleta.posicao or atleta.equipa }}{% if atleta.posicao_secundaria %} / {{ atleta.posicao_secundaria }}{% endif %}{% endif %}</small></span>
                 </label>
                 {% else %}
                 <p class="training-team-empty">Não existem atletas ativos disponíveis.</p>
@@ -220,7 +220,7 @@
         <div class="training-organization-body">
             <div class="training-team-controls">
                 <label><span>Jogadores por equipa</span><select data-team-size><option value="2">Equipas de 2</option><option value="3">Equipas de 3</option><option value="4">Equipas de 4</option><option value="5">Equipas de 5</option></select></label>
-                <label data-post-count-wrap hidden><span>Grandes por equipa</span><select data-post-count><option value="1">1 poste/grande</option><option value="2">2 postes/grandes</option></select></label>
+                <label data-post-count-wrap hidden><span>Postes por equipa</span><select data-post-count><option value="1">1 poste</option><option value="2">2 postes</option></select></label>
                 <p data-team-rule>Sem restrição de posição.</p>
                 <button type="button" class="ds-button ds-button-primary" data-generate-teams>Adicionar agrupamento</button>
             </div>

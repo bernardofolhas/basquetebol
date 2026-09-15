@@ -1008,19 +1008,20 @@ def actualizar_estrutura_convocacoes_assiduidade() -> None:
 
 
 def actualizar_estrutura_jogadores() -> None:
-    """Adiciona suporte de fotografia a instalações anteriores às migrações."""
+    """Atualiza os campos de perfil em instalações anteriores às migrações."""
     inspector = inspect(engine)
     if not inspector.has_table("jogadores"):
         return
     colunas = {coluna["name"] for coluna in inspector.get_columns("jogadores")}
-    if "fotografia" in colunas:
-        return
-    with engine.begin() as ligacao:
-        if engine.dialect.name == "postgresql":
-            ligacao.execute(text("ALTER TABLE jogadores ADD COLUMN IF NOT EXISTS fotografia VARCHAR NULL"))
-        else:
-            ligacao.execute(text("ALTER TABLE jogadores ADD COLUMN fotografia VARCHAR NULL"))
-    logger.info("Coluna 'fotografia' adicionada a jogadores.")
+    for coluna in ("fotografia", "posicao_secundaria"):
+        if coluna in colunas:
+            continue
+        with engine.begin() as ligacao:
+            if engine.dialect.name == "postgresql":
+                ligacao.execute(text(f"ALTER TABLE jogadores ADD COLUMN IF NOT EXISTS {coluna} VARCHAR NULL"))
+            else:
+                ligacao.execute(text(f"ALTER TABLE jogadores ADD COLUMN {coluna} VARCHAR NULL"))
+        logger.info("Coluna '%s' adicionada a jogadores.", coluna)
 
 
 def actualizar_estrutura_estatisticas() -> None:

@@ -15,6 +15,40 @@ def jogador_e_interior(posicao: str | None) -> bool:
     return any(termo in posicao_normalizada for termo in POSICOES_INTERIORES)
 
 
+def posicao_agrupamento(valor: str | None) -> str | None:
+    texto = normalizar_texto(str(valor or "").split("/")[0].strip())
+    if any(termo in texto for termo in POSICOES_INTERIORES):
+        return "Poste"
+    if "extremo" in texto or "ala" in texto:
+        return "Extremo"
+    if "base" in texto or "armador" in texto:
+        return "Base"
+    return None
+
+
+def _preferencias(jogador: dict) -> tuple[str | None, str | None]:
+    partes = str(jogador.get("posicao") or "").split("/", 1)
+    principal = posicao_agrupamento(partes[0])
+    secundaria = posicao_agrupamento(jogador.get("posicao_secundaria") or (partes[1] if len(partes) > 1 else None))
+    return principal, secundaria if secundaria != principal else None
+
+
+def _chave_altura(jogador: dict, papel: str, altura_mediana: float) -> tuple:
+    try:
+        altura = float(jogador["altura"])
+    except (TypeError, ValueError, KeyError):
+        altura = None
+    if altura is None:
+        principal, _ = _preferencias(jogador)
+        ordem = {"Base": 0, "Extremo": 1, "Poste": 2}.get(principal, 1)
+        return (1, ordem if papel == "Base" else -ordem if papel == "Poste" else abs(ordem - 1))
+    if papel == "Base":
+        return (0, altura)
+    if papel == "Poste":
+        return (0, -altura)
+    return (0, abs(altura - altura_mediana))
+
+
 def gerar_equipas_equilibradas(
     jogadores: list[dict],
     tamanho_base: int,
@@ -28,7 +62,7 @@ def gerar_equipas_equilibradas(
         raise ValueError("Seleciona pelo menos um atleta previsto.")
 
     if tamanho_base in {4, 5}:
-        postes_necessarios = 2 if postes_por_equipa == 2 else 1
+        postes_necessarios = 2 if postes_por_equipa == 2 or (tamanho_base == 5 and postes_por_equipa is None) else 1
     elif tamanho_base == 3:
         postes_necessarios = 1
     else:
@@ -44,32 +78,63 @@ def gerar_equipas_equilibradas(
 
     candidatos = list(jogadores)
     sorteio.shuffle(candidatos)
-    candidatos.sort(key=lambda item: (
-        0 if item.get("interior") else 1,
-        -(float(item["altura"]) if item.get("altura") is not None else -1),
-    ))
-    quantidade_grandes = min(len(jogadores), total_equipas * postes_necessarios)
-    grandes = candidatos[:quantidade_grandes]
-    grandes_ids = {int(item["id"]) for item in grandes}
-
+    alturas = []
+    for item in candidatos:
+        try:
+            alturas.append(float(item["altura"]))
+        except (TypeError, ValueError, KeyError):
+            continue
+    alturas.sort()
+    altura_mediana = alturas[len(alturas) // 2] if alturas else 0
     equipas = [[] for _ in range(total_equipas)]
-    for ronda in range(postes_necessarios):
-        for indice in range(total_equipas):
-            posicao = ronda * total_equipas + indice
-            if posicao >= len(grandes) or len(equipas[indice]) >= tamanhos[indice]:
-                continue
-            equipas[indice].append(int(grandes[posicao]["id"]))
+    posicoes_ids = {}
+    necessidades = []
+    for tamanho in tamanhos:
+        postes = min(postes_necessarios, max(0, tamanho - 1))
+        base = 1 if tamanho else 0
+        necessidades.append({"Base": base, "Poste": postes, "Extremo": tamanho - base - postes})
+    lugares = []
+    for papel in ("Base", "Poste", "Extremo"):
+        for ronda in range(max(necessidade[papel] for necessidade in necessidades)):
+            lugares.extend(
+                (indice, papel)
+                for indice, necessidade in enumerate(necessidades)
+                if necessidade[papel] > ronda
+            )
 
-    restantes = [item for item in jogadores if int(item["id"]) not in grandes_ids]
-    sorteio.shuffle(restantes)
-    for equipa, tamanho in zip(equipas, tamanhos):
-        while len(equipa) < tamanho and restantes:
-            equipa.append(int(restantes.pop()["id"]))
+    # Primeiro esgota posições principais, depois alternativas; só então recorre à altura.
+    for fase in (0, 1, 2):
+        for papel in ("Base", "Poste", "Extremo"):
+            for indice, lugar_papel in lugares:
+                if lugar_papel != papel or sum(
+                    posicoes_ids[str(id_)] == papel for id_ in equipas[indice]
+                ) >= necessidades[indice][papel]:
+                    continue
+                disponiveis = [item for item in candidatos if (
+                    fase == 2 or _preferencias(item)[fase] == papel
+                )]
+                if not disponiveis:
+                    continue
+                disponiveis.sort(key=lambda item: (
+                    0 if fase == 0 and _preferencias(item)[1] is None else 1,
+                    _chave_altura(item, papel, altura_mediana),
+                ))
+                escolhido = disponiveis[0]
+                id_ = int(escolhido["id"])
+                equipas[indice].append(id_)
+                posicoes_ids[str(id_)] = papel
+                candidatos.remove(escolhido)
+
+    grandes_ids = sorted(int(id_) for id_, papel in posicoes_ids.items() if papel == "Poste")
+    ordem_papeis = {"Base": 0, "Extremo": 1, "Poste": 2}
+    for equipa in equipas:
+        equipa.sort(key=lambda id_: ordem_papeis[posicoes_ids[str(id_)]])
 
     return {
         "tamanho": tamanho_base,
         "postes_por_equipa": postes_necessarios,
-        "grandes_ids": sorted(grandes_ids),
+        "grandes_ids": grandes_ids,
+        "posicoes_ids": posicoes_ids,
         "equipas": [
             {"nome": f"Equipa {indice + 1}", "slots": slots}
             for indice, slots in enumerate(equipas)

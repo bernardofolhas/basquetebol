@@ -59,14 +59,25 @@
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             </div>
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Posição</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Posição principal</label>
                 <select name="posicao" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
                     <option value="">Selecciona</option>
                     {% for pos in ["Base", "Extremo", "Poste"] %}
-                    <option value="{{ pos }}" {% if jogador and jogador.posicao == pos %}selected{% endif %}>{{ pos }}</option>
+                    <option value="{{ pos }}" {% if jogador and jogador.posicao and jogador.posicao.split('/')[0].strip() == pos %}selected{% endif %}>{{ pos }}</option>
                     {% endfor %}
                 </select>
             </div>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Posição secundária</label>
+            <select name="posicao_secundaria" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+                <option value="">Sem posição secundária</option>
+                {% for pos in ["Base", "Extremo", "Poste"] %}
+                <option value="{{ pos }}" {% if jogador and (jogador.posicao_secundaria == pos or (not jogador.posicao_secundaria and jogador.posicao and '/' in jogador.posicao and jogador.posicao.split('/')[1].strip() == pos)) %}selected{% endif %}>{{ pos }}</option>
+                {% endfor %}
+            </select>
+            <p class="mt-1 text-xs text-gray-500">Ex.: Base / Extremo ou Extremo / Poste.</p>
         </div>
 
         <div class="mb-4">

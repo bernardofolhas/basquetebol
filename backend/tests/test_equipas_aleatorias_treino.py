@@ -39,6 +39,43 @@ def test_distribuicao_absorve_excedentes_sem_criar_equipa_incompleta():
         assert len(set(equipa["slots"]) & set(equipas_de_cinco["grandes_ids"])) == 2
 
 
+def test_equipas_de_cinco_usam_posicao_principal_depois_secundaria_e_altura():
+    jogadores = _jogadores(10)
+    for indice, jogador in enumerate(jogadores):
+        jogador["altura"] = 160 + indice * 4
+        jogador["posicao"] = "Base" if indice < 4 else "Extremo" if indice < 6 else "Poste"
+        jogador["posicao_secundaria"] = "Extremo" if 2 <= indice < 4 else None
+
+    resultado = gerar_equipas_equilibradas(jogadores, 5, gerador=random.Random(7))
+    assert resultado["postes_por_equipa"] == 2
+    for equipa in resultado["equipas"]:
+        papeis = [resultado["posicoes_ids"][str(id_)] for id_ in equipa["slots"]]
+        assert papeis.count("Base") == 1
+        assert papeis.count("Extremo") == 2
+        assert papeis.count("Poste") == 2
+        assert papeis == ["Base", "Extremo", "Extremo", "Poste", "Poste"]
+    assert all(resultado["posicoes_ids"][str(id_)] == "Extremo" for id_ in (3, 4))
+
+    sem_posicoes = [{**jogador, "posicao": None, "posicao_secundaria": None} for jogador in jogadores]
+    por_altura = gerar_equipas_equilibradas(sem_posicoes, 5, gerador=random.Random(7))
+    assert {int(id_) for id_, papel in por_altura["posicoes_ids"].items() if papel == "Base"} == {1, 2}
+    assert {int(id_) for id_, papel in por_altura["posicoes_ids"].items() if papel == "Poste"} == {7, 8, 9, 10}
+    assert not any({9, 10}.issubset(set(equipa["slots"])) for equipa in por_altura["equipas"])
+
+
+def test_equipas_de_quatro_respeitam_a_escolha_de_postes():
+    jogadores = _jogadores(8)
+    for jogador in jogadores:
+        jogador["posicao"] = None
+    for postes, extremos in ((1, 2), (2, 1)):
+        resultado = gerar_equipas_equilibradas(jogadores, 4, postes, random.Random(7))
+        for equipa in resultado["equipas"]:
+            papeis = [resultado["posicoes_ids"][str(id_)] for id_ in equipa["slots"]]
+            assert papeis.count("Base") == 1
+            assert papeis.count("Extremo") == extremos
+            assert papeis.count("Poste") == postes
+
+
 def test_estado_antigo_e_convertido_no_primeiro_agrupamento():
     plano = SimpleNamespace(equipas_aleatorias=json.dumps({
         "tamanho": 2,
@@ -129,6 +166,24 @@ def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_adm
         assert 'data-workspace-panel="treino:equipas"' in pagina.text
         plano = db.query(PlanoTreino).filter(PlanoTreino.sessao_id == sessao.id).one()
 
+        jogador = db.query(Jogador).filter(Jogador.id == jogador_id).one()
+        editar = client_admin.post(
+            f"/jogadores/{jogador_id}/editar",
+            data={
+                "nome": jogador.nome,
+                "equipa_id": str(equipa_id),
+                "posicao": "Poste",
+                "posicao_secundaria": "Base",
+            },
+            follow_redirects=False,
+        )
+        assert editar.status_code == 303
+        db.refresh(jogador)
+        assert jogador.posicao_secundaria == "Base"
+        perfil = client_admin.get(f"/jogadores/{jogador_id}/editar")
+        assert 'name="posicao_secundaria"' in perfil.text
+        assert 'value="Base" selected' in perfil.text
+
         previstos = client_admin.post(
             f"/treino/planos/{plano.id}/atletas-previstos",
             json={"jogador_ids": [jogador_id, outro_id]},
@@ -146,6 +201,7 @@ def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_adm
         primeiro_grupo = estado["grupos"][0]
         assert primeiro_grupo["tamanho"] == 2
         assert set(primeiro_grupo["equipas"][0]["slots"]) == {jogador_id, outro_id}
+        assert primeiro_grupo["posicoes_ids"][str(jogador_id)] == "Base"
 
         segundo = client_admin.post(
             f"/treino/planos/{plano.id}/equipas-aleatorias/gerar",
@@ -177,6 +233,7 @@ def test_plano_guarda_previstos_gera_e_reorganiza_equipas_sem_refresh(client_adm
         assert "Equipa 1" in impressao.text
         assert "Agrupamento 2" in impressao.text
         assert "Equipas de 3" in impressao.text
+        assert 'class="training-team-role">Base</span>' in impressao.text
         assert "Lugar por preencher" not in impressao.text
         assert "Lugar vazio" not in impressao.text
         assert impressao.text.index("Equipas do treino") > impressao.text.index('class="content"')

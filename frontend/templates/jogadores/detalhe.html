@@ -134,7 +134,7 @@
             </div>
             <div class="flex justify-between">
                 <span class="text-gray-500">Posição</span>
-                <span class="font-medium text-gray-800">{{ jogador.posicao if jogador.posicao else "—" }}</span>
+                <span class="font-medium text-gray-800">{{ jogador.posicao or "—" }}{% if jogador.posicao_secundaria %} / {{ jogador.posicao_secundaria }}{% endif %}</span>
             </div>
         </div>
     </div>
