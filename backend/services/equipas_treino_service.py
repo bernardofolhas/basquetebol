@@ -100,6 +100,18 @@ def gerar_equipas_equilibradas(
                 if necessidade[papel] > ronda
             )
 
+    # Reserva alternativas indispensaveis antes de ocupar vagas da posicao principal.
+    reservados = set()
+    for papel in ("Base", "Poste", "Extremo"):
+        falta = max(0, sum(necessidade[papel] for necessidade in necessidades) - sum(
+            posicoes_jogador(item)[0] == papel for item in jogadores
+        ))
+        alternativas = [item for item in candidatos if (
+            posicoes_jogador(item)[1] == papel and int(item["id"]) not in reservados
+        )]
+        alternativas.sort(key=lambda item: _chave_altura(item, papel, altura_mediana))
+        reservados.update(int(item["id"]) for item in alternativas[:falta])
+
     # Primeiro esgota posições principais, depois alternativas; só então recorre à altura.
     for fase in (0, 1, 2):
         for papel in ("Base", "Poste", "Extremo"):
@@ -111,6 +123,7 @@ def gerar_equipas_equilibradas(
                 disponiveis = [item for item in candidatos if (
                     altura_jogador(item) is not None and not any(posicoes_jogador(item))
                     if fase == 2 else posicoes_jogador(item)[fase] == papel
+                    and (fase != 0 or int(item["id"]) not in reservados)
                 )]
                 if not disponiveis:
                     continue

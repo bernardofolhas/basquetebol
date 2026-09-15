@@ -118,6 +118,42 @@ def test_gualdimir_extremo_poste_nao_passa_a_base_por_ser_baixo():
     assert [len(equipa["slots"]) for equipa in resultado["equipas"]] == [5, 5]
 
 
+def test_extremo_base_muda_de_papel_conforme_necessidade_do_agrupamento():
+    jogadores = _jogadores(5)
+    for indice, jogador in enumerate(jogadores):
+        jogador.update(posicao="Extremo" if indice < 2 else "Poste", altura=175 + indice * 4)
+    jogadores[0]["posicao_secundaria"] = "Base"
+
+    sem_base_principal = gerar_equipas_equilibradas(jogadores[:3], 3, gerador=random.Random(7))
+    assert sem_base_principal["posicoes_ids"]["1"] == "Base"
+    assert [sem_base_principal["posicoes_ids"][str(id_)] for id_ in sem_base_principal["equipas"][0]["slots"]] == ["Base", "Extremo", "Poste"]
+
+    com_base_principal = gerar_equipas_equilibradas(
+        [{**jogadores[1], "posicao": "Base"}, jogadores[0], *jogadores[2:]],
+        5, gerador=random.Random(7),
+    )
+    assert com_base_principal["posicoes_ids"]["1"] == "Extremo"
+    assert com_base_principal["posicoes_ids"]["2"] == "Base"
+    equipa_de_quatro = gerar_equipas_equilibradas(
+        [{**jogadores[1], "posicao": "Base"}, jogadores[0], *jogadores[2:4]],
+        4, postes_por_equipa=2, gerador=random.Random(7),
+    )
+    assert equipa_de_quatro["posicoes_ids"]["1"] == "Extremo"
+
+
+def test_extremos_com_base_secundaria_cobrem_duas_equipas_de_tres():
+    jogadores = _jogadores(6)
+    for indice, jogador in enumerate(jogadores):
+        jogador.update(posicao="Extremo" if indice < 4 else "Poste", altura=175 + indice * 4)
+        jogador["posicao_secundaria"] = "Base" if indice < 2 else None
+
+    resultado = gerar_equipas_equilibradas(jogadores, 3, gerador=random.Random(7))
+    assert {int(id_) for id_, papel in resultado["posicoes_ids"].items() if papel == "Base"} == {1, 2}
+    for equipa in resultado["equipas"]:
+        papeis = [resultado["posicoes_ids"][str(id_)] for id_ in equipa["slots"]]
+        assert papeis == ["Base", "Extremo", "Poste"]
+
+
 def test_estado_antigo_e_convertido_no_primeiro_agrupamento():
     plano = SimpleNamespace(equipas_aleatorias=json.dumps({
         "tamanho": 2,
@@ -167,6 +203,22 @@ def test_agrupamento_guardado_corrige_base_invalido_com_altura_registada():
     assert grupo["posicoes_ids"] == {"1": "Extremo", "2": "Base"}
     assert grupo["grandes_ids"] == []
     assert grupo["equipas"][0]["slots"] == [1, 2]
+
+
+def test_ordem_guardada_das_equipas_e_dos_atletas_nao_e_reorganizada():
+    plano = SimpleNamespace(equipas_aleatorias=json.dumps({
+        "grupos": [{
+            "id": 4, "tamanho": 3, "postes_por_equipa": 1,
+            "posicoes_ids": {"1": "Base", "2": "Extremo", "3": "Poste", "4": "Base"},
+            "equipas": [
+                {"nome": "Equipa 2", "slots": [4, 3]},
+                {"nome": "Equipa 1", "slots": [2, 1]},
+            ],
+        }],
+    }))
+    grupo = _estado_equipas_guardado(plano, [1, 2, 3, 4])["grupos"][0]
+    assert [equipa["slots"] for equipa in grupo["equipas"]] == [[4, 3], [2, 1]]
+    assert [equipa["nome"] for equipa in grupo["equipas"]] == ["Equipa 1", "Equipa 2"]
 
 
 def test_plano_convoca_sub18_e_adiciona_aos_atletas_previstos_sem_refresh(client_admin):

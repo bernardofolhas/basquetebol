@@ -10,6 +10,7 @@
     let state = data.estado || {grupos: []};
     if (!Array.isArray(state.grupos)) state = state.equipas ? {grupos: [{id: 1, nome: 'Agrupamento 1', ...state}]} : {grupos: []};
     let drag = null;
+    let saving = false;
     const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
     const groupRoot = root.querySelector('[data-random-team-groups]');
     const teamStatus = root.querySelector('[data-team-status]');
@@ -70,10 +71,10 @@
             const player = players.get(Number(playerId));
             if (!player) return '';
             const role = group.posicoes_ids?.[playerId] || (group.grandes_ids?.includes(Number(playerId)) ? 'Poste' : (player.posicao || 'Posição por definir'));
-            return `<div class="training-team-player" draggable="true" tabindex="0" data-team-player="${playerId}" data-group-id="${group.id}" data-team-index="${teamIndex}" data-slot-index="${slotIndex}">${avatar(player)}<span class="min-w-0"><b>${escapeHTML(player.nome)}</b><small>${escapeHTML(role)}</small></span></div>`;
+            return `<div class="training-team-player" tabindex="0" data-team-player="${playerId}" data-group-id="${group.id}" data-team-index="${teamIndex}" data-slot-index="${slotIndex}" title="Arrastar para mudar de equipa ou posição">${avatar(player)}<span class="min-w-0"><b>${escapeHTML(player.nome)}</b><small>${escapeHTML(role)}</small></span></div>`;
           }).join('');
           const total = (team.slots || []).filter(id => id !== null).length;
-          return `<section class="training-random-team" data-random-team="${teamIndex}" data-group-id="${group.id}"><header><b>${escapeHTML(team.nome || `Equipa ${teamIndex + 1}`)}</b><span>${total} atleta(s)</span></header><div class="training-team-slots">${slots}</div></section>`;
+          return `<section class="training-random-team" data-random-team="${teamIndex}" data-group-id="${group.id}"><header><button type="button" class="training-team-reorder" data-team-drag="${teamIndex}" data-group-id="${group.id}" title="Arrastar para ordenar equipas" aria-label="Arrastar ${escapeHTML(team.nome || `Equipa ${teamIndex + 1}`)} para outra posição">⠿</button><b>${escapeHTML(team.nome || `Equipa ${teamIndex + 1}`)}</b><span>${total} atleta(s)</span></header><div class="training-team-slots">${slots}</div></section>`;
         }).join('');
         const postes = Number(group.postes_por_equipa || (Number(group.tamanho) === 5 ? 2 : 1));
         const composition = Number(group.tamanho) >= 3 ? ` · objetivo: 1 base · ${Number(group.tamanho) - 1 - postes} extremo(s) · ${postes} poste(s)` : '';
@@ -85,26 +86,39 @@
       return state.grupos.find(group => Number(group.id) === Number(groupId));
     }
 
-    function movePlayer(groupId, fromTeam, fromSlot, toTeam, toSlot = null) {
+    function movePlayer(groupId, fromTeam, fromSlot, toTeam, targetId = null, after = false) {
       const group = findGroup(groupId);
       if (!group?.equipas?.[fromTeam] || !group.equipas[toTeam]) return false;
-      const playerId = group.equipas[fromTeam].slots[fromSlot];
+      const source = group.equipas[fromTeam].slots;
+      const playerId = source[fromSlot];
       if (playerId === null || playerId === undefined) return false;
-      if (fromTeam === toTeam && fromSlot === toSlot) return false;
-      group.equipas[fromTeam].slots[fromSlot] = null;
-      if (toSlot !== null && group.equipas[toTeam].slots[toSlot] === null) group.equipas[toTeam].slots[toSlot] = playerId;
-      else group.equipas[toTeam].slots.push(playerId);
-      return true;
+      if (targetId !== null && Number(targetId) === Number(playerId)) return false;
+      source.splice(fromSlot, 1);
+      const destination = group.equipas[toTeam].slots;
+      const targetIndex = targetId === null ? destination.length : destination.findIndex(id => Number(id) === Number(targetId));
+      destination.splice(targetIndex < 0 ? destination.length : targetIndex + Number(after), 0, playerId);
+      return fromTeam !== toTeam || source.indexOf(playerId) !== fromSlot;
+    }
+
+    function moveTeam(groupId, fromTeam, toTeam, after) {
+      const group = findGroup(groupId);
+      if (!group?.equipas?.[fromTeam] || !group.equipas[toTeam] || fromTeam === toTeam) return false;
+      const [team] = group.equipas.splice(fromTeam, 1);
+      const destination = toTeam - Number(fromTeam < toTeam) + Number(after);
+      group.equipas.splice(destination, 0, team);
+      group.equipas.forEach((item, index) => { item.nome = `Equipa ${index + 1}`; });
+      return destination !== fromTeam;
     }
 
     async function saveGroup(groupId, previous) {
       const group = findGroup(groupId);
       if (!group) return;
+      saving = true;
       setStatus(teamStatus, 'A guardar organização...');
       try {
         const payload = await post(`/treino/planos/${data.plano_id}/equipas-aleatorias`, {
           grupo_id: Number(groupId),
-          equipas: group.equipas.map(team => team.slots),
+          equipas: group.equipas.map(team => team.slots.filter(id => id !== null)),
         });
         state = payload.estado;
         renderGroups();
@@ -113,80 +127,83 @@
         state = previous;
         renderGroups();
         setStatus(teamStatus, error.message, true);
+      } finally {
+        saving = false;
       }
     }
 
     function dropTargetAt(x, y) {
       const element = document.elementFromPoint(x, y);
-      return element?.closest?.('[data-team-slot-empty],[data-random-team]') || null;
+      return element?.closest?.('[data-team-player],[data-random-team]') || null;
     }
 
-    function completeMove(target) {
+    function completeMove(target, x, y) {
       if (!drag || !target || Number(target.dataset.groupId) !== drag.groupId) return;
       const previous = JSON.parse(JSON.stringify(state));
-      const team = Number(target.dataset.teamIndex ?? target.dataset.randomTeam);
-      const slot = target.matches('[data-team-slot-empty]') ? Number(target.dataset.slotIndex) : null;
-      if (movePlayer(drag.groupId, drag.team, drag.slot, team, slot)) {
+      const teamCard = target.closest('[data-random-team]');
+      const team = Number(teamCard.dataset.randomTeam);
+      let changed = false;
+      if (drag.kind === 'team') {
+        const rect = teamCard.getBoundingClientRect();
+        const after = Math.abs(x - (rect.left + rect.width / 2)) > Math.abs(y - (rect.top + rect.height / 2))
+          ? x >= rect.left + rect.width / 2 : y >= rect.top + rect.height / 2;
+        changed = moveTeam(drag.groupId, drag.team, team, after);
+      } else {
+        const playerTarget = target.closest('[data-team-player]');
+        const after = playerTarget ? y >= playerTarget.getBoundingClientRect().top + playerTarget.offsetHeight / 2 : false;
+        changed = movePlayer(drag.groupId, drag.team, drag.slot, team, playerTarget?.dataset.teamPlayer ?? null, after);
+      }
+      if (changed) {
         renderGroups();
         saveGroup(drag.groupId, previous);
       }
     }
 
-    groupRoot?.addEventListener('dragstart', event => {
-      const item = event.target.closest('[data-team-player]');
-      if (!item) return;
-      drag = {groupId:Number(item.dataset.groupId),team:Number(item.dataset.teamIndex),slot:Number(item.dataset.slotIndex),pointer:false};
-      item.classList.add('is-dragging');
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', item.dataset.teamPlayer);
-    });
-    groupRoot?.addEventListener('dragover', event => {
-      const target = event.target.closest('[data-team-slot-empty],[data-random-team]');
-      if (!target || Number(target.dataset.groupId) !== drag?.groupId) return;
-      event.preventDefault();
-      groupRoot.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
-      target.closest('[data-random-team]')?.classList.add('is-drop-target');
-    });
-    groupRoot?.addEventListener('drop', event => {
-      event.preventDefault();
-      completeMove(event.target.closest('[data-team-slot-empty],[data-random-team]'));
-      drag = null;
-    });
-    groupRoot?.addEventListener('dragend', () => {
-      groupRoot.querySelectorAll('.is-dragging,.is-drop-target').forEach(item => item.classList.remove('is-dragging','is-drop-target'));
-      drag = null;
-    });
-
     groupRoot?.addEventListener('pointerdown', event => {
-      if (event.pointerType === 'mouse' || event.button !== 0) return;
-      const item = event.target.closest('[data-team-player]');
+      if (event.button !== 0 || saving) return;
+      const item = event.target.closest('[data-team-drag],[data-team-player]');
       if (!item) return;
       event.preventDefault();
-      drag = {groupId:Number(item.dataset.groupId),team:Number(item.dataset.teamIndex),slot:Number(item.dataset.slotIndex),pointer:true,id:event.pointerId,x:event.clientX,y:event.clientY,item,ghost:null};
+      const kind = item.hasAttribute('data-team-drag') ? 'team' : 'player';
+      drag = {kind,groupId:Number(item.dataset.groupId),team:Number(kind === 'team' ? item.dataset.teamDrag : item.dataset.teamIndex),slot:Number(item.dataset.slotIndex),id:event.pointerId,x:event.clientX,y:event.clientY,item,ghost:null};
       item.setPointerCapture?.(event.pointerId);
     });
     document.addEventListener('pointermove', event => {
-      if (!drag?.pointer || drag.id !== event.pointerId) return;
+      if (!drag || drag.id !== event.pointerId) return;
       if (!drag.ghost && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 6) return;
       event.preventDefault();
       if (!drag.ghost) {
-        drag.ghost = drag.item.cloneNode(true);
+        drag.ghost = drag.kind === 'team' ? document.createElement('div') : drag.item.cloneNode(true);
+        if (drag.kind === 'team') drag.ghost.textContent = `Equipa ${drag.team + 1}`;
         drag.ghost.classList.add('training-team-drag-ghost');
         document.body.appendChild(drag.ghost);
         drag.item.classList.add('is-dragging');
       }
       drag.ghost.style.left = `${event.clientX}px`;
       drag.ghost.style.top = `${event.clientY}px`;
-      groupRoot.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
+      groupRoot.querySelectorAll('.is-drop-target,.is-drop-after').forEach(item => item.classList.remove('is-drop-target','is-drop-after'));
       const target = dropTargetAt(event.clientX, event.clientY);
-      if (Number(target?.dataset.groupId) === drag.groupId) target.closest('[data-random-team]')?.classList.add('is-drop-target');
+      if (Number(target?.dataset.groupId) === drag.groupId) {
+        const marked = drag.kind === 'team' ? target.closest('[data-random-team]') : target;
+        marked.classList.add('is-drop-target');
+        if (drag.kind === 'player' && marked.matches('[data-team-player]')
+          && event.clientY >= marked.getBoundingClientRect().top + marked.offsetHeight / 2) marked.classList.add('is-drop-after');
+      }
     }, {passive:false});
     document.addEventListener('pointerup', event => {
-      if (!drag?.pointer || drag.id !== event.pointerId) return;
+      if (!drag || drag.id !== event.pointerId) return;
       const target = dropTargetAt(event.clientX, event.clientY);
       drag.ghost?.remove();
       drag.item?.classList.remove('is-dragging');
-      completeMove(target);
+      if (drag.ghost) completeMove(target, event.clientX, event.clientY);
+      groupRoot.querySelectorAll('.is-drop-target,.is-drop-after').forEach(item => item.classList.remove('is-drop-target','is-drop-after'));
+      drag = null;
+    });
+    document.addEventListener('pointercancel', event => {
+      if (!drag || drag.id !== event.pointerId) return;
+      drag.ghost?.remove();
+      drag.item?.classList.remove('is-dragging');
+      groupRoot.querySelectorAll('.is-drop-target,.is-drop-after').forEach(item => item.classList.remove('is-drop-target','is-drop-after'));
       drag = null;
     });
 
