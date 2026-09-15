@@ -76,6 +76,35 @@ def test_equipas_de_quatro_respeitam_a_escolha_de_postes():
             assert papeis.count("Poste") == postes
 
 
+def test_sem_altura_nao_inventa_bases_e_sem_posicao_nao_inventa_papel():
+    jogadores = _jogadores(10)
+    for indice, jogador in enumerate(jogadores):
+        jogador["altura"] = None
+        jogador["posicao"] = "Extremo" if indice < 6 else "Poste"
+    resultado = gerar_equipas_equilibradas(jogadores, 5, gerador=random.Random(7))
+    assert [len(equipa["slots"]) for equipa in resultado["equipas"]] == [5, 5]
+    assert set(resultado["posicoes_ids"].values()) == {"Extremo", "Poste"}
+    assert all(
+        resultado["posicoes_ids"][str(jogador["id"])] == jogador["posicao"]
+        for jogador in jogadores
+    )
+
+    sem_perfil = [{**jogador, "posicao": None} for jogador in jogadores]
+    sem_papel = gerar_equipas_equilibradas(sem_perfil, 5, gerador=random.Random(7))
+    assert sem_papel["posicoes_ids"] == {}
+    assert [len(equipa["slots"]) for equipa in sem_papel["equipas"]] == [5, 5]
+
+
+def test_alturas_de_outros_atletas_nao_reclassificam_quem_nao_tem_altura():
+    jogadores = _jogadores(10)
+    jogadores[0].update(altura=None, posicao="Extremo")
+    jogadores[1].update(altura=None, posicao="Poste")
+    resultado = gerar_equipas_equilibradas(jogadores, 5, gerador=random.Random(7))
+    assert resultado["posicoes_ids"]["1"] == "Extremo"
+    assert resultado["posicoes_ids"]["2"] == "Poste"
+    assert {int(id_) for id_, papel in resultado["posicoes_ids"].items() if papel == "Base"}.isdisjoint({1, 2})
+
+
 def test_estado_antigo_e_convertido_no_primeiro_agrupamento():
     plano = SimpleNamespace(equipas_aleatorias=json.dumps({
         "tamanho": 2,
@@ -89,6 +118,24 @@ def test_estado_antigo_e_convertido_no_primeiro_agrupamento():
     assert estado["grupos"][0]["id"] == 1
     assert estado["grupos"][0]["tamanho"] == 2
     assert estado["grupos"][0]["equipas"][0]["slots"] == [1, 2]
+
+
+def test_agrupamento_guardado_corrige_papeis_deduzidos_sem_altura():
+    plano = SimpleNamespace(equipas_aleatorias=json.dumps({
+        "tamanho": 2,
+        "postes_por_equipa": 0,
+        "grandes_ids": [1, 2],
+        "posicoes_ids": {"1": "Base", "2": "Poste"},
+        "equipas": [{"nome": "Equipa 1", "slots": [1, 2]}],
+    }))
+    atletas = [
+        {"id": 1, "altura": None, "posicao": "Extremo", "posicao_secundaria": None},
+        {"id": 2, "altura": None, "posicao": None, "posicao_secundaria": None},
+    ]
+    grupo = _estado_equipas_guardado(plano, [1, 2], atletas)["grupos"][0]
+    assert grupo["equipas"][0]["slots"] == [1, 2]
+    assert grupo["posicoes_ids"] == {"1": "Extremo"}
+    assert grupo["grandes_ids"] == []
 
 
 def test_plano_convoca_sub18_e_adiciona_aos_atletas_previstos_sem_refresh(client_admin):

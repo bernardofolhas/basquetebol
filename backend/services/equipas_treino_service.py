@@ -1,5 +1,6 @@
 import random
 import unicodedata
+import math
 
 
 POSICOES_INTERIORES = ("poste", "pivot", "pivo", "interior", "center", "centro")
@@ -26,22 +27,25 @@ def posicao_agrupamento(valor: str | None) -> str | None:
     return None
 
 
-def _preferencias(jogador: dict) -> tuple[str | None, str | None]:
+def posicoes_jogador(jogador: dict) -> tuple[str | None, str | None]:
     partes = str(jogador.get("posicao") or "").split("/", 1)
     principal = posicao_agrupamento(partes[0])
     secundaria = posicao_agrupamento(jogador.get("posicao_secundaria") or (partes[1] if len(partes) > 1 else None))
     return principal, secundaria if secundaria != principal else None
 
 
-def _chave_altura(jogador: dict, papel: str, altura_mediana: float) -> tuple:
+def altura_jogador(jogador: dict) -> float | None:
     try:
         altura = float(jogador["altura"])
     except (TypeError, ValueError, KeyError):
-        altura = None
+        return None
+    return altura if math.isfinite(altura) and altura > 0 else None
+
+
+def _chave_altura(jogador: dict, papel: str, altura_mediana: float) -> tuple:
+    altura = altura_jogador(jogador)
     if altura is None:
-        principal, _ = _preferencias(jogador)
-        ordem = {"Base": 0, "Extremo": 1, "Poste": 2}.get(principal, 1)
-        return (1, ordem if papel == "Base" else -ordem if papel == "Poste" else abs(ordem - 1))
+        return (1, 0)
     if papel == "Base":
         return (0, altura)
     if papel == "Poste":
@@ -78,13 +82,7 @@ def gerar_equipas_equilibradas(
 
     candidatos = list(jogadores)
     sorteio.shuffle(candidatos)
-    alturas = []
-    for item in candidatos:
-        try:
-            alturas.append(float(item["altura"]))
-        except (TypeError, ValueError, KeyError):
-            continue
-    alturas.sort()
+    alturas = sorted(altura for item in candidatos if (altura := altura_jogador(item)) is not None)
     altura_mediana = alturas[len(alturas) // 2] if alturas else 0
     equipas = [[] for _ in range(total_equipas)]
     posicoes_ids = {}
@@ -111,12 +109,12 @@ def gerar_equipas_equilibradas(
                 ) >= necessidades[indice][papel]:
                     continue
                 disponiveis = [item for item in candidatos if (
-                    fase == 2 or _preferencias(item)[fase] == papel
+                    altura_jogador(item) is not None if fase == 2 else posicoes_jogador(item)[fase] == papel
                 )]
                 if not disponiveis:
                     continue
                 disponiveis.sort(key=lambda item: (
-                    0 if fase == 0 and _preferencias(item)[1] is None else 1,
+                    0 if fase == 0 and posicoes_jogador(item)[1] is None else 1,
                     _chave_altura(item, papel, altura_mediana),
                 ))
                 escolhido = disponiveis[0]
@@ -125,10 +123,22 @@ def gerar_equipas_equilibradas(
                 posicoes_ids[str(id_)] = papel
                 candidatos.remove(escolhido)
 
+    # Sem altura, os atletas restantes conservam a posição indicada no perfil.
+    for escolhido in candidatos:
+        indice = min(
+            (indice for indice in range(total_equipas) if len(equipas[indice]) < tamanhos[indice]),
+            key=lambda indice: len(equipas[indice]) / tamanhos[indice],
+        )
+        id_ = int(escolhido["id"])
+        equipas[indice].append(id_)
+        principal, secundaria = posicoes_jogador(escolhido)
+        if principal or secundaria:
+            posicoes_ids[str(id_)] = principal or secundaria
+
     grandes_ids = sorted(int(id_) for id_, papel in posicoes_ids.items() if papel == "Poste")
     ordem_papeis = {"Base": 0, "Extremo": 1, "Poste": 2}
     for equipa in equipas:
-        equipa.sort(key=lambda id_: ordem_papeis[posicoes_ids[str(id_)]])
+        equipa.sort(key=lambda id_: ordem_papeis.get(posicoes_ids.get(str(id_)), 3))
 
     return {
         "tamanho": tamanho_base,

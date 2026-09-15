@@ -40,7 +40,13 @@ from services.desenho_service import (
 )
 from services.conteudos_sessao_service import construir_sugestoes_plano_treino
 from services.horarios_exercicios import recalcular_horas_exercicios
-from services.equipas_treino_service import gerar_equipas_equilibradas, jogador_e_interior, posicao_agrupamento
+from services.equipas_treino_service import (
+    altura_jogador,
+    gerar_equipas_equilibradas,
+    jogador_e_interior,
+    posicao_agrupamento,
+    posicoes_jogador,
+)
 from services.assiduidade_service import calcular_pse_real
 from services.mapa_conteudos_service import obter_sugestoes_conteudos_microciclo
 from services.sincronizacao_ui import enriquecer_sessao_para_ui
@@ -177,7 +183,11 @@ def _ids_atletas_previstos(plano: PlanoTreino, atletas: list[dict]) -> list[int]
     return [int(valor) for valor in dados if isinstance(valor, int) and not isinstance(valor, bool) and valor in disponiveis]
 
 
-def _estado_equipas_guardado(plano: PlanoTreino, atletas_previstos_ids: list[int]) -> dict | None:
+def _estado_equipas_guardado(
+    plano: PlanoTreino,
+    atletas_previstos_ids: list[int],
+    atletas: list[dict] | None = None,
+) -> dict | None:
     estado = _carregar_json(plano.equipas_aleatorias, None)
     if not isinstance(estado, dict):
         return None
@@ -231,6 +241,27 @@ def _estado_equipas_guardado(plano: PlanoTreino, atletas_previstos_ids: list[int
         })
     if not grupos:
         return None
+    if atletas is not None:
+        por_id = {int(atleta["id"]): atleta for atleta in atletas}
+        for grupo in grupos:
+            papeis = grupo["posicoes_ids"]
+            for jogador_id in permitidos:
+                atleta = por_id.get(jogador_id)
+                if not atleta or altura_jogador(atleta) is not None:
+                    continue
+                principal, secundaria = posicoes_jogador(atleta)
+                papel = papeis.get(str(jogador_id))
+                if papel not in {principal, secundaria}:
+                    if principal or secundaria:
+                        papeis[str(jogador_id)] = principal or secundaria
+                    else:
+                        papeis.pop(str(jogador_id), None)
+            grupo["grandes_ids"] = [
+                jogador_id for jogador_id in grupo["grandes_ids"]
+                if jogador_id not in por_id
+                or altura_jogador(por_id[jogador_id]) is not None
+                or "Poste" in posicoes_jogador(por_id[jogador_id])
+            ]
     return {"grupos": grupos}
 
 
@@ -240,7 +271,7 @@ def _equipas_para_impressao(db: Session, equipa: Equipa, plano: PlanoTreino | No
         return []
     atletas = _dados_atletas_plano(db, equipa, plano.sessao_id)
     previstos_ids = _ids_atletas_previstos(plano, atletas)
-    estado = _estado_equipas_guardado(plano, previstos_ids)
+    estado = _estado_equipas_guardado(plano, previstos_ids, atletas)
     if not estado:
         return []
     por_id = {int(atleta["id"]): atleta for atleta in atletas}
@@ -822,7 +853,7 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
     ]
     atletas_treino = _dados_atletas_plano(db, equipa, sessao.id)
     atletas_previstos_ids = _ids_atletas_previstos(plano, atletas_treino)
-    equipas_treino_estado = _estado_equipas_guardado(plano, atletas_previstos_ids)
+    equipas_treino_estado = _estado_equipas_guardado(plano, atletas_previstos_ids, atletas_treino)
     return templates.TemplateResponse(request, "treino/plano.html", {
         "utilizador": utilizador,
         "sessao": sessao,
@@ -971,7 +1002,7 @@ async def gerar_equipas_aleatorias(
         equipas_geradas = gerar_equipas_equilibradas(selecionados, tamanho, postes)
     except ValueError as erro:
         return JSONResponse({"sucesso": False, "erro": str(erro)}, status_code=422)
-    estado = _estado_equipas_guardado(plano, list(previstos)) or {"grupos": []}
+    estado = _estado_equipas_guardado(plano, list(previstos), atletas) or {"grupos": []}
     grupos = estado["grupos"]
     if grupo_id is None:
         grupo_id = max((grupo["id"] for grupo in grupos), default=0) + 1
@@ -1023,7 +1054,7 @@ async def guardar_organizacao_equipas(
     if len(recebidos) != len(set(recebidos)) or set(recebidos) != previstos:
         return JSONResponse({"sucesso": False, "erro": "Todos os atletas previstos devem aparecer uma única vez."}, status_code=422)
 
-    estado = _estado_equipas_guardado(plano, list(previstos))
+    estado = _estado_equipas_guardado(plano, list(previstos), atletas)
     if not estado:
         return JSONResponse({"sucesso": False, "erro": "Agrupamento não encontrado."}, status_code=404)
     try:
@@ -1054,7 +1085,7 @@ def eliminar_agrupamento_equipas(
     equipa = plano.sessao.microciclo.mesociclo.macrociclo.equipa
     atletas = _dados_atletas_plano(db, equipa, plano.sessao_id)
     previstos = _ids_atletas_previstos(plano, atletas)
-    estado = _estado_equipas_guardado(plano, previstos)
+    estado = _estado_equipas_guardado(plano, previstos, atletas)
     if not estado or not any(grupo["id"] == grupo_id for grupo in estado["grupos"]):
         return JSONResponse({"sucesso": False, "erro": "Agrupamento não encontrado."}, status_code=404)
     estado["grupos"] = [grupo for grupo in estado["grupos"] if grupo["id"] != grupo_id]

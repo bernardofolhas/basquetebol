@@ -69,14 +69,14 @@
             if (playerId === null) return '';
             const player = players.get(Number(playerId));
             if (!player) return '';
-            const role = group.posicoes_ids?.[playerId] || (group.grandes_ids?.includes(Number(playerId)) ? 'Poste' : (player.posicao || player.equipa || 'Atleta'));
+            const role = group.posicoes_ids?.[playerId] || (group.grandes_ids?.includes(Number(playerId)) ? 'Poste' : (player.posicao || 'Posição por definir'));
             return `<div class="training-team-player" draggable="true" tabindex="0" data-team-player="${playerId}" data-group-id="${group.id}" data-team-index="${teamIndex}" data-slot-index="${slotIndex}">${avatar(player)}<span class="min-w-0"><b>${escapeHTML(player.nome)}</b><small>${escapeHTML(role)}</small></span></div>`;
           }).join('');
           const total = (team.slots || []).filter(id => id !== null).length;
           return `<section class="training-random-team" data-random-team="${teamIndex}" data-group-id="${group.id}"><header><b>${escapeHTML(team.nome || `Equipa ${teamIndex + 1}`)}</b><span>${total} atleta(s)</span></header><div class="training-team-slots">${slots}</div></section>`;
         }).join('');
         const postes = Number(group.postes_por_equipa || (Number(group.tamanho) === 5 ? 2 : 1));
-        const composition = Number(group.tamanho) >= 3 ? ` · 1 base · ${Number(group.tamanho) - 1 - postes} extremo(s) · ${postes} poste(s)` : '';
+        const composition = Number(group.tamanho) >= 3 ? ` · objetivo: 1 base · ${Number(group.tamanho) - 1 - postes} extremo(s) · ${postes} poste(s)` : '';
         return `<article class="training-team-group" data-team-group-card="${group.id}"><header class="training-team-group-head"><div><span>Agrupamento ${groupIndex + 1}</span><h3>Equipas de ${group.tamanho}${composition}</h3></div><div><button type="button" class="ds-quiet-link" data-regenerate-group="${group.id}">Gerar novamente</button><button type="button" class="training-group-delete" data-delete-group="${group.id}">Eliminar</button></div></header><div class="training-random-teams" data-team-group="${group.id}">${teams}</div></article>`;
       }).join('');
     }
