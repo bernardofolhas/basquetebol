@@ -247,20 +247,23 @@ def _estado_equipas_guardado(
             papeis = grupo["posicoes_ids"]
             for jogador_id in permitidos:
                 atleta = por_id.get(jogador_id)
-                if not atleta or altura_jogador(atleta) is not None:
+                if not atleta:
                     continue
                 principal, secundaria = posicoes_jogador(atleta)
                 papel = papeis.get(str(jogador_id))
-                if papel not in {principal, secundaria}:
-                    if principal or secundaria:
+                if principal or secundaria:
+                    if papel not in {principal, secundaria}:
                         papeis[str(jogador_id)] = principal or secundaria
-                    else:
-                        papeis.pop(str(jogador_id), None)
+                elif altura_jogador(atleta) is None:
+                    papeis.pop(str(jogador_id), None)
             grupo["grandes_ids"] = [
                 jogador_id for jogador_id in grupo["grandes_ids"]
                 if jogador_id not in por_id
-                or altura_jogador(por_id[jogador_id]) is not None
-                or "Poste" in posicoes_jogador(por_id[jogador_id])
+                or (
+                    papeis.get(str(jogador_id)) == "Poste"
+                    if any(posicoes_jogador(por_id[jogador_id]))
+                    else altura_jogador(por_id[jogador_id]) is not None
+                )
             ]
     return {"grupos": grupos}
 

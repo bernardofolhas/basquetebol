@@ -109,7 +109,8 @@ def gerar_equipas_equilibradas(
                 ) >= necessidades[indice][papel]:
                     continue
                 disponiveis = [item for item in candidatos if (
-                    altura_jogador(item) is not None if fase == 2 else posicoes_jogador(item)[fase] == papel
+                    altura_jogador(item) is not None and not any(posicoes_jogador(item))
+                    if fase == 2 else posicoes_jogador(item)[fase] == papel
                 )]
                 if not disponiveis:
                     continue
@@ -123,7 +124,7 @@ def gerar_equipas_equilibradas(
                 posicoes_ids[str(id_)] = papel
                 candidatos.remove(escolhido)
 
-    # Sem altura, os atletas restantes conservam a posição indicada no perfil.
+    # Os atletas restantes conservam o papel declarado, mesmo com altura registada.
     for escolhido in candidatos:
         indice = min(
             (indice for indice in range(total_equipas) if len(equipas[indice]) < tamanhos[indice]),

@@ -105,6 +105,19 @@ def test_alturas_de_outros_atletas_nao_reclassificam_quem_nao_tem_altura():
     assert {int(id_) for id_, papel in resultado["posicoes_ids"].items() if papel == "Base"}.isdisjoint({1, 2})
 
 
+def test_gualdimir_extremo_poste_nao_passa_a_base_por_ser_baixo():
+    jogadores = _jogadores(10)
+    for indice, jogador in enumerate(jogadores):
+        jogador["altura"] = 170 + indice * 2
+        jogador["posicao"] = "Extremo" if indice < 6 else "Poste"
+    jogadores[0].update(nome="Gualdimir Té", altura=155, posicao_secundaria="Poste")
+
+    resultado = gerar_equipas_equilibradas(jogadores, 5, gerador=random.Random(7))
+    assert resultado["posicoes_ids"]["1"] in {"Extremo", "Poste"}
+    assert "Base" not in resultado["posicoes_ids"].values()
+    assert [len(equipa["slots"]) for equipa in resultado["equipas"]] == [5, 5]
+
+
 def test_estado_antigo_e_convertido_no_primeiro_agrupamento():
     plano = SimpleNamespace(equipas_aleatorias=json.dumps({
         "tamanho": 2,
@@ -136,6 +149,24 @@ def test_agrupamento_guardado_corrige_papeis_deduzidos_sem_altura():
     assert grupo["equipas"][0]["slots"] == [1, 2]
     assert grupo["posicoes_ids"] == {"1": "Extremo"}
     assert grupo["grandes_ids"] == []
+
+
+def test_agrupamento_guardado_corrige_base_invalido_com_altura_registada():
+    plano = SimpleNamespace(equipas_aleatorias=json.dumps({
+        "tamanho": 2,
+        "postes_por_equipa": 0,
+        "grandes_ids": [1],
+        "posicoes_ids": {"1": "Base", "2": "Extremo"},
+        "equipas": [{"nome": "Equipa 1", "slots": [1, 2]}],
+    }))
+    atletas = [
+        {"id": 1, "altura": 190, "posicao": "Extremo", "posicao_secundaria": "Poste"},
+        {"id": 2, "altura": 175, "posicao": "Base", "posicao_secundaria": None},
+    ]
+    grupo = _estado_equipas_guardado(plano, [1, 2], atletas)["grupos"][0]
+    assert grupo["posicoes_ids"] == {"1": "Extremo", "2": "Base"}
+    assert grupo["grandes_ids"] == []
+    assert grupo["equipas"][0]["slots"] == [1, 2]
 
 
 def test_plano_convoca_sub18_e_adiciona_aos_atletas_previstos_sem_refresh(client_admin):
