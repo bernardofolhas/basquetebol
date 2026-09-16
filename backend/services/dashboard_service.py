@@ -157,7 +157,7 @@ def obter_painel_operacional(
             if not jogo.convocados:
                 _adicionar(item, "Criar convocatória", f"/jogos/{jogo.id}", item["data"] == hoje)
             if not jogo.plano:
-                _adicionar(item, "Preparar plano de jogo", f"/jogos/{jogo.id}/plano", item["data"] == hoje)
+                _adicionar(item, "Preparar plano de jogo", f"/scouting/jogos/{jogo.id}/plano-jogo", item["data"] == hoje)
             elif item["data"] == hoje:
                 _adicionar(item, "Abrir jogo", item["link"], True)
 

@@ -452,7 +452,9 @@ async def guardar_plano_jogo(
 
     db.commit()
     set_flash(request, "Plano de jogo guardado.")
-    return RedirectResponse(url=f"/jogos/{jogo_id}/plano", status_code=303)
+    voltar = str(dados.get("voltar") or "")
+    destino = voltar if voltar.startswith("/scouting/") and "//" not in voltar else f"/jogos/{jogo_id}/plano"
+    return RedirectResponse(url=destino, status_code=303)
 
 
 @router.get("/{jogo_id}/convocatoria/print", response_class=HTMLResponse)

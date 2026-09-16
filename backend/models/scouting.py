@@ -111,6 +111,7 @@ class ScoutingAdversario(Base):
     opcoes_defensivas = relationship("ScoutingOpcoesDefensivas", back_populates="adversario_scouting", uselist=False, cascade="all, delete-orphan")
     conceitos_ofensivos = relationship("ScoutingConceitoOfensivo", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingConceitoOfensivo.ordem")
     momentos_playbook = relationship("ScoutingMomentoPlaybook", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingMomentoPlaybook.ordem")
+    rotacao_prevista = relationship("ScoutingRotacaoPrevista", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingRotacaoPrevista.papel, ScoutingRotacaoPrevista.ordem")
 
 
 class ScoutingAdversarioJogo(Base):
@@ -154,6 +155,7 @@ class ScoutingJogador(Base):
     estatisticas = relationship("ScoutingEstatisticaJogo", back_populates="jogador", cascade="all, delete-orphan", order_by="ScoutingEstatisticaJogo.data.desc()")
     itens = relationship("ScoutingJogadorItem", back_populates="jogador", cascade="all, delete-orphan")
     zonas = relationship("ScoutingZonaAcao", back_populates="jogador", cascade="all, delete-orphan")
+    rotacoes_previstas = relationship("ScoutingRotacaoPrevista", back_populates="jogador", cascade="all, delete-orphan")
 
 
 class ScoutingFichaIndividual(Base):
@@ -354,3 +356,16 @@ class ScoutingMomentoPlaybook(Base):
     ordem = Column(Integer, nullable=False, default=0)
     adversario_scouting = relationship("ScoutingAdversario", back_populates="momentos_playbook")
     setplay = relationship("SetPlay")
+
+
+class ScoutingRotacaoPrevista(Base):
+    __tablename__ = "scouting_rotacoes_previstas"
+    __table_args__ = (UniqueConstraint("adversario_id", "jogador_id", name="uq_scouting_rotacao_adversario_jogador"),)
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    jogador_id = Column(Integer, ForeignKey("scouting_roster_jogadores.id", ondelete="CASCADE"), nullable=False, index=True)
+    papel = Column(String(16), nullable=False)
+    ordem = Column(Integer, nullable=False, default=0)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="rotacao_prevista")
+    jogador = relationship("ScoutingJogador", back_populates="rotacoes_previstas")

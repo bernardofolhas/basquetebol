@@ -1,5 +1,5 @@
 <nav class="scouting-tabs" aria-label="Áreas do adversário">
-  {% for slug, label in [('resumo','Resumo'),('roster','Roster'),('individual','Scouting Individual'),('coletivo','Scouting Coletivo'),('relatorios','Relatórios')] %}
+  {% for slug, label in [('resumo','Resumo'),('roster','Roster'),('individual','Scouting Individual'),('coletivo','Scouting Coletivo'),('plano-jogo','Plano de Jogo'),('relatorios','Relatórios')] %}
   <a href="/scouting/adversarios/{{ adversario.id }}/{{ slug }}" class="{% if separador == slug %}is-active{% endif %}">{{ label }}</a>
   {% endfor %}
 </nav>

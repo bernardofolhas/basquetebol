@@ -23,16 +23,13 @@ def test_scouting_mantem_modelos_e_migracao_por_jogo():
 
 
 def test_scouting_e_plano_de_jogo_estao_acessiveis_no_fluxo_de_jogos():
-    navbar = (TEMPLATES_DIR / "partials" / "navbar_global.html").read_text(
-        encoding="utf-8"
-    )
+    tabs = (TEMPLATES_DIR / "scouting" / "_departamento_tabs.html").read_text(encoding="utf-8")
     detalhe_jogo = (TEMPLATES_DIR / "jogos" / "detalhe.html").read_text(
         encoding="utf-8"
     )
 
-    assert 'Plano de jogo' in navbar
-    assert "'/jogos/' ~ jogo_nav.id ~ '/plano'" in navbar
-    assert "'/scouting/jogos/' ~ jogo_nav.id" in navbar
+    assert "Plano de Jogo" in tabs
+    assert "plano-jogo" in tabs
     assert 'data-workspace-tab="scouting"' in detalhe_jogo
     assert 'Abrir scouting' in detalhe_jogo
 
@@ -83,7 +80,7 @@ def test_departamento_scouting_expoe_tabs_roster_e_ficha_individual():
     campos = (TEMPLATES_DIR / "scouting" / "_roster_fields.html").read_text(encoding="utf-8")
     individual = (TEMPLATES_DIR / "scouting" / "individual.html").read_text(encoding="utf-8")
 
-    for titulo in ("Resumo", "Roster", "Scouting Individual", "Scouting Coletivo", "Relatórios"):
+    for titulo in ("Resumo", "Roster", "Scouting Individual", "Scouting Coletivo", "Plano de Jogo", "Relatórios"):
         assert titulo in tabs
     for nome in ("fotografia", "posicao_principal", "posicao_alternativa", "altura_cm", "peso_kg", "estado", "mao_dominante"):
         assert f'name="{nome}"' in campos
@@ -158,3 +155,32 @@ def test_playbook_studio_regressa_ao_scouting_coletivo():
     assert "ScoutingMomentoPlaybook" in router
     assert "url_voltar" in router
     assert "url_voltar|default" in studio
+
+
+def test_scouting_coletivo_guarda_cinco_inicial_e_rotacoes_previstas():
+    modelo = (ROOT / "backend" / "models" / "scouting.py").read_text(encoding="utf-8")
+    migracao = (ROOT / "backend" / "migrations" / "versions" / "0049_scouting_rotacao_prevista.py").read_text(encoding="utf-8")
+    coletivo = (TEMPLATES_DIR / "scouting" / "coletivo.html").read_text(encoding="utf-8")
+    router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+
+    assert "class ScoutingRotacaoPrevista" in modelo
+    assert "scouting_rotacoes_previstas" in migracao
+    assert "Cinco inicial e principais rotações" in coletivo
+    assert 'name="titular_{{ indice + 1 }}"' in coletivo
+    assert 'name="rotacoes"' in coletivo
+    assert "guardar_rotacao_prevista" in router
+
+
+def test_plano_de_jogo_vive_no_dossier_e_importa_scouting_sem_substituir():
+    tabs = (TEMPLATES_DIR / "scouting" / "_departamento_tabs.html").read_text(encoding="utf-8")
+    plano = (TEMPLATES_DIR / "scouting" / "plano_jogo.html").read_text(encoding="utf-8")
+    router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+    jogos = (ROOT / "backend" / "routers" / "jogos.py").read_text(encoding="utf-8")
+
+    assert "('plano-jogo','Plano de Jogo')" in tabs
+    assert "Importar análise do Scouting Coletivo" in plano
+    assert "O conteúdo escrito no plano nunca é substituído" in plano
+    assert 'action="/jogos/{{ jogo.id }}/plano"' in plano
+    assert "_preencher_se_vazio" in router
+    assert "importar_scouting_para_plano" in router
+    assert 'voltar.startswith("/scouting/")' in jogos
