@@ -44,6 +44,7 @@
   {% elif microciclo is defined and microciclo and microciclo.mesociclo and microciclo.mesociclo.macrociclo %}{% set equipa_contexto_id = microciclo.mesociclo.macrociclo.equipa_id %}{% if microciclo.mesociclo.macrociclo.equipa %}{% set equipa_contexto_nome = microciclo.mesociclo.macrociclo.equipa.nome %}{% endif %}
   {% elif sessao is defined and sessao and sessao.microciclo and sessao.microciclo.mesociclo and sessao.microciclo.mesociclo.macrociclo %}{% set equipa_contexto_id = sessao.microciclo.mesociclo.macrociclo.equipa_id %}{% if sessao.microciclo.mesociclo.macrociclo.equipa %}{% set equipa_contexto_nome = sessao.microciclo.mesociclo.macrociclo.equipa.nome %}{% endif %}
   {% elif jogador is defined and jogador and jogador.equipa_id %}{% set equipa_contexto_id = jogador.equipa_id %}{% if jogador.equipa %}{% set equipa_contexto_nome = jogador.equipa.nome %}{% endif %}{% endif %}
+  {% if not equipa_contexto_id and p.startswith('/scouting') and request.session.get('equipa_contexto_id') %}{% set equipa_contexto_id = request.session.get('equipa_contexto_id') %}{% set equipa_contexto_nome = request.session.get('equipa_contexto_nome') %}{% endif %}
   {% endif %}
 
   {% include "partials/navbar_global.html" %}

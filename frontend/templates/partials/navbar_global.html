@@ -133,14 +133,6 @@
           {{ menu_link('/planeamento-clube/espacos', 'Espaços e horários', 'Consulta de espaços') }}
           {% endif %}
           {% if perfil in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta', 'superadministrador'] %}{{ menu_link('/biblioteca', 'Biblioteca de exercícios', 'Pesquisar e reutilizar') }}{% endif %}
-          {% if nav.jogos_proximos|default([]) and perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}
-          <div class="ds-dropdown-section"><p class="ds-dropdown-label px-2 pb-1">Próximos jogos</p><div class="sidebar-page-list">
-            {% for jogo_nav in nav.jogos_proximos %}
-            {{ menu_link('/jogos/' ~ jogo_nav.id ~ '/plano', 'Plano de jogo · ' ~ jogo_nav.adversario, jogo_nav.data|data_pt) }}
-            {{ menu_link('/scouting/jogos/' ~ jogo_nav.id, 'Scouting · ' ~ jogo_nav.adversario, 'Abrir dossier do adversário') }}
-            {% endfor %}
-          </div></div>
-          {% endif %}
         </div>
       </details>
 
@@ -156,7 +148,7 @@
             {{ menu_link('/fisico/equipas/' ~ equipa_contexto_id, 'Análise física e testes', 'Testes e evolução física') }}
             {{ menu_link('/assiduidade/equipas/' ~ equipa_contexto_id, 'Relatório de presenças e RPE', 'Consultar participação e esforço percebido') }}
             {{ menu_link('/questionarios/equipas/' ~ equipa_contexto_id, 'Questionários', 'Escolher o dashboard a consultar', p.startswith('/questionarios')) }}
-            {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}{{ menu_link('/scouting', 'Scouting', 'Adversários, roster e análise individual', p.startswith('/scouting')) }}{% endif %}
+            {% if perfil in ['administrador', 'coordenador', 'treinador', 'superadministrador'] %}{{ menu_link('/scouting?equipa_id=' ~ equipa_contexto_id, 'Scouting', 'Adversários, roster e análise individual', p.startswith('/scouting')) }}{% endif %}
           </div>
           {% else %}
           <p class="sidebar-hint">Escolhe a equipa que queres analisar.</p>

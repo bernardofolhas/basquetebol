@@ -34,6 +34,8 @@ def test_sidebar_nao_enumera_registos_mas_preserva_caixa_de_entrada(perfil):
     assert 'Aviso teste' not in sidebar
     assert 'data-inbox-open' in sidebar
     assert '/jogos/equipas/7' in sidebar
+    if perfil != 'staff':
+        assert '/scouting?equipa_id=7' in sidebar
     assert '/logout' in sidebar
     dialog = html.split('<dialog', 1)[1].split('</dialog>', 1)[0]
     assert 'Pendencia teste' in dialog
@@ -60,6 +62,17 @@ def test_sidebar_sem_equipa_da_acesso_direto_a_planeamento_e_analise():
     assert 'Escolhe a equipa que queres analisar.' in html
 
 
+def test_scouting_guarda_o_contexto_da_equipa_para_manter_a_sidebar():
+    raiz = Path(__file__).resolve().parents[2]
+    base = (raiz / "frontend" / "templates" / "base.html").read_text(encoding="utf-8")
+    router = (raiz / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+
+    assert "p.startswith('/scouting')" in base
+    assert 'request.session["equipa_contexto_id"] = equipa.id' in router
+    assert 'request.session["equipa_contexto_nome"] = equipa.nome' in router
+    assert '_guardar_contexto_equipa(request, jogo.equipa)' in router
+
+
 def test_sidebar_usa_seccoes_recolhiveis_com_estado_persistente():
     raiz = Path(__file__).resolve().parents[2]
     navbar = (raiz / 'frontend' / 'templates' / 'partials' / 'navbar_global.html').read_text(encoding='utf-8')
@@ -73,3 +86,13 @@ def test_sidebar_usa_seccoes_recolhiveis_com_estado_persistente():
     assert "if (other !== group) other.open = false" in javascript
     assert "candidates[0].link.closest('details[data-sidebar-section]')" in javascript
     assert '.sidebar-group[open]>.sidebar-heading .sidebar-section-chevron' in estilos
+
+
+def test_acao_nao_inclui_planos_de_jogo_nem_scouting():
+    raiz = Path(__file__).resolve().parents[2]
+    navbar = (raiz / 'frontend' / 'templates' / 'partials' / 'navbar_global.html').read_text(encoding='utf-8')
+    secao_acao = navbar.split('data-sidebar-section="acao"', 1)[1].split('data-sidebar-section="analise"', 1)[0]
+
+    assert "'/jogos/' ~ jogo_nav.id ~ '/plano'" not in secao_acao
+    assert "'/scouting/jogos/' ~ jogo_nav.id" not in secao_acao
+    assert 'Próximos jogos' not in secao_acao
