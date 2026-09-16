@@ -88,6 +88,14 @@ def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
     assert "fotografias.get(j.id)" in html
     assert "truncate(180)" in html
     assert "stat_fields" in html
+    assert 'class="portrait"' in html
+    assert 'class="stats"' in html
+    assert "Pontos fortes" in html
+    assert "Pontos a explorar" in html
+    assert "Movimentos preferenciais" in html
+    assert "Como defender" in html
+    assert "j.idade" in html
+    assert "j.peso_kg" in html
 
 
 def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
