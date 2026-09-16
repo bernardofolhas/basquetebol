@@ -835,11 +835,11 @@ table tbody tr:hover { background:#fafbfd; }
 .training-editor-dialog-head p { color:var(--clube-primary);font-size:.68rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase; }
 .training-editor-dialog-head h2 { margin-top:.2rem;color:var(--text-main);font-size:1.2rem;font-weight:850; }
 .training-editor-dialog-head>button { display:grid;width:2.25rem;height:2.25rem;place-items:center;border:1px solid var(--border-soft);border-radius:999px;background:#fff;color:var(--text-muted);font-size:1.25rem; }
-.training-drawing-dialog-body { min-height:0;overflow:auto;padding:1rem 1.25rem; }
+.training-drawing-dialog-body { min-height:0;overflow:auto;scrollbar-gutter:stable;padding:1rem 1.25rem; }
 .training-drawing-dialog-actions { display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem; }
 .training-drawing-dialog-actions>p { color:var(--text-muted);font-size:.8rem; }
 .training-drawing-dialog-actions>div { display:flex;flex-wrap:wrap;gap:.5rem; }
-.training-drawing-editor-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,27rem),1fr));gap:1rem; }
+.training-drawing-editor-grid { display:grid;grid-template-columns:minmax(0,56rem);justify-content:center;gap:1rem; }
 .training-editor-dialog-footer { display:flex;justify-content:flex-end;border-top:1px solid var(--border-soft);padding:.85rem 1.25rem;background:#fff; }
 .training-workspace [role="tabpanel"] { border-radius:var(--radius-card); }
 .training-guidance-header { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;padding:.75rem 1rem;border-top:1px solid var(--border-soft);background:var(--surface-subtle);color:var(--text-muted);font-size:.8rem; }
@@ -1243,6 +1243,10 @@ table tbody tr:hover { background:#fafbfd; }
 .ds-tactical-tool-pen small { font-size:.58rem; }
 .ds-tactical-tool:hover { border-color:var(--clube-primary-border);background:var(--clube-primary-surface);transform:translateY(-1px); }
 .ds-tactical-tool.is-active { border-color:var(--clube-primary);background:var(--clube-primary);color:var(--clube-on-primary);box-shadow:0 2px 6px color-mix(in srgb,var(--clube-primary) 25%,transparent); }
+.ds-tactical-path-mode { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.25rem;margin-top:.3rem;border-radius:.45rem;background:#f3f6fa;padding:.2rem; }
+.ds-tactical-path-mode button { min-height:1.8rem;border-radius:.35rem;color:#475569;font-size:.62rem;font-weight:800; }
+.ds-tactical-path-mode button.is-active { background:var(--clube-primary);color:var(--clube-on-primary); }
+.ds-tactical-path-hint { color:#64748b;font-size:.55rem;line-height:1.35; }
 .ds-tactical-tool small { max-width:100%;overflow:hidden;font-size:.5rem;font-weight:750;line-height:1.1;text-overflow:ellipsis;white-space:nowrap; }
 .ds-tactical-tool-danger { color:#b4232f; }
 .ds-tactical-symbol { display:grid;width:1.35rem;height:1.35rem;place-items:center;border:2px solid currentColor;border-radius:50%;font-size:.7rem;font-weight:850; }

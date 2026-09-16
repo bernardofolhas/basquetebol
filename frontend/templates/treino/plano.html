@@ -1095,7 +1095,7 @@ function inicializarDesenho(canvasId) {
         redesenhar(canvasId);
     };
     const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'seleccionar', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, gestoCaneta: null, ultimoToqueCaneta: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033', reconhecimentoAtivo: false, reconhecimentoBackup: null };
+    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'seleccionar', formatoLinha: 'reta', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, gestoCaneta: null, ultimoToqueCaneta: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033', reconhecimentoAtivo: false, reconhecimentoBackup: null };
     requestAnimationFrame(() => {
         configurarCanvas();
         if (canvas.dataset.estado) restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
@@ -1604,8 +1604,9 @@ function aoPremir(canvasId, e) {
         redesenhar(canvasId);
         return;
     }
-    if (!est.linhaMultipla) est.linhaMultipla = { tipo: est.ferramenta, pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 };
+    if (!est.linhaMultipla) est.linhaMultipla = { tipo: est.ferramenta, curva: est.formatoLinha === 'curva', pontos: [{ x: pos.x, y: pos.y }], largura: est.larguraLinha, cor: est.corLinha, tamanho: 1 };
     else est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
+    if (est.linhaMultipla.curva) est.aDesconhar = true;
     redesenhar(canvasId);
     if (est.posicaoCursor) desenharLinhaMultipla(est.ctx, est.linhaMultipla, est.posicaoCursor);
 }
@@ -1630,6 +1631,17 @@ function aoMover(canvasId, e) {
         }
         return;
     }
+    if (est.aDesconhar && est.linhaMultipla?.curva) {
+        const eventos = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [e];
+        (eventos.length ? eventos : [e]).forEach(evento => {
+            const ponto = obterPos(est.canvas, evento);
+            const ultimo = est.linhaMultipla.pontos[est.linhaMultipla.pontos.length - 1];
+            if (Math.hypot(ponto.x - ultimo.x, ponto.y - ultimo.y) >= 2) est.linhaMultipla.pontos.push(ponto);
+        });
+        redesenhar(canvasId);
+        desenharLinhaMultipla(est.ctx, est.linhaMultipla, pos);
+        return;
+    }
     if (est.ferramenta === 'seleccionar' && est.aDesconhar && est.objectoSeleccionado) {
         const obj = est.objectoSeleccionado;
         if (eObjectoMovel(obj)) {
@@ -1652,7 +1664,7 @@ function aoMover(canvasId, e) {
     }
 }
 
-function aoSoltar(canvasId) {
+function aoSoltar(canvasId, evento) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
     if (est.ferramenta === 'caneta' && est.aDesconhar && est.linhaMultipla) {
@@ -1664,6 +1676,17 @@ function aoSoltar(canvasId) {
         est.linhaMultipla = null;
         est.aDesconhar = false;
         redesenhar(canvasId);
+        return;
+    }
+    if (est.linhaMultipla?.curva && est.aDesconhar) {
+        if (evento?.clientX !== undefined) {
+            const fim = obterPos(est.canvas, evento);
+            const ultimo = est.linhaMultipla.pontos[est.linhaMultipla.pontos.length - 1];
+            if (Math.hypot(fim.x - ultimo.x, fim.y - ultimo.y) >= 1) est.linhaMultipla.pontos.push(fim);
+        }
+        est.aDesconhar = false;
+        if (est.linhaMultipla.pontos.length >= 2) finalizarLinhaPendente(canvasId);
+        else redesenhar(canvasId);
         return;
     }
     if (est.ferramenta === 'apagar' || est.apagarComPonteiro) {
@@ -1766,6 +1789,45 @@ function desenharSimbolo(ctx, obj) {
     ctx.restore();
 }
 
+function suavizarPontosLinha(pontos) {
+    if (pontos.length < 3) return pontos;
+    return pontos.map((ponto, indice) => {
+        if (indice === 0 || indice === pontos.length - 1) return ponto;
+        const anterior = pontos[indice - 1], seguinte = pontos[indice + 1];
+        return { x: (anterior.x + 2 * ponto.x + seguinte.x) / 4, y: (anterior.y + 2 * ponto.y + seguinte.y) / 4 };
+    });
+}
+
+function tracarCurvaSuave(ctx, pontos) {
+    ctx.moveTo(pontos[0].x, pontos[0].y);
+    for (let indice = 1; indice < pontos.length - 1; indice++) {
+        const ponto = pontos[indice], seguinte = pontos[indice + 1];
+        ctx.quadraticCurveTo(ponto.x, ponto.y, (ponto.x + seguinte.x) / 2, (ponto.y + seguinte.y) / 2);
+    }
+    ctx.lineTo(pontos[pontos.length - 1].x, pontos[pontos.length - 1].y);
+}
+
+function amostrarCurva(pontos, intervalo = 11) {
+    const amostras = [pontos[0]];
+    let distanciaRestante = intervalo;
+    for (let indice = 1; indice < pontos.length; indice++) {
+        let inicio = pontos[indice - 1];
+        const fim = pontos[indice];
+        let distancia = Math.hypot(fim.x - inicio.x, fim.y - inicio.y);
+        while (distancia >= distanciaRestante && distancia > 0) {
+            const proporcao = distanciaRestante / distancia;
+            inicio = { x: inicio.x + (fim.x - inicio.x) * proporcao, y: inicio.y + (fim.y - inicio.y) * proporcao };
+            amostras.push(inicio);
+            distancia = Math.hypot(fim.x - inicio.x, fim.y - inicio.y);
+            distanciaRestante = intervalo;
+        }
+        distanciaRestante -= distancia;
+    }
+    const ultimo = pontos[pontos.length - 1];
+    if (Math.hypot(ultimo.x - amostras[amostras.length - 1].x, ultimo.y - amostras[amostras.length - 1].y) > 0.5) amostras.push(ultimo);
+    return amostras;
+}
+
 function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
     if (!linha.pontos || linha.pontos.length === 0) return;
     ctx.save();
@@ -1774,22 +1836,24 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
     const todosPontos = [...linha.pontos];
     if (posicaoCursor) todosPontos.push(posicaoCursor);
     if (todosPontos.length < 2) { ctx.restore(); return; }
+    const pontosDesenho = linha.curva ? suavizarPontosLinha(todosPontos) : todosPontos;
     ctx.beginPath();
     if (linha.tipo === 'caneta') {
-        ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
-        for (let i = 1; i < todosPontos.length - 1; i++) {
-            const meioX = (todosPontos[i].x + todosPontos[i + 1].x) / 2;
-            const meioY = (todosPontos[i].y + todosPontos[i + 1].y) / 2;
-            ctx.quadraticCurveTo(todosPontos[i].x, todosPontos[i].y, meioX, meioY);
-        }
-        ctx.lineTo(todosPontos[todosPontos.length - 1].x, todosPontos[todosPontos.length - 1].y);
-    } else if (linha.tipo === 'seta_curva') {
-        ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
-        for (let i = 0; i < todosPontos.length - 1; i++) { const mx = (todosPontos[i].x + todosPontos[i + 1].x) / 2, my = (todosPontos[i].y + todosPontos[i + 1].y) / 2; ctx.quadraticCurveTo(todosPontos[i].x, todosPontos[i].y, mx, my); }
-        ctx.lineTo(todosPontos[todosPontos.length - 1].x, todosPontos[todosPontos.length - 1].y);
+        tracarCurvaSuave(ctx, pontosDesenho);
+    } else if (linha.tipo === 'seta_curva' || (linha.curva && !['seta_zigzag', 'lancamento'].includes(linha.tipo))) {
+        tracarCurvaSuave(ctx, pontosDesenho);
     } else if (linha.tipo === 'seta_zigzag') {
-        ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
-        for (let i = 0; i < todosPontos.length - 1; i++) {
+        ctx.moveTo(pontosDesenho[0].x, pontosDesenho[0].y);
+        if (linha.curva) {
+            const amostras = amostrarCurva(pontosDesenho);
+            for (let indice = 1; indice < amostras.length - 1; indice++) {
+                const anterior = amostras[indice - 1], seguinte = amostras[indice + 1], ponto = amostras[indice];
+                const angulo = Math.atan2(seguinte.y - anterior.y, seguinte.x - anterior.x);
+                const lado = indice % 2 === 0 ? 1 : -1;
+                ctx.lineTo(ponto.x - Math.sin(angulo) * lado * 6, ponto.y + Math.cos(angulo) * lado * 6);
+            }
+            ctx.lineTo(amostras[amostras.length - 1].x, amostras[amostras.length - 1].y);
+        } else for (let i = 0; i < todosPontos.length - 1; i++) {
             const p1 = todosPontos[i], p2 = todosPontos[i + 1]; const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x); const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
             const n = Math.max(1, Math.floor(dist / 15)); const stepX = (p2.x - p1.x) / (n * 2), stepY = (p2.y - p1.y) / (n * 2); const perpX = -Math.sin(ang) * 6, perpY = Math.cos(ang) * 6;
             for (let j = 0; j < n; j++) { ctx.lineTo(p1.x + stepX * (j * 2 + 1) + (j % 2 === 0 ? perpX : -perpX), p1.y + stepY * (j * 2 + 1) + (j % 2 === 0 ? perpY : -perpY)); ctx.lineTo(p1.x + stepX * (j * 2 + 2), p1.y + stepY * (j * 2 + 2)); }
@@ -1798,21 +1862,28 @@ function desenharLinhaMultipla(ctx, linha, posicaoCursor) {
         const afastamento = 5;
         for (const lado of [-1, 1]) {
             ctx.beginPath();
-            todosPontos.forEach((ponto, indice) => {
-                const anterior = todosPontos[Math.max(0, indice - 1)], seguinte = todosPontos[Math.min(todosPontos.length - 1, indice + 1)];
+            const lateral = pontosDesenho.map((ponto, indice) => {
+                const anterior = pontosDesenho[Math.max(0, indice - 1)], seguinte = pontosDesenho[Math.min(pontosDesenho.length - 1, indice + 1)];
                 const angulo = Math.atan2(seguinte.y - anterior.y, seguinte.x - anterior.x);
-                const x = ponto.x - Math.sin(angulo) * lado * afastamento;
-                const y = ponto.y + Math.cos(angulo) * lado * afastamento;
-                if (indice === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                return { x: ponto.x - Math.sin(angulo) * lado * afastamento, y: ponto.y + Math.cos(angulo) * lado * afastamento };
             });
+            if (linha.curva) tracarCurvaSuave(ctx, lateral);
+            else lateral.forEach((ponto, indice) => { if (indice === 0) ctx.moveTo(ponto.x, ponto.y); else ctx.lineTo(ponto.x, ponto.y); });
             ctx.stroke();
         }
     } else {
         ctx.moveTo(todosPontos[0].x, todosPontos[0].y);
         for (let i = 1; i < todosPontos.length; i++) ctx.lineTo(todosPontos[i].x, todosPontos[i].y);
     }
-    ctx.stroke();
-    const ultimo = todosPontos[todosPontos.length - 1], penultimo = todosPontos[todosPontos.length - 2];
+    if (linha.tipo !== 'lancamento') ctx.stroke();
+    const ultimo = pontosDesenho[pontosDesenho.length - 1];
+    let penultimo = pontosDesenho[pontosDesenho.length - 2];
+    if (linha.curva) {
+        for (let indice = pontosDesenho.length - 2; indice >= 0; indice--) {
+            penultimo = pontosDesenho[indice];
+            if (Math.hypot(ultimo.x - penultimo.x, ultimo.y - penultimo.y) >= 8) break;
+        }
+    }
     const ang = Math.atan2(ultimo.y - penultimo.y, ultimo.x - penultimo.x); const tp = 19;
     ctx.setLineDash([]);
     if (linha.tipo === 'bloqueio') {
@@ -1898,6 +1969,19 @@ function definirFerramenta(canvasId, ferramenta) {
         });
     }
     sincronizarNumeroJogador(canvasId);
+}
+
+function definirFormatoLinha(canvasId, formato) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est || !['reta', 'curva'].includes(formato)) return;
+    finalizarLinhaPendente(canvasId);
+    est.formatoLinha = formato;
+    const toolbar = document.getElementById('toolbar_' + canvasId);
+    toolbar?.querySelectorAll('[data-formato-linha]').forEach(botao => {
+        const activo = botao.dataset.formatoLinha === formato;
+        botao.classList.toggle('is-active', activo);
+        botao.setAttribute('aria-pressed', activo ? 'true' : 'false');
+    });
 }
 
 function finalizarLinhaPendente(canvasId) {

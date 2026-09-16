@@ -23,10 +23,15 @@
         <h4>Movimentos</h4>
         <div class="ds-tactical-tool-grid">
             <button type="button" class="ds-tactical-tool ds-tactical-tool-pen" data-ferramenta="caneta" onclick="definirFerramenta('{{ canvas_id }}', 'caneta')" title="Desenhar livremente com Apple Pencil, toque ou rato"><span aria-hidden="true">&#9998;</span><small>Caneta livre</small></button>
-            {% for ferramenta, simbolo, label in [('seta','→','Corrida'),('seta_tracejada','⇢','Passe'),('seta_zigzag','≋','Drible'),('lancamento','⇉','Lançamento'),('seta_curva','⌒','Curva'),('bloqueio','⊣','Bloqueio'),('linha','—','Linha')] %}
+            {% for ferramenta, simbolo, label in [('seta','→','Corrida'),('seta_tracejada','⇢','Passe'),('seta_zigzag','≋','Drible'),('lancamento','⇉','Lançamento'),('bloqueio','⊣','Bloqueio'),('linha','—','Linha')] %}
             <button type="button" class="ds-tactical-tool" data-ferramenta="{{ ferramenta }}" onclick="definirFerramenta('{{ canvas_id }}', '{{ ferramenta }}')" title="{{ label }}"><span>{{ simbolo }}</span><small>{{ label }}</small></button>
             {% endfor %}
         </div>
+        <div class="ds-tactical-path-mode" role="group" aria-label="Forma do risco">
+            <button type="button" class="is-active" data-formato-linha="reta" aria-pressed="true" onclick="definirFormatoLinha('{{ canvas_id }}', 'reta')">Reta</button>
+            <button type="button" data-formato-linha="curva" aria-pressed="false" onclick="definirFormatoLinha('{{ canvas_id }}', 'curva')">Curva</button>
+        </div>
+        <small class="ds-tactical-path-hint">Escolhe a ação e depois a forma. Para curvas, arrasta a caneta ou o rato.</small>
     </section>
     <section class="ds-tactical-tool-group">
         <h4>Estilo da linha</h4>
