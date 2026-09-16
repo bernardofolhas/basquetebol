@@ -39,7 +39,7 @@ def test_contactos_sao_removidos_para_perfil_nao_autorizado():
         ("ordem", "contactos,identificacao"),
     ])
     _, _, secoes = _configuracao_relatorio("roster", dados, UtilizadorFalso(PerfilEnum.treinador))
-    assert secoes == ["identificacao"]
+    assert secoes == ["fotografia", "identificacao"]
 
 
 def test_a3_nunca_inclui_contactos_mesmo_para_administrador():
@@ -51,7 +51,7 @@ def test_a3_nunca_inclui_contactos_mesmo_para_administrador():
     ])
     formato, _, secoes = _configuracao_relatorio("roster", dados, UtilizadorFalso(PerfilEnum.administrador))
     assert formato == "a3"
-    assert secoes == ["identificacao"]
+    assert secoes == ["fotografia", "identificacao"]
 
 
 def test_ordem_escolhida_e_preservada_e_vazios_usam_padrao():
@@ -62,7 +62,7 @@ def test_ordem_escolhida_e_preservada_e_vazios_usam_padrao():
         ("ordem", "zonas,identificacao"),
     ])
     _, _, secoes = _configuracao_relatorio("scouting-individual", dados, UtilizadorFalso(PerfilEnum.treinador))
-    assert secoes == ["zonas", "identificacao"]
+    assert secoes == ["fotografia", "zonas", "identificacao"]
     _, _, vazias = _configuracao_relatorio("plano-jogo", FormData([("formato", "facil")]), UtilizadorFalso(PerfilEnum.treinador))
     assert vazias == _secoes_padrao("plano-jogo", "facil")
 
@@ -71,6 +71,23 @@ def test_configurador_tem_selecao_arrastar_previsualizacao_e_predefinicoes():
     html = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
     for marcador in ("draggable=\"true\"", "Pré-visualizar", "Descarregar PDF", "Guardar predefinição", "Selecionar tudo", "Repor formato"):
         assert marcador in html
+
+
+def test_estatisticas_sao_escolhidas_individualmente_antes_da_exportacao():
+    formulario = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
+    rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+    assert 'name="estatisticas"' in formulario
+    assert 'dados.getlist("estatisticas")' in rota
+    assert "campo in STAT_FIELDS" in rota
+
+
+def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
+    html = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
+    assert 'class="players"' in html
+    assert 'class="player"' in html
+    assert "j.fotografia" in html
+    assert "truncate(180)" in html
+    assert "stat_fields" in html
 
 
 def test_formulario_dinamico_transporta_token_da_sessao():

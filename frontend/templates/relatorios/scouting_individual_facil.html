@@ -1,1 +1,38 @@
-{% include "relatorios/_documento.html" %}
+{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>{{ titulo_relatorio }} · {{ alvo_nome }}</title>
+{{ estilo_pdf() }}
+<style>
+@page{size:A4 {{ 'landscape' if orientacao == 'paisagem' else 'portrait' }};margin:11mm}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#172033;font-size:10px;line-height:1.35}.intro{display:flex;justify-content:space-between;gap:12px;margin:4px 0 12px;color:#64748b}.players{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.player{display:grid;grid-template-columns:64px 1fr;gap:9px;padding:10px;border:1px solid #dbe3ee;border-radius:10px;background:#fff;page-break-inside:avoid;box-shadow:0 2px 0 #e2e8f0}.photo{width:64px;height:76px;border-radius:8px;object-fit:cover;background:#e2e8f0}.photo.placeholder{display:grid;place-items:center;color:#64748b;font-size:18px;font-weight:800}.identity h2{margin:0;color:var(--pdf-primary-dark);font-size:15px}.meta{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 7px}.meta span{padding:2px 5px;border-radius:999px;background:var(--pdf-primary-light);font-weight:700}.summary{margin:0 0 6px;color:#334155}.focus{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.focus-card{padding:6px;border-radius:7px;background:#f8fafc;border-left:3px solid var(--pdf-primary)}.focus-card strong{display:block;margin-bottom:3px;color:#0f172a;font-size:9px;text-transform:uppercase}.focus-card p{margin:2px 0}.zones{grid-column:1/-1;display:flex;gap:4px;flex-wrap:wrap}.zones span{padding:3px 6px;border-radius:999px;background:#eef2f7}.stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr);gap:4px}.stat{padding:5px 3px;text-align:center;border-radius:6px;background:var(--pdf-primary-light)}.stat b,.stat small{display:block}.stat b{font-size:13px;color:var(--pdf-primary-dark)}.stat small{font-size:7px;text-transform:uppercase}.empty{padding:24px;text-align:center;color:#64748b;border:1px dashed #cbd5e1;border-radius:10px}
+</style>
+</head>
+<body>
+{{ cabecalho_pdf('Scouting individual · leitura fácil', alvo_nome, 'Exportado em ' ~ data_exportacao ~ ' · ' ~ nome_autor) }}
+<div class="intro"><strong>Guia rápido para atletas</strong><span>{{ atletas|length }} jogador(es) selecionado(s)</span></div>
+<main class="players">
+{% for j in atletas %}
+{% set grupos=itens_atletas[j.id] %}
+<article class="player">
+  {% if j.fotografia %}<img class="photo" src="{{ j.fotografia }}" alt="{{ j.nome }}">{% else %}<div class="photo placeholder">{{ j.nome[:2]|upper }}</div>{% endif %}
+  <div class="identity">
+    <h2>#{{ j.numero or '—' }} · {{ j.nome }}</h2>
+    <div class="meta"><span>{{ j.posicao_principal }}{% if j.posicao_alternativa %}/{{ j.posicao_alternativa }}{% endif %}</span>{% if j.altura_cm %}<span>{{ j.altura_cm|round|int }} cm</span>{% endif %}{% if j.mao_dominante %}<span>Mão {{ j.mao_dominante }}</span>{% endif %}</div>
+    {% if 'observacoes' in secoes_set and j.ficha and j.ficha.resumo %}<p class="summary">{{ j.ficha.resumo|truncate(180) }}</p>{% endif %}
+  </div>
+  <div class="focus">
+    {% if ('pontos_fortes' in secoes_set or 'pontos_fracos' in secoes_set) and grupos.get('caracteristica') %}<div class="focus-card"><strong>Atenção</strong>{% for rel in grupos['caracteristica'][:3] %}<p>{{ rel.item.nome }}{% if rel.observacao %} · {{ rel.observacao|truncate(70) }}{% endif %}</p>{% endfor %}</div>{% endif %}
+    {% if 'tendencias' in secoes_set and grupos.get('movimento') %}<div class="focus-card"><strong>Movimentos</strong>{% for rel in grupos['movimento'][:3] %}<p>{{ rel.item.nome }}{% if rel.observacao %} · {{ rel.observacao|truncate(70) }}{% endif %}</p>{% endfor %}</div>{% endif %}
+    {% if 'recomendacoes' in secoes_set and grupos.get('estrategia') %}<div class="focus-card"><strong>Como defender</strong>{% for rel in grupos['estrategia'][:3] %}<p>{{ rel.item.nome }}{% if rel.observacao %} · {{ rel.observacao|truncate(70) }}{% endif %}</p>{% endfor %}</div>{% endif %}
+  </div>
+  {% if 'zonas' in secoes_set and j.zonas %}<div class="zones">{% for z in j.zonas[:4] %}<span>{{ z.zona }}</span>{% endfor %}</div>{% endif %}
+  {% if 'estatisticas' in secoes_set and stat_fields and j.media_epoca %}<div class="stats">{% for campo in stat_fields if j.media_epoca|attr(campo) is not none %}<div class="stat"><b>{{ j.media_epoca|attr(campo)|round(1) }}</b><small>{{ stat_labels.get(campo, campo|replace('_',' ')) }}</small></div>{% endfor %}</div>{% endif %}
+</article>
+{% else %}<div class="empty">Sem atletas selecionados.</div>{% endfor %}
+</main>
+{{ rodape_pdf(equipa.nome ~ ' · Scouting individual') }}
+</body>
+</html>

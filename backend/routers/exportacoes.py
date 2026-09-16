@@ -749,6 +749,29 @@ RELATORIOS_CONFIG = {
     },
 }
 
+STAT_LABELS = {
+    "minutos": "MIN",
+    "pontos": "PTS",
+    "fg_c": "FG convertidos",
+    "fg_t": "FG tentados",
+    "dois_c": "2P convertidos",
+    "dois_t": "2P tentados",
+    "tres_c": "3P convertidos",
+    "tres_t": "3P tentados",
+    "ll_c": "LL convertidos",
+    "ll_t": "LL tentados",
+    "ress_of": "Ressaltos ofensivos",
+    "ress_def": "Ressaltos defensivos",
+    "ress_total": "Ressaltos",
+    "assistencias": "Assistências",
+    "faltas": "Faltas",
+    "turnovers": "Turnovers",
+    "roubos": "Roubos",
+    "desarmes": "Desarmes",
+    "mais_menos": "+/-",
+    "eficiencia": "Eficiência",
+}
+
 PERFIS_CONTACTOS = {"superadministrador", "administrador", "coordenador", "secretaria"}
 
 
@@ -773,6 +796,8 @@ def _configuracao_relatorio(tipo: str, dados, utilizador) -> tuple[str, str, lis
     secoes = ordem + [s for s in escolhidas if s not in ordem]
     if not secoes:
         secoes = _secoes_padrao(tipo, formato)
+    if tipo in {"roster", "scouting-individual"} and "fotografia" not in secoes:
+        secoes.insert(0, "fotografia")
     if formato == "a3" or _perfil(utilizador) not in PERFIS_CONTACTOS:
         secoes = [s for s in secoes if s != "contactos"]
     return formato, orientacao, secoes
@@ -823,22 +848,30 @@ def _itens_por_categoria(itens) -> dict[str, list]:
 def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> dict:
     contexto = {"tipo_relatorio": tipo, "equipa": equipa, "alvo": alvo}
     ids = {int(v) for v in dados.getlist("entidades") if str(v).isdigit()}
+    stat_fields = [campo for campo in dados.getlist("estatisticas") if campo in STAT_FIELDS]
     if tipo == "roster":
         atletas = [j for j in alvo.jogadores if j.estado != "arquivado" and (not ids or j.id in ids)]
         contexto.update(
             atletas=sorted(atletas, key=lambda j: j.nome.lower()),
-            stat_fields=STAT_FIELDS,
+            stat_fields=stat_fields,
+            stat_labels=STAT_LABELS,
         )
     elif tipo == "scouting-individual":
         atletas = [j for j in alvo.jogadores if not ids or j.id in ids]
-        contexto.update(atletas=atletas, itens_atletas={j.id: _itens_por_categoria(j.itens) for j in atletas}, stat_fields=STAT_FIELDS)
+        contexto.update(
+            atletas=atletas,
+            itens_atletas={j.id: _itens_por_categoria(j.itens) for j in atletas},
+            stat_fields=stat_fields,
+            stat_labels=STAT_LABELS,
+        )
     elif tipo == "scouting-coletivo":
         contexto.update(
             adversario=alvo,
             itens_coletivos=_itens_por_categoria(alvo.itens_coletivos),
             cinco_previsto=[r for r in alvo.rotacao_prevista if r.papel == "titular"],
             rotacoes_previstas=[r for r in alvo.rotacao_prevista if r.papel != "titular"],
-            stat_fields=STAT_FIELDS,
+            stat_fields=stat_fields,
+            stat_labels=STAT_LABELS,
         )
     else:
         plano = alvo.plano
@@ -894,6 +927,9 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
         "predefinicao": predefinicao,
         "selecionadas": selecionadas,
         "padroes": {f: _secoes_padrao(tipo, f) for f in FORMATOS_RELATORIO},
+        "estatisticas_disponiveis": [(campo, STAT_LABELS[campo]) for campo in STAT_FIELDS]
+        if any(secao["chave"] == "estatisticas" for secao in RELATORIOS_CONFIG[tipo]["secoes"])
+        else [],
         "pode_ver_contactos": _perfil(utilizador) in PERFIS_CONTACTOS,
     }
 
