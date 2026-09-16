@@ -853,6 +853,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         atletas = [j for j in alvo.jogadores if j.estado != "arquivado" and (not ids or j.id in ids)]
         contexto.update(
             atletas=sorted(atletas, key=lambda j: j.nome.lower()),
+            fotografias={j.id: _fotografia_embebida(j.fotografia) for j in atletas},
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,
         )
@@ -860,6 +861,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         atletas = [j for j in alvo.jogadores if not ids or j.id in ids]
         contexto.update(
             atletas=atletas,
+            fotografias={j.id: _fotografia_embebida(j.fotografia) for j in atletas},
             itens_atletas={j.id: _itens_por_categoria(j.itens) for j in atletas},
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,
@@ -867,6 +869,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
     elif tipo == "scouting-coletivo":
         contexto.update(
             adversario=alvo,
+            fotografias={j.id: _fotografia_embebida(j.fotografia) for j in alvo.jogadores},
             itens_coletivos=_itens_por_categoria(alvo.itens_coletivos),
             cinco_previsto=[r for r in alvo.rotacao_prevista if r.papel == "titular"],
             rotacoes_previstas=[r for r in alvo.rotacao_prevista if r.papel != "titular"],
@@ -886,7 +889,15 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             plano=plano,
             convocados=alvo.convocados,
             titulares=titulares_ordenados,
+            fotografias_equipa={
+                j.id: _fotografia_embebida(j.fotografia)
+                for j in {c.jogador for c in alvo.convocados} | set(titulares_ordenados)
+            },
             adversario=adversario,
+            fotografias_adversario={
+                j.id: _fotografia_embebida(j.fotografia)
+                for j in (adversario.jogadores if adversario else [])
+            },
             cinco_adversario=[r for r in adversario.rotacao_prevista if r.papel == "titular"] if adversario else [],
             itens_coletivos=_itens_por_categoria(adversario.itens_coletivos) if adversario else {},
         )

@@ -4,7 +4,7 @@
 <div class="easy-intro"><strong>Referência rápida do adversário</strong><span>{{ atletas|length }} atleta(s)</span></div>
 <main class="easy-roster">
 {% for j in atletas %}<article class="easy-card easy-person">
-{% if j.fotografia %}<img class="easy-photo" src="{{ j.fotografia }}" alt="{{ j.nome }}">{% else %}<div class="easy-avatar">{{ j.nome[:2]|upper }}</div>{% endif %}
+{% if fotografias.get(j.id) %}<img class="easy-photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="easy-avatar">{{ j.nome[:2]|upper }}</div>{% endif %}
 <div><h2>#{{ j.numero or '—' }} · {{ j.nome }}</h2><div class="easy-meta"><span>{{ j.posicao_principal }}{% if j.posicao_alternativa %}/{{ j.posicao_alternativa }}{% endif %}</span>{% if j.altura_cm %}<span>{{ j.altura_cm|round|int }} cm</span>{% endif %}{% if j.mao_dominante %}<span>Mão {{ j.mao_dominante }}</span>{% endif %}</div>{% if 'notas' in secoes_set and j.observacoes %}<p class="muted">{{ j.observacoes|truncate(120) }}</p>{% endif %}</div>
 {% if 'estatisticas' in secoes_set and stat_fields and j.media_epoca %}<div class="easy-stats">{% for campo in stat_fields if j.media_epoca|attr(campo) is not none %}<div class="easy-stat"><b>{{ j.media_epoca|attr(campo)|round(1) }}</b><small>{{ stat_labels.get(campo, campo|replace('_',' ')) }}</small></div>{% endfor %}</div>{% endif %}
 </article>{% else %}<div class="easy-empty">Sem atletas selecionados.</div>{% endfor %}

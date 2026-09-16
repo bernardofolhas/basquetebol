@@ -17,7 +17,7 @@
 {% for j in atletas %}
 {% set grupos=itens_atletas[j.id] %}
 <article class="player">
-  {% if j.fotografia %}<img class="photo" src="{{ j.fotografia }}" alt="{{ j.nome }}">{% else %}<div class="photo placeholder">{{ j.nome[:2]|upper }}</div>{% endif %}
+  {% if fotografias.get(j.id) %}<img class="photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="photo placeholder">{{ j.nome[:2]|upper }}</div>{% endif %}
   <div class="identity">
     <h2>#{{ j.numero or '—' }} · {{ j.nome }}</h2>
     <div class="meta"><span>{{ j.posicao_principal }}{% if j.posicao_alternativa %}/{{ j.posicao_alternativa }}{% endif %}</span>{% if j.altura_cm %}<span>{{ j.altura_cm|round|int }} cm</span>{% endif %}{% if j.mao_dominante %}<span>Mão {{ j.mao_dominante }}</span>{% endif %}</div>

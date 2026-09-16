@@ -85,14 +85,14 @@ def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
     html = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
     assert 'class="players"' in html
     assert 'class="player"' in html
-    assert "j.fotografia" in html
+    assert "fotografias.get(j.id)" in html
     assert "truncate(180)" in html
     assert "stat_fields" in html
 
 
 def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
     marcadores = {
-        "roster_facil.html": ("easy-roster", "j.fotografia", "Referência rápida"),
+        "roster_facil.html": ("easy-roster", "fotografias.get(j.id)", "Referência rápida"),
         "scouting_coletivo_facil.html": ("Quando defendemos", "Quando atacamos", "Jogadores-chave"),
         "plano_jogo_facil.html": ("briefing da equipa", "O nosso cinco", "Convocados"),
     }
@@ -113,6 +113,26 @@ def test_relatorios_faceis_com_jogadores_apresentam_fotografias():
         html = (TEMPLATES / "relatorios" / ficheiro).read_text(encoding="utf-8")
         assert "fotografia" in html
         assert "easy-photo" in html or 'class="photo"' in html
+
+
+def test_relatorios_faceis_validam_fotografias_antes_de_renderizar():
+    rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+    roster = (TEMPLATES / "relatorios" / "roster_facil.html").read_text(encoding="utf-8")
+    individual = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
+    assert "fotografias={j.id: _fotografia_embebida(j.fotografia)" in rota
+    assert "fotografias.get(j.id)" in roster
+    assert "fotografias.get(j.id)" in individual
+    assert 'alt="{{ j.nome }}"' not in roster
+
+
+def test_quadro_individual_permite_escolher_blocos_no_pendente():
+    html = (TEMPLATES / "scouting" / "individual.html").read_text(encoding="utf-8")
+    script = (ROOT / "frontend" / "static" / "js" / "scouting-individual-config.js").read_text(encoding="utf-8")
+    assert "Configurar quadro" in html
+    assert "data-reading-toggle" in html
+    assert "data-reading-category" in html
+    assert "localStorage" in script
+    assert "card.hidden=!active.has" in script
 
 
 def test_formulario_dinamico_transporta_token_da_sessao():
