@@ -13,24 +13,34 @@ from clube_contexto import clube_atual_id
 from database import get_db
 from flash import set_flash
 from models.jogo import Jogo
+from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.scouting import (
     STAT_FIELDS,
     RelatorioScouting,
     ScoutingAcao,
     ScoutingAdversario,
+    ScoutingAdversarioItem,
     ScoutingAdversarioJogo,
+    ScoutingConceitoOfensivo,
     ScoutingEstatisticaJogo,
+    ScoutingEstatisticaColetivaJogo,
     ScoutingFichaIndividual,
     ScoutingItemBiblioteca,
     ScoutingJogador,
     ScoutingJogadorAdversario,
     ScoutingJogadorItem,
+    ScoutingLiderEstatistico,
     ScoutingMediaEpoca,
+    ScoutingMediaColetiva,
+    ScoutingMomentoPlaybook,
+    ScoutingOpcoesDefensivas,
+    ScoutingResultadoColetivo,
     ScoutingZonaAcao,
 )
 from paths import TEMPLATES_DIR
 from services.pdf_service import content_disposition_pdf, renderizar_pdf
 from services.fotografia_jogador_service import apagar_fotografia, guardar_fotografia
+from services.desenho_service import decompor_desenho_editavel
 from template_config import Jinja2Templates
 
 
@@ -45,7 +55,20 @@ CATEGORIAS_BIBLIOTECA = {
     "caracteristica": "Características",
     "movimento": "Movimentos preferenciais",
     "estrategia": "Estratégias defensivas",
+    "estatistica_coletiva": "Características estatísticas",
+    "ataque_forte": "Ataque · pontos fortes",
+    "ataque_fraco": "Ataque · pontos fracos",
+    "defesa_forte": "Defesa · pontos fortes",
+    "defesa_fraco": "Defesa · pontos fracos",
 }
+TIPOS_LIDERANCA = ("Melhor marcador", "Melhor ressaltador", "Melhor assistente", "Melhor lançador de 3 pontos", "Jogador mais utilizado", "Jogador mais eficiente", "Melhor defensor")
+OPCOES_DEFENSIVAS = (
+    ("bloqueio_central", "Bloqueios diretos centrais"),
+    ("bloqueio_lateral", "Bloqueios diretos laterais"),
+    ("bloqueio_indireto", "Bloqueios indiretos"),
+    ("handoff", "Handoff"), ("bola_interior", "Defesa da bola interior"),
+    ("alteracoes", "Alterações defensivas"),
+)
 ZONAS_CAMPO = (
     ("canto_esquerdo", "Canto esquerdo"), ("ala_esquerda", "Ala esquerda"),
     ("topo", "Topo"), ("ala_direita", "Ala direita"), ("canto_direito", "Canto direito"),
@@ -124,9 +147,83 @@ def _contexto_departamento(request, utilizador, adversario=None, **extra):
         "utilizador": utilizador, "adversario": adversario, "equipa": None,
         "posicoes": POSICOES, "estados_jogador": ESTADOS_JOGADOR,
         "categorias_biblioteca": CATEGORIAS_BIBLIOTECA, "zonas_campo": ZONAS_CAMPO,
+        "tipos_lideranca": TIPOS_LIDERANCA, "opcoes_defensivas_lista": OPCOES_DEFENSIVAS,
     }
     contexto.update(extra)
     return contexto
+
+
+def _sincronizar_resultados_coletivos(db: Session, adversario: ScoutingAdversario) -> None:
+    alterado = False
+    for ligacao in adversario.jogos:
+        jogo = ligacao.jogo
+        if not jogo or jogo.pontos_nos is None or jogo.pontos_adversario is None:
+            continue
+        resultado = db.query(ScoutingResultadoColetivo).filter(
+            ScoutingResultadoColetivo.adversario_id == adversario.id,
+            ScoutingResultadoColetivo.jogo_id == jogo.id,
+        ).first()
+        if not resultado:
+            resultado = ScoutingResultadoColetivo(
+                clube_id=adversario.clube_id, adversario_id=adversario.id, jogo_id=jogo.id,
+                data=jogo.data, oponente=jogo.equipa.nome, em_casa=not jogo.em_casa,
+            )
+            db.add(resultado)
+        resultado.pontos_marcados = jogo.pontos_adversario
+        resultado.pontos_sofridos = jogo.pontos_nos
+        resultado.competicao = jogo.competicao
+        alterado = True
+    if alterado:
+        db.commit()
+
+
+def _media_calculada(adversario: ScoutingAdversario) -> dict[str, float | None]:
+    registos = list(adversario.estatisticas_coletivas)
+    if not registos:
+        return {campo: None for campo in STAT_FIELDS}
+    media = {}
+    for campo in STAT_FIELDS:
+        valores = [getattr(registo, campo) for registo in registos if getattr(registo, campo) is not None]
+        media[campo] = round(sum(valores) / len(valores), 1) if valores else None
+    return media
+
+
+def _playbook_scouting(db: Session, adversario: ScoutingAdversario) -> Playbook | None:
+    ligacao = next((item for item in adversario.jogos if item.jogo and item.jogo.equipa), None)
+    if not ligacao:
+        return None
+    equipa = ligacao.jogo.equipa
+    base = db.query(Playbook).filter(Playbook.equipa_id == equipa.id).order_by(Playbook.id).first()
+    if not base:
+        db.add(Playbook(clube_id=adversario.clube_id, equipa_id=equipa.id, nome=f"Playbook — {equipa.nome}"))
+        db.flush()
+    nome = f"Scouting · {adversario.nome}"
+    playbook = db.query(Playbook).filter(Playbook.equipa_id == equipa.id, Playbook.nome == nome).first()
+    if not playbook:
+        playbook = Playbook(clube_id=adversario.clube_id, equipa_id=equipa.id, nome=nome, descricao="Área técnica interna do scouting coletivo.")
+        db.add(playbook)
+        db.flush()
+    return playbook
+
+
+def _criar_setplay_scouting(db: Session, adversario: ScoutingAdversario, titulo: str, observacoes: str | None, categoria: str) -> SetPlay | None:
+    playbook = _playbook_scouting(db, adversario)
+    if not playbook:
+        return None
+    setplay = SetPlay(
+        clube_id=adversario.clube_id, playbook_id=playbook.id, nome=titulo,
+        categoria=categoria, descricao=observacoes, origem="scouting", ordem=len(playbook.setplays),
+    )
+    db.add(setplay)
+    db.flush()
+    db.add(PassoSetPlay(clube_id=adversario.clube_id, setplay_id=setplay.id, ordem=0, observacao=observacoes))
+    return setplay
+
+
+def _preparar_preview(registos) -> None:
+    for registo in registos:
+        primeiro = registo.setplay.passos[0] if registo.setplay and registo.setplay.passos else None
+        registo.preview_imagem = decompor_desenho_editavel(primeiro.desenho)[0] if primeiro and primeiro.desenho else None
 
 
 def _jogo_e_relatorio(db: Session, jogo_id: int, utilizador):
@@ -168,7 +265,18 @@ def _contexto_pdf(request: Request, relatorio: RelatorioScouting, utilizador) ->
 
 
 @router.get("", response_class=HTMLResponse)
-def departamento_scouting(request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+def departamento_scouting(
+    request: Request,
+    equipa_id: int | None = None,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_scouting),
+):
+    if equipa_id and verificar_acesso_equipa(utilizador, equipa_id, db):
+        from models.equipa import Equipa
+        equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+        if equipa:
+            request.session["equipa_contexto_id"] = equipa.id
+            request.session["equipa_contexto_nome"] = equipa.nome
     _sincronizar_adversarios(db, utilizador)
     acessiveis = []
     for adversario in db.query(ScoutingAdversario).filter(
@@ -209,9 +317,288 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
         return templates.TemplateResponse(request, "scouting/resumo.html", _contexto_departamento(
             request, utilizador, adversario, separador=separador, jogos=jogos
         ))
+    if separador == "coletivo":
+        _sincronizar_resultados_coletivos(db, adversario)
+        if not adversario.media_coletiva:
+            db.add(ScoutingMediaColetiva(clube_id=adversario.clube_id, adversario_id=adversario.id))
+        if not adversario.opcoes_defensivas:
+            db.add(ScoutingOpcoesDefensivas(clube_id=adversario.clube_id, adversario_id=adversario.id))
+        db.commit()
+        biblioteca = db.query(ScoutingItemBiblioteca).filter(
+            ScoutingItemBiblioteca.clube_id == adversario.clube_id,
+            ScoutingItemBiblioteca.categoria.in_(("estatistica_coletiva", "ataque_forte", "ataque_fraco", "defesa_forte", "defesa_fraco")),
+        ).order_by(ScoutingItemBiblioteca.nome).all()
+        media_calculada = _media_calculada(adversario)
+        media_exibida = {campo: getattr(adversario.media_coletiva, campo) for campo in STAT_FIELDS} if adversario.media_coletiva.usar_manual else media_calculada
+        _preparar_preview(adversario.conceitos_ofensivos)
+        _preparar_preview(adversario.momentos_playbook)
+        return templates.TemplateResponse(request, "scouting/coletivo.html", _contexto_departamento(
+            request, utilizador, adversario, separador=separador, jogos=jogos,
+            resultados=adversario.resultados[:5], biblioteca=biblioteca,
+            media_calculada=media_calculada, media_exibida=media_exibida, stat_fields=STAT_FIELDS,
+        ))
     return templates.TemplateResponse(request, "scouting/em_desenvolvimento.html", _contexto_departamento(
-        request, utilizador, adversario, separador=separador, titulo="Scouting coletivo" if separador == "coletivo" else "Relatórios"
+        request, utilizador, adversario, separador=separador, titulo="Relatórios"
     ))
+
+
+def _voltar_coletivo(adversario_id: int, ancora: str = ""):
+    return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/coletivo{ancora}", status_code=303)
+
+
+@router.post("/adversarios/{adversario_id}/coletivo/resultados")
+async def adicionar_resultado_coletivo(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    dados = await request.form()
+    try:
+        data_resultado = datetime.strptime(str(dados.get("data")), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        set_flash(request, "Indica uma data válida para o resultado.", "error")
+        return _voltar_coletivo(adversario.id, "#resultados")
+    oponente = _limpo(dados.get("oponente"))
+    if not oponente:
+        set_flash(request, "Indica o adversário desse jogo.", "error")
+        return _voltar_coletivo(adversario.id, "#resultados")
+    db.add(ScoutingResultadoColetivo(
+        clube_id=adversario.clube_id, adversario_id=adversario.id, data=data_resultado,
+        oponente=oponente, em_casa=dados.get("local") != "fora",
+        pontos_marcados=_int(dados.get("pontos_marcados")), pontos_sofridos=_int(dados.get("pontos_sofridos")),
+        competicao=_limpo(dados.get("competicao")),
+    ))
+    db.commit()
+    set_flash(request, "Resultado adicionado ao histórico.")
+    return _voltar_coletivo(adversario.id, "#resultados")
+
+
+@router.post("/coletivo/resultados/{resultado_id}/eliminar")
+def eliminar_resultado_coletivo(resultado_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    resultado = db.query(ScoutingResultadoColetivo).filter(ScoutingResultadoColetivo.id == resultado_id).first()
+    adversario = _adversario_acessivel(db, resultado.adversario_id, utilizador) if resultado else None
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    db.delete(resultado)
+    db.commit()
+    return _voltar_coletivo(adversario.id, "#resultados")
+
+
+@router.post("/adversarios/{adversario_id}/coletivo/estatisticas")
+async def guardar_estatistica_coletiva(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    dados = await request.form()
+    resultado_id = _int(dados.get("resultado_id"))
+    resultado = db.query(ScoutingResultadoColetivo).filter(
+        ScoutingResultadoColetivo.id == resultado_id,
+        ScoutingResultadoColetivo.adversario_id == adversario.id,
+    ).first()
+    if not resultado:
+        set_flash(request, "Seleciona um resultado válido.", "error")
+        return _voltar_coletivo(adversario.id, "#estatisticas-coletivas")
+    registo = db.query(ScoutingEstatisticaColetivaJogo).filter(
+        ScoutingEstatisticaColetivaJogo.adversario_id == adversario.id,
+        ScoutingEstatisticaColetivaJogo.resultado_id == resultado.id,
+    ).first()
+    if not registo:
+        registo = ScoutingEstatisticaColetivaJogo(
+            clube_id=adversario.clube_id, adversario_id=adversario.id,
+            resultado_id=resultado.id, data=resultado.data,
+        )
+        db.add(registo)
+    for campo in STAT_FIELDS:
+        setattr(registo, campo, _float(dados.get(campo)))
+    db.commit()
+    set_flash(request, "Estatísticas coletivas guardadas e média recalculada.")
+    return _voltar_coletivo(adversario.id, "#estatisticas-coletivas")
+
+
+@router.post("/adversarios/{adversario_id}/coletivo/media")
+async def guardar_media_coletiva(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    dados = await request.form()
+    media = adversario.media_coletiva or ScoutingMediaColetiva(clube_id=adversario.clube_id, adversario_id=adversario.id)
+    db.add(media)
+    media.usar_manual = dados.get("usar_manual") == "true"
+    for campo in STAT_FIELDS:
+        setattr(media, campo, _float(dados.get(campo)))
+    db.commit()
+    set_flash(request, "Configuração da média coletiva atualizada.")
+    return _voltar_coletivo(adversario.id, "#estatisticas-coletivas")
+
+
+@router.post("/adversarios/{adversario_id}/coletivo/itens")
+async def associar_item_coletivo(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    dados = await request.form()
+    categorias = {"estatistica_coletiva", "ataque_forte", "ataque_fraco", "defesa_forte", "defesa_fraco"}
+    categoria, nome = dados.get("categoria"), _limpo(dados.get("nome_novo"))
+    item_id = _int(dados.get("item_id"))
+    item = db.query(ScoutingItemBiblioteca).filter(ScoutingItemBiblioteca.id == item_id, ScoutingItemBiblioteca.clube_id == adversario.clube_id).first() if item_id else None
+    if nome and categoria in categorias:
+        normalizado = _normalizar(nome)
+        item = db.query(ScoutingItemBiblioteca).filter(
+            ScoutingItemBiblioteca.clube_id == adversario.clube_id,
+            ScoutingItemBiblioteca.categoria == categoria,
+            ScoutingItemBiblioteca.nome_normalizado == normalizado,
+        ).first()
+        if not item:
+            item = ScoutingItemBiblioteca(clube_id=adversario.clube_id, categoria=categoria, nome=nome, nome_normalizado=normalizado)
+            db.add(item)
+            db.flush()
+    if not item or item.categoria not in categorias:
+        set_flash(request, "Seleciona uma característica válida ou cria uma nova.", "error")
+    else:
+        associacao = db.query(ScoutingAdversarioItem).filter(
+            ScoutingAdversarioItem.adversario_id == adversario.id,
+            ScoutingAdversarioItem.item_id == item.id,
+        ).first()
+        if not associacao:
+            associacao = ScoutingAdversarioItem(clube_id=adversario.clube_id, adversario_id=adversario.id, item_id=item.id)
+            db.add(associacao)
+        associacao.observacao = _limpo(dados.get("observacao"))
+        associacao.valor = _limpo(dados.get("valor"))
+        associacao.ranking = _limpo(dados.get("ranking"))
+        associacao.validade = _limpo(dados.get("validade"))
+        db.commit()
+        set_flash(request, "Característica associada ao adversário.")
+    return _voltar_coletivo(adversario.id, "#leitura-coletiva")
+
+
+@router.post("/coletivo/itens/{associacao_id}/eliminar")
+def remover_item_coletivo(associacao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    associacao = db.query(ScoutingAdversarioItem).filter(ScoutingAdversarioItem.id == associacao_id).first()
+    adversario = _adversario_acessivel(db, associacao.adversario_id, utilizador) if associacao else None
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    db.delete(associacao)
+    db.commit()
+    return _voltar_coletivo(adversario.id, "#leitura-coletiva")
+
+
+@router.post("/adversarios/{adversario_id}/coletivo/lideres")
+async def adicionar_lider(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    dados = await request.form()
+    jogador_id, tipo = _int(dados.get("jogador_id")), _limpo(dados.get("tipo_novo")) or _limpo(dados.get("tipo"))
+    jogador = db.query(ScoutingJogador).filter(ScoutingJogador.id == jogador_id, ScoutingJogador.adversario_id == adversario.id).first()
+    if not jogador or not tipo:
+        set_flash(request, "Seleciona um atleta e indica o tipo de liderança.", "error")
+    else:
+        db.add(ScoutingLiderEstatistico(clube_id=adversario.clube_id, adversario_id=adversario.id, jogador_id=jogador.id, tipo=tipo, observacao=_limpo(dados.get("observacao"))))
+        db.commit()
+        set_flash(request, "Líder estatístico adicionado.")
+    return _voltar_coletivo(adversario.id, "#lideres")
+
+
+@router.post("/coletivo/lideres/{lider_id}/eliminar")
+def eliminar_lider(lider_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    lider = db.query(ScoutingLiderEstatistico).filter(ScoutingLiderEstatistico.id == lider_id).first()
+    adversario = _adversario_acessivel(db, lider.adversario_id, utilizador) if lider else None
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    db.delete(lider)
+    db.commit()
+    return _voltar_coletivo(adversario.id, "#lideres")
+
+
+@router.post("/adversarios/{adversario_id}/coletivo/opcoes-defensivas")
+async def guardar_opcoes_defensivas(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    dados = await request.form()
+    opcoes = adversario.opcoes_defensivas or ScoutingOpcoesDefensivas(clube_id=adversario.clube_id, adversario_id=adversario.id)
+    db.add(opcoes)
+    for campo, _ in OPCOES_DEFENSIVAS:
+        setattr(opcoes, campo, dados.get(campo) == "true")
+        setattr(opcoes, f"{campo}_notas", _limpo(dados.get(f"{campo}_notas")))
+    db.commit()
+    set_flash(request, "Opções defensivas atualizadas.")
+    return _voltar_coletivo(adversario.id, "#opcoes-defensivas")
+
+
+async def _criar_elemento_desenhado(adversario, request, db, modelo, categoria, ancora):
+    dados = await request.form()
+    titulo = _limpo(dados.get("titulo"))
+    if not titulo:
+        set_flash(request, "Indica um título.", "error")
+        return _voltar_coletivo(adversario.id, ancora)
+    setplay = _criar_setplay_scouting(db, adversario, titulo, _limpo(dados.get("observacoes")), categoria)
+    if not setplay:
+        set_flash(request, "O adversário precisa de estar associado a uma equipa e a um jogo.", "error")
+        return _voltar_coletivo(adversario.id, ancora)
+    lista = adversario.conceitos_ofensivos if modelo is ScoutingConceitoOfensivo else adversario.momentos_playbook
+    db.add(modelo(clube_id=adversario.clube_id, adversario_id=adversario.id, setplay_id=setplay.id, ordem=len(lista)))
+    db.commit()
+    return RedirectResponse(url=f"/playbook/studio/setplays/{setplay.id}", status_code=303)
+
+
+@router.post("/adversarios/{adversario_id}/coletivo/conceitos")
+async def criar_conceito_ofensivo(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    return await _criar_elemento_desenhado(adversario, request, db, ScoutingConceitoOfensivo, "Scouting · Conceito ofensivo", "#conceitos")
+
+
+@router.post("/adversarios/{adversario_id}/coletivo/momentos")
+async def criar_momento_playbook(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    return await _criar_elemento_desenhado(adversario, request, db, ScoutingMomentoPlaybook, "Scouting · Playbook adversário", "#playbook-coletivo")
+
+
+def _modelo_elemento(tipo: str):
+    if tipo == "conceito":
+        return ScoutingConceitoOfensivo, "#conceitos"
+    if tipo == "momento":
+        return ScoutingMomentoPlaybook, "#playbook-coletivo"
+    return None, None
+
+
+@router.post("/coletivo/{tipo}/{elemento_id}/eliminar")
+def eliminar_elemento_desenhado(tipo: str, elemento_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    modelo, ancora = _modelo_elemento(tipo)
+    if modelo is None:
+        return RedirectResponse(url="/scouting", status_code=303)
+    elemento = db.query(modelo).filter(modelo.id == elemento_id).first()
+    adversario = _adversario_acessivel(db, elemento.adversario_id, utilizador) if elemento else None
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    setplay = elemento.setplay
+    db.delete(elemento)
+    db.flush()
+    db.delete(setplay)
+    db.commit()
+    set_flash(request, "Elemento eliminado sem afetar os restantes.")
+    return _voltar_coletivo(adversario.id, ancora)
+
+
+@router.post("/coletivo/{tipo}/{elemento_id}/mover/{direcao}")
+def mover_elemento_desenhado(tipo: str, elemento_id: int, direcao: str, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    modelo, ancora = _modelo_elemento(tipo)
+    if modelo is None:
+        return RedirectResponse(url="/scouting", status_code=303)
+    elemento = db.query(modelo).filter(modelo.id == elemento_id).first()
+    adversario = _adversario_acessivel(db, elemento.adversario_id, utilizador) if elemento else None
+    if not adversario or direcao not in {"cima", "baixo"}:
+        return RedirectResponse(url="/scouting", status_code=303)
+    lista = list(adversario.conceitos_ofensivos if tipo == "conceito" else adversario.momentos_playbook)
+    indice = next((i for i, item in enumerate(lista) if item.id == elemento.id), -1)
+    destino = indice - 1 if direcao == "cima" else indice + 1
+    if indice >= 0 and 0 <= destino < len(lista):
+        lista[indice].ordem, lista[destino].ordem = lista[destino].ordem, lista[indice].ordem
+        db.commit()
+    return _voltar_coletivo(adversario.id, ancora)
 
 
 @router.post("/adversarios/{adversario_id}/jogadores")

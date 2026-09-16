@@ -17,6 +17,7 @@ from models.playbook import (
     SecaoCadernoPlaybook,
     SetPlay,
 )
+from models.scouting import ScoutingConceitoOfensivo, ScoutingMomentoPlaybook
 from services.desenho_service import (
     compor_desenho_sobre_campo,
     decompor_desenho_editavel,
@@ -496,6 +497,15 @@ def studio_setplay(setplay_id: int, request: Request, db: Session = Depends(get_
         passo.desenho_imagem, passo.desenho_estado = decompor_desenho_editavel(passo.desenho)
 
     categorias = ["Ataque", "Defesa", "Transição Ofensiva", "Transição Defensiva", "Zona", "Bola Parada", "Outro"]
+    elemento_scouting = db.query(ScoutingConceitoOfensivo).filter(ScoutingConceitoOfensivo.setplay_id == setplay.id).first()
+    ancora_scouting = "#conceitos"
+    if not elemento_scouting:
+        elemento_scouting = db.query(ScoutingMomentoPlaybook).filter(ScoutingMomentoPlaybook.setplay_id == setplay.id).first()
+        ancora_scouting = "#playbook-coletivo"
+    url_voltar = (
+        f"/scouting/adversarios/{elemento_scouting.adversario_id}/coletivo{ancora_scouting}"
+        if elemento_scouting else f"/playbook/equipas/{setplay.playbook.equipa_id}"
+    )
     return templates.TemplateResponse(request, "playbook/detalhe.html", {
         "utilizador": utilizador,
         "setplay": setplay,
@@ -504,6 +514,7 @@ def studio_setplay(setplay_id: int, request: Request, db: Session = Depends(get_
         "passos": setplay.passos,
         "passos_studio": [_serializar_passo(passo) for passo in setplay.passos],
         "categorias": categorias,
+        "url_voltar": url_voltar,
     })
 
 

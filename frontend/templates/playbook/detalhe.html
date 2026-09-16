@@ -24,7 +24,7 @@
   <div class="pbs-app" data-playbook-studio data-setplay-id="{{ setplay.id }}" data-equipa-id="{{ equipa.id }}" data-imported="{{ 'true' if setplay.origem == 'ebp' else 'false' }}">
     <header class="pbs-topbar">
       <div class="pbs-topbar-start">
-        <a class="pbs-icon-button pbs-back" href="/playbook/equipas/{{ equipa.id }}" aria-label="Voltar ao Playbook" title="Voltar ao Playbook">
+        <a class="pbs-icon-button pbs-back" href="{{ url_voltar|default('/playbook/equipas/' ~ equipa.id, true) }}" aria-label="Voltar ao Playbook" title="Voltar ao Playbook">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
         </a>
         {% if identidade.logo_principal %}<img class="pbs-club-mark" src="{{ identidade.logo_principal }}" alt="">{% endif %}

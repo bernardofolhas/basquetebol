@@ -103,6 +103,14 @@ class ScoutingAdversario(Base):
 
     jogos = relationship("ScoutingAdversarioJogo", back_populates="adversario", cascade="all, delete-orphan")
     jogadores = relationship("ScoutingJogador", back_populates="adversario", cascade="all, delete-orphan", order_by="ScoutingJogador.numero, ScoutingJogador.nome")
+    resultados = relationship("ScoutingResultadoColetivo", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingResultadoColetivo.data.desc()")
+    estatisticas_coletivas = relationship("ScoutingEstatisticaColetivaJogo", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingEstatisticaColetivaJogo.data.desc()")
+    media_coletiva = relationship("ScoutingMediaColetiva", back_populates="adversario_scouting", uselist=False, cascade="all, delete-orphan")
+    itens_coletivos = relationship("ScoutingAdversarioItem", back_populates="adversario_scouting", cascade="all, delete-orphan")
+    lideres = relationship("ScoutingLiderEstatistico", back_populates="adversario_scouting", cascade="all, delete-orphan")
+    opcoes_defensivas = relationship("ScoutingOpcoesDefensivas", back_populates="adversario_scouting", uselist=False, cascade="all, delete-orphan")
+    conceitos_ofensivos = relationship("ScoutingConceitoOfensivo", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingConceitoOfensivo.ordem")
+    momentos_playbook = relationship("ScoutingMomentoPlaybook", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingMomentoPlaybook.ordem")
 
 
 class ScoutingAdversarioJogo(Base):
@@ -239,3 +247,110 @@ class ScoutingZonaAcao(Base):
     zona = Column(String(48), nullable=False)
     observacao = Column(Text, nullable=True)
     jogador = relationship("ScoutingJogador", back_populates="zonas")
+
+
+class ScoutingResultadoColetivo(Base):
+    __tablename__ = "scouting_resultados_coletivos"
+    __table_args__ = (UniqueConstraint("adversario_id", "jogo_id", name="uq_scouting_resultado_jogo"),)
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    jogo_id = Column(Integer, ForeignKey("jogos.id", ondelete="SET NULL"), nullable=True, index=True)
+    data = Column(Date, nullable=False)
+    oponente = Column(String(160), nullable=False)
+    em_casa = Column(Boolean, nullable=False, default=True)
+    pontos_marcados = Column(Integer, nullable=True)
+    pontos_sofridos = Column(Integer, nullable=True)
+    competicao = Column(String(160), nullable=True)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="resultados")
+    jogo = relationship("Jogo")
+
+
+class ScoutingMediaColetiva(_ScoutingStatMixin, Base):
+    __tablename__ = "scouting_medias_coletivas"
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, unique=True)
+    usar_manual = Column(Boolean, nullable=False, default=False)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="media_coletiva")
+
+
+class ScoutingEstatisticaColetivaJogo(_ScoutingStatMixin, Base):
+    __tablename__ = "scouting_estatisticas_coletivas_jogo"
+    __table_args__ = (UniqueConstraint("adversario_id", "resultado_id", name="uq_scouting_estatistica_coletiva_resultado"),)
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    resultado_id = Column(Integer, ForeignKey("scouting_resultados_coletivos.id", ondelete="CASCADE"), nullable=True, index=True)
+    data = Column(Date, nullable=False)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="estatisticas_coletivas")
+    resultado = relationship("ScoutingResultadoColetivo")
+
+
+class ScoutingAdversarioItem(Base):
+    __tablename__ = "scouting_adversarios_itens"
+    __table_args__ = (UniqueConstraint("adversario_id", "item_id", name="uq_scouting_adversario_item"),)
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_id = Column(Integer, ForeignKey("scouting_biblioteca_itens.id", ondelete="CASCADE"), nullable=False, index=True)
+    observacao = Column(Text, nullable=True)
+    valor = Column(String(80), nullable=True)
+    ranking = Column(String(80), nullable=True)
+    validade = Column(String(120), nullable=True)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="itens_coletivos")
+    item = relationship("ScoutingItemBiblioteca")
+
+
+class ScoutingLiderEstatistico(Base):
+    __tablename__ = "scouting_lideres_estatisticos"
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    jogador_id = Column(Integer, ForeignKey("scouting_roster_jogadores.id", ondelete="CASCADE"), nullable=False, index=True)
+    tipo = Column(String(120), nullable=False)
+    observacao = Column(Text, nullable=True)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="lideres")
+    jogador = relationship("ScoutingJogador")
+
+
+class ScoutingOpcoesDefensivas(Base):
+    __tablename__ = "scouting_opcoes_defensivas"
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, unique=True)
+    bloqueio_central = Column(Boolean, nullable=False, default=False)
+    bloqueio_central_notas = Column(Text, nullable=True)
+    bloqueio_lateral = Column(Boolean, nullable=False, default=False)
+    bloqueio_lateral_notas = Column(Text, nullable=True)
+    bloqueio_indireto = Column(Boolean, nullable=False, default=False)
+    bloqueio_indireto_notas = Column(Text, nullable=True)
+    handoff = Column(Boolean, nullable=False, default=False)
+    handoff_notas = Column(Text, nullable=True)
+    bola_interior = Column(Boolean, nullable=False, default=False)
+    bola_interior_notas = Column(Text, nullable=True)
+    alteracoes = Column(Boolean, nullable=False, default=False)
+    alteracoes_notas = Column(Text, nullable=True)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="opcoes_defensivas")
+
+
+class ScoutingConceitoOfensivo(Base):
+    __tablename__ = "scouting_conceitos_ofensivos"
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    setplay_id = Column(Integer, ForeignKey("setplays.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    ordem = Column(Integer, nullable=False, default=0)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="conceitos_ofensivos")
+    setplay = relationship("SetPlay")
+
+
+class ScoutingMomentoPlaybook(Base):
+    __tablename__ = "scouting_momentos_playbook"
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    setplay_id = Column(Integer, ForeignKey("setplays.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    ordem = Column(Integer, nullable=False, default=0)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="momentos_playbook")
+    setplay = relationship("SetPlay")

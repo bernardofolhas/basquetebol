@@ -109,3 +109,52 @@ def test_departamento_scouting_abre_para_administrador(client_admin):
     assert resposta.status_code == 200
     assert "Scouting de adversários" in resposta.text
     assert "Roster permanente" in resposta.text
+
+
+def test_scouting_coletivo_separa_todos_os_dados_pedidos():
+    modelo = (ROOT / "backend" / "models" / "scouting.py").read_text(encoding="utf-8")
+    migracao = (ROOT / "backend" / "migrations" / "versions" / "0048_scouting_coletivo.py").read_text(encoding="utf-8")
+
+    classes = (
+        "ScoutingResultadoColetivo", "ScoutingMediaColetiva", "ScoutingEstatisticaColetivaJogo",
+        "ScoutingAdversarioItem", "ScoutingLiderEstatistico", "ScoutingOpcoesDefensivas",
+        "ScoutingConceitoOfensivo", "ScoutingMomentoPlaybook",
+    )
+    for classe in classes:
+        assert f"class {classe}" in modelo
+    for tabela in (
+        "scouting_resultados_coletivos", "scouting_estatisticas_coletivas_jogo",
+        "scouting_adversarios_itens", "scouting_lideres_estatisticos",
+        "scouting_opcoes_defensivas", "scouting_conceitos_ofensivos",
+        "scouting_momentos_playbook",
+    ):
+        assert tabela in migracao
+
+
+def test_pagina_coletiva_tem_estatistica_leitura_e_playbook_completos():
+    coletivo = (TEMPLATES_DIR / "scouting" / "coletivo.html").read_text(encoding="utf-8")
+    cartao = (TEMPLATES_DIR / "scouting" / "_drawn_card.html").read_text(encoding="utf-8")
+    router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+
+    for titulo in (
+        "Últimos 5 resultados", "Média estatística da equipa", "Características estatísticas",
+        "Líderes estatísticos", "Identidade ofensiva e defensiva", "Principais conceitos ofensivos",
+        "Principais opções defensivas", "Playbook coletivo",
+    ):
+        assert titulo in coletivo
+    assert 'data-library-search' in coletivo
+    assert 'data-defense-toggle' in coletivo
+    assert '/playbook/studio/setplays/' in cartao
+    assert '/mover/cima' in cartao and '/mover/baixo' in cartao
+    assert "_media_calculada" in router
+    assert 'origem="scouting"' in router
+
+
+def test_playbook_studio_regressa_ao_scouting_coletivo():
+    router = (ROOT / "backend" / "routers" / "playbook.py").read_text(encoding="utf-8")
+    studio = (TEMPLATES_DIR / "playbook" / "detalhe.html").read_text(encoding="utf-8")
+
+    assert "ScoutingConceitoOfensivo" in router
+    assert "ScoutingMomentoPlaybook" in router
+    assert "url_voltar" in router
+    assert "url_voltar|default" in studio

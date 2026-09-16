@@ -9,6 +9,12 @@ down_revision = "0046_posicao_secundaria"
 branch_labels = None
 depends_on = None
 
+TABELAS = {
+    "scouting_adversarios", "scouting_adversarios_jogos", "scouting_roster_jogadores",
+    "scouting_fichas_individuais", "scouting_medias_epoca", "scouting_estatisticas_jogo",
+    "scouting_biblioteca_itens", "scouting_jogadores_itens", "scouting_zonas_acao",
+}
+
 
 def _tenant_columns():
     return [
@@ -26,15 +32,13 @@ def _stats():
 
 
 def upgrade() -> None:
-    tabelas = {
-        "scouting_adversarios", "scouting_adversarios_jogos", "scouting_roster_jogadores",
-        "scouting_fichas_individuais", "scouting_medias_epoca", "scouting_estatisticas_jogo",
-        "scouting_biblioteca_itens", "scouting_jogadores_itens", "scouting_zonas_acao",
-    }
-    existentes = set(sa.inspect(op.get_bind()).get_table_names())
-    if tabelas.issubset(existentes):
+    try:
+        existentes = set(sa.inspect(op.get_bind()).get_table_names())
+    except sa.exc.NoInspectionAvailable:
+        existentes = set()
+    if TABELAS.issubset(existentes):
         return
-    if tabelas & existentes:
+    if TABELAS & existentes:
         raise RuntimeError("A estrutura do departamento de scouting está apenas parcialmente criada.")
     op.create_table("scouting_adversarios", *_tenant_columns(),
         sa.Column("nome", sa.String(160), nullable=False), sa.Column("nome_normalizado", sa.String(160), nullable=False),
@@ -77,7 +81,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    existentes = set(sa.inspect(op.get_bind()).get_table_names())
+    try:
+        existentes = set(sa.inspect(op.get_bind()).get_table_names())
+    except sa.exc.NoInspectionAvailable:
+        existentes = set(TABELAS)
     for tabela in ("scouting_zonas_acao", "scouting_jogadores_itens", "scouting_biblioteca_itens", "scouting_estatisticas_jogo", "scouting_medias_epoca", "scouting_fichas_individuais", "scouting_roster_jogadores", "scouting_adversarios_jogos", "scouting_adversarios"):
         if tabela in existentes:
             op.drop_table(tabela)
