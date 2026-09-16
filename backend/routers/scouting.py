@@ -395,6 +395,16 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             cinco_previsto=[item for item in adversario.rotacao_prevista if item.papel == "titular"],
             rotacoes_previstas=[item for item in adversario.rotacao_prevista if item.papel == "rotacao"],
         ))
+    if separador == "relatorios":
+        equipas_relatorio = list({jogo.equipa.id: jogo.equipa for jogo in jogos}.values())
+        return templates.TemplateResponse(request, "scouting/relatorios.html", _contexto_departamento(
+            request,
+            utilizador,
+            adversario,
+            separador=separador,
+            jogos=jogos,
+            equipas_relatorio=equipas_relatorio,
+        ))
     return templates.TemplateResponse(request, "scouting/em_desenvolvimento.html", _contexto_departamento(
         request, utilizador, adversario, separador=separador, titulo="Relatórios"
     ))

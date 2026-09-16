@@ -68,9 +68,27 @@ def test_ordem_escolhida_e_preservada_e_vazios_usam_padrao():
 
 
 def test_configurador_tem_selecao_arrastar_previsualizacao_e_predefinicoes():
-    html = (TEMPLATES / "exportacoes" / "relatorio_configurar.html").read_text(encoding="utf-8")
+    html = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
     for marcador in ("draggable=\"true\"", "Pré-visualizar", "Descarregar PDF", "Guardar predefinição", "Selecionar tudo", "Repor formato"):
         assert marcador in html
+
+
+def test_relatorios_estao_centralizados_em_cartoes_com_modal():
+    central = (TEMPLATES / "scouting" / "relatorios.html").read_text(encoding="utf-8")
+    assert central.count('class="report-hub-card"') == 4
+    assert "report-hub-dialog" in central
+    assert "report-hub.js" in central
+    for ficheiro in ("equipas/plantel.html", "scouting/individual_lista.html", "scouting/coletivo.html", "scouting/plano_jogo.html"):
+        conteudo = (TEMPLATES / ficheiro).read_text(encoding="utf-8")
+        assert "Exportar relatório" not in conteudo
+
+
+def test_fragmento_e_inicializador_do_popup_existem():
+    rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+    script = (ROOT / "frontend" / "static" / "js" / "report-hub.js").read_text(encoding="utf-8")
+    assert '/fragmento"' in rota
+    assert "initReportBuilder" in script
+    assert "showModal" in script
 
 
 def test_documento_omite_seccoes_sem_conteudo_por_condicao():

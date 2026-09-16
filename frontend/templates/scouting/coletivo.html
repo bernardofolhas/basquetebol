@@ -2,7 +2,7 @@
 {% block titulo %}Scouting coletivo · {{ adversario.nome }}{% endblock %}
 {% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260916-2">{% endblock %}
 {% block conteudo %}
-<header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">{{ adversario.nome }}</p><h1>Scouting coletivo</h1><p>Resultados, identidade estatística e leitura técnico-tática do adversário.</p></div><div class="scouting-plan-actions"><span>{{ adversario.jogadores|length }} atletas no roster</span><a class="ds-button-secondary" href="/exportacoes/relatorios/scouting-coletivo/{{ adversario.id }}">Exportar relatório</a></div></header>
+<header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">{{ adversario.nome }}</p><h1>Scouting coletivo</h1><p>Resultados, identidade estatística e leitura técnico-tática do adversário.</p></div><span>{{ adversario.jogadores|length }} atletas no roster</span></header>
 {% include "scouting/_departamento_tabs.html" %}
 <nav class="scouting-profile-nav scouting-collective-nav"><a href="#resultados">Resultados</a><a href="#rotacao-prevista">Cinco e rotações</a><a href="#estatisticas-coletivas">Média estatística</a><a href="#caracteristicas-estatisticas">Características</a><a href="#lideres">Líderes</a><a href="#leitura-coletiva">Ataque/Defesa</a><a href="#conceitos">Conceitos</a><a href="#opcoes-defensivas">Opções defensivas</a><a href="#playbook-coletivo">Playbook</a></nav>
 

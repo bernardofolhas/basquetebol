@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}Relatórios · {{ adversario.nome }}{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260916-4"><link rel="stylesheet" href="/static/css/report-export.css?v=20260916-2"><link rel="stylesheet" href="/static/css/report-hub.css?v=20260916-1">{% endblock %}
+{% block conteudo %}
+<header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">{{ adversario.nome }}</p><h1>Relatórios</h1><p>Central única para configurar, pré-visualizar e exportar documentos.</p></div><span>4 modelos disponíveis</span></header>
+{% include "scouting/_departamento_tabs.html" %}
+<section class="report-hub-intro"><div><p class="ds-kicker">Centro documental</p><h2>Que relatório queres preparar?</h2><p>Escolhe um cartão. As opções de formato, conteúdo, ordem e predefinições abrem sem sair desta página.</p></div></section>
+<div class="report-hub-grid">
+  <button type="button" class="report-hub-card" data-report-type="roster" data-report-title="Relatório de plantel" data-report-options='{{ equipas_relatorio|map(attribute="id")|list|tojson }}'><span>PL</span><small>Equipa</small><h2>Plantel</h2><p>Fotografias, identificação, perfil físico, notas e contactos autorizados.</p><b>Configurar relatório</b></button>
+  <button type="button" class="report-hub-card" data-report-type="scouting-individual" data-report-target="{{ adversario.id }}" data-report-title="Scouting individual"><span>SI</span><small>Adversário</small><h2>Scouting individual</h2><p>Seleciona um ou vários atletas, tendências, zonas e estatísticas.</p><b>Configurar relatório</b></button>
+  <button type="button" class="report-hub-card" data-report-type="scouting-coletivo" data-report-target="{{ adversario.id }}" data-report-title="Scouting coletivo"><span>SC</span><small>Adversário</small><h2>Scouting coletivo</h2><p>Identidade, cinco previsto, rotação, ataque, defesa e prioridades.</p><b>Configurar relatório</b></button>
+  <button type="button" class="report-hub-card" data-report-type="plano-jogo" data-report-title="Plano de jogo" data-report-options='{{ jogos|map(attribute="id")|list|tojson }}'><span>PJ</span><small>Jogo</small><h2>Plano de jogo</h2><p>Convocatória, cincos iniciais, plano ofensivo e plano defensivo.</p><b>Configurar relatório</b></button>
+</div>
+
+<dialog class="report-hub-dialog" id="report-hub-dialog"><header><div><p class="ds-kicker">Exportação</p><h2 data-report-dialog-title>Configurar relatório</h2></div><button type="button" data-report-close aria-label="Fechar">×</button></header><div class="report-hub-target" data-report-target-picker hidden><label>Seleciona o destino<select class="ds-input" data-report-target-select></select></label><button type="button" class="ds-button ds-button-primary" data-report-continue>Continuar</button></div><div class="report-hub-loading" data-report-loading hidden>A preparar opções...</div><div class="report-hub-content" data-report-content></div></dialog>
+
+<template id="report-team-options">{% for equipa in equipas_relatorio %}<option value="{{ equipa.id }}">{{ equipa.nome }}</option>{% endfor %}</template>
+<template id="report-game-options">{% for jogo in jogos %}<option value="{{ jogo.id }}">{{ jogo.data|data_pt }} · {{ jogo.equipa.nome }} vs {{ jogo.adversario }}</option>{% endfor %}</template>
+{% endblock %}
+{% block scripts_extra %}<script src="/static/js/report-export.js?v=20260916-1"></script><script src="/static/js/report-hub.js?v=20260916-1"></script>{% endblock %}

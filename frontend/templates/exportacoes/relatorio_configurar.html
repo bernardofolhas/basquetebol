@@ -1,55 +1,5 @@
 {% extends "base.html" %}
 {% block titulo %}Exportar relatório · {{ alvo_nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/report-export.css?v=20260916-1">{% endblock %}
-{% block conteudo %}
-<main class="report-builder">
-  <header class="report-builder-hero">
-    <div><a href="javascript:history.back()">← Voltar</a><p class="ds-kicker">{{ equipa.nome }}</p><h1>Exportar relatório</h1><p>{{ config.nome }} · {{ alvo_nome }}</p></div>
-    <span>PDF configurável</span>
-  </header>
-
-  <form id="report-form" method="post" class="report-builder-form">
-    <section class="report-step"><header><b>1</b><div><h2>Escolhe o formato</h2><p>Cada formato adapta automaticamente a densidade e a hierarquia da informação.</p></div></header>
-      <div class="report-format-grid">
-      {% for chave, item in formatos.items() %}<label class="report-format-card"><input type="radio" name="formato" value="{{ chave }}" {% if (predefinicao and predefinicao.formato == chave) or (not predefinicao and chave == 'completo') %}checked{% endif %}><span><i>{{ 'A3' if chave == 'a3' else ('01' if chave == 'completo' else '02') }}</i><strong>{{ item.nome }}</strong><small>{{ item.descricao }}</small></span></label>{% endfor %}
-      </div>
-      <div class="report-orientation"><strong>Orientação</strong><label><input type="radio" name="orientacao" value="retrato" {% if not predefinicao or predefinicao.orientacao == 'retrato' %}checked{% endif %}> Retrato</label><label><input type="radio" name="orientacao" value="paisagem" {% if predefinicao and predefinicao.orientacao == 'paisagem' %}checked{% endif %}> Paisagem</label></div>
-    </section>
-
-    {% if entidades %}<section class="report-step"><header><b>2</b><div><h2>Seleciona {{ config.entidades }}</h2><p>Sem seleção explícita serão incluídos todos os registos disponíveis.</p></div></header>
-      <div class="report-entity-toolbar"><button type="button" data-entities="all">Selecionar todos</button><button type="button" data-entities="none">Limpar</button></div>
-      <div class="report-entity-grid">{% for entidade in entidades %}<label><input type="checkbox" name="entidades" value="{{ entidade.id }}" checked><span>{% if entidade.fotografia %}<img src="{{ entidade.fotografia }}" alt="">{% else %}<i>{{ entidade.nome[:2]|upper }}</i>{% endif %}<strong>{{ entidade.nome }}</strong><small>#{{ entidade.numero_camisola if tipo == 'roster' else entidade.numero or '—' }}</small></span></label>{% endfor %}</div>
-    </section>{% endif %}
-
-    <section class="report-step"><header><b>{{ 3 if entidades else 2 }}</b><div><h2>Define e ordena as secções</h2><p>Arrasta os cartões pela pega para definir a ordem de leitura no documento.</p></div></header>
-      <div class="report-section-toolbar"><button type="button" data-sections="all">Selecionar tudo</button><button type="button" data-sections="none">Limpar</button><button type="button" data-sections="defaults">Repor formato</button></div>
-      <input type="hidden" name="ordem" id="report-order">
-      <div class="report-section-list" id="report-section-list">
-      {% for secao in config.secoes %}{% if secao.chave != 'contactos' or pode_ver_contactos %}<article draggable="true" data-section="{{ secao.chave }}"><span class="report-drag" title="Arrastar">⋮⋮</span><label><input type="checkbox" name="secoes" value="{{ secao.chave }}" {% if secao.chave in selecionadas %}checked{% endif %}><span><strong>{{ secao.nome }}</strong><small>{{ secao.descricao }}</small></span></label></article>{% endif %}{% endfor %}
-      </div>
-    </section>
-
-    <section class="report-step report-presets"><header><b>{{ 4 if entidades else 3 }}</b><div><h2>Predefinições</h2><p>Guarda esta composição para reutilizar individualmente ou com a equipa.</p></div></header>
-      <div class="report-system-presets"><button type="button" data-system-preset="completo"><strong>Completo</strong><small>Predefinição protegida</small></button><button type="button" data-system-preset="facil"><strong>Leitura fácil</strong><small>Predefinição protegida</small></button><button type="button" data-system-preset="a3"><strong>Poster A3</strong><small>Predefinição protegida</small></button></div>
-      {% if predefinicoes %}<div class="report-saved-presets">{% for item in predefinicoes %}<a href="?predefinicao_id={{ item.id }}"><strong>{{ item.nome }}</strong><small>{{ 'Da equipa' if item.ambito == 'equipa' else 'Pessoal' }} · {{ formatos[item.formato].nome }}</small></a>{% endfor %}</div>{% endif %}
-      <div class="report-save-preset"><input class="ds-input" name="nome_predefinicao" placeholder="Nome da predefinição"><select class="ds-input" name="ambito"><option value="pessoal">Só para mim</option><option value="equipa">Partilhar com a equipa</option></select><button class="ds-button ds-button-secondary" formaction="/exportacoes/relatorios/{{ tipo }}/{{ alvo_id }}/predefinicoes">Guardar predefinição</button></div>
-    </section>
-
-    <footer class="report-actions"><div><strong>Pronto para exportar</strong><small>A pré-visualização abre num novo separador.</small></div><button class="ds-button ds-button-secondary" formtarget="_blank" formaction="/exportacoes/relatorios/{{ tipo }}/{{ alvo_id }}/previsualizar">Pré-visualizar</button><button class="ds-button ds-button-primary" formaction="/exportacoes/relatorios/{{ tipo }}/{{ alvo_id }}/pdf">Descarregar PDF</button></footer>
-  </form>
-</main>
-{% endblock %}
-{% block scripts_extra %}
-<script>
-const reportDefaults={{ padroes|tojson }};
-const list=document.getElementById('report-section-list'), order=document.getElementById('report-order');
-const syncOrder=()=>order.value=[...list.querySelectorAll('[data-section]')].map(el=>el.dataset.section).join(',');
-let dragged=null;
-list.querySelectorAll('[draggable]').forEach(card=>{card.addEventListener('dragstart',()=>{dragged=card;card.classList.add('is-dragging')});card.addEventListener('dragend',()=>{card.classList.remove('is-dragging');dragged=null;syncOrder()});card.addEventListener('dragover',event=>{event.preventDefault();if(!dragged||dragged===card)return;const box=card.getBoundingClientRect();list.insertBefore(dragged,event.clientY<box.top+box.height/2?card:card.nextSibling)})});
-const sectionChecks=()=>[...list.querySelectorAll('input[name="secoes"]')];
-document.querySelectorAll('[data-sections]').forEach(button=>button.addEventListener('click',()=>{const mode=button.dataset.sections,format=document.querySelector('input[name="formato"]:checked').value;sectionChecks().forEach(input=>input.checked=mode==='all'||(mode==='defaults'&&reportDefaults[format].includes(input.value)))}));
-document.querySelectorAll('[data-system-preset]').forEach(button=>button.addEventListener('click',()=>{const format=button.dataset.systemPreset;document.querySelector(`input[name="formato"][value="${format}"]`).checked=true;sectionChecks().forEach(input=>input.checked=reportDefaults[format].includes(input.value));if(format==='a3')document.querySelector('input[name="orientacao"][value="paisagem"]').checked=true}));
-document.querySelectorAll('[data-entities]').forEach(button=>button.addEventListener('click',()=>document.querySelectorAll('input[name="entidades"]').forEach(input=>input.checked=button.dataset.entities==='all')));
-document.getElementById('report-form').addEventListener('submit',syncOrder);syncOrder();
-</script>
-{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/report-export.css?v=20260916-2">{% endblock %}
+{% block conteudo %}<main class="report-builder"><header class="report-builder-hero"><div><a href="javascript:history.back()">← Voltar</a><p class="ds-kicker">{{ equipa.nome }}</p><h1>Exportar relatório</h1><p>{{ config.nome }} · {{ alvo_nome }}</p></div><span>PDF configurável</span></header>{% include "exportacoes/_relatorio_formulario.html" %}</main>{% endblock %}
+{% block scripts_extra %}<script src="/static/js/report-export.js?v=20260916-1"></script><script>window.initReportBuilder(document);</script>{% endblock %}

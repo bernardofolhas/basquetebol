@@ -878,17 +878,7 @@ def _predefinicoes_relatorio(db: Session, utilizador, tipo: str, equipa_id: int)
     ).order_by(PredefinicaoRelatorio.ambito, PredefinicaoRelatorio.nome).all()
 
 
-@router.get("/relatorios/{tipo}/{alvo_id}", response_class=HTMLResponse)
-def configurar_relatorio(
-    tipo: str,
-    alvo_id: int,
-    request: Request,
-    predefinicao_id: int | None = None,
-    db: Session = Depends(get_db),
-    utilizador=Depends(exigir_operacao_desportiva),
-):
-    if tipo not in RELATORIOS_CONFIG:
-        raise HTTPException(404, "Tipo de relatorio desconhecido.")
+def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, predefinicao_id: int | None = None) -> dict:
     alvo, equipa, alvo_nome = _alvo_relatorio(tipo, alvo_id, db, utilizador)
     predefinicoes = _predefinicoes_relatorio(db, utilizador, tipo, equipa.id)
     predefinicao = next((p for p in predefinicoes if p.id == predefinicao_id), None)
@@ -898,7 +888,7 @@ def configurar_relatorio(
         entidades = [j for j in alvo.jogadores if j.ativo]
     elif tipo == "scouting-individual":
         entidades = alvo.jogadores
-    return templates.TemplateResponse(request, "exportacoes/relatorio_configurar.html", {
+    return {
         "utilizador": utilizador,
         "tipo": tipo,
         "alvo_id": alvo_id,
@@ -912,7 +902,43 @@ def configurar_relatorio(
         "selecionadas": selecionadas,
         "padroes": {f: _secoes_padrao(tipo, f) for f in FORMATOS_RELATORIO},
         "pode_ver_contactos": _perfil(utilizador) in PERFIS_CONTACTOS,
-    })
+    }
+
+
+@router.get("/relatorios/{tipo}/{alvo_id}", response_class=HTMLResponse)
+def configurar_relatorio(
+    tipo: str,
+    alvo_id: int,
+    request: Request,
+    predefinicao_id: int | None = None,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    if tipo not in RELATORIOS_CONFIG:
+        raise HTTPException(404, "Tipo de relatorio desconhecido.")
+    return templates.TemplateResponse(
+        request,
+        "exportacoes/relatorio_configurar.html",
+        _contexto_configurador(tipo, alvo_id, db, utilizador, predefinicao_id),
+    )
+
+
+@router.get("/relatorios/{tipo}/{alvo_id}/fragmento", response_class=HTMLResponse)
+def fragmento_configurar_relatorio(
+    tipo: str,
+    alvo_id: int,
+    request: Request,
+    predefinicao_id: int | None = None,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    if tipo not in RELATORIOS_CONFIG:
+        raise HTTPException(404, "Tipo de relatorio desconhecido.")
+    return templates.TemplateResponse(
+        request,
+        "exportacoes/_relatorio_formulario.html",
+        _contexto_configurador(tipo, alvo_id, db, utilizador, predefinicao_id),
+    )
 
 
 def _gerar_relatorio(tipo: str, alvo_id: int, request: Request, dados, db: Session, utilizador, previsualizar: bool):
