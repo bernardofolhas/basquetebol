@@ -1,0 +1,87 @@
+from pathlib import Path
+
+from starlette.datastructures import FormData
+
+from models.utilizador import PerfilEnum
+from routers.exportacoes import RELATORIOS_CONFIG, _configuracao_relatorio, _secoes_padrao
+
+
+ROOT = Path(__file__).resolve().parents[2]
+TEMPLATES = ROOT / "frontend" / "templates"
+
+
+class UtilizadorFalso:
+    def __init__(self, perfil):
+        self.perfil = perfil
+
+
+def test_quatro_tipos_e_tres_formatos_tem_template_proprio():
+    assert set(RELATORIOS_CONFIG) == {"roster", "scouting-individual", "scouting-coletivo", "plano-jogo"}
+    for tipo in RELATORIOS_CONFIG:
+        base = tipo.replace("-", "_")
+        for formato in ("completo", "facil", "a3"):
+            assert (TEMPLATES / "relatorios" / f"{base}_{formato}.html").is_file()
+
+
+def test_a3_usa_tamanho_fisico_a3_e_composicao_propria():
+    documento = (TEMPLATES / "relatorios" / "_documento.html").read_text(encoding="utf-8")
+    assert "A3" in documento
+    assert "size:" in documento
+    assert "formato == 'a3'" in documento
+
+
+def test_contactos_sao_removidos_para_perfil_nao_autorizado():
+    dados = FormData([
+        ("formato", "completo"),
+        ("orientacao", "retrato"),
+        ("secoes", "identificacao"),
+        ("secoes", "contactos"),
+        ("ordem", "contactos,identificacao"),
+    ])
+    _, _, secoes = _configuracao_relatorio("roster", dados, UtilizadorFalso(PerfilEnum.treinador))
+    assert secoes == ["identificacao"]
+
+
+def test_a3_nunca_inclui_contactos_mesmo_para_administrador():
+    dados = FormData([
+        ("formato", "a3"),
+        ("secoes", "contactos"),
+        ("secoes", "identificacao"),
+        ("ordem", "contactos,identificacao"),
+    ])
+    formato, _, secoes = _configuracao_relatorio("roster", dados, UtilizadorFalso(PerfilEnum.administrador))
+    assert formato == "a3"
+    assert secoes == ["identificacao"]
+
+
+def test_ordem_escolhida_e_preservada_e_vazios_usam_padrao():
+    dados = FormData([
+        ("formato", "facil"),
+        ("secoes", "zonas"),
+        ("secoes", "identificacao"),
+        ("ordem", "zonas,identificacao"),
+    ])
+    _, _, secoes = _configuracao_relatorio("scouting-individual", dados, UtilizadorFalso(PerfilEnum.treinador))
+    assert secoes == ["zonas", "identificacao"]
+    _, _, vazias = _configuracao_relatorio("plano-jogo", FormData([("formato", "facil")]), UtilizadorFalso(PerfilEnum.treinador))
+    assert vazias == _secoes_padrao("plano-jogo", "facil")
+
+
+def test_configurador_tem_selecao_arrastar_previsualizacao_e_predefinicoes():
+    html = (TEMPLATES / "exportacoes" / "relatorio_configurar.html").read_text(encoding="utf-8")
+    for marcador in ("draggable=\"true\"", "Pré-visualizar", "Descarregar PDF", "Guardar predefinição", "Selecionar tudo", "Repor formato"):
+        assert marcador in html
+
+
+def test_documento_omite_seccoes_sem_conteudo_por_condicao():
+    html = (TEMPLATES / "relatorios" / "_documento.html").read_text(encoding="utf-8")
+    assert "and adversario.observacoes" in html
+    assert "and convocados" in html
+    assert "and plano.situacoes_especiais" in html
+
+
+def test_migracao_e_modelo_de_predefinicoes_estao_registados():
+    migracao = ROOT / "backend" / "migrations" / "versions" / "0050_predefinicoes_relatorios.py"
+    main = (ROOT / "backend" / "main.py").read_text(encoding="utf-8")
+    assert migracao.is_file()
+    assert "import models.relatorio_exportacao" in main

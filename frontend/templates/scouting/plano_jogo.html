@@ -2,7 +2,7 @@
 {% block titulo %}Plano de Jogo · {{ adversario.nome }}{% endblock %}
 {% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260916-3">{% endblock %}
 {% block conteudo %}
-<header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">{{ adversario.nome }}</p><h1>Plano de Jogo</h1><p>Transforma a informação recolhida no scouting em decisões práticas para o próximo jogo.</p></div>{% if jogo %}<div class="scouting-plan-actions"><a href="/jogos/{{ jogo.id }}/plano/print" class="ds-button-secondary">Imprimir</a><a href="/jogos/{{ jogo.id }}/plano/pdf" class="ds-button-secondary">Exportar PDF</a></div>{% endif %}</header>
+<header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">{{ adversario.nome }}</p><h1>Plano de Jogo</h1><p>Transforma a informação recolhida no scouting em decisões práticas para o próximo jogo.</p></div>{% if jogo %}<div class="scouting-plan-actions"><a href="/jogos/{{ jogo.id }}/plano/print" class="ds-button-secondary">Imprimir</a><a href="/exportacoes/relatorios/plano-jogo/{{ jogo.id }}" class="ds-button-secondary">Exportar relatório</a></div>{% endif %}</header>
 {% include "scouting/_departamento_tabs.html" %}
 
 {% if jogos %}

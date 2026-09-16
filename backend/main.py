@@ -30,6 +30,7 @@ import models.planeamento_clube
 import models.playbook
 import models.questionario
 import models.recuperacao_password
+import models.relatorio_exportacao
 import models.scouting
 import models.treinador
 import models.treino

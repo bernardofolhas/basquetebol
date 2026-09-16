@@ -18,6 +18,7 @@ from sqlalchemy.inspection import inspect as sa_inspect
 from sqlalchemy.orm import Session
 from template_config import Jinja2Templates
 
+from auth import verificar_acesso_equipa
 from auth_deps import exigir_autenticacao, exigir_coordenacao, exigir_operacao_desportiva, verificar_ou_negar_equipa
 from database import get_db
 from flash import set_flash
@@ -53,6 +54,8 @@ from models.planeamento_clube import (
     evento_planeamento_clube_equipa,
 )
 from models.playbook import PassoSetPlay, Playbook, SetPlay
+from models.relatorio_exportacao import PredefinicaoRelatorio
+from models.scouting import ScoutingAdversario, ScoutingAdversarioJogo, ScoutingJogador, STAT_FIELDS
 from models.treinador import Treinador, treinador_equipa
 from models.treino import BibliotecoExercicio, BlocoTreino, ExercicioPlano, ImportacaoPlanoTreino, PlanoTreino
 from models.utilizador import Utilizador
@@ -60,7 +63,8 @@ from paths import STATIC_DIR, TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
 from services.fotografia_jogador_service import caminho_fotografia
 from services.identidade_clube_service import caminho_ficheiro_logo
-from services.pdf_service import content_disposition_pdf
+from services.desenho_service import imagem_estatica_data_uri
+from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
 
 router = APIRouter(prefix="/exportacoes", tags=["exportacoes"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -663,3 +667,324 @@ def exportar_dados_clube(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="backup_clube_{_nome_seguro(clube.nome_curto)}.zip"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# Relatorios desportivos configuraveis
+# ---------------------------------------------------------------------------
+
+FORMATOS_RELATORIO = {
+    "completo": {
+        "nome": "Completo",
+        "descricao": "Dossier detalhado para preparar, arquivar e partilhar com a equipa tecnica.",
+    },
+    "facil": {
+        "nome": "Leitura facil",
+        "descricao": "Resumo visual, direto e confortavel para consultar no telemovel ou no balneario.",
+    },
+    "a3": {
+        "nome": "Poster A3",
+        "descricao": "Uma pagina de grande formato apenas com as mensagens essenciais e sem dados confidenciais.",
+    },
+}
+
+
+def _secao(chave: str, nome: str, descricao: str, formatos=("completo", "facil")) -> dict:
+    return {"chave": chave, "nome": nome, "descricao": descricao, "formatos": formatos}
+
+
+RELATORIOS_CONFIG = {
+    "roster": {
+        "nome": "Relatorio de plantel",
+        "entidades": "jogadores",
+        "secoes": [
+            _secao("fotografia", "Fotografia", "Identificacao visual dos atletas.", ("completo", "facil", "a3")),
+            _secao("identificacao", "Identificacao", "Nome, numero, posicao e idade.", ("completo", "facil", "a3")),
+            _secao("fisico", "Perfil fisico", "Altura, peso e envergadura mais recentes.", ("completo", "facil")),
+            _secao("estado", "Estado desportivo", "Inscricao e exame medico.", ("completo",)),
+            _secao("notas", "Notas tecnicas", "Resumo e objetivos do atleta.", ("completo", "facil")),
+            _secao("contactos", "Contactos confidenciais", "Contactos pessoais e familiares, apenas para perfis autorizados.", ("completo",)),
+        ],
+    },
+    "scouting-individual": {
+        "nome": "Scouting individual",
+        "entidades": "atletas do adversario",
+        "secoes": [
+            _secao("identificacao", "Identificacao", "Numero, posicao, idade e perfil fisico.", ("completo", "facil", "a3")),
+            _secao("fotografia", "Fotografia", "Referencia visual do atleta.", ("completo", "facil", "a3")),
+            _secao("pontos_fortes", "Pontos fortes", "Caracteristicas que exigem maior atencao.", ("completo", "facil", "a3")),
+            _secao("pontos_fracos", "Pontos a explorar", "Limitacoes e oportunidades identificadas.", ("completo", "facil", "a3")),
+            _secao("tendencias", "Tendencias", "Movimentos, decisoes e comportamentos recorrentes.", ("completo", "facil")),
+            _secao("zonas", "Zonas de acao", "Locais preferenciais e observacoes por zona.", ("completo", "facil")),
+            _secao("estatisticas", "Estatisticas", "Medias da epoca e indicadores principais.", ("completo", "facil")),
+            _secao("observacoes", "Observacoes", "Resumo tecnico individual.", ("completo",)),
+            _secao("recomendacoes", "Recomendacoes", "Orientacoes praticas para o matchup.", ("completo", "facil", "a3")),
+        ],
+    },
+    "scouting-coletivo": {
+        "nome": "Scouting coletivo",
+        "secoes": [
+            _secao("identidade", "Identidade", "Perfil global, ritmo e contexto do adversario.", ("completo", "facil", "a3")),
+            _secao("estatisticas", "Estatisticas coletivas", "Medias e lideres estatisticos.", ("completo", "facil")),
+            _secao("cinco_rotacao", "Cinco e rotacoes", "Cinco inicial previsto e principais rotacoes.", ("completo", "facil", "a3")),
+            _secao("ataque", "Ataque", "Pontos fortes, fragilidades e conceitos ofensivos.", ("completo", "facil", "a3")),
+            _secao("defesa", "Defesa", "Comportamentos e opcoes defensivas esperadas.", ("completo", "facil", "a3")),
+            _secao("jogadores_chave", "Jogadores-chave", "Lideres e prioridades individuais.", ("completo", "facil", "a3")),
+            _secao("prioridades", "Prioridades", "Plano pratico para atacar e defender.", ("completo", "facil", "a3")),
+            _secao("diagramas", "Diagramas", "Conceitos e momentos associados ao Playbook.", ("completo",)),
+        ],
+    },
+    "plano-jogo": {
+        "nome": "Plano de jogo",
+        "secoes": [
+            _secao("dados_jogo", "Dados do jogo", "Data, hora, local, competicao e adversario.", ("completo", "facil", "a3")),
+            _secao("convocatoria", "Convocatoria", "Atletas convocados e informacao de encontro.", ("completo", "facil")),
+            _secao("cinco_previsto", "Cinco e rotacoes", "Cinco inicial da equipa e previsao do adversario.", ("completo", "facil", "a3")),
+            _secao("plano_ofensivo", "Plano ofensivo", "Chaves e movimentos prioritarios.", ("completo", "facil", "a3")),
+            _secao("plano_defensivo", "Plano defensivo", "Coberturas e respostas por acao.", ("completo", "facil", "a3")),
+            _secao("situacoes_especiais", "Situacoes especiais", "Decisoes para momentos especificos.", ("completo", "facil")),
+            _secao("scouting", "Sintese do scouting", "Informacao coletiva importada do adversario.", ("completo", "facil")),
+            _secao("mensagem", "Mensagem final", "Rotações, prioridades e mensagem curta para a equipa.", ("completo", "facil", "a3")),
+        ],
+    },
+}
+
+PERFIS_CONTACTOS = {"superadministrador", "administrador", "coordenador", "secretaria"}
+
+
+def _perfil(utilizador) -> str:
+    return getattr(getattr(utilizador, "perfil", None), "value", str(getattr(utilizador, "perfil", "")))
+
+
+def _secoes_padrao(tipo: str, formato: str) -> list[str]:
+    return [s["chave"] for s in RELATORIOS_CONFIG[tipo]["secoes"] if formato in s["formatos"]]
+
+
+def _configuracao_relatorio(tipo: str, dados, utilizador) -> tuple[str, str, list[str]]:
+    formato = dados.get("formato", "completo")
+    if formato not in FORMATOS_RELATORIO:
+        formato = "completo"
+    orientacao = dados.get("orientacao", "paisagem" if formato == "a3" else "retrato")
+    if orientacao not in {"retrato", "paisagem"}:
+        orientacao = "retrato"
+    validas = {s["chave"] for s in RELATORIOS_CONFIG[tipo]["secoes"]}
+    escolhidas = [s for s in dados.getlist("secoes") if s in validas]
+    ordem = [s for s in dados.get("ordem", "").split(",") if s in escolhidas]
+    secoes = ordem + [s for s in escolhidas if s not in ordem]
+    if not secoes:
+        secoes = _secoes_padrao(tipo, formato)
+    if formato == "a3" or _perfil(utilizador) not in PERFIS_CONTACTOS:
+        secoes = [s for s in secoes if s != "contactos"]
+    return formato, orientacao, secoes
+
+
+def _fotografia_embebida(url: str | None) -> str | None:
+    caminho = caminho_fotografia(url)
+    if not caminho or not caminho.is_file():
+        return None
+    mime = "image/png" if caminho.suffix.lower() == ".png" else "image/jpeg"
+    return imagem_estatica_data_uri(caminho, mime)
+
+
+def _idade(data_nascimento) -> int | None:
+    if not data_nascimento:
+        return None
+    hoje = date.today()
+    return hoje.year - data_nascimento.year - ((hoje.month, hoje.day) < (data_nascimento.month, data_nascimento.day))
+
+
+def _alvo_relatorio(tipo: str, alvo_id: int, db: Session, utilizador):
+    clube_id = utilizador.clube_id
+    if tipo == "roster":
+        equipa = db.query(Equipa).filter(Equipa.id == alvo_id, Equipa.clube_id == clube_id).first()
+        if not equipa:
+            raise HTTPException(404, "Equipa nao encontrada.")
+        verificar_ou_negar_equipa(utilizador, equipa.id, db)
+        return equipa, equipa, equipa.nome
+    if tipo in {"scouting-individual", "scouting-coletivo"}:
+        adversario = db.query(ScoutingAdversario).filter(ScoutingAdversario.id == alvo_id, ScoutingAdversario.clube_id == clube_id).first()
+        if not adversario:
+            raise HTTPException(404, "Adversario nao encontrado.")
+        equipas = [ligacao.jogo.equipa for ligacao in adversario.jogos if ligacao.jogo and verificar_acesso_equipa(utilizador, ligacao.jogo.equipa_id, db)]
+        if not equipas:
+            raise HTTPException(403, "Sem acesso a este adversario.")
+        return adversario, equipas[0], adversario.nome
+    if tipo == "plano-jogo":
+        jogo = db.query(Jogo).filter(Jogo.id == alvo_id, Jogo.clube_id == clube_id).first()
+        if not jogo:
+            raise HTTPException(404, "Jogo nao encontrado.")
+        verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+        return jogo, jogo.equipa, f"{jogo.equipa.nome} vs {jogo.adversario}"
+    raise HTTPException(404, "Tipo de relatorio desconhecido.")
+
+
+def _itens_por_categoria(itens) -> dict[str, list]:
+    resultado: dict[str, list] = {}
+    for relacao in itens or []:
+        categoria = getattr(getattr(relacao, "item", None), "categoria", "outros")
+        resultado.setdefault(categoria, []).append(relacao)
+    return resultado
+
+
+def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> dict:
+    contexto = {"tipo_relatorio": tipo, "equipa": equipa, "alvo": alvo}
+    ids = {int(v) for v in dados.getlist("entidades") if str(v).isdigit()}
+    if tipo == "roster":
+        atletas = [j for j in alvo.jogadores if j.ativo and (not ids or j.id in ids)]
+        linhas = []
+        for atleta in sorted(atletas, key=lambda j: j.nome.lower()):
+            medida = db.query(RegistoAntropometrico).filter(RegistoAntropometrico.jogador_id == atleta.id).order_by(RegistoAntropometrico.data.desc()).first()
+            linhas.append({"jogador": atleta, "idade": _idade(atleta.data_nascimento), "medida": medida, "fotografia": _fotografia_embebida(atleta.fotografia)})
+        contexto.update(atletas=linhas)
+    elif tipo == "scouting-individual":
+        atletas = [j for j in alvo.jogadores if not ids or j.id in ids]
+        contexto.update(atletas=atletas, itens_atletas={j.id: _itens_por_categoria(j.itens) for j in atletas}, stat_fields=STAT_FIELDS)
+    elif tipo == "scouting-coletivo":
+        contexto.update(
+            adversario=alvo,
+            itens_coletivos=_itens_por_categoria(alvo.itens_coletivos),
+            cinco_previsto=[r for r in alvo.rotacao_prevista if r.papel == "titular"],
+            rotacoes_previstas=[r for r in alvo.rotacao_prevista if r.papel != "titular"],
+            stat_fields=STAT_FIELDS,
+        )
+    else:
+        plano = alvo.plano
+        titulares_ids = [getattr(plano, f"titular_{i}", None) for i in range(1, 6)] if plano else []
+        titulares = db.query(Jogador).filter(Jogador.id.in_([i for i in titulares_ids if i])).all() if any(titulares_ids) else []
+        titulares_map = {j.id: j for j in titulares}
+        titulares_ordenados = [titulares_map[i] for i in titulares_ids if i in titulares_map]
+        ligacao = db.query(ScoutingAdversarioJogo).filter(ScoutingAdversarioJogo.jogo_id == alvo.id).first()
+        adversario = ligacao.adversario if ligacao else None
+        contexto.update(
+            jogo=alvo,
+            plano=plano,
+            convocados=alvo.convocados,
+            titulares=titulares_ordenados,
+            adversario=adversario,
+            cinco_adversario=[r for r in adversario.rotacao_prevista if r.papel == "titular"] if adversario else [],
+            itens_coletivos=_itens_por_categoria(adversario.itens_coletivos) if adversario else {},
+        )
+    return contexto
+
+
+def _predefinicoes_relatorio(db: Session, utilizador, tipo: str, equipa_id: int) -> list[PredefinicaoRelatorio]:
+    return db.query(PredefinicaoRelatorio).filter(
+        PredefinicaoRelatorio.clube_id == utilizador.clube_id,
+        PredefinicaoRelatorio.tipo == tipo,
+        or_(
+            and_(PredefinicaoRelatorio.ambito == "pessoal", PredefinicaoRelatorio.utilizador_id == utilizador.id),
+            and_(PredefinicaoRelatorio.ambito == "equipa", PredefinicaoRelatorio.equipa_id == equipa_id),
+        ),
+    ).order_by(PredefinicaoRelatorio.ambito, PredefinicaoRelatorio.nome).all()
+
+
+@router.get("/relatorios/{tipo}/{alvo_id}", response_class=HTMLResponse)
+def configurar_relatorio(
+    tipo: str,
+    alvo_id: int,
+    request: Request,
+    predefinicao_id: int | None = None,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    if tipo not in RELATORIOS_CONFIG:
+        raise HTTPException(404, "Tipo de relatorio desconhecido.")
+    alvo, equipa, alvo_nome = _alvo_relatorio(tipo, alvo_id, db, utilizador)
+    predefinicoes = _predefinicoes_relatorio(db, utilizador, tipo, equipa.id)
+    predefinicao = next((p for p in predefinicoes if p.id == predefinicao_id), None)
+    selecionadas = json.loads(predefinicao.secoes) if predefinicao else _secoes_padrao(tipo, "completo")
+    entidades = []
+    if tipo == "roster":
+        entidades = [j for j in alvo.jogadores if j.ativo]
+    elif tipo == "scouting-individual":
+        entidades = alvo.jogadores
+    return templates.TemplateResponse(request, "exportacoes/relatorio_configurar.html", {
+        "utilizador": utilizador,
+        "tipo": tipo,
+        "alvo_id": alvo_id,
+        "alvo_nome": alvo_nome,
+        "equipa": equipa,
+        "config": RELATORIOS_CONFIG[tipo],
+        "formatos": FORMATOS_RELATORIO,
+        "entidades": entidades,
+        "predefinicoes": predefinicoes,
+        "predefinicao": predefinicao,
+        "selecionadas": selecionadas,
+        "padroes": {f: _secoes_padrao(tipo, f) for f in FORMATOS_RELATORIO},
+        "pode_ver_contactos": _perfil(utilizador) in PERFIS_CONTACTOS,
+    })
+
+
+def _gerar_relatorio(tipo: str, alvo_id: int, request: Request, dados, db: Session, utilizador, previsualizar: bool):
+    if tipo not in RELATORIOS_CONFIG:
+        raise HTTPException(404, "Tipo de relatorio desconhecido.")
+    alvo, equipa, alvo_nome = _alvo_relatorio(tipo, alvo_id, db, utilizador)
+    formato, orientacao, secoes = _configuracao_relatorio(tipo, dados, utilizador)
+    contexto = _contexto_relatorio(tipo, alvo, equipa, dados, db)
+    contexto.update(
+        formato=formato,
+        orientacao=orientacao,
+        secoes=secoes,
+        secoes_set=set(secoes),
+        titulo_relatorio=RELATORIOS_CONFIG[tipo]["nome"],
+        alvo_nome=alvo_nome,
+        nome_autor=utilizador.nome,
+        pode_ver_contactos=_perfil(utilizador) in PERFIS_CONTACTOS and formato != "a3",
+    )
+    template = f"relatorios/{tipo.replace('-', '_')}_{formato}.html"
+    nome = f"{RELATORIOS_CONFIG[tipo]['nome']} - {alvo_nome} - {date.today().isoformat()}"
+    if previsualizar:
+        html = templates.get_template(template).render(preparar_contexto_pdf(request, contexto))
+        return HTMLResponse(html)
+    pdf = renderizar_pdf(request, template, contexto)
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": content_disposition_pdf(nome)})
+
+
+@router.post("/relatorios/{tipo}/{alvo_id}/previsualizar")
+async def previsualizar_relatorio(tipo: str, alvo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_operacao_desportiva)):
+    return _gerar_relatorio(tipo, alvo_id, request, await request.form(), db, utilizador, True)
+
+
+@router.post("/relatorios/{tipo}/{alvo_id}/pdf")
+async def descarregar_relatorio(tipo: str, alvo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_operacao_desportiva)):
+    return _gerar_relatorio(tipo, alvo_id, request, await request.form(), db, utilizador, False)
+
+
+@router.post("/relatorios/{tipo}/{alvo_id}/predefinicoes")
+async def guardar_predefinicao_relatorio(tipo: str, alvo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_operacao_desportiva)):
+    if tipo not in RELATORIOS_CONFIG:
+        raise HTTPException(404, "Tipo de relatorio desconhecido.")
+    _, equipa, _ = _alvo_relatorio(tipo, alvo_id, db, utilizador)
+    dados = await request.form()
+    nome = str(dados.get("nome_predefinicao", "")).strip()
+    ambito = str(dados.get("ambito", "pessoal"))
+    if not nome or ambito not in {"pessoal", "equipa"}:
+        raise HTTPException(400, "Indica um nome e um ambito validos.")
+    formato, orientacao, secoes = _configuracao_relatorio(tipo, dados, utilizador)
+    filtro = [
+        PredefinicaoRelatorio.clube_id == utilizador.clube_id,
+        PredefinicaoRelatorio.tipo == tipo,
+        PredefinicaoRelatorio.ambito == ambito,
+        PredefinicaoRelatorio.nome == nome,
+    ]
+    if ambito == "pessoal":
+        filtro.append(PredefinicaoRelatorio.utilizador_id == utilizador.id)
+    else:
+        filtro.append(PredefinicaoRelatorio.equipa_id == equipa.id)
+    registo = db.query(PredefinicaoRelatorio).filter(*filtro).first()
+    if not registo:
+        registo = PredefinicaoRelatorio(
+            clube_id=utilizador.clube_id,
+            utilizador_id=utilizador.id if ambito == "pessoal" else None,
+            equipa_id=equipa.id if ambito == "equipa" else None,
+            tipo=tipo,
+            ambito=ambito,
+            nome=nome,
+            protegido=False,
+        )
+        db.add(registo)
+    registo.formato = formato
+    registo.orientacao = orientacao
+    registo.secoes = json.dumps(secoes)
+    db.commit()
+    return RedirectResponse(f"/exportacoes/relatorios/{tipo}/{alvo_id}?predefinicao_id={registo.id}", status_code=303)
