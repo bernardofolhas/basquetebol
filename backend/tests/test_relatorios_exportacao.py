@@ -90,6 +90,31 @@ def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
     assert "stat_fields" in html
 
 
+def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
+    marcadores = {
+        "roster_facil.html": ("easy-roster", "j.fotografia", "Referência rápida"),
+        "scouting_coletivo_facil.html": ("Quando defendemos", "Quando atacamos", "Jogadores-chave"),
+        "plano_jogo_facil.html": ("briefing da equipa", "O nosso cinco", "Convocados"),
+    }
+    for ficheiro, esperados in marcadores.items():
+        html = (TEMPLATES / "relatorios" / ficheiro).read_text(encoding="utf-8")
+        assert '_documento.html' not in html
+        for esperado in esperados:
+            assert esperado in html
+
+
+def test_relatorios_faceis_com_jogadores_apresentam_fotografias():
+    for ficheiro in (
+        "roster_facil.html",
+        "scouting_individual_facil.html",
+        "scouting_coletivo_facil.html",
+        "plano_jogo_facil.html",
+    ):
+        html = (TEMPLATES / "relatorios" / ficheiro).read_text(encoding="utf-8")
+        assert "fotografia" in html
+        assert "easy-photo" in html or 'class="photo"' in html
+
+
 def test_formulario_dinamico_transporta_token_da_sessao():
     html = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
     script = (ROOT / "frontend" / "static" / "js" / "report-hub.js").read_text(encoding="utf-8")
