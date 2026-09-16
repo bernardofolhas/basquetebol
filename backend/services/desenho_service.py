@@ -18,7 +18,7 @@ _MAX_ESTADO_BYTES = 500_000
 
 def normalizar_data_uri(valor: str | None) -> str | None:
     """Devolve um data URI raster válido, aceitando também Base64 legado."""
-    if not valor:
+    if not valor or not isinstance(valor, str):
         return None
     valor = valor.strip()
     if valor.startswith("data:"):
@@ -44,7 +44,7 @@ def normalizar_data_uri(valor: str | None) -> str | None:
 
 def decompor_desenho_editavel(valor: str | None) -> tuple[str | None, dict | None]:
     """Separa a imagem de apresentação do estado vetorial, aceitando PNGs antigos."""
-    if not valor:
+    if not valor or not isinstance(valor, str):
         return None, None
     try:
         pacote = json.loads(valor)

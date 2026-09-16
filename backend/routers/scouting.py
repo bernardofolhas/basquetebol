@@ -1,18 +1,19 @@
 """Scouting técnico por jogo: adversário, respostas da equipa e auto-scouting."""
 
-from datetime import datetime
+from datetime import date, datetime
 import unicodedata
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session, joinedload
 
 from auth import verificar_acesso_equipa
 from auth_deps import exigir_scouting, verificar_ou_negar_equipa
 from clube_contexto import clube_atual_id
 from database import get_db
 from flash import set_flash
+from logging_config import obter_logger
 from models.jogador import Jogador
 from models.jogo import Jogo, PlanoJogo
 from models.playbook import PassoSetPlay, Playbook, SetPlay
@@ -49,6 +50,7 @@ from template_config import Jinja2Templates
 
 router = APIRouter(prefix="/scouting")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+logger = obter_logger(__name__)
 
 ESTADOS = {"rascunho", "publicado", "revisto", "arquivado"}
 CONFIANCAS = {"baixa", "média", "alta"}
@@ -167,7 +169,13 @@ def _sincronizar_resultados_coletivos(db: Session, adversario: ScoutingAdversari
     alterado = False
     for ligacao in adversario.jogos:
         jogo = ligacao.jogo
-        if not jogo or jogo.pontos_nos is None or jogo.pontos_adversario is None:
+        if (
+            not jogo
+            or not jogo.data
+            or not jogo.equipa
+            or jogo.pontos_nos is None
+            or jogo.pontos_adversario is None
+        ):
             continue
         resultado = db.query(ScoutingResultadoColetivo).filter(
             ScoutingResultadoColetivo.adversario_id == adversario.id,
@@ -184,11 +192,14 @@ def _sincronizar_resultados_coletivos(db: Session, adversario: ScoutingAdversari
         resultado.competicao = jogo.competicao
         alterado = True
     if alterado:
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # Outra abertura simultânea pode ter sincronizado os mesmos jogos.
+            db.rollback()
 
 
-def _media_calculada(adversario: ScoutingAdversario) -> dict[str, float | None]:
-    registos = list(adversario.estatisticas_coletivas)
+def _media_calculada(registos: list[ScoutingEstatisticaColetivaJogo]) -> dict[str, float | None]:
     if not registos:
         return {campo: None for campo in STAT_FIELDS}
     media = {}
@@ -275,8 +286,68 @@ def _criar_setplay_scouting(db: Session, adversario: ScoutingAdversario, titulo:
 
 def _preparar_preview(registos) -> None:
     for registo in registos:
-        primeiro = registo.setplay.passos[0] if registo.setplay and registo.setplay.passos else None
-        registo.preview_imagem = decompor_desenho_editavel(primeiro.desenho)[0] if primeiro and primeiro.desenho else None
+        try:
+            primeiro = registo.setplay.passos[0] if registo.setplay and registo.setplay.passos else None
+            registo.preview_imagem = decompor_desenho_editavel(primeiro.desenho)[0] if primeiro and primeiro.desenho else None
+        except (AttributeError, TypeError, ValueError):
+            logger.warning("Desenho inválido ignorado na pré-visualização do scouting: %s", registo.id)
+            registo.preview_imagem = None
+
+
+def _garantir_ficha_individual(
+    db: Session,
+    jogador: ScoutingJogador,
+) -> tuple[ScoutingFichaIndividual, ScoutingMediaEpoca]:
+    """Obtém a ficha e a média sem depender de relações ORM possivelmente expiradas."""
+    jogador_id = jogador.id
+    clube_id = jogador.clube_id
+    ficha = db.query(ScoutingFichaIndividual).filter(
+        ScoutingFichaIndividual.jogador_id == jogador_id
+    ).first()
+    media = db.query(ScoutingMediaEpoca).filter(
+        ScoutingMediaEpoca.jogador_id == jogador_id
+    ).first()
+    if ficha and media:
+        return ficha, media
+
+    if not ficha:
+        db.add(ScoutingFichaIndividual(clube_id=clube_id, jogador_id=jogador_id))
+    if not media:
+        db.add(ScoutingMediaEpoca(clube_id=clube_id, jogador_id=jogador_id))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+    ficha = db.query(ScoutingFichaIndividual).filter(
+        ScoutingFichaIndividual.jogador_id == jogador_id
+    ).one()
+    media = db.query(ScoutingMediaEpoca).filter(
+        ScoutingMediaEpoca.jogador_id == jogador_id
+    ).one()
+    return ficha, media
+
+
+def _itens_validos_jogador(
+    db: Session,
+    jogador: ScoutingJogador,
+) -> dict[str, list[ScoutingJogadorItem]]:
+    """Agrupa apenas associações que ainda apontam para itens válidos do clube."""
+    associacoes = (
+        db.query(ScoutingJogadorItem)
+        .options(joinedload(ScoutingJogadorItem.item))
+        .join(ScoutingItemBiblioteca, ScoutingJogadorItem.item_id == ScoutingItemBiblioteca.id)
+        .filter(
+            ScoutingJogadorItem.jogador_id == jogador.id,
+            ScoutingItemBiblioteca.clube_id == jogador.clube_id,
+            ScoutingItemBiblioteca.categoria.in_(tuple(CATEGORIAS_BIBLIOTECA)),
+        )
+        .order_by(ScoutingItemBiblioteca.categoria, ScoutingItemBiblioteca.nome)
+        .all()
+    )
+    agrupados = {categoria: [] for categoria in CATEGORIAS_BIBLIOTECA}
+    for associacao in associacoes:
+        agrupados[associacao.item.categoria].append(associacao)
+    return agrupados
 
 
 def _jogo_plano_adversario(adversario: ScoutingAdversario, db: Session, utilizador, jogo_id: int | None = None) -> Jogo | None:
@@ -390,7 +461,7 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
     jogos = sorted([
         ligacao.jogo for ligacao in adversario.jogos
         if ligacao.jogo and verificar_acesso_equipa(utilizador, ligacao.jogo.equipa_id, db)
-    ], key=lambda jogo: jogo.data, reverse=True)
+    ], key=lambda jogo: jogo.data or date.min, reverse=True)
     if separador == "roster":
         grupos = {posicao: [j for j in adversario.jogadores if j.posicao_principal == posicao] for posicao in POSICOES}
         return templates.TemplateResponse(request, "scouting/roster.html", _contexto_departamento(
@@ -424,24 +495,73 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             ScoutingItemBiblioteca.clube_id == adversario.clube_id,
             ScoutingItemBiblioteca.categoria.in_(("estatistica_coletiva", "ataque_forte", "ataque_fraco", "defesa_forte", "defesa_fraco")),
         ).order_by(ScoutingItemBiblioteca.nome).all()
-        media_calculada = _media_calculada(adversario)
+        estatisticas_coletivas = (
+            db.query(ScoutingEstatisticaColetivaJogo)
+            .filter(ScoutingEstatisticaColetivaJogo.adversario_id == adversario.id)
+            .order_by(ScoutingEstatisticaColetivaJogo.data.desc())
+            .all()
+        )
+        media_calculada = _media_calculada(estatisticas_coletivas)
         media_exibida = (
             {campo: getattr(media_coletiva, campo) for campo in STAT_FIELDS}
             if media_coletiva.usar_manual
             else media_calculada
         )
-        resultados = [item for item in adversario.resultados if item.data][:5]
-        itens_coletivos = [item for item in adversario.itens_coletivos if item.item]
-        lideres = [item for item in adversario.lideres if item.jogador]
-        conceitos = [item for item in adversario.conceitos_ofensivos if item.setplay]
-        momentos = [item for item in adversario.momentos_playbook if item.setplay]
-        rotacoes = [item for item in adversario.rotacao_prevista if item.jogador]
+        resultados = (
+            db.query(ScoutingResultadoColetivo)
+            .filter(
+                ScoutingResultadoColetivo.adversario_id == adversario.id,
+                ScoutingResultadoColetivo.data.isnot(None),
+            )
+            .order_by(ScoutingResultadoColetivo.data.desc())
+            .limit(5)
+            .all()
+        )
+        itens_coletivos = (
+            db.query(ScoutingAdversarioItem)
+            .options(joinedload(ScoutingAdversarioItem.item))
+            .join(ScoutingItemBiblioteca, ScoutingAdversarioItem.item_id == ScoutingItemBiblioteca.id)
+            .filter(ScoutingAdversarioItem.adversario_id == adversario.id)
+            .all()
+        )
+        lideres = (
+            db.query(ScoutingLiderEstatistico)
+            .options(joinedload(ScoutingLiderEstatistico.jogador))
+            .join(ScoutingJogador, ScoutingLiderEstatistico.jogador_id == ScoutingJogador.id)
+            .filter(ScoutingLiderEstatistico.adversario_id == adversario.id)
+            .all()
+        )
+        conceitos = (
+            db.query(ScoutingConceitoOfensivo)
+            .options(joinedload(ScoutingConceitoOfensivo.setplay))
+            .join(SetPlay, ScoutingConceitoOfensivo.setplay_id == SetPlay.id)
+            .filter(ScoutingConceitoOfensivo.adversario_id == adversario.id)
+            .order_by(ScoutingConceitoOfensivo.ordem, ScoutingConceitoOfensivo.id)
+            .all()
+        )
+        momentos = (
+            db.query(ScoutingMomentoPlaybook)
+            .options(joinedload(ScoutingMomentoPlaybook.setplay))
+            .join(SetPlay, ScoutingMomentoPlaybook.setplay_id == SetPlay.id)
+            .filter(ScoutingMomentoPlaybook.adversario_id == adversario.id)
+            .order_by(ScoutingMomentoPlaybook.ordem, ScoutingMomentoPlaybook.id)
+            .all()
+        )
+        rotacoes = (
+            db.query(ScoutingRotacaoPrevista)
+            .options(joinedload(ScoutingRotacaoPrevista.jogador))
+            .join(ScoutingJogador, ScoutingRotacaoPrevista.jogador_id == ScoutingJogador.id)
+            .filter(ScoutingRotacaoPrevista.adversario_id == adversario.id)
+            .order_by(ScoutingRotacaoPrevista.papel, ScoutingRotacaoPrevista.ordem)
+            .all()
+        )
         _preparar_preview(conceitos)
         _preparar_preview(momentos)
         return templates.TemplateResponse(request, "scouting/coletivo.html", _contexto_departamento(
             request, utilizador, adversario, separador=separador, jogos=jogos,
             resultados=resultados, biblioteca=biblioteca,
             media_calculada=media_calculada, media_exibida=media_exibida, stat_fields=STAT_FIELDS,
+            estatisticas_coletivas=estatisticas_coletivas,
             media_coletiva=media_coletiva, opcoes_defensivas=opcoes_defensivas,
             itens_coletivos=itens_coletivos, lideres=lideres,
             conceitos=conceitos, momentos=momentos,
@@ -897,16 +1017,28 @@ def ficha_individual(jogador_id: int, request: Request, db: Session = Depends(ge
     jogador = _jogador_acessivel(db, jogador_id, utilizador)
     if not jogador:
         return RedirectResponse(url="/scouting", status_code=303)
-    if not jogador.ficha:
-        db.add(ScoutingFichaIndividual(clube_id=jogador.clube_id, jogador_id=jogador.id))
-    if not jogador.media_epoca:
-        db.add(ScoutingMediaEpoca(clube_id=jogador.clube_id, jogador_id=jogador.id))
-    db.commit()
-    biblioteca = db.query(ScoutingItemBiblioteca).filter(ScoutingItemBiblioteca.clube_id == jogador.clube_id).order_by(ScoutingItemBiblioteca.nome).all()
-    jogos = sorted([ligacao.jogo for ligacao in jogador.adversario.jogos if ligacao.jogo], key=lambda jogo: jogo.data, reverse=True)
+    ficha, media_epoca = _garantir_ficha_individual(db, jogador)
+    biblioteca = db.query(ScoutingItemBiblioteca).filter(
+        ScoutingItemBiblioteca.clube_id == jogador.clube_id,
+        ScoutingItemBiblioteca.categoria.in_(tuple(CATEGORIAS_BIBLIOTECA)),
+    ).order_by(ScoutingItemBiblioteca.nome).all()
+    jogos = sorted(
+        [ligacao.jogo for ligacao in jogador.adversario.jogos if ligacao.jogo],
+        key=lambda jogo: jogo.data or date.min,
+        reverse=True,
+    )
+    estatisticas = db.query(ScoutingEstatisticaJogo).filter(
+        ScoutingEstatisticaJogo.jogador_id == jogador.id,
+        ScoutingEstatisticaJogo.data.isnot(None),
+    ).order_by(ScoutingEstatisticaJogo.data.desc()).all()
+    zonas = db.query(ScoutingZonaAcao).filter(
+        ScoutingZonaAcao.jogador_id == jogador.id,
+        ScoutingZonaAcao.zona.in_(tuple(zona for zona, _ in ZONAS_CAMPO)),
+    ).all()
     return templates.TemplateResponse(request, "scouting/individual.html", _contexto_departamento(
         request, utilizador, jogador.adversario, separador="individual", jogador=jogador, biblioteca=biblioteca,
-        jogos=jogos, stat_fields=STAT_FIELDS
+        jogos=jogos, stat_fields=STAT_FIELDS, ficha=ficha, media_epoca=media_epoca,
+        estatisticas=estatisticas, zonas=zonas, itens_por_categoria=_itens_validos_jogador(db, jogador),
     ))
 
 
@@ -916,7 +1048,8 @@ async def guardar_resumo_individual(jogador_id: int, request: Request, db: Sessi
     if not jogador:
         return RedirectResponse(url="/scouting", status_code=303)
     dados = await request.form()
-    jogador.ficha.resumo = _limpo(dados.get("resumo"))
+    ficha, _ = _garantir_ficha_individual(db, jogador)
+    ficha.resumo = _limpo(dados.get("resumo"))
     db.commit()
     set_flash(request, "Resumo individual guardado.")
     return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}", status_code=303)
@@ -928,8 +1061,7 @@ async def guardar_media(jogador_id: int, request: Request, db: Session = Depends
     if not jogador:
         return RedirectResponse(url="/scouting", status_code=303)
     dados = await request.form()
-    media = jogador.media_epoca or ScoutingMediaEpoca(clube_id=jogador.clube_id, jogador_id=jogador.id)
-    db.add(media)
+    _, media = _garantir_ficha_individual(db, jogador)
     for campo in STAT_FIELDS:
         setattr(media, campo, _float(dados.get(campo)))
     db.commit()
@@ -978,21 +1110,80 @@ async def associar_item(jogador_id: int, request: Request, db: Session = Depends
         return RedirectResponse(url="/scouting", status_code=303)
     dados = await request.form()
     categoria, nome = dados.get("categoria"), _limpo(dados.get("nome_novo"))
+    if categoria not in CATEGORIAS_BIBLIOTECA:
+        set_flash(request, "A categoria selecionada não é válida.", "error")
+        return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#leitura", status_code=303)
+    if nome and len(nome) > 160:
+        set_flash(request, "O nome deve ter no máximo 160 caracteres.", "error")
+        return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#leitura", status_code=303)
     item_id = _int(dados.get("item_id"))
-    item = db.query(ScoutingItemBiblioteca).filter(ScoutingItemBiblioteca.id == item_id, ScoutingItemBiblioteca.clube_id == jogador.clube_id).first() if item_id else None
-    if nome and categoria in CATEGORIAS_BIBLIOTECA:
-        normalizado = _normalizar(nome)
-        item = db.query(ScoutingItemBiblioteca).filter(ScoutingItemBiblioteca.clube_id == jogador.clube_id, ScoutingItemBiblioteca.categoria == categoria, ScoutingItemBiblioteca.nome_normalizado == normalizado).first()
+    normalizado = _normalizar(nome) if nome else None
+    try:
+        item = db.query(ScoutingItemBiblioteca).filter(
+            ScoutingItemBiblioteca.id == item_id,
+            ScoutingItemBiblioteca.clube_id == jogador.clube_id,
+            ScoutingItemBiblioteca.categoria == categoria,
+        ).first() if item_id else None
+        if nome:
+            item = db.query(ScoutingItemBiblioteca).filter(
+                ScoutingItemBiblioteca.clube_id == jogador.clube_id,
+                ScoutingItemBiblioteca.categoria == categoria,
+                ScoutingItemBiblioteca.nome_normalizado == normalizado,
+            ).first()
+            if not item:
+                item = ScoutingItemBiblioteca(
+                    clube_id=jogador.clube_id,
+                    categoria=categoria,
+                    nome=nome,
+                    nome_normalizado=normalizado,
+                )
+                db.add(item)
+                db.flush()
         if not item:
-            item = ScoutingItemBiblioteca(clube_id=jogador.clube_id, categoria=categoria, nome=nome, nome_normalizado=normalizado)
-            db.add(item)
-            db.flush()
-    if not item:
-        set_flash(request, "Seleciona uma opção da biblioteca ou cria uma nova.", "error")
-    elif not db.query(ScoutingJogadorItem).filter(ScoutingJogadorItem.jogador_id == jogador.id, ScoutingJogadorItem.item_id == item.id).first():
-        db.add(ScoutingJogadorItem(clube_id=jogador.clube_id, jogador_id=jogador.id, item_id=item.id, observacao=_limpo(dados.get("observacao"))))
-        db.commit()
-        set_flash(request, "Informação associada à ficha.")
+            set_flash(request, "Seleciona uma opção da biblioteca ou cria uma nova.", "error")
+        else:
+            associacao = db.query(ScoutingJogadorItem).filter(
+                ScoutingJogadorItem.jogador_id == jogador.id,
+                ScoutingJogadorItem.item_id == item.id,
+            ).first()
+            if not associacao:
+                associacao = ScoutingJogadorItem(
+                    clube_id=jogador.clube_id,
+                    jogador_id=jogador.id,
+                    item_id=item.id,
+                )
+                db.add(associacao)
+            associacao.observacao = _limpo(dados.get("observacao"))
+            db.commit()
+            set_flash(request, "Informação associada à ficha.")
+    except IntegrityError:
+        db.rollback()
+        # Uma submissão repetida não deve bloquear a ficha nem criar duplicados.
+        item = db.query(ScoutingItemBiblioteca).filter(
+            ScoutingItemBiblioteca.clube_id == jogador.clube_id,
+            ScoutingItemBiblioteca.categoria == categoria,
+            ScoutingItemBiblioteca.nome_normalizado == normalizado,
+        ).first() if normalizado else None
+        if item:
+            associacao = db.query(ScoutingJogadorItem).filter(
+                ScoutingJogadorItem.jogador_id == jogador.id,
+                ScoutingJogadorItem.item_id == item.id,
+            ).first()
+            if not associacao:
+                db.add(ScoutingJogadorItem(
+                    clube_id=jogador.clube_id,
+                    jogador_id=jogador.id,
+                    item_id=item.id,
+                    observacao=_limpo(dados.get("observacao")),
+                ))
+                db.commit()
+            set_flash(request, "Informação associada à ficha.")
+        else:
+            set_flash(request, "Não foi possível associar esta informação. Tenta novamente.", "error")
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Falha ao associar item à ficha de scouting do jogador %s", jogador.id)
+        set_flash(request, "Não foi possível associar esta informação. A ficha continua disponível.", "error")
     return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#leitura", status_code=303)
 
 

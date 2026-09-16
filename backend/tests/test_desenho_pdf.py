@@ -68,3 +68,11 @@ def test_desenho_editavel_guarda_imagem_e_objectos_sem_quebrar_formato_legado():
     assert imagem_recuperada == imagem
     assert estado_recuperado == estado
     assert decompor_desenho_editavel(imagem) == (imagem, None)
+
+
+def test_desenho_editavel_malformado_nao_bloqueia_a_pagina():
+    pacote = '{"formato":"desenho-tatico-v1","imagem":{},"estado":{}}'
+
+    assert normalizar_data_uri({}) is None
+    assert decompor_desenho_editavel({}) == (None, None)
+    assert decompor_desenho_editavel(pacote) == (None, None)

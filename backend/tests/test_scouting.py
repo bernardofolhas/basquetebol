@@ -11,6 +11,9 @@ from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.scouting import (
     ScoutingAdversario,
     ScoutingAdversarioJogo,
+    ScoutingItemBiblioteca,
+    ScoutingJogador,
+    ScoutingJogadorItem,
     ScoutingMediaColetiva,
     ScoutingOpcoesDefensivas,
 )
@@ -231,10 +234,77 @@ def test_conceito_ofensivo_abre_playbook_studio_com_cena_valida(client_admin):
             assert setplay.clube_id == clube_id
             assert passo.clube_id == clube_id
             assert setplay.playbook.nome == f"Scouting · {nome_adversario}"
+            passo.desenho = '{"formato":"desenho-tatico-v1","imagem":{},"estado":{}}'
+            db.commit()
+        finally:
+            db.close()
+
+        coletivo = client_admin.get(f"/scouting/adversarios/{adversario_id}/coletivo")
+        studio_com_desenho_antigo = client_admin.get(criacao.headers["location"])
+        assert coletivo.status_code == 200
+        assert studio_com_desenho_antigo.status_code == 200
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_id, playbook_id)
+
+
+def test_movimento_especifico_e_associado_sem_bloquear_ficha(client_admin):
+    adversario_id, jogo_id, _, clube_id, _ = _criar_adversario_integracao()
+    nome_movimento = f"Movimento específico {uuid4().hex[:8]}"
+    jogador_id = None
+    try:
+        db = SessionLocal()
+        try:
+            jogador = ScoutingJogador(
+                clube_id=clube_id,
+                adversario_id=adversario_id,
+                nome="Atleta Académica",
+                numero="7",
+                posicao_principal="Base",
+            )
+            db.add(jogador)
+            db.commit()
+            jogador_id = jogador.id
+        finally:
+            db.close()
+
+        resposta = client_admin.post(
+            f"/scouting/jogadores/{jogador_id}/itens",
+            data={
+                "categoria": "movimento",
+                "nome_novo": nome_movimento,
+                "observacao": "Leitura específica",
+            },
+            follow_redirects=True,
+        )
+
+        assert resposta.status_code == 200
+        assert nome_movimento in resposta.text
+        db = SessionLocal()
+        try:
+            item = db.query(ScoutingItemBiblioteca).filter(
+                ScoutingItemBiblioteca.clube_id == clube_id,
+                ScoutingItemBiblioteca.nome == nome_movimento,
+            ).one()
+            associacao = db.query(ScoutingJogadorItem).filter(
+                ScoutingJogadorItem.jogador_id == jogador_id,
+                ScoutingJogadorItem.item_id == item.id,
+            ).one()
+            assert associacao.observacao == "Leitura específica"
         finally:
             db.close()
     finally:
-        _eliminar_adversario_integracao(adversario_id, jogo_id, playbook_id)
+        _eliminar_adversario_integracao(adversario_id, jogo_id)
+        db = SessionLocal()
+        try:
+            item = db.query(ScoutingItemBiblioteca).filter(
+                ScoutingItemBiblioteca.clube_id == clube_id,
+                ScoutingItemBiblioteca.nome == nome_movimento,
+            ).first()
+            if item:
+                db.delete(item)
+                db.commit()
+        finally:
+            db.close()
 
 
 def test_scouting_coletivo_separa_todos_os_dados_pedidos():
@@ -272,12 +342,21 @@ def test_pagina_coletiva_tem_estatistica_leitura_e_playbook_completos():
     assert 'data-defense-toggle' in coletivo
     assert '/playbook/studio/setplays/' in cartao
     assert '/mover/cima' in cartao and '/mover/baixo' in cartao
+    assert "loop.index" not in cartao
+    assert "elemento.ordem" in cartao
     assert "_media_calculada" in router
     assert 'origem="scouting"' in router
     assert "_garantir_configuracao_coletiva" in router
     assert "except IntegrityError" in router
     assert "adversario.media_coletiva" not in coletivo
     assert "adversario.opcoes_defensivas" not in coletivo
+
+
+def test_ficha_individual_nao_renderiza_associacoes_orfas_diretamente():
+    individual = (TEMPLATES_DIR / "scouting" / "individual.html").read_text(encoding="utf-8")
+
+    assert "itens_por_categoria.get(categoria, [])" in individual
+    assert "jogador.itens" not in individual
 
 
 def test_playbook_studio_regressa_ao_scouting_coletivo():
