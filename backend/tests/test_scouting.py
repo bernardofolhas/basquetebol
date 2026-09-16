@@ -274,6 +274,10 @@ def test_pagina_coletiva_tem_estatistica_leitura_e_playbook_completos():
     assert '/mover/cima' in cartao and '/mover/baixo' in cartao
     assert "_media_calculada" in router
     assert 'origem="scouting"' in router
+    assert "_garantir_configuracao_coletiva" in router
+    assert "except IntegrityError" in router
+    assert "adversario.media_coletiva" not in coletivo
+    assert "adversario.opcoes_defensivas" not in coletivo
 
 
 def test_playbook_studio_regressa_ao_scouting_coletivo():

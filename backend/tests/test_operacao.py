@@ -18,6 +18,7 @@ def test_health_responde_com_200():
         "estado": "ok",
         "servico": "basquetebol",
         "ambiente": main.config.ambiente,
+        "versao": main.VERSAO_APLICACAO,
     }
 
 

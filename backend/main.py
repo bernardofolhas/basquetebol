@@ -1,3 +1,6 @@
+import os
+from uuid import uuid4
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -107,6 +110,7 @@ from routers import treinadores
 from routers import treino
 
 logger = obter_logger(__name__)
+VERSAO_APLICACAO = os.getenv("RAILWAY_GIT_COMMIT_SHA", "local")[:8]
 
 
 def _validar_caminhos() -> None:
@@ -265,8 +269,10 @@ async def handle_acesso_negado(request: Request, exc: AcessoNegado):
 
 @app.exception_handler(Exception)
 async def erro_geral(request: Request, exc: Exception):
+    incidente = uuid4().hex[:8].upper()
     logger.error(
-        "Erro não tratado ao processar o pedido '%s %s'.",
+        "Incidente %s: erro não tratado ao processar o pedido '%s %s'.",
+        incidente,
         request.method,
         request.url.path,
         exc_info=(type(exc), exc, exc.__traceback__),
@@ -279,8 +285,13 @@ async def erro_geral(request: Request, exc: Exception):
         )
 
     return HTMLResponse(
-        "<h1>Ocorreu um erro interno</h1><p>Tenta novamente dentro de instantes.</p>",
+        "<main style='font-family:system-ui;max-width:680px;margin:12vh auto;padding:32px'>"
+        "<h1>Não foi possível abrir esta página</h1>"
+        "<p>O erro ficou registado e pode ser identificado pelo código "
+        f"<strong>{incidente}</strong>.</p>"
+        "<p><a href='javascript:history.back()'>Voltar à página anterior</a></p></main>",
         status_code=500,
+        headers={"X-Incident-Id": incidente},
     )
 
 
@@ -296,6 +307,7 @@ def healthcheck():
         "estado": "ok",
         "servico": "basquetebol",
         "ambiente": config.ambiente,
+        "versao": VERSAO_APLICACAO,
     }
 
 

@@ -5,6 +5,7 @@ import unicodedata
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from auth import verificar_acesso_equipa
@@ -197,6 +198,48 @@ def _media_calculada(adversario: ScoutingAdversario) -> dict[str, float | None]:
     return media
 
 
+def _garantir_configuracao_coletiva(
+    db: Session,
+    adversario: ScoutingAdversario,
+) -> tuple[ScoutingMediaColetiva, ScoutingOpcoesDefensivas]:
+    """Obtém os registos auxiliares sem depender do estado da relação ORM."""
+    adversario_id = adversario.id
+    clube_id = adversario.clube_id
+    media = db.query(ScoutingMediaColetiva).filter(
+        ScoutingMediaColetiva.adversario_id == adversario_id
+    ).first()
+    opcoes = db.query(ScoutingOpcoesDefensivas).filter(
+        ScoutingOpcoesDefensivas.adversario_id == adversario_id
+    ).first()
+    if media and opcoes:
+        return media, opcoes
+
+    if not media:
+        media = ScoutingMediaColetiva(
+            clube_id=clube_id,
+            adversario_id=adversario_id,
+        )
+        db.add(media)
+    if not opcoes:
+        opcoes = ScoutingOpcoesDefensivas(
+            clube_id=clube_id,
+            adversario_id=adversario_id,
+        )
+        db.add(opcoes)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Dois pedidos simultâneos podem tentar preparar a página pela primeira vez.
+        db.rollback()
+        media = db.query(ScoutingMediaColetiva).filter(
+            ScoutingMediaColetiva.adversario_id == adversario_id
+        ).one()
+        opcoes = db.query(ScoutingOpcoesDefensivas).filter(
+            ScoutingOpcoesDefensivas.adversario_id == adversario_id
+        ).one()
+    return media, opcoes
+
+
 def _playbook_scouting(db: Session, adversario: ScoutingAdversario) -> Playbook | None:
     ligacao = next((item for item in adversario.jogos if item.jogo and item.jogo.equipa), None)
     if not ligacao:
@@ -376,23 +419,7 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
         ))
     if separador == "coletivo":
         _sincronizar_resultados_coletivos(db, adversario)
-        media_coletiva = adversario.media_coletiva
-        if not media_coletiva:
-            media_coletiva = ScoutingMediaColetiva(
-                clube_id=adversario.clube_id,
-                adversario_id=adversario.id,
-            )
-            adversario.media_coletiva = media_coletiva
-            db.add(media_coletiva)
-        opcoes_defensivas = adversario.opcoes_defensivas
-        if not opcoes_defensivas:
-            opcoes_defensivas = ScoutingOpcoesDefensivas(
-                clube_id=adversario.clube_id,
-                adversario_id=adversario.id,
-            )
-            adversario.opcoes_defensivas = opcoes_defensivas
-            db.add(opcoes_defensivas)
-        db.commit()
+        media_coletiva, opcoes_defensivas = _garantir_configuracao_coletiva(db, adversario)
         biblioteca = db.query(ScoutingItemBiblioteca).filter(
             ScoutingItemBiblioteca.clube_id == adversario.clube_id,
             ScoutingItemBiblioteca.categoria.in_(("estatistica_coletiva", "ataque_forte", "ataque_fraco", "defesa_forte", "defesa_fraco")),
@@ -403,14 +430,23 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             if media_coletiva.usar_manual
             else media_calculada
         )
-        _preparar_preview(adversario.conceitos_ofensivos)
-        _preparar_preview(adversario.momentos_playbook)
+        resultados = [item for item in adversario.resultados if item.data][:5]
+        itens_coletivos = [item for item in adversario.itens_coletivos if item.item]
+        lideres = [item for item in adversario.lideres if item.jogador]
+        conceitos = [item for item in adversario.conceitos_ofensivos if item.setplay]
+        momentos = [item for item in adversario.momentos_playbook if item.setplay]
+        rotacoes = [item for item in adversario.rotacao_prevista if item.jogador]
+        _preparar_preview(conceitos)
+        _preparar_preview(momentos)
         return templates.TemplateResponse(request, "scouting/coletivo.html", _contexto_departamento(
             request, utilizador, adversario, separador=separador, jogos=jogos,
-            resultados=adversario.resultados[:5], biblioteca=biblioteca,
+            resultados=resultados, biblioteca=biblioteca,
             media_calculada=media_calculada, media_exibida=media_exibida, stat_fields=STAT_FIELDS,
-            cinco_previsto=[item for item in adversario.rotacao_prevista if item.papel == "titular"],
-            rotacoes_previstas=[item for item in adversario.rotacao_prevista if item.papel == "rotacao"],
+            media_coletiva=media_coletiva, opcoes_defensivas=opcoes_defensivas,
+            itens_coletivos=itens_coletivos, lideres=lideres,
+            conceitos=conceitos, momentos=momentos,
+            cinco_previsto=[item for item in rotacoes if item.papel == "titular"],
+            rotacoes_previstas=[item for item in rotacoes if item.papel == "rotacao"],
         ))
     if separador == "relatorios":
         equipas_relatorio = list({jogo.equipa.id: jogo.equipa for jogo in jogos}.values())
