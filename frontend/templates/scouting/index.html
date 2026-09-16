@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}Departamento de Scouting{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260916-1">{% endblock %}
+{% block conteudo %}
+<header class="scouting-hero"><div><p class="ds-kicker">Departamento de análise</p><h1>Scouting de adversários</h1><p>Roster permanente, fichas individuais e histórico associado aos jogos.</p></div><div class="scouting-hero-metrics"><strong>{{ adversarios|length }}</strong><span>adversários</span><strong>{{ total_jogadores }}</strong><span>atletas observados</span></div></header>
+<section class="scouting-opponents">
+  {% for item in adversarios %}<a class="scouting-opponent-card" href="/scouting/adversarios/{{ item.id }}/resumo"><div class="scouting-opponent-mark">{{ item.nome[:2]|upper }}</div><div><p class="ds-kicker">Adversário</p><h2>{{ item.nome }}</h2><p>{{ item.jogadores|length }} atleta(s) · {{ item.jogos_acessiveis|length }} jogo(s)</p>{% if item.jogos_acessiveis %}<small>Próximo/último: {{ item.jogos_acessiveis[0].data|data_pt }} · {{ item.jogos_acessiveis[0].equipa.nome }}</small>{% endif %}</div><span aria-hidden="true">→</span></a>
+  {% else %}<div class="ds-empty">Os adversários aparecem automaticamente quando são criados jogos no calendário.</div>{% endfor %}
+</section>
+{% endblock %}

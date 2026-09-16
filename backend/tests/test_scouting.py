@@ -57,3 +57,55 @@ def test_templates_de_scouting_renderizam_no_ambiente_jinja():
         "scouting/pdf_atletas.html",
     ):
         templates.env.get_template(nome)
+
+
+def test_departamento_scouting_tem_modelo_permanente_e_dados_separados():
+    modelo = (ROOT / "backend" / "models" / "scouting.py").read_text(encoding="utf-8")
+    migracao = (ROOT / "backend" / "migrations" / "versions" / "0047_departamento_scouting.py").read_text(encoding="utf-8")
+
+    for classe in (
+        "ScoutingAdversario", "ScoutingAdversarioJogo", "ScoutingJogador",
+        "ScoutingFichaIndividual", "ScoutingMediaEpoca", "ScoutingEstatisticaJogo",
+        "ScoutingItemBiblioteca", "ScoutingJogadorItem", "ScoutingZonaAcao",
+    ):
+        assert f"class {classe}" in modelo
+    for tabela in (
+        "scouting_adversarios", "scouting_roster_jogadores", "scouting_fichas_individuais",
+        "scouting_medias_epoca", "scouting_estatisticas_jogo", "scouting_biblioteca_itens",
+        "scouting_zonas_acao",
+    ):
+        assert tabela in migracao
+
+
+def test_departamento_scouting_expoe_tabs_roster_e_ficha_individual():
+    tabs = (TEMPLATES_DIR / "scouting" / "_departamento_tabs.html").read_text(encoding="utf-8")
+    roster = (TEMPLATES_DIR / "scouting" / "roster.html").read_text(encoding="utf-8")
+    campos = (TEMPLATES_DIR / "scouting" / "_roster_fields.html").read_text(encoding="utf-8")
+    individual = (TEMPLATES_DIR / "scouting" / "individual.html").read_text(encoding="utf-8")
+
+    for titulo in ("Resumo", "Roster", "Scouting Individual", "Scouting Coletivo", "Relatórios"):
+        assert titulo in tabs
+    for nome in ("fotografia", "posicao_principal", "posicao_alternativa", "altura_cm", "peso_kg", "estado", "mao_dominante"):
+        assert f'name="{nome}"' in campos
+    assert 'action="/scouting/roster/' in roster
+    assert "Média da época vs. jogo selecionado" in individual
+    assert "Biblioteca reutilizável" in individual
+    assert 'name="zonas"' in individual
+    assert "campo_meio.png" in individual
+
+
+def test_scouting_entra_na_area_de_analise_e_jogos_abrem_dossier():
+    navbar = (TEMPLATES_DIR / "partials" / "navbar_global.html").read_text(encoding="utf-8")
+    router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+
+    assert "Adversários, roster e análise individual" in navbar
+    assert "ScoutingAdversarioJogo.jogo_id == jogo.id" in router
+    assert 'url=f"/scouting/adversarios/{ligacao.adversario_id}/resumo"' in router
+
+
+def test_departamento_scouting_abre_para_administrador(client_admin):
+    resposta = client_admin.get("/scouting")
+
+    assert resposta.status_code == 200
+    assert "Scouting de adversários" in resposta.text
+    assert "Roster permanente" in resposta.text

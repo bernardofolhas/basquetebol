@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titulo %}{{ adversario.nome }} · Scouting{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260916-1">{% endblock %}
+{% block conteudo %}
+<header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">Dossier de adversário</p><h1>{{ adversario.nome }}</h1></div><span>{{ adversario.jogadores|length }} atletas</span></header>
+{% include "scouting/_departamento_tabs.html" %}
+<div class="scouting-summary-grid"><a class="ds-card ds-card-link p-6" href="/scouting/adversarios/{{ adversario.id }}/roster"><p class="ds-kicker">Roster</p><h2>{{ adversario.jogadores|length }} atletas registados</h2><p>Gerir identificação, disponibilidade e posição.</p></a><a class="ds-card ds-card-link p-6" href="/scouting/adversarios/{{ adversario.id }}/individual"><p class="ds-kicker">Scouting individual</p><h2>Fichas e tendências</h2><p>Estatísticas, movimentos, respostas defensivas e zonas.</p></a></div>
+<section class="ds-card p-6 mt-5"><p class="ds-kicker">Jogos associados</p><h2 class="text-xl font-extrabold mt-1">Calendário contra {{ adversario.nome }}</h2><div class="scouting-game-list">{% for jogo in jogos %}<div><div><strong>{{ jogo.equipa.nome }} · {{ jogo.data|data_pt }}</strong><span>{{ jogo.hora or 'Hora por definir' }} · {{ jogo.local or 'Local por definir' }}</span></div><a href="/jogos/{{ jogo.id }}">Abrir jogo</a></div>{% else %}<p>Sem jogos associados.</p>{% endfor %}</div></section>
+{% endblock %}

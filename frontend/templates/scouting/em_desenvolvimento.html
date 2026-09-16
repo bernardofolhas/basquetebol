@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }} · {{ adversario.nome }}{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260916-1">{% endblock %}
+{% block conteudo %}<header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">{{ adversario.nome }}</p><h1>{{ titulo }}</h1></div></header>{% include "scouting/_departamento_tabs.html" %}<div class="scouting-coming"><span>◌</span><h2>Em desenvolvimento</h2><p>Esta área está preparada para a próxima fase, sem formulários incompletos nem ações ambíguas.</p></div>{% endblock %}
