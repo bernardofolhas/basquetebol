@@ -1,5 +1,20 @@
+from datetime import date
 from pathlib import Path
+from uuid import uuid4
 
+import pytest
+
+from database import SessionLocal
+from models.equipa import Equipa
+from models.jogo import Jogo
+from models.playbook import PassoSetPlay, Playbook, SetPlay
+from models.scouting import (
+    ScoutingAdversario,
+    ScoutingAdversarioJogo,
+    ScoutingMediaColetiva,
+    ScoutingOpcoesDefensivas,
+)
+from models.utilizador import Utilizador
 from paths import TEMPLATES_DIR
 from template_config import Jinja2Templates
 
@@ -106,6 +121,120 @@ def test_departamento_scouting_abre_para_administrador(client_admin):
     assert resposta.status_code == 200
     assert "Scouting de adversários" in resposta.text
     assert "Roster permanente" in resposta.text
+
+
+def _criar_adversario_integracao():
+    db = SessionLocal()
+    try:
+        administrador = db.query(Utilizador).filter(Utilizador.username == "admin").first()
+        if not administrador or not administrador.clube_id:
+            pytest.skip("Conta administrativa de teste sem clube.")
+        equipa = db.query(Equipa).filter(Equipa.clube_id == administrador.clube_id).first()
+        if not equipa:
+            pytest.skip("Clube de teste sem equipa.")
+
+        sufixo = uuid4().hex[:10]
+        nome = f"Adversário integração {sufixo}"
+        jogo = Jogo(
+            clube_id=administrador.clube_id,
+            equipa_id=equipa.id,
+            data=date(2042, 9, 16),
+            hora="20:00",
+            adversario=nome,
+            em_casa=True,
+        )
+        adversario = ScoutingAdversario(
+            clube_id=administrador.clube_id,
+            nome=nome,
+            nome_normalizado=nome.lower(),
+        )
+        db.add_all((jogo, adversario))
+        db.flush()
+        db.add(ScoutingAdversarioJogo(
+            clube_id=administrador.clube_id,
+            adversario_id=adversario.id,
+            jogo_id=jogo.id,
+        ))
+        db.commit()
+        return adversario.id, jogo.id, equipa.id, administrador.clube_id, nome
+    finally:
+        db.close()
+
+
+def _eliminar_adversario_integracao(adversario_id, jogo_id, playbook_id=None):
+    db = SessionLocal()
+    try:
+        adversario = db.query(ScoutingAdversario).filter(ScoutingAdversario.id == adversario_id).first()
+        if adversario:
+            db.delete(adversario)
+            db.flush()
+        if playbook_id:
+            playbook = db.query(Playbook).filter(Playbook.id == playbook_id).first()
+            if playbook:
+                db.delete(playbook)
+                db.flush()
+        jogo = db.query(Jogo).filter(Jogo.id == jogo_id).first()
+        if jogo:
+            db.delete(jogo)
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_primeira_abertura_do_scouting_coletivo_cria_dependencias_sem_erro(client_admin):
+    adversario_id, jogo_id, _, clube_id, _ = _criar_adversario_integracao()
+    try:
+        resposta = client_admin.get(f"/scouting/adversarios/{adversario_id}/coletivo")
+
+        assert resposta.status_code == 200
+        assert "Scouting Coletivo" in resposta.text
+
+        db = SessionLocal()
+        try:
+            media = db.query(ScoutingMediaColetiva).filter(
+                ScoutingMediaColetiva.adversario_id == adversario_id
+            ).one()
+            opcoes = db.query(ScoutingOpcoesDefensivas).filter(
+                ScoutingOpcoesDefensivas.adversario_id == adversario_id
+            ).one()
+            assert media.clube_id == clube_id
+            assert opcoes.clube_id == clube_id
+        finally:
+            db.close()
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_id)
+
+
+def test_conceito_ofensivo_abre_playbook_studio_com_cena_valida(client_admin):
+    adversario_id, jogo_id, _, clube_id, nome_adversario = _criar_adversario_integracao()
+    playbook_id = None
+    try:
+        criacao = client_admin.post(
+            f"/scouting/adversarios/{adversario_id}/coletivo/conceitos",
+            data={"titulo": "Saída horns", "observacoes": "Primeira leitura"},
+            follow_redirects=False,
+        )
+        assert criacao.status_code == 303
+        assert criacao.headers["location"].startswith("/playbook/studio/setplays/")
+
+        setplay_id = int(criacao.headers["location"].rsplit("/", 1)[-1])
+        studio = client_admin.get(criacao.headers["location"])
+        assert studio.status_code == 200
+        assert "Playbook Studio" in studio.text
+        assert "Saída horns" in studio.text
+
+        db = SessionLocal()
+        try:
+            setplay = db.query(SetPlay).filter(SetPlay.id == setplay_id).one()
+            passo = db.query(PassoSetPlay).filter(PassoSetPlay.setplay_id == setplay.id).one()
+            playbook_id = setplay.playbook_id
+            assert setplay.clube_id == clube_id
+            assert passo.clube_id == clube_id
+            assert setplay.playbook.nome == f"Scouting · {nome_adversario}"
+        finally:
+            db.close()
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_id, playbook_id)
 
 
 def test_scouting_coletivo_separa_todos_os_dados_pedidos():

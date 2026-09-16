@@ -204,7 +204,8 @@ def _playbook_scouting(db: Session, adversario: ScoutingAdversario) -> Playbook 
     equipa = ligacao.jogo.equipa
     base = db.query(Playbook).filter(Playbook.equipa_id == equipa.id).order_by(Playbook.id).first()
     if not base:
-        db.add(Playbook(clube_id=adversario.clube_id, equipa_id=equipa.id, nome=f"Playbook — {equipa.nome}"))
+        base = Playbook(clube_id=adversario.clube_id, equipa_id=equipa.id, nome=f"Playbook — {equipa.nome}")
+        db.add(base)
         db.flush()
     nome = f"Scouting · {adversario.nome}"
     playbook = db.query(Playbook).filter(Playbook.equipa_id == equipa.id, Playbook.nome == nome).first()
@@ -375,17 +376,33 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
         ))
     if separador == "coletivo":
         _sincronizar_resultados_coletivos(db, adversario)
-        if not adversario.media_coletiva:
-            db.add(ScoutingMediaColetiva(clube_id=adversario.clube_id, adversario_id=adversario.id))
-        if not adversario.opcoes_defensivas:
-            db.add(ScoutingOpcoesDefensivas(clube_id=adversario.clube_id, adversario_id=adversario.id))
+        media_coletiva = adversario.media_coletiva
+        if not media_coletiva:
+            media_coletiva = ScoutingMediaColetiva(
+                clube_id=adversario.clube_id,
+                adversario_id=adversario.id,
+            )
+            adversario.media_coletiva = media_coletiva
+            db.add(media_coletiva)
+        opcoes_defensivas = adversario.opcoes_defensivas
+        if not opcoes_defensivas:
+            opcoes_defensivas = ScoutingOpcoesDefensivas(
+                clube_id=adversario.clube_id,
+                adversario_id=adversario.id,
+            )
+            adversario.opcoes_defensivas = opcoes_defensivas
+            db.add(opcoes_defensivas)
         db.commit()
         biblioteca = db.query(ScoutingItemBiblioteca).filter(
             ScoutingItemBiblioteca.clube_id == adversario.clube_id,
             ScoutingItemBiblioteca.categoria.in_(("estatistica_coletiva", "ataque_forte", "ataque_fraco", "defesa_forte", "defesa_fraco")),
         ).order_by(ScoutingItemBiblioteca.nome).all()
         media_calculada = _media_calculada(adversario)
-        media_exibida = {campo: getattr(adversario.media_coletiva, campo) for campo in STAT_FIELDS} if adversario.media_coletiva.usar_manual else media_calculada
+        media_exibida = (
+            {campo: getattr(media_coletiva, campo) for campo in STAT_FIELDS}
+            if media_coletiva.usar_manual
+            else media_calculada
+        )
         _preparar_preview(adversario.conceitos_ofensivos)
         _preparar_preview(adversario.momentos_playbook)
         return templates.TemplateResponse(request, "scouting/coletivo.html", _contexto_departamento(

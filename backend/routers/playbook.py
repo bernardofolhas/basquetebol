@@ -134,7 +134,11 @@ def playbook_equipa(equipa_id: int, request: Request, db: Session = Depends(get_
 
     playbook = db.query(Playbook).filter(Playbook.equipa_id == equipa_id).first()
     if not playbook:
-        playbook = Playbook(equipa_id=equipa_id, nome=f"Playbook — {equipa.nome}")
+        playbook = Playbook(
+            clube_id=equipa.clube_id,
+            equipa_id=equipa_id,
+            nome=f"Playbook — {equipa.nome}",
+        )
         db.add(playbook)
         db.commit()
         db.refresh(playbook)
@@ -168,8 +172,12 @@ async def criar_caderno_playbook(
     descricao: str = Form(""),
 ):
     _verificar_acesso_playbook(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    if not equipa:
+        return RedirectResponse(url="/equipas", status_code=303)
     total = db.query(CadernoPlaybook).filter(CadernoPlaybook.equipa_id == equipa_id).count()
     caderno = CadernoPlaybook(
+        clube_id=equipa.clube_id,
         equipa_id=equipa_id,
         nome=nome.strip() or "Novo playbook",
         descricao=descricao.strip() or None,
@@ -245,7 +253,12 @@ async def criar_secao_caderno(
     _verificar_acesso_playbook(utilizador, equipa_id, db)
     caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
     if caderno:
-        db.add(SecaoCadernoPlaybook(caderno_id=caderno.id, nome=nome.strip() or "Nova secção", ordem=len(caderno.secoes)))
+        db.add(SecaoCadernoPlaybook(
+            clube_id=caderno.clube_id,
+            caderno_id=caderno.id,
+            nome=nome.strip() or "Nova secção",
+            ordem=len(caderno.secoes),
+        ))
         db.commit()
     return RedirectResponse(url=f"/playbook/cadernos/{caderno_id}", status_code=303)
 
@@ -278,7 +291,13 @@ async def adicionar_jogadas_caderno(
     for setplay in validos:
         if setplay.id in ids_existentes:
             continue
-        db.add(JogadaCadernoPlaybook(caderno_id=caderno.id, secao_id=secao_id, setplay_id=setplay.id, ordem=ordem))
+        db.add(JogadaCadernoPlaybook(
+            clube_id=caderno.clube_id,
+            caderno_id=caderno.id,
+            secao_id=secao_id,
+            setplay_id=setplay.id,
+            ordem=ordem,
+        ))
         ordem += 1
     db.commit()
     return RedirectResponse(url=f"/playbook/cadernos/{caderno_id}", status_code=303)
@@ -389,9 +408,21 @@ async def criar_setplay(equipa_id: int, request: Request, db: Session = Depends(
         return RedirectResponse(url=f"/playbook/equipas/{equipa_id}", status_code=303)
 
     ordem = len(playbook.setplays)
-    setplay = SetPlay(playbook_id=playbook.id, nome=nome, categoria=categoria or None,
-                      descricao=descricao or None, ordem=ordem)
+    setplay = SetPlay(
+        clube_id=playbook.clube_id,
+        playbook_id=playbook.id,
+        nome=nome,
+        categoria=categoria or None,
+        descricao=descricao or None,
+        ordem=ordem,
+    )
     db.add(setplay)
+    db.flush()
+    db.add(PassoSetPlay(
+        clube_id=playbook.clube_id,
+        setplay_id=setplay.id,
+        ordem=0,
+    ))
     db.commit()
     db.refresh(setplay)
     set_flash(request, f"Setplay '{nome}' criado.")
@@ -422,7 +453,11 @@ async def importar_setplay_ebp(
 
     playbook = db.query(Playbook).filter(Playbook.equipa_id == equipa_id).first()
     if not playbook:
-        playbook = Playbook(equipa_id=equipa_id, nome=f"Playbook — {equipa.nome}")
+        playbook = Playbook(
+            clube_id=equipa.clube_id,
+            equipa_id=equipa_id,
+            nome=f"Playbook — {equipa.nome}",
+        )
         db.add(playbook)
         db.flush()
 
@@ -444,6 +479,7 @@ async def importar_setplay_ebp(
             setplay.descricao = jogada.descricao or None
     else:
         setplay = SetPlay(
+            clube_id=playbook.clube_id,
             playbook_id=playbook.id,
             nome=jogada.nome,
             categoria=categoria or "Outro",
@@ -463,6 +499,7 @@ async def importar_setplay_ebp(
                 passo.observacao = sequencia.texto or None
         else:
             db.add(PassoSetPlay(
+                clube_id=playbook.clube_id,
                 setplay_id=setplay.id,
                 ordem=ordem,
                 observacao=sequencia.texto or None,
@@ -594,7 +631,11 @@ async def adicionar_passo(setplay_id: int, request: Request, db: Session = Depen
     setplay = db.query(SetPlay).filter(SetPlay.id == setplay_id).first()
     if setplay:
         ordem = len(setplay.passos)
-        passo = PassoSetPlay(setplay_id=setplay_id, ordem=ordem)
+        passo = PassoSetPlay(
+            clube_id=setplay.clube_id,
+            setplay_id=setplay_id,
+            ordem=ordem,
+        )
         db.add(passo)
         db.commit()
         db.refresh(passo)
@@ -629,6 +670,7 @@ async def duplicar_passo(
     for seguinte in seguintes:
         seguinte.ordem += 1
     copia = PassoSetPlay(
+        clube_id=passo.clube_id,
         setplay_id=passo.setplay_id,
         ordem=passo.ordem + 1,
         observacao=passo.observacao,

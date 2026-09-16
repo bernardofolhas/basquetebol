@@ -1,6 +1,7 @@
 import base64
 from io import BytesIO
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from PIL import Image
@@ -50,6 +51,45 @@ def test_playbook_expoe_imagem_e_desenho_em_cada_passo():
     assert 'name="imagem"' in template
     assert "/imagem/eliminar" in template
     assert "passo.imagem_composta_pdf" in pdf
+
+
+def test_nova_jogada_abre_studio_com_primeira_cena_persistida(client_admin):
+    db = SessionLocal()
+    setplay_id = None
+    try:
+        administrador = db.query(Utilizador).filter(Utilizador.username == "admin").first()
+        if not administrador or not administrador.clube_id:
+            pytest.skip("Conta administrativa de teste sem clube.")
+        equipa = db.query(Equipa).filter(Equipa.clube_id == administrador.clube_id).first()
+        if not equipa:
+            pytest.skip("Clube de teste sem equipa.")
+
+        client_admin.get(f"/playbook/equipas/{equipa.id}")
+        nome = f"Jogada persistida {uuid4().hex[:8]}"
+        criacao = client_admin.post(
+            f"/playbook/equipas/{equipa.id}/setplays/novo",
+            data={"nome": nome, "categoria": "Ataque", "descricao": ""},
+            follow_redirects=False,
+        )
+        assert criacao.status_code == 303
+        setplay_id = int(criacao.headers["location"].rsplit("/", 1)[-1])
+
+        db.expire_all()
+        setplay = db.query(SetPlay).filter(SetPlay.id == setplay_id).one()
+        assert setplay.clube_id == administrador.clube_id
+        assert len(setplay.passos) == 1
+        assert setplay.passos[0].clube_id == administrador.clube_id
+
+        studio = client_admin.get(criacao.headers["location"])
+        assert studio.status_code == 200
+        assert nome in studio.text
+    finally:
+        if setplay_id:
+            setplay = db.query(SetPlay).filter(SetPlay.id == setplay_id).first()
+            if setplay:
+                db.delete(setplay)
+                db.commit()
+        db.close()
 
 
 def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
