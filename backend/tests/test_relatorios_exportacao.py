@@ -73,6 +73,14 @@ def test_configurador_tem_selecao_arrastar_previsualizacao_e_predefinicoes():
         assert marcador in html
 
 
+def test_formulario_dinamico_transporta_token_da_sessao():
+    html = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
+    script = (ROOT / "frontend" / "static" / "js" / "report-hub.js").read_text(encoding="utf-8")
+    assert 'name="csrf_token"' in html
+    assert "request.session.get('_csrf'" in html
+    assert "credentials:'same-origin'" in script
+
+
 def test_relatorios_estao_centralizados_em_cartoes_com_modal():
     central = (TEMPLATES / "scouting" / "relatorios.html").read_text(encoding="utf-8")
     assert central.count('class="report-hub-card"') == 4
@@ -81,6 +89,16 @@ def test_relatorios_estao_centralizados_em_cartoes_com_modal():
     for ficheiro in ("equipas/plantel.html", "scouting/individual_lista.html", "scouting/coletivo.html", "scouting/plano_jogo.html"):
         conteudo = (TEMPLATES / ficheiro).read_text(encoding="utf-8")
         assert "Exportar relatório" not in conteudo
+
+
+def test_relatorio_plantel_usa_o_adversario_em_analise():
+    central = (TEMPLATES / "scouting" / "relatorios.html").read_text(encoding="utf-8")
+    rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+    documento = (TEMPLATES / "relatorios" / "_documento.html").read_text(encoding="utf-8")
+    assert 'data-report-type="roster" data-report-target="{{ adversario.id }}"' in central
+    assert 'tipo in {"roster", "scouting-individual", "scouting-coletivo"}' in rota
+    assert "j.numero or '—'" in documento
+    assert "j.posicao_principal" in documento
 
 
 def test_fragmento_e_inicializador_do_popup_existem():

@@ -700,10 +700,10 @@ RELATORIOS_CONFIG = {
         "secoes": [
             _secao("fotografia", "Fotografia", "Identificacao visual dos atletas.", ("completo", "facil", "a3")),
             _secao("identificacao", "Identificacao", "Nome, numero, posicao e idade.", ("completo", "facil", "a3")),
-            _secao("fisico", "Perfil fisico", "Altura, peso e envergadura mais recentes.", ("completo", "facil")),
-            _secao("estado", "Estado desportivo", "Inscricao e exame medico.", ("completo",)),
-            _secao("notas", "Notas tecnicas", "Resumo e objetivos do atleta.", ("completo", "facil")),
-            _secao("contactos", "Contactos confidenciais", "Contactos pessoais e familiares, apenas para perfis autorizados.", ("completo",)),
+            _secao("fisico", "Perfil fisico", "Altura, peso e mao dominante.", ("completo", "facil")),
+            _secao("estado", "Estado desportivo", "Estado atual no roster adversario.", ("completo",)),
+            _secao("notas", "Notas tecnicas", "Observacoes e equipa anterior.", ("completo", "facil")),
+            _secao("estatisticas", "Estatisticas", "Medias da epoca e indicadores principais.", ("completo", "facil")),
         ],
     },
     "scouting-individual": {
@@ -795,13 +795,7 @@ def _idade(data_nascimento) -> int | None:
 
 def _alvo_relatorio(tipo: str, alvo_id: int, db: Session, utilizador):
     clube_id = utilizador.clube_id
-    if tipo == "roster":
-        equipa = db.query(Equipa).filter(Equipa.id == alvo_id, Equipa.clube_id == clube_id).first()
-        if not equipa:
-            raise HTTPException(404, "Equipa nao encontrada.")
-        verificar_ou_negar_equipa(utilizador, equipa.id, db)
-        return equipa, equipa, equipa.nome
-    if tipo in {"scouting-individual", "scouting-coletivo"}:
+    if tipo in {"roster", "scouting-individual", "scouting-coletivo"}:
         adversario = db.query(ScoutingAdversario).filter(ScoutingAdversario.id == alvo_id, ScoutingAdversario.clube_id == clube_id).first()
         if not adversario:
             raise HTTPException(404, "Adversario nao encontrado.")
@@ -830,12 +824,11 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
     contexto = {"tipo_relatorio": tipo, "equipa": equipa, "alvo": alvo}
     ids = {int(v) for v in dados.getlist("entidades") if str(v).isdigit()}
     if tipo == "roster":
-        atletas = [j for j in alvo.jogadores if j.ativo and (not ids or j.id in ids)]
-        linhas = []
-        for atleta in sorted(atletas, key=lambda j: j.nome.lower()):
-            medida = db.query(RegistoAntropometrico).filter(RegistoAntropometrico.jogador_id == atleta.id).order_by(RegistoAntropometrico.data.desc()).first()
-            linhas.append({"jogador": atleta, "idade": _idade(atleta.data_nascimento), "medida": medida, "fotografia": _fotografia_embebida(atleta.fotografia)})
-        contexto.update(atletas=linhas)
+        atletas = [j for j in alvo.jogadores if j.estado != "arquivado" and (not ids or j.id in ids)]
+        contexto.update(
+            atletas=sorted(atletas, key=lambda j: j.nome.lower()),
+            stat_fields=STAT_FIELDS,
+        )
     elif tipo == "scouting-individual":
         atletas = [j for j in alvo.jogadores if not ids or j.id in ids]
         contexto.update(atletas=atletas, itens_atletas={j.id: _itens_por_categoria(j.itens) for j in atletas}, stat_fields=STAT_FIELDS)
@@ -885,7 +878,7 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
     selecionadas = json.loads(predefinicao.secoes) if predefinicao else _secoes_padrao(tipo, "completo")
     entidades = []
     if tipo == "roster":
-        entidades = [j for j in alvo.jogadores if j.ativo]
+        entidades = [j for j in alvo.jogadores if j.estado != "arquivado"]
     elif tipo == "scouting-individual":
         entidades = alvo.jogadores
     return {
