@@ -883,17 +883,20 @@ table tbody tr:hover { background:#fafbfd; }
 .training-tabs-inner>.ds-workspace-tabs-list { min-width:0; }
 .training-tabs-tools { display:flex;min-width:0;align-items:center;gap:.45rem; }
 .training-tab-count { display:inline-grid;min-width:1.25rem;height:1.25rem;margin-left:.3rem;place-items:center;border-radius:999px;background:var(--clube-primary-soft);color:var(--clube-primary-dark);font-size:.6rem;font-weight:900; }
-.training-guidance-shell { position:relative;z-index:var(--layer-content); }
-.training-guidance-shell:has(.training-guidance-menu[open]) { z-index:var(--layer-notice); }
+.training-guidance-shell { position:relative;z-index:var(--layer-content);isolation:isolate; }
+/* Os cartões do planeamento usam animações e contextos de empilhamento
+   próprios. Quando aberto, o pendente passa para uma camada superior a toda
+   a página, não apenas ao seu bloco imediato. */
+.training-guidance-shell:has(.training-guidance-menu[open]) { z-index:200; }
 .training-guidance-menu { position:relative;z-index:1;flex:none; }
-.training-guidance-menu[open] { z-index:2; }
+.training-guidance-menu[open] { z-index:201; }
 .training-guidance-menu>summary { display:flex;min-height:2.35rem;cursor:pointer;list-style:none;align-items:center;gap:.5rem;border:1px solid var(--border-strong);border-radius:.55rem;background:#fff;padding:.5rem .72rem;color:var(--text-main);font-size:.75rem;font-weight:750;white-space:nowrap;transition:border-color .15s,box-shadow .15s,color .15s; }
 .training-guidance-menu>summary::-webkit-details-marker { display:none; }
 .training-guidance-menu>summary strong { color:var(--clube-primary);font-size:.7rem; }
 .training-guidance-chevron { display:inline-grid;width:.9rem;height:.9rem;place-items:center;font-size:1rem;font-weight:800;line-height:.65;transition:transform .18s ease; }
 .training-guidance-menu[open]>summary { border-color:var(--clube-primary-border);color:var(--clube-primary-dark);box-shadow:0 0 0 3px var(--clube-primary-soft); }
 .training-guidance-menu[open]>summary .training-guidance-chevron { transform:rotate(180deg); }
-.training-guidance-popover { position:absolute;top:calc(100% + .5rem);right:0;z-index:45;width:min(52rem,calc(100vw - 2rem));max-height:min(70vh,38rem);overflow-y:auto;border:1px solid var(--border-soft);border-radius:1rem;background:#fff;box-shadow:0 20px 50px rgb(15 23 42 / .18); }
+.training-guidance-popover { position:absolute;top:calc(100% + .5rem);right:0;z-index:202;width:min(52rem,calc(100vw - 2rem));max-height:min(70vh,38rem);overflow-y:auto;border:1px solid var(--border-soft);border-radius:1rem;background:#fff;box-shadow:0 20px 50px rgb(15 23 42 / .18); }
 .training-menu-symbol { display:none;width:1.35rem;height:1.35rem;place-items:center;border-radius:.4rem;background:var(--clube-primary-soft);color:var(--clube-primary-dark);font-size:.65rem;font-style:normal;font-weight:850; }
 .training-guidance-header b { color:var(--text-main);font-size:.82rem; }
 .training-guidance-header p { margin-top:.15rem;font-size:.72rem; }
