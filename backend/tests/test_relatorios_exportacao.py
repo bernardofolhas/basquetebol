@@ -126,6 +126,20 @@ def test_quatro_modelos_de_scouting_seguem_estrutura_de_exportacao_fornecida():
     assert "compor_desenho_sobre_campo" in rota
 
 
+def test_exportacoes_de_scouting_usam_tabelas_simplificadas_e_hotzones():
+    coletivo_completo = (TEMPLATES / "relatorios" / "scouting_coletivo_completo.html").read_text(encoding="utf-8")
+    coletivo_facil = (TEMPLATES / "relatorios" / "scouting_coletivo_facil.html").read_text(encoding="utf-8")
+    individual_facil = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
+    estilos = (TEMPLATES / "relatorios" / "_scouting_estilos.html").read_text(encoding="utf-8")
+
+    for documento in (coletivo_completo, coletivo_facil):
+        assert '<th>Ranking</th>' not in documento
+        assert '<th>Período</th>' not in documento
+    assert "player-hotzone" in individual_facil
+    assert "Hotzones" in individual_facil
+    assert "object-fit:contain" in estilos
+
+
 def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
     marcadores = {
         "roster_facil.html": ("easy-roster", "fotografias.get(j.id)", "Referência rápida"),
