@@ -777,6 +777,31 @@ STAT_LABELS = {
     "eficiencia": "Eficiência",
 }
 
+# Os nomes completos mantêm-se na interface de configuração. Nos PDFs usam-se
+# códigos compactos para preservar a leitura das tabelas com muitos indicadores.
+STAT_CODES = {
+    "minutos": "MIN",
+    "pontos": "PTS",
+    "fg_c": "FGM",
+    "fg_t": "FGA",
+    "dois_c": "2PM",
+    "dois_t": "2PA",
+    "tres_c": "3PM",
+    "tres_t": "3PA",
+    "ll_c": "FTM",
+    "ll_t": "FTA",
+    "ress_of": "OREB",
+    "ress_def": "DREB",
+    "ress_total": "REB",
+    "assistencias": "AST",
+    "faltas": "PF",
+    "turnovers": "TOV",
+    "roubos": "STL",
+    "desarmes": "BLK",
+    "mais_menos": "+/-",
+    "eficiencia": "EFF",
+}
+
 PERFIS_CONTACTOS = {"superadministrador", "administrador", "coordenador", "secretaria"}
 
 
@@ -882,6 +907,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in atletas},
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,
+            stat_codes=STAT_CODES,
         )
     elif tipo == "scouting-individual":
         atletas = [j for j in alvo.jogadores if not ids or j.id in ids]
@@ -893,6 +919,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             campo_meio=imagem_estatica_data_uri(STATIC_DIR / "campos" / "campo_meio.png"),
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,
+            stat_codes=STAT_CODES,
         )
     elif tipo == "scouting-coletivo":
         setplays = [r.setplay for r in alvo.conceitos_ofensivos] + [r.setplay for r in alvo.momentos_playbook]
@@ -911,6 +938,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             passos_setplay={setplay.id: _passos_setplay_pdf(setplay) for setplay in setplays},
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,
+            stat_codes=STAT_CODES,
         )
     else:
         plano = alvo.plano
