@@ -192,6 +192,7 @@ def test_cabecalho_semanal_liga_ao_plano_e_mostra_balanco_e_sugestoes():
     assert "{{ treino.minutos_atribuidos }}/{{ treino.minutos_limite" in conteudo
     assert 'class="training-guidance-menu"' in conteudo
     assert "Sugestões da semana" in conteudo
+    assert 'class="training-guidance-shell mb-6 flex justify-end"' in conteudo
 
 
 def test_pdf_completo_do_microciclo_prioriza_carga_sem_detalhe_repetido():
