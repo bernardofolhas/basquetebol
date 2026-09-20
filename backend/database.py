@@ -170,6 +170,13 @@ def actualizar_estrutura_escaloes() -> None:
     if engine.dialect.name != "postgresql" or not inspect(engine).has_table("equipas"):
         return
     with engine.begin() as ligacao:
+        tipo_existe = ligacao.execute(text(
+            "SELECT to_regtype('escalaoenum') IS NOT NULL"
+        )).scalar()
+        # Algumas instalações antigas guardam o escalão como texto. Nelas não
+        # existe um enum PostgreSQL para alterar e o novo valor é já aceite.
+        if not tipo_existe:
+            return
         existe = ligacao.execute(text(
             "SELECT 1 FROM pg_enum "
             "WHERE enumtypid = 'escalaoenum'::regtype AND enumlabel = 'sub23'"
