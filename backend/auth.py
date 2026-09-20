@@ -80,7 +80,7 @@ def verificar_acesso_equipa(utilizador, equipa_id: int, db) -> bool:
     """
     Verifica se o utilizador tem acesso a uma equipa específica.
     - administrador e coordenador: acesso a tudo
-    - treinador, staff e fisioterapeuta: apenas às equipas associadas
+    - treinador, staff, fisioterapeuta e secretaria: apenas às equipas associadas
     """
     if not utilizador:
         return False
@@ -117,10 +117,7 @@ def verificar_acesso_equipa(utilizador, equipa_id: int, db) -> bool:
         equipas_ids = [e.id for e in treinador.equipas]
         return equipa_id in equipas_ids
 
-    if utilizador.perfil.value == "staff":
-        return equipa_id in {equipa.id for equipa in (utilizador.equipas_staff or [])}
-
-    if utilizador.perfil.value == "fisioterapeuta":
+    if utilizador.perfil.value in {"staff", "fisioterapeuta", "secretaria"}:
         return equipa_id in {equipa.id for equipa in (utilizador.equipas_staff or [])}
 
     return False

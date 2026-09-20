@@ -23,7 +23,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 FUNCOES_EQUIPE_TECNICA = (
     "Treinador", "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
-    "Presidente", "Vice-Presidente",
+    "Secretaria", "Presidente", "Vice-Presidente",
 )
 
 
@@ -61,10 +61,10 @@ def _validar_atribuicoes_utilizador(
     """Valida e normaliza as ligações específicas de cada perfil."""
     equipas = (
         _equipas_staff_selecionadas(db, equipa_ids, clube_id)
-        if perfil in {PerfilEnum.staff, PerfilEnum.fisioterapeuta}
+        if perfil in {PerfilEnum.staff, PerfilEnum.fisioterapeuta, PerfilEnum.secretaria}
         else []
     )
-    if perfil in {PerfilEnum.staff, PerfilEnum.fisioterapeuta} and not equipas:
+    if perfil in {PerfilEnum.staff, PerfilEnum.fisioterapeuta, PerfilEnum.secretaria} and not equipas:
         raise ValueError("Seleciona pelo menos uma equipa para esta função técnica.")
 
     treinador_associado = None
@@ -79,6 +79,8 @@ def _validar_atribuicoes_utilizador(
 def _funcao_tecnica(perfil: PerfilEnum, funcao: str) -> str | None:
     if perfil == PerfilEnum.fisioterapeuta:
         return "Fisioterapeuta"
+    if perfil == PerfilEnum.secretaria:
+        return "Secretaria"
     if perfil == PerfilEnum.staff:
         return funcao if funcao in FUNCOES_EQUIPE_TECNICA else "Seccionista"
     return None

@@ -88,6 +88,12 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
 details:has(.ds-overlay-menu)[open],
 .overflow-hidden:has(details[open]),
 .overflow-auto:has(details[open]) { overflow:visible; }
+/* Um pendente aberto não pode ficar escondido sob cartões vizinhos nem ser
+   recortado pelo painel onde foi acionado. */
+#conteudo-principal:has(details[open] > :is(.ds-overlay-menu,.ds-dropdown,.training-guidance-popover)) { z-index:var(--layer-notice); }
+details:has(> :is(.ds-overlay-menu,.ds-dropdown,.training-guidance-popover))[open] { position:relative;z-index:var(--layer-notice); }
+.overflow-hidden:has(details[open] > :is(.ds-overlay-menu,.ds-dropdown,.training-guidance-popover)),
+.overflow-auto:has(details[open] > :is(.ds-overlay-menu,.ds-dropdown,.training-guidance-popover)) { overflow:visible; }
 dialog[open],
 :where(.modal,.ds-modal,[role="dialog"])[open] { z-index:var(--layer-modal); }
 .ds-flash { position:relative; z-index:var(--layer-notice); }

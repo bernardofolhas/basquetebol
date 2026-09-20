@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 FUNCOES_EQUIPE_TECNICA = (
     "Treinador", "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
-    "Presidente", "Vice-Presidente",
+    "Secretaria", "Presidente", "Vice-Presidente",
 )
 
 
@@ -36,6 +36,8 @@ def _perfil_login_para_funcao(funcao: str) -> PerfilEnum:
         return PerfilEnum.fisioterapeuta
     if funcao == "Treinador":
         return PerfilEnum.treinador
+    if funcao == "Secretaria":
+        return PerfilEnum.secretaria
     return PerfilEnum.staff
 
 

@@ -27,7 +27,7 @@ def _equipas_permitidas(db, utilizador, clube_atual=None) -> list:
             list(getattr(treinador, "equipas", []) or []),
             key=lambda equipa: equipa.nome.lower(),
         )
-    if utilizador.perfil == PerfilEnum.staff:
+    if utilizador.perfil in {PerfilEnum.staff, PerfilEnum.secretaria}:
         return sorted(
             list(getattr(utilizador, "equipas_staff", []) or []),
             key=lambda equipa: equipa.nome.lower(),

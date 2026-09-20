@@ -56,7 +56,7 @@ def _ordenar_treinadores(treinadores):
 
 FUNCOES_EQUIPE_TECNICA = (
     "Treinador", "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
-    "Presidente", "Vice-Presidente",
+    "Secretaria", "Presidente", "Vice-Presidente",
 )
 
 
@@ -75,11 +75,16 @@ def _pode_gerir_equipa(utilizador) -> bool:
 def _sincronizar_utilizadores_tecnicos(db: Session) -> None:
     """Expõe contas técnicas já existentes como elementos selecionáveis."""
     contas = db.query(Utilizador).filter(
-        Utilizador.perfil.in_([PerfilEnum.staff, PerfilEnum.fisioterapeuta])
+        Utilizador.perfil.in_([PerfilEnum.staff, PerfilEnum.fisioterapeuta, PerfilEnum.secretaria])
     ).all()
     alterado = False
     for conta in contas:
-        funcao = "Fisioterapeuta" if conta.perfil == PerfilEnum.fisioterapeuta else "Seccionista"
+        funcao_por_perfil = {
+            PerfilEnum.fisioterapeuta: "Fisioterapeuta",
+            PerfilEnum.secretaria: "Secretaria",
+            PerfilEnum.staff: "Seccionista",
+        }
+        funcao = funcao_por_perfil[conta.perfil]
         elemento = conta.treinador
         if elemento is None:
             elemento = Treinador(
@@ -92,12 +97,20 @@ def _sincronizar_utilizadores_tecnicos(db: Session) -> None:
             db.flush()
             conta.treinador_id = elemento.id
             alterado = True
-        if conta.perfil == PerfilEnum.fisioterapeuta and elemento.funcao != funcao:
+        if conta.perfil in {PerfilEnum.fisioterapeuta, PerfilEnum.secretaria} and elemento.funcao != funcao:
             elemento.funcao = funcao
             alterado = True
-        for equipa in conta.equipas_staff:
+        # Instalações anteriores podem ter gravado a associação apenas no
+        # elemento técnico. Mantemos os dois lados sincronizados.
+        equipas_associadas = {equipa.id: equipa for equipa in conta.equipas_staff}
+        for equipa in elemento.equipas:
+            equipas_associadas.setdefault(equipa.id, equipa)
+        for equipa in equipas_associadas.values():
             if equipa not in elemento.equipas:
                 elemento.equipas.append(equipa)
+                alterado = True
+            if equipa not in conta.equipas_staff:
+                conta.equipas_staff.append(equipa)
                 alterado = True
     if alterado:
         db.commit()

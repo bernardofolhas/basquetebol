@@ -38,7 +38,7 @@
                     <option value="">Seleciona um perfil</option>
                     {% for p in perfis %}
                     <option value="{{ p.value }}" {% if modo == "editar" and utilizador_editar.perfil.value == p.value %}selected{% endif %}>
-                        {{ 'Staff da equipa' if p.value == 'staff' else ('Fisioterapeuta' if p.value == 'fisioterapeuta' else p.value|capitalize) }}
+                        {{ 'Staff da equipa' if p.value == 'staff' else ('Fisioterapeuta' if p.value == 'fisioterapeuta' else ('Secretaria da equipa' if p.value == 'secretaria' else p.value|capitalize)) }}
                     </option>
                     {% endfor %}
                 </select>
@@ -138,7 +138,8 @@ document.addEventListener("DOMContentLoaded", function () {
     function atualizarCamposDoPerfil() {
         const eFisio = perfil.value === "fisioterapeuta";
         const eStaff = perfil.value === "staff";
-        const eTecnico = eFisio || eStaff;
+        const eSecretaria = perfil.value === "secretaria";
+        const eTecnico = eFisio || eStaff || eSecretaria;
         equipas.hidden = !eTecnico;
         treinador.hidden = perfil.value !== "treinador";
         explicacaoFisio.hidden = !eFisio;
@@ -147,6 +148,7 @@ document.addEventListener("DOMContentLoaded", function () {
         seletorEquipas.required = eTecnico;
         seletorFuncao.required = eTecnico;
         if (eFisio) seletorFuncao.value = "Fisioterapeuta";
+        if (eSecretaria) seletorFuncao.value = "Secretaria";
     }
 
     perfil.addEventListener("change", atualizarCamposDoPerfil);

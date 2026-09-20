@@ -92,7 +92,7 @@ def exigir_operacao_desportiva(request: Request, db: Session = Depends(get_db)):
         raise NaoAutenticado()
     perfis = _perfis_com_superadmin_em_apoio(
         request,
-        ["administrador", "coordenador", "treinador", "staff", "fisioterapeuta"],
+        ["administrador", "coordenador", "treinador", "secretaria", "staff", "fisioterapeuta"],
     )
     if not verificar_perfil(utilizador, perfis):
         raise SemPermissao("/dashboard")

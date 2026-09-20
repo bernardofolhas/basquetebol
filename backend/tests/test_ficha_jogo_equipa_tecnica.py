@@ -25,6 +25,7 @@ def test_equipa_tecnica_agrupa_apenas_funcoes_com_elementos():
 
 def test_perfis_tecnicos_usam_funcoes_da_equipa_sem_criar_novos_logins():
     assert _funcao_tecnica(PerfilEnum.fisioterapeuta, "Médico") == "Fisioterapeuta"
+    assert _funcao_tecnica(PerfilEnum.secretaria, "") == "Secretaria"
     assert _funcao_tecnica(PerfilEnum.staff, "Médico") == "Médico"
     assert _funcao_tecnica(PerfilEnum.staff, "") == "Seccionista"
 
