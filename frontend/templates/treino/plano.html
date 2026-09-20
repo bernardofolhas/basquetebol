@@ -178,21 +178,21 @@
             <span><strong data-expected-player-count>{{ atletas_previstos_ids|length }}</strong> atletas selecionados</span>
             <button type="button" class="ds-quiet-link" data-toggle-all-expected>Selecionar todos</button>
         </div>
-        <section class="training-sub18-callup">
-            <header><div><span>Reforços para esta sessão</span><h3>Convocar atletas Sub-18</h3><p>Os atletas convocados ficam automaticamente previstos e disponíveis nas presenças e avaliações deste treino.</p></div><strong data-sub18-available-count>{{ atletas_sub18_convocaveis|length }}</strong></header>
+        {% if escalao_inferior_convocavel %}<section class="training-sub18-callup">
+            <header><div><span>Reforços para esta sessão</span><h3>Convocar atletas {{ escalao_inferior_convocavel.value if escalao_inferior_convocavel else 'do escalão inferior' }}</h3><p>São elegíveis apenas atletas do escalão imediatamente inferior e do mesmo género. Os convocados ficam automaticamente previstos e disponíveis nas presenças e avaliações deste treino.</p></div><strong data-sub18-available-count>{{ atletas_escalhao_inferior_convocaveis|length }}</strong></header>
             <div class="training-sub18-options" data-sub18-options>
-                {% for atleta in atletas_sub18_convocaveis %}
+                {% for atleta in atletas_escalhao_inferior_convocaveis %}
                 <label class="training-sub18-option" data-sub18-option="{{ atleta.id }}">
                     <input type="checkbox" value="{{ atleta.id }}">
                     <span class="training-expected-avatar">{% if atleta.fotografia %}<img src="{{ atleta.fotografia }}" alt="Fotografia de {{ atleta.nome }}">{% else %}{{ atleta.numero_camisola or atleta.nome[:1]|upper }}{% endif %}</span>
                     <span><b>{{ atleta.nome }}</b><small>{{ atleta.equipa.nome }}</small></span>
                 </label>
                 {% else %}
-                <p class="training-team-empty" data-sub18-empty>Não existem atletas Sub-18 disponíveis para convocar.</p>
+                <p class="training-team-empty" data-sub18-empty>Não existem atletas elegíveis no escalão imediatamente inferior.</p>
                 {% endfor %}
             </div>
-            <footer><span data-sub18-status>Seleciona os atletas Sub-18 que vão participar neste treino.</span><button type="button" class="ds-button ds-button-secondary" data-callup-sub18>Convocar selecionados</button></footer>
-        </section>
+            <footer><span data-sub18-status>Seleciona os atletas que vão participar neste treino.</span><button type="button" class="ds-button ds-button-secondary" data-callup-sub18>Convocar selecionados</button></footer>
+        </section>{% endif %}
         <div class="training-organization-body">
             <div class="training-expected-grid" data-expected-player-options>
                 {% for atleta in atletas_treino %}

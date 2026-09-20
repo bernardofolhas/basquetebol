@@ -11,6 +11,7 @@ class EscalaoEnum(str, enum.Enum):
     sub14 = "Sub-14"
     sub16 = "Sub-16"
     sub18 = "Sub-18"
+    sub23 = "Sub-23"
     senior = "Sénior"
     masters = "Masters"
 

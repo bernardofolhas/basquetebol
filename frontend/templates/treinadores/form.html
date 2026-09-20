@@ -16,6 +16,7 @@
 
     <form method="POST" action="{{ '/treinadores/' ~ treinador.id ~ '/editar' if treinador else '/treinadores/novo' }}">
         <input type="hidden" name="voltar" value="{{ voltar|default('/treinadores') }}">
+        {% if equipa_contexto_id %}<input type="hidden" name="equipa_contexto_id" value="{{ equipa_contexto_id }}">{% endif %}
 
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
@@ -139,7 +140,7 @@
                     class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
                 {{ "Guardar alterações" if treinador else "Registar elemento" }}
             </button>
-            <a href="{{ '/treinadores/' ~ treinador.id if treinador else '/treinadores' }}"
+            <a href="{{ voltar|default('/treinadores') }}"
                class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition">
                 Cancelar
             </a>

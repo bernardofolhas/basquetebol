@@ -58,6 +58,7 @@ from database import (
     actualizar_estrutura_staff,
     actualizar_estrutura_jogadores,
     actualizar_estrutura_perfis,
+    actualizar_estrutura_escaloes,
     actualizar_estrutura_preferencias_dashboard,
     actualizar_estrutura_testes_fisicos,
     actualizar_estrutura_planeamento_clube,
@@ -130,6 +131,7 @@ try:
     validar_ligacao_base_dados()
     Base.metadata.create_all(bind=engine)
     actualizar_estrutura_perfis()
+    actualizar_estrutura_escaloes()
     actualizar_estrutura_preferencias_dashboard()
     actualizar_estrutura_testes_fisicos()
     actualizar_estrutura_equipas_treino()

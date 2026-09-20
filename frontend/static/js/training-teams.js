@@ -250,13 +250,13 @@
       const ids = selected.map(input => Number(input.value));
       const status = root.querySelector('[data-sub18-status]');
       if (!ids.length) {
-        setStatus(status, 'Seleciona pelo menos um atleta Sub-18.', true);
+        setStatus(status, 'Seleciona pelo menos um atleta do escalão inferior.', true);
         return;
       }
       button.disabled = true;
       setStatus(status, 'A convocar atletas...');
       try {
-        const payload = await post(`/treino/planos/${data.plano_id}/convocar-sub18`, {jogador_ids:ids});
+        const payload = await post(`/treino/planos/${data.plano_id}/convocar-escalhao-inferior`, {jogador_ids:ids});
         expectedIds = payload.jogador_ids;
         state = {grupos: []};
         const expectedRoot = root.querySelector('[data-expected-player-options]');
@@ -271,7 +271,7 @@
         const remaining = root.querySelectorAll('[data-sub18-option]').length;
         updateCounters('[data-sub18-available-count]', remaining);
         if (!remaining && !root.querySelector('[data-sub18-empty]')) {
-          root.querySelector('[data-sub18-options]')?.insertAdjacentHTML('beforeend', '<p class="training-team-empty" data-sub18-empty>Não existem atletas Sub-18 disponíveis para convocar.</p>');
+          root.querySelector('[data-sub18-options]')?.insertAdjacentHTML('beforeend', '<p class="training-team-empty" data-sub18-empty>Não existem atletas elegíveis no escalão imediatamente inferior.</p>');
         }
         updateCounters('[data-expected-player-count]', expectedIds.length);
         renderGroups();

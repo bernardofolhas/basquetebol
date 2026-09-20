@@ -221,25 +221,25 @@ def test_ordem_guardada_das_equipas_e_dos_atletas_nao_e_reorganizada():
     assert [equipa["nome"] for equipa in grupo["equipas"]] == ["Equipa 1", "Equipa 2"]
 
 
-def test_plano_convoca_sub18_e_adiciona_aos_atletas_previstos_sem_refresh(client_admin):
+def test_plano_convoca_escalhao_inferior_e_adiciona_aos_atletas_previstos_sem_refresh(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
-    equipa_sub18 = None
+    equipa_sub16 = None
     convocado = None
     try:
         equipa = db.query(Equipa).filter(Equipa.id == equipa_id).one()
-        equipa_sub18 = Equipa(
+        equipa_sub16 = Equipa(
             clube_id=equipa.clube_id,
-            nome="Sub-18 de apoio",
-            escalao=EscalaoEnum.sub18,
+            nome="Sub-16 de apoio",
+            escalao=EscalaoEnum.sub16,
             genero=equipa.genero,
         )
         convocado = Jogador(
             clube_id=equipa.clube_id,
-            nome="Atleta Sub-18 Convocado",
+            nome="Atleta Sub-16 Convocado",
             numero_camisola=18,
-            equipa=equipa_sub18,
+            equipa=equipa_sub16,
         )
-        db.add_all([equipa_sub18, convocado])
+        db.add_all([equipa_sub16, convocado])
         db.commit()
         convocado_id = convocado.id
         sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
@@ -248,8 +248,8 @@ def test_plano_convoca_sub18_e_adiciona_aos_atletas_previstos_sem_refresh(client
 
         pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
         assert pagina.status_code == 200
-        assert "Convocar atletas Sub-18" in pagina.text
-        assert "Atleta Sub-18 Convocado" in pagina.text
+        assert "Convocar atletas Sub-16" in pagina.text
+        assert "Atleta Sub-16 Convocado" in pagina.text
         plano = db.query(PlanoTreino).filter(PlanoTreino.sessao_id == sessao.id).one()
 
         resposta = client_admin.post(
@@ -258,14 +258,14 @@ def test_plano_convoca_sub18_e_adiciona_aos_atletas_previstos_sem_refresh(client
         )
         assert resposta.status_code == 200
         assert resposta.json()["jogador_ids"][-1] == convocado_id
-        assert resposta.json()["adicionados"][0]["nome"] == "Atleta Sub-18 Convocado"
+        assert resposta.json()["adicionados"][0]["nome"] == "Atleta Sub-16 Convocado"
         assert db.query(ConvocacaoAssiduidade).filter_by(
             sessao_id=sessao.id,
             jogador_id=convocado_id,
         ).count() == 1
 
         pagina_atualizada = client_admin.get(f"/treino/sessoes/{sessao.id}")
-        assert "Convocado · Sub-18 de apoio" in pagina_atualizada.text
+        assert "Convocado · Sub-16 de apoio" in pagina_atualizada.text
         assert f'data-sub18-option="{convocado_id}"' not in pagina_atualizada.text
     finally:
         if convocado is not None:
@@ -273,8 +273,8 @@ def test_plano_convoca_sub18_e_adiciona_aos_atletas_previstos_sem_refresh(client
                 ConvocacaoAssiduidade.jogador_id == convocado.id,
             ).delete(synchronize_session=False)
             db.delete(convocado)
-        if equipa_sub18 is not None:
-            db.delete(equipa_sub18)
+        if equipa_sub16 is not None:
+            db.delete(equipa_sub16)
         db.commit()
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()

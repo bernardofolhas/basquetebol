@@ -22,6 +22,7 @@ from services.jogos_service import (
     preparar_epocas_calendario_jogos,
     preparar_linhas_calendario_jogos,
 )
+from services.escaloes_service import escalao_imediatamente_inferior
 
 router = APIRouter(prefix="/jogos")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -95,6 +96,41 @@ def _jogadores_ficha(jogadores):
         )
         jogador.altura_ficha = registos[0].altura if registos else None
     return jogadores
+
+
+def _jogadores_escalhao_inferior(db: Session, equipa: Equipa):
+    """Devolve apenas reforços permitidos para treinos e jogos da equipa."""
+    escalao_origem = escalao_imediatamente_inferior(equipa.escalao)
+    if not escalao_origem:
+        return []
+    return db.query(Jogador).join(Equipa, Jogador.equipa_id == Equipa.id).filter(
+        Jogador.clube_id == equipa.clube_id,
+        Jogador.ativo.is_(True),
+        Equipa.escalao == escalao_origem,
+        Equipa.genero == equipa.genero,
+    ).order_by(Jogador.numero_camisola, Jogador.nome).all()
+
+
+def _jogadores_disponiveis_jogo(
+    db: Session,
+    jogo: Jogo,
+    incluir_escalhao_inferior: bool = False,
+    incluir_convocados: bool = False,
+):
+    """Plantel próprio, candidatos elegíveis e/ou reforços já convocados."""
+    equipa = jogo.equipa
+    plantel = db.query(Jogador).filter(
+        Jogador.equipa_id == jogo.equipa_id,
+        Jogador.ativo.is_(True),
+    ).order_by(Jogador.numero_camisola, Jogador.nome).all()
+    reforcos = _jogadores_escalhao_inferior(db, equipa) if incluir_escalhao_inferior else []
+    if incluir_convocados:
+        ids = {jogador.id for jogador in plantel + reforcos}
+        reforcos.extend(
+            convocado.jogador for convocado in jogo.convocados
+            if convocado.jogador and convocado.jogador.ativo and convocado.jogador_id not in ids
+        )
+    return plantel + [jogador for jogador in reforcos if jogador.id not in {item.id for item in plantel}]
 
 
 def _elementos_equipa_ficha(db: Session, equipa_id: int):
@@ -224,9 +260,7 @@ def detalhe_jogo(
         return RedirectResponse(url="/equipas")
     verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
 
-    jogadores = db.query(Jogador).filter(
-        Jogador.equipa_id == jogo.equipa_id
-    ).order_by(Jogador.nome).all()
+    jogadores = _jogadores_disponiveis_jogo(db, jogo, incluir_escalhao_inferior=True)
     convocados_ids = {c.jogador_id for c in jogo.convocados}
     jogos_anteriores = db.query(Jogo).filter(
         Jogo.equipa_id == jogo.equipa_id,
@@ -377,9 +411,13 @@ async def guardar_convocatoria(
 
     db.query(Convocado).filter(Convocado.jogo_id == jogo_id).delete()
 
+    jogadores_permitidos = {
+        jogador.id: jogador
+        for jogador in _jogadores_disponiveis_jogo(db, jogo, incluir_escalhao_inferior=True)
+    }
     for jogador_id in jogadores_ids:
-        jogador = db.query(Jogador).filter(Jogador.id == jogador_id).first()
-        if not jogador or jogador.equipa_id != jogo.equipa_id:
+        jogador = jogadores_permitidos.get(jogador_id)
+        if not jogador:
             continue
         db.add(Convocado(
             jogo_id=jogo_id,
@@ -392,6 +430,34 @@ async def guardar_convocatoria(
     db.commit()
     set_flash(request, "Convocatória atualizada.")
     return RedirectResponse(url=f"/jogos/{jogo_id}", status_code=303)
+
+
+@router.post("/{jogo_id}/ficha-jogo/convocar-escalhao-inferior")
+async def convocar_para_ficha_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+    jogador_ids: list[int] = Form(default=[]),
+):
+    """Adiciona reforços temporários à convocatória, sem mexer no plantel."""
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    permitidos = {jogador.id: jogador for jogador in _jogadores_escalhao_inferior(db, jogo.equipa)}
+    existentes = {convocado.jogador_id for convocado in jogo.convocados}
+    adicionados = 0
+    for jogador_id in dict.fromkeys(jogador_ids):
+        if jogador_id in permitidos and jogador_id not in existentes:
+            db.add(Convocado(jogo_id=jogo.id, jogador_id=jogador_id))
+            adicionados += 1
+    if adicionados:
+        db.commit()
+        set_flash(request, f"{adicionados} atleta(s) do escalão inferior adicionado(s) à ficha.")
+    else:
+        set_flash(request, "Seleciona pelo menos um atleta elegível do escalão inferior.", "error")
+    return RedirectResponse(url=f"/jogos/{jogo_id}/ficha-jogo", status_code=303)
 
 
 @router.post("/{jogo_id}/convocatoria/copiar/{origem_id}")
@@ -534,14 +600,17 @@ def selecionar_ficha_jogo(
     if not jogo:
         return RedirectResponse(url="/equipas")
     verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
-    jogadores = db.query(Jogador).filter(
-        Jogador.equipa_id == jogo.equipa_id,
-        Jogador.ativo.is_(True),
-    ).order_by(Jogador.numero_camisola, Jogador.nome).all()
+    jogadores = _jogadores_disponiveis_jogo(db, jogo, incluir_convocados=True)
+    convocados_ids = {convocado.jogador_id for convocado in jogo.convocados}
+    reforcos_disponiveis = [
+        jogador for jogador in _jogadores_escalhao_inferior(db, jogo.equipa)
+        if jogador.id not in convocados_ids
+    ]
     return templates.TemplateResponse(request, "jogos/ficha_jogo.html", {
         "utilizador": utilizador,
         "jogo": jogo,
         "jogadores": _jogadores_ficha(jogadores),
+        "reforcos_disponiveis": reforcos_disponiveis,
         "elementos_tecnicos": _elementos_equipa_ficha(db, jogo.equipa_id),
         "cores_equipamento": ("Branco", "Escuro", "Vermelho", "Azul", "Preto", "Amarelo", "Outro"),
     })
@@ -564,11 +633,9 @@ async def exportar_ficha_jogo(
     capitao_id = int(dados.get("capitao_id")) if str(dados.get("capitao_id", "")).isdigit() else None
     cor_equipamento = str(dados.get("cor_equipamento", "")).strip()
 
-    jogadores = db.query(Jogador).filter(
-        Jogador.equipa_id == jogo.equipa_id,
-        Jogador.id.in_(jogadores_ids),
-        Jogador.ativo.is_(True),
-    ).order_by(Jogador.numero_camisola, Jogador.nome).all() if jogadores_ids else []
+    jogadores_disponiveis = {jogador.id: jogador for jogador in _jogadores_disponiveis_jogo(db, jogo, incluir_convocados=True)}
+    jogadores = [jogadores_disponiveis[jogador_id] for jogador_id in jogadores_ids if jogador_id in jogadores_disponiveis]
+    jogadores.sort(key=lambda jogador: (jogador.numero_camisola is None, jogador.numero_camisola or 0, jogador.nome))
     elementos_disponiveis = _elementos_equipa_ficha(db, jogo.equipa_id)
     elementos = [elemento for elemento in elementos_disponiveis if elemento.id in elementos_ids]
 

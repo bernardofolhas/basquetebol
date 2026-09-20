@@ -26,6 +26,7 @@ from services.assiduidade_service import (
     obter_relatorio_assiduidade_equipa,
 )
 from services.sessao_workflow import normalizar_estado_sessao
+from services.escaloes_service import escalao_imediatamente_inferior
 
 router = APIRouter(prefix="/assiduidade")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -100,16 +101,21 @@ def _jogadores_folha_assiduidade(db: Session, equipa, sessao_id: int):
 
 
 def _jogadores_disponiveis_para_convocatoria(db: Session, equipa, sessao_id: int):
+    escalao_origem = escalao_imediatamente_inferior(equipa.escalao)
+    if not escalao_origem:
+        return []
     convocados_ids = db.query(ConvocacaoAssiduidade.jogador_id).filter(
         ConvocacaoAssiduidade.sessao_id == sessao_id,
         ConvocacaoAssiduidade.clube_id == equipa.clube_id,
     )
     return (
         db.query(Jogador)
+        .join(Equipa, Jogador.equipa_id == Equipa.id)
         .filter(
             Jogador.clube_id == equipa.clube_id,
             Jogador.ativo.is_(True),
-            or_(Jogador.equipa_id.is_(None), Jogador.equipa_id != equipa.id),
+            Equipa.escalao == escalao_origem,
+            Equipa.genero == equipa.genero,
             ~Jogador.id.in_(convocados_ids),
         )
         .order_by(Jogador.nome)

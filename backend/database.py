@@ -165,6 +165,20 @@ def actualizar_estrutura_perfis() -> None:
             logger.info("Perfil 'atleta' adicionado ao enum da base de dados.")
 
 
+def actualizar_estrutura_escaloes() -> None:
+    """Mantém o enum de escalões compatível com equipas Sub-23 existentes."""
+    if engine.dialect.name != "postgresql" or not inspect(engine).has_table("equipas"):
+        return
+    with engine.begin() as ligacao:
+        existe = ligacao.execute(text(
+            "SELECT 1 FROM pg_enum "
+            "WHERE enumtypid = 'escalaoenum'::regtype AND enumlabel = 'sub23'"
+        )).first()
+        if not existe:
+            ligacao.execute(text("ALTER TYPE escalaoenum ADD VALUE 'sub23'"))
+            logger.info("Escalão 'Sub-23' adicionado ao enum da base de dados.")
+
+
 def actualizar_estrutura_preferencias_dashboard() -> None:
     """Adiciona preferências de visualização por utilizador em instalações existentes."""
     inspector = inspect(engine)

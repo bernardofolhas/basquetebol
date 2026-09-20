@@ -6,7 +6,7 @@ from template_config import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from auth import encriptar_password, verificar_perfil
-from auth_deps import exigir_autenticacao, exigir_coordenacao
+from auth_deps import AcessoNegado, exigir_autenticacao
 from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
@@ -39,6 +39,24 @@ def _perfil_login_para_funcao(funcao: str) -> PerfilEnum:
     return PerfilEnum.staff
 
 
+def _pode_gerir_equipa_tecnica(utilizador, equipa_id: int | None, db: Session) -> bool:
+    """Permite gestão apenas no contexto da equipa atribuída."""
+    if not equipa_id:
+        return verificar_perfil(utilizador, ["administrador", "coordenador"])
+    if verificar_perfil(utilizador, ["administrador", "coordenador"]):
+        return True
+    if not verificar_perfil(utilizador, ["treinador", "staff"]):
+        return False
+    from auth import verificar_acesso_equipa
+    return verificar_acesso_equipa(utilizador, equipa_id, db)
+
+
+def _equipas_do_formulario(utilizador, equipa_contexto_id: int | None, db: Session):
+    if equipa_contexto_id and not verificar_perfil(utilizador, ["administrador", "coordenador"]):
+        return db.query(Equipa).filter(Equipa.id == equipa_contexto_id).all()
+    return db.query(Equipa).all()
+
+
 @router.get("", response_class=HTMLResponse)
 def listar_treinadores(
     request: Request,
@@ -58,10 +76,11 @@ def form_novo_treinador(
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_autenticacao),
 ):
-    if not verificar_perfil(utilizador, ["administrador", "coordenador"]):
-        return RedirectResponse(url="/treinadores", status_code=302)
-    equipas = db.query(Equipa).all()
     equipa_preselecionada = request.query_params.get("equipa_id", "")
+    equipa_contexto_id = int(equipa_preselecionada) if equipa_preselecionada.isdigit() else None
+    if not _pode_gerir_equipa_tecnica(utilizador, equipa_contexto_id, db):
+        raise AcessoNegado("/equipas")
+    equipas = _equipas_do_formulario(utilizador, equipa_contexto_id, db)
     return templates.TemplateResponse(request, "treinadores/form.html", {
         "utilizador": utilizador,
         "equipas": equipas,
@@ -69,7 +88,8 @@ def form_novo_treinador(
         "erro": None,
         "funcoes": FUNCOES_EQUIPE_TECNICA,
         "funcao_preselecionada": _normalizar_funcao(request.query_params.get("funcao")),
-        "equipa_preselecionada": int(equipa_preselecionada) if equipa_preselecionada.isdigit() else None,
+        "equipa_preselecionada": equipa_contexto_id,
+        "equipa_contexto_id": equipa_contexto_id,
         "voltar": _voltar_seguro(request.query_params.get("voltar"), "/treinadores"),
     })
 
@@ -89,16 +109,19 @@ async def criar_treinador(
     funcao: str = Form("Treinador"),
     observacoes: str = Form(""),
     equipas_ids: list[int] = Form(default=[]),
+    equipa_contexto_id: int | None = Form(None),
     login_username: str = Form(""),
     login_password: str = Form(""),
     voltar: str = Form(""),
 ):
-    if not verificar_perfil(utilizador, ["administrador", "coordenador"]):
-        return RedirectResponse(url="/treinadores", status_code=302)
+    if not _pode_gerir_equipa_tecnica(utilizador, equipa_contexto_id, db):
+        raise AcessoNegado("/equipas")
+    if equipa_contexto_id and not verificar_perfil(utilizador, ["administrador", "coordenador"]):
+        equipas_ids = [equipa_contexto_id]
     # Validar username/password se fornecidos
     if login_username or login_password:
         if not login_username or not login_password:
-            equipas = db.query(Equipa).all()
+            equipas = _equipas_do_formulario(utilizador, equipa_contexto_id, db)
             return templates.TemplateResponse(request, "treinadores/form.html", {
                 "utilizador": utilizador,
                 "equipas": equipas,
@@ -107,10 +130,11 @@ async def criar_treinador(
                 "funcoes": FUNCOES_EQUIPE_TECNICA,
                 "funcao_preselecionada": _normalizar_funcao(funcao),
                 "equipa_preselecionada": None,
+                "equipa_contexto_id": equipa_contexto_id,
                 "voltar": _voltar_seguro(voltar, "/treinadores"),
             })
         if len(login_password) < 8:
-            equipas = db.query(Equipa).all()
+            equipas = _equipas_do_formulario(utilizador, equipa_contexto_id, db)
             return templates.TemplateResponse(request, "treinadores/form.html", {
                 "utilizador": utilizador,
                 "equipas": equipas,
@@ -119,10 +143,11 @@ async def criar_treinador(
                 "funcoes": FUNCOES_EQUIPE_TECNICA,
                 "funcao_preselecionada": _normalizar_funcao(funcao),
                 "equipa_preselecionada": None,
+                "equipa_contexto_id": equipa_contexto_id,
                 "voltar": _voltar_seguro(voltar, "/treinadores"),
             })
         if db.query(Utilizador).filter(Utilizador.username == login_username).first():
-            equipas = db.query(Equipa).all()
+            equipas = _equipas_do_formulario(utilizador, equipa_contexto_id, db)
             return templates.TemplateResponse(request, "treinadores/form.html", {
                 "utilizador": utilizador,
                 "equipas": equipas,
@@ -131,6 +156,7 @@ async def criar_treinador(
                 "funcoes": FUNCOES_EQUIPE_TECNICA,
                 "funcao_preselecionada": _normalizar_funcao(funcao),
                 "equipa_preselecionada": None,
+                "equipa_contexto_id": equipa_contexto_id,
                 "voltar": _voltar_seguro(voltar, "/treinadores"),
             })
 
@@ -195,13 +221,21 @@ def form_editar_treinador(
     treinador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_autenticacao),
 ):
     treinador = db.query(Treinador).filter(Treinador.id == treinador_id).first()
     if not treinador:
         return RedirectResponse(url="/treinadores")
 
-    equipas = db.query(Equipa).all()
+    equipa_parametro = request.query_params.get("equipa_id", "")
+    equipa_contexto_id = int(equipa_parametro) if equipa_parametro.isdigit() else None
+    if not _pode_gerir_equipa_tecnica(utilizador, equipa_contexto_id, db):
+        raise AcessoNegado("/equipas")
+    if equipa_contexto_id:
+        equipa_contexto = db.query(Equipa).filter(Equipa.id == equipa_contexto_id).first()
+        if not equipa_contexto or treinador not in equipa_contexto.treinadores:
+            raise AcessoNegado(f"/equipas/{equipa_contexto_id}/equipa-tecnica")
+    equipas = _equipas_do_formulario(utilizador, equipa_contexto_id, db)
     return templates.TemplateResponse(request, "treinadores/form.html", {
         "utilizador": utilizador,
         "treinador": treinador,
@@ -209,6 +243,7 @@ def form_editar_treinador(
         "funcoes": FUNCOES_EQUIPE_TECNICA,
         "funcao_preselecionada": treinador.funcao,
         "equipa_preselecionada": None,
+        "equipa_contexto_id": equipa_contexto_id,
         "voltar": _voltar_seguro(request.query_params.get("voltar"), f"/treinadores/{treinador_id}"),
     })
 
@@ -218,7 +253,7 @@ async def editar_treinador(
     treinador_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    utilizador=Depends(exigir_coordenacao),
+    utilizador=Depends(exigir_autenticacao),
     nome: str = Form(...),
     data_nascimento: str = Form(""),
     morada: str = Form(""),
@@ -229,11 +264,19 @@ async def editar_treinador(
     funcao: str = Form("Treinador"),
     observacoes: str = Form(""),
     equipas_ids: list[int] = Form(default=[]),
+    equipa_contexto_id: int | None = Form(None),
     voltar: str = Form(""),
 ):
     treinador = db.query(Treinador).filter(Treinador.id == treinador_id).first()
     if not treinador:
         return RedirectResponse(url="/treinadores")
+    if not _pode_gerir_equipa_tecnica(utilizador, equipa_contexto_id, db):
+        raise AcessoNegado("/equipas")
+    if equipa_contexto_id and not verificar_perfil(utilizador, ["administrador", "coordenador"]):
+        equipa_contexto = db.query(Equipa).filter(Equipa.id == equipa_contexto_id).first()
+        if not equipa_contexto or treinador not in equipa_contexto.treinadores:
+            raise AcessoNegado(f"/equipas/{equipa_contexto_id}/equipa-tecnica")
+        equipas_ids = [equipa.id for equipa in treinador.equipas]
 
     treinador.nome = nome
     treinador.data_nascimento = date.fromisoformat(data_nascimento) if data_nascimento else None

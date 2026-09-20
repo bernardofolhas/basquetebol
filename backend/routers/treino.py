@@ -19,7 +19,7 @@ from auth_deps import AcessoNegado, exigir_autenticacao
 from database import get_db
 from flash import set_flash
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
-from models.equipa import Equipa, EscalaoEnum
+from models.equipa import Equipa
 from models.assiduidade import ConvocacaoAssiduidade, RegistoAssiduidade
 from models.jogador import Jogador, RegistoAntropometrico
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
@@ -72,6 +72,7 @@ from services.sessao_workflow import (
     opcoes_transicao_sessao,
     transicao_sessao_valida,
 )
+from services.escaloes_service import escalao_imediatamente_inferior
 
 router = APIRouter(prefix="/treino")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -120,7 +121,11 @@ def _atletas_disponiveis_plano(db: Session, equipa: Equipa, sessao_id: int) -> l
     return plantel + [jogador for jogador in convocados if jogador.id not in ids_plantel]
 
 
-def _atletas_sub18_convocaveis(db: Session, equipa: Equipa, sessao_id: int) -> list[Jogador]:
+def _atletas_escalhao_inferior_convocaveis(db: Session, equipa: Equipa, sessao_id: int) -> list[Jogador]:
+    """Atletas do escalão imediatamente inferior, do mesmo género."""
+    escalao_origem = escalao_imediatamente_inferior(equipa.escalao)
+    if not escalao_origem:
+        return []
     convocados_ids = db.query(ConvocacaoAssiduidade.jogador_id).filter(
         ConvocacaoAssiduidade.sessao_id == sessao_id,
         ConvocacaoAssiduidade.clube_id == equipa.clube_id,
@@ -132,7 +137,7 @@ def _atletas_sub18_convocaveis(db: Session, equipa: Equipa, sessao_id: int) -> l
             Jogador.clube_id == equipa.clube_id,
             Jogador.ativo.is_(True),
             Jogador.equipa_id != equipa.id,
-            Equipa.escalao == EscalaoEnum.sub18,
+            Equipa.escalao == escalao_origem,
             Equipa.genero == equipa.genero,
             ~Jogador.id.in_(convocados_ids),
         )
@@ -885,7 +890,8 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "prioridades_microciclo": prioridades_microciclo,
         "hora_sugerida_exercicio": _hora_sugerida_exercicio(sessao, list(plano.exercicios)),
         "atletas_treino": atletas_treino,
-        "atletas_sub18_convocaveis": _atletas_sub18_convocaveis(db, equipa, sessao.id),
+        "atletas_escalhao_inferior_convocaveis": _atletas_escalhao_inferior_convocaveis(db, equipa, sessao.id),
+        "escalao_inferior_convocavel": escalao_imediatamente_inferior(equipa.escalao),
         "atletas_previstos_ids": atletas_previstos_ids,
         "equipas_treino_estado": equipas_treino_estado,
     })
@@ -927,8 +933,9 @@ async def guardar_atletas_previstos(
     })
 
 
-@router.post("/planos/{plano_id}/convocar-sub18")
-async def convocar_atletas_sub18(
+@router.post("/planos/{plano_id}/convocar-escalhao-inferior")
+@router.post("/planos/{plano_id}/convocar-sub18", include_in_schema=False)
+async def convocar_atletas_escalhao_inferior(
     plano_id: int,
     request: Request,
     db: Session = Depends(get_db),
@@ -944,12 +951,12 @@ async def convocar_atletas_sub18(
         return JSONResponse({"sucesso": False, "erro": "A convocatória enviada não é válida."}, status_code=400)
     ids = dados.get("jogador_ids") if isinstance(dados, dict) else None
     if not isinstance(ids, list) or not ids or any(isinstance(valor, bool) or not isinstance(valor, int) for valor in ids):
-        return JSONResponse({"sucesso": False, "erro": "Seleciona pelo menos um atleta Sub-18."}, status_code=422)
+        return JSONResponse({"sucesso": False, "erro": "Seleciona pelo menos um atleta do escalão inferior."}, status_code=422)
 
     equipa = plano.sessao.microciclo.mesociclo.macrociclo.equipa
-    convocaveis = {jogador.id: jogador for jogador in _atletas_sub18_convocaveis(db, equipa, plano.sessao_id)}
+    convocaveis = {jogador.id: jogador for jogador in _atletas_escalhao_inferior_convocaveis(db, equipa, plano.sessao_id)}
     if len(ids) != len(set(ids)) or not set(ids).issubset(convocaveis):
-        return JSONResponse({"sucesso": False, "erro": "A seleção contém atletas Sub-18 indisponíveis."}, status_code=422)
+        return JSONResponse({"sucesso": False, "erro": "A seleção contém atletas do escalão inferior indisponíveis."}, status_code=422)
 
     anteriores = None if plano.atletas_previstos is None else _carregar_json(plano.atletas_previstos, [])
     for jogador_id in ids:
@@ -972,7 +979,7 @@ async def convocar_atletas_sub18(
     adicionados = [atleta for atleta in atletas if atleta["id"] in ids]
     return JSONResponse({
         "sucesso": True,
-        "mensagem": f"{len(adicionados)} atleta(s) Sub-18 convocado(s) e selecionado(s).",
+        "mensagem": f"{len(adicionados)} atleta(s) convocado(s) e selecionado(s).",
         "adicionados": adicionados,
         "jogador_ids": previstos_ids,
     })

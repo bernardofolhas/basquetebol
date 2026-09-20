@@ -147,6 +147,7 @@
                         <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">#{{ jogador.numero_camisola }}</span>
                         {% endif %}
                         <span class="text-sm text-gray-700">{{ jogador.nome }}</span>
+                        {% if jogador.equipa_id != jogo.equipa_id %}<span class="text-xs font-semibold text-blue-600">Reforço · {{ jogador.equipa.nome if jogador.equipa else 'Escalão inferior' }}</span>{% endif %}
                         {% if jogador.posicao %}
                         <span class="text-xs text-gray-400">{{ jogador.posicao }}</span>
                         {% endif %}

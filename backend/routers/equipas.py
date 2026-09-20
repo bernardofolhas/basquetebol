@@ -68,6 +68,10 @@ def _agrupar_equipa_tecnica(elementos):
     return [(funcao, _ordenar_treinadores(grupos[funcao])) for funcao in FUNCOES_EQUIPE_TECNICA if grupos.get(funcao)]
 
 
+def _pode_gerir_equipa(utilizador) -> bool:
+    return verificar_perfil(utilizador, ["administrador", "coordenador", "treinador", "staff"])
+
+
 def _sincronizar_utilizadores_tecnicos(db: Session) -> None:
     """Expõe contas técnicas já existentes como elementos selecionáveis."""
     contas = db.query(Utilizador).filter(
@@ -216,7 +220,6 @@ def detalhe_equipa(
     utilizador=Depends(exigir_autenticacao),
 ):
     verificar_ou_negar_equipa(utilizador, equipa_id, db)
-
     _sincronizar_utilizadores_tecnicos(db)
 
     equipa = _carregar_equipa_detalhe(equipa_id, db)
@@ -258,6 +261,8 @@ def equipa_tecnica_equipa(
 ):
     verificar_ou_negar_equipa(utilizador, equipa_id, db)
 
+    _sincronizar_utilizadores_tecnicos(db)
+
     equipa = _carregar_equipa_detalhe(equipa_id, db)
     if not equipa:
         return RedirectResponse(url="/equipas")
@@ -268,7 +273,7 @@ def equipa_tecnica_equipa(
         "secoes_tecnicas": _agrupar_equipa_tecnica(equipa.treinadores),
         "funcoes_tecnicas": FUNCOES_EQUIPE_TECNICA,
         "pode_gerir_equipa_tecnica": verificar_perfil(
-            utilizador, ["administrador", "coordenador"]
+            utilizador, ["administrador", "coordenador", "treinador", "staff"]
         ),
         "elementos_disponiveis": _ordenar_treinadores(
             db.query(Treinador).filter(~Treinador.equipas.any(Equipa.id == equipa_id)).all()
@@ -285,6 +290,8 @@ def associar_elemento_equipa_tecnica(
     utilizador=Depends(exigir_operacao_desportiva),
 ):
     verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    if not _pode_gerir_equipa(utilizador):
+        raise AcessoNegado(f"/equipas/{equipa_id}/equipa-tecnica")
     equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
     elemento = db.query(Treinador).filter(Treinador.id == elemento_id).first()
     if not equipa or not elemento:
@@ -305,6 +312,8 @@ def desassociar_elemento_equipa_tecnica(
     utilizador=Depends(exigir_operacao_desportiva),
 ):
     verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    if not _pode_gerir_equipa(utilizador):
+        raise AcessoNegado(f"/equipas/{equipa_id}/equipa-tecnica")
     equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
     elemento = db.query(Treinador).filter(Treinador.id == elemento_id).first()
     if equipa and elemento and elemento in equipa.treinadores:
