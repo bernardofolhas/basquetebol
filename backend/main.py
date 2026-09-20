@@ -53,6 +53,7 @@ from database import (
     actualizar_estrutura_assiduidade,
     actualizar_estrutura_campos_desenho,
     actualizar_estrutura_estatisticas,
+    actualizar_estrutura_ficha_jogo,
     actualizar_estrutura_equipas_treino,
     actualizar_estrutura_staff,
     actualizar_estrutura_jogadores,
@@ -144,6 +145,7 @@ try:
     actualizar_estrutura_assiduidade()
     actualizar_estrutura_convocacoes_assiduidade()
     actualizar_estrutura_jogadores()
+    actualizar_estrutura_ficha_jogo()
     actualizar_estrutura_estatisticas()
     with SessionLocal() as db:
         from services.questionarios_service import sincronizar_acessos_atletas

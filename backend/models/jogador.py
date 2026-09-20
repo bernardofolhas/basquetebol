@@ -34,6 +34,7 @@ class Jogador(Base):
     naturalidade = Column(String, nullable=True)
     morada = Column(String, nullable=True)
     numero_camisola = Column(Integer, nullable=True)
+    numero_licenca_fpb = Column(String, nullable=True)
     posicao = Column(String, nullable=True)
     posicao_secundaria = Column(String, nullable=True)
     fotografia = Column(String, nullable=True)

@@ -20,6 +20,7 @@
         {% if jogo.em_casa %}Casa{% else %}Fora{% endif %}
     </span>
     <a href="/estatisticas/jogos/{{ jogo.id }}?offline={{ utilizador.id }}" class="ds-button ds-button-primary">Estatísticas</a>
+    <a href="/jogos/{{ jogo.id }}/ficha-jogo" class="ds-button ds-button-export">Ficha de jogo PDF</a>
     {% if utilizador.perfil.value != 'staff' %}<a href="/jogos/{{ jogo.id }}/editar"
        class="bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">
         ✏️ Editar Jogo

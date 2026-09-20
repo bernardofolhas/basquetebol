@@ -1013,7 +1013,7 @@ def actualizar_estrutura_jogadores() -> None:
     if not inspector.has_table("jogadores"):
         return
     colunas = {coluna["name"] for coluna in inspector.get_columns("jogadores")}
-    for coluna in ("fotografia", "posicao_secundaria"):
+    for coluna in ("fotografia", "posicao_secundaria", "numero_licenca_fpb"):
         if coluna in colunas:
             continue
         with engine.begin() as ligacao:
@@ -1022,6 +1022,31 @@ def actualizar_estrutura_jogadores() -> None:
             else:
                 ligacao.execute(text(f"ALTER TABLE jogadores ADD COLUMN {coluna} VARCHAR NULL"))
         logger.info("Coluna '%s' adicionada a jogadores.", coluna)
+
+
+def actualizar_estrutura_ficha_jogo() -> None:
+    """Garante os campos de identificação usados na ficha de jogo."""
+    inspector = inspect(engine)
+    tabelas = {
+        "treinadores": {"funcao": "VARCHAR NOT NULL DEFAULT 'Treinador'"},
+        "jogos": {"numero_jogo": "VARCHAR NULL"},
+    }
+    for tabela, definicoes in tabelas.items():
+        if not inspector.has_table(tabela):
+            continue
+        existentes = {coluna["name"] for coluna in inspector.get_columns(tabela)}
+        em_falta = {nome: tipo for nome, tipo in definicoes.items() if nome not in existentes}
+        if not em_falta:
+            continue
+        with engine.begin() as ligacao:
+            for coluna, tipo in em_falta.items():
+                if engine.dialect.name == "postgresql":
+                    ligacao.execute(text(
+                        f"ALTER TABLE {tabela} ADD COLUMN IF NOT EXISTS {coluna} {tipo}"
+                    ))
+                else:
+                    ligacao.execute(text(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}"))
+        logger.info("Campos da ficha de jogo atualizados em %s.", tabela)
 
 
 def actualizar_estrutura_estatisticas() -> None:

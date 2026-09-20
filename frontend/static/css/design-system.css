@@ -27,6 +27,11 @@
     --topbar-height: 4rem;
     --sidebar-width: 16rem;
     --sidebar-collapsed-width: 4.5rem;
+    --layer-content: 0;
+    --layer-sticky: 20;
+    --layer-popover: 40;
+    --layer-modal: 60;
+    --layer-notice: 80;
     --cor-principal: var(--clube-primary);
 }
 
@@ -66,6 +71,26 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--clube-primary) 13%, transparent);
     outline: 0;
 }
+
+/* Camadas comuns: menus e diálogos usam níveis previsíveis sem competir com
+   o conteúdo das páginas. Os contentores só deixam de cortar quando têm um
+   overlay aberto, preservando o recorte das imagens e cartões normais. */
+.ds-overlay-menu,
+:where(.dropdown-menu,.dropdown-content,.select-menu,.popover,.popper,[data-floating-ui-portal]) {
+    position:absolute;
+    z-index:var(--layer-popover);
+    border:1px solid var(--border-soft);
+    border-radius:var(--radius-control);
+    background:var(--surface-raised);
+    box-shadow:var(--shadow-raised);
+}
+:where([role="menu"],[role="listbox"]) { z-index:var(--layer-popover); }
+details:has(.ds-overlay-menu)[open],
+.overflow-hidden:has(details[open]),
+.overflow-auto:has(details[open]) { overflow:visible; }
+dialog[open],
+:where(.modal,.ds-modal,[role="dialog"])[open] { z-index:var(--layer-modal); }
+.ds-flash { position:relative; z-index:var(--layer-notice); }
 
 /* Estrutura visual comum: privilegia uma ação principal e leitura por blocos. */
 .ds-page-header { display:flex; align-items:flex-end; justify-content:space-between; gap:1.25rem; margin-bottom:1.5rem; }

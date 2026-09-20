@@ -5,6 +5,7 @@
 {% set pode_eliminar = utilizador.perfil.value in ['administrador', 'coordenador', 'treinador', 'staff', 'fisioterapeuta'] %}
 {% call equipa_contexto(equipa, "Plantel", "Lista operacional da equipa com acesso direto às fichas.", "plantel", "/equipas/" ~ equipa.id, "Voltar ao resumo") %}
   <a href="/jogadores/novo?equipa_id={{ equipa.id }}" class="ds-button ds-button-primary">+ Novo {{ termo_jogador(equipa, capitalizar=False) }}</a>
+  <a href="/equipas/{{ equipa.id }}/plantel/pdf" class="ds-button ds-button-export">Exportar PDF</a>
 {% endcall %}
 
 {% if equipa.jogadores %}

@@ -5,76 +5,61 @@
 
 {% block conteudo %}
 
-{% set treinadores_com_telefone = equipa.treinadores | selectattr('telefone') | list | length %}
+{% set elementos_com_telefone = equipa.treinadores | selectattr('telefone') | list | length %}
 
 {% call equipa_contexto(
     equipa,
     "Equipa Técnica",
-    "Treinadores ligados à equipa e respetivos contactos principais.",
+    "Treinadores e restantes elementos associados à equipa.",
     "equipa_tecnica",
     "/equipas/" ~ equipa.id,
     "Voltar ao resumo"
 ) %}
-    <a href="/treinadores"
-       class="bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-full text-sm font-medium ring-1 ring-gray-200 transition">
-        Ver treinadores
-    </a>
+    <a href="/treinadores?voltar=/equipas/{{ equipa.id }}/equipa-tecnica" class="ds-button ds-button-secondary">Ver elementos</a>
 {% endcall %}
 
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
     <div class="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
-        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Treinadores</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Equipa técnica</p>
         <p class="mt-2 text-3xl font-bold text-gray-800">{{ equipa.treinadores | length }}</p>
-        <p class="mt-1 text-sm text-gray-500">Associados à equipa</p>
+        <p class="mt-1 text-sm text-gray-500">Elementos associados</p>
     </div>
     <div class="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Com telefone</p>
-        <p class="mt-2 text-3xl font-bold text-gray-800">{{ treinadores_com_telefone }}</p>
+        <p class="mt-2 text-3xl font-bold text-gray-800">{{ elementos_com_telefone }}</p>
         <p class="mt-1 text-sm text-gray-500">Contacto direto disponível</p>
     </div>
 </div>
 
-<div>
-    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-        <div class="flex items-center justify-between mb-4">
-            <div>
-                <h2 class="font-semibold text-gray-700">Treinadores da Equipa</h2>
-                <p class="text-sm text-gray-400 mt-1">Página dedicada para não depender do resumo da equipa.</p>
+<section class="ds-panel p-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div><h2 class="font-semibold text-gray-800">Elementos da equipa</h2><p class="mt-1 text-sm text-gray-500">As secções só surgem quando têm elementos associados.</p></div>
+        {% if pode_gerir_equipa_tecnica %}<details class="relative">
+            <summary class="ds-button ds-button-primary cursor-pointer list-none">+ Adicionar elemento</summary>
+            <div class="ds-overlay-menu right-0 mt-2 w-72 p-2">
+                {% for funcao in funcoes_tecnicas %}<a class="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" href="/treinadores/novo?equipa_id={{ equipa.id }}&funcao={{ funcao|urlencode }}&voltar=/equipas/{{ equipa.id }}/equipa-tecnica">{{ funcao }}</a>{% endfor %}
             </div>
-            <span class="text-sm text-gray-400">{{ equipa.treinadores | length }} registo(s)</span>
-        </div>
-
-        {% if equipa.treinadores %}
-        <div class="space-y-4">
-            {% for treinador in equipa.treinadores %}
-            <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <p class="font-semibold text-gray-800">{{ treinador.nome }}</p>
-                        <div class="mt-3 space-y-1 text-sm text-gray-500">
-                            {% if treinador.telefone %}<p>📞 {{ treinador.telefone }}</p>{% endif %}
-                            {% if treinador.email %}<p class="truncate">✉️ {{ treinador.email }}</p>{% endif %}
-                            {% if not treinador.telefone and not treinador.email %}
-                            <p class="text-gray-400">Sem contactos adicionais preenchidos.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <a href="/treinadores/{{ treinador.id }}"
-                       class="text-sm font-medium text-orange-500 hover:text-orange-600">
-                        Ver →
-                    </a>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="rounded-2xl border border-dashed border-gray-300 p-10 text-center">
-            <span class="text-5xl">🧑‍🏫</span>
-            <p class="mt-4 text-gray-500">Ainda não há treinadores associados a esta equipa.</p>
-        </div>
-        {% endif %}
+        </details>{% endif %}
     </div>
 
-</div>
+    {% if pode_gerir_equipa_tecnica and elementos_disponiveis %}
+    <form method="POST" action="/equipas/{{ equipa.id }}/equipa-tecnica/associar" class="mt-5 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-4">
+        <label class="min-w-56 flex-1 text-sm font-semibold text-slate-700">Associar elemento já existente<select name="elemento_id" class="mt-1 ds-input">{% for elemento in elementos_disponiveis %}<option value="{{ elemento.id }}">{{ elemento.nome }} · {{ elemento.funcao or 'Treinador' }}</option>{% endfor %}</select></label>
+        <button class="ds-button ds-button-secondary" type="submit">Associar à equipa</button>
+    </form>
+    {% endif %}
+
+    {% if secoes_tecnicas %}
+    <nav class="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3" aria-label="Funções da equipa técnica">{% for funcao, elementos in secoes_tecnicas %}<a href="#funcao-{{ funcao|lower|replace(' ', '-') }}" class="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200">{{ funcao }} <span class="ml-1 text-slate-400">{{ elementos|length }}</span></a>{% endfor %}</nav>
+    {% for funcao, elementos in secoes_tecnicas %}
+    <section id="funcao-{{ funcao|lower|replace(' ', '-') }}" class="mt-6 scroll-mt-24">
+        <div class="mb-3 flex items-center justify-between"><h3 class="text-base font-extrabold text-slate-800">{{ funcao }}{% if elementos|length != 1 %}s{% endif %}</h3><span class="text-sm text-slate-400">{{ elementos|length }} registo(s)</span></div>
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {% for elemento in elementos %}<article class="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="truncate font-bold text-slate-800">{{ elemento.nome }}</p><p class="mt-1 text-xs font-semibold uppercase tracking-wide text-brand-700">{{ elemento.funcao or 'Treinador' }}</p><div class="mt-3 space-y-1 text-sm text-slate-500">{% if elemento.numero_fpb %}<p>Licença FPB: {{ elemento.numero_fpb }}</p>{% endif %}{% if elemento.telefone %}<p>{{ elemento.telefone }}</p>{% endif %}{% if elemento.email %}<p class="truncate">{{ elemento.email }}</p>{% endif %}{% if not elemento.numero_fpb and not elemento.telefone and not elemento.email %}<p>Sem contactos ou licença registados.</p>{% endif %}</div></div>{% if pode_gerir_equipa_tecnica %}<div class="flex shrink-0 flex-col gap-2"><a href="/treinadores/{{ elemento.id }}/editar?voltar=/equipas/{{ equipa.id }}/equipa-tecnica" class="text-sm font-semibold text-blue-700 hover:underline">Editar</a><form method="POST" action="/equipas/{{ equipa.id }}/equipa-tecnica/{{ elemento.id }}/desassociar"><button class="text-sm font-semibold text-red-700 hover:underline" type="submit" onclick="return confirm('Desassociar {{ elemento.nome|e }} desta equipa?')">Remover</button></form></div>{% endif %}</div></article>{% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+    {% else %}<div class="ds-empty mt-6"><strong>A equipa técnica ainda está vazia.</strong><p>Adiciona ou associa o primeiro elemento à equipa.</p></div>{% endif %}
+</section>
 
 {% endblock %}

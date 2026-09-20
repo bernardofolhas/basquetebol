@@ -20,6 +20,7 @@ class Jogo(Base):
     local = Column(String, nullable=True)          # Pavilhão
     adversario = Column(String, nullable=False)    # Nome do adversário
     competicao = Column(String, nullable=True)     # Ex: "Campeonato Nacional"
+    numero_jogo = Column(String, nullable=True)
 
     # Casa ou fora
     em_casa = Column(Boolean, default=True)

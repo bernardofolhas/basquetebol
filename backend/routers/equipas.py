@@ -23,6 +23,7 @@ from models.jogo import Jogo
 from models.planeamento import Macrociclo
 from models.planeamento_clube import EventoPlaneamentoClube
 from models.playbook import Playbook
+from models.treinador import Treinador
 from paths import TEMPLATES_DIR
 from services.desenho_service import imagem_estatica_data_uri
 from services.fotografia_jogador_service import caminho_fotografia
@@ -50,6 +51,20 @@ def _ordenar_treinadores(treinadores):
         treinadores,
         key=lambda treinador: ((treinador.nome or "").lower(), treinador.id),
     )
+
+
+FUNCOES_EQUIPE_TECNICA = (
+    "Treinador", "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
+    "Presidente", "Vice-Presidente",
+)
+
+
+def _agrupar_equipa_tecnica(elementos):
+    grupos = {}
+    for elemento in elementos:
+        funcao = elemento.funcao or "Treinador"
+        grupos.setdefault(funcao, []).append(elemento)
+    return [(funcao, _ordenar_treinadores(grupos[funcao])) for funcao in FUNCOES_EQUIPE_TECNICA if grupos.get(funcao)]
 
 
 def _calcular_idade(data_nascimento: date | None, hoje: date | None = None) -> int | None:
@@ -216,7 +231,53 @@ def equipa_tecnica_equipa(
     return templates.TemplateResponse(request, "equipas/equipa_tecnica.html", {
         "utilizador": utilizador,
         "equipa": equipa,
+        "secoes_tecnicas": _agrupar_equipa_tecnica(equipa.treinadores),
+        "funcoes_tecnicas": FUNCOES_EQUIPE_TECNICA,
+        "pode_gerir_equipa_tecnica": verificar_perfil(
+            utilizador, ["administrador", "coordenador"]
+        ),
+        "elementos_disponiveis": _ordenar_treinadores(
+            db.query(Treinador).filter(~Treinador.equipas.any(Equipa.id == equipa_id)).all()
+        ),
     })
+
+
+@router.post("/{equipa_id}/equipa-tecnica/associar")
+def associar_elemento_equipa_tecnica(
+    equipa_id: int,
+    request: Request,
+    elemento_id: int = Form(...),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    elemento = db.query(Treinador).filter(Treinador.id == elemento_id).first()
+    if not equipa or not elemento:
+        set_flash(request, "Não foi possível associar o elemento selecionado.", "error")
+    elif elemento not in equipa.treinadores:
+        equipa.treinadores.append(elemento)
+        db.commit()
+        set_flash(request, f"{elemento.nome} associado(a) à equipa.")
+    return RedirectResponse(url=f"/equipas/{equipa_id}/equipa-tecnica", status_code=303)
+
+
+@router.post("/{equipa_id}/equipa-tecnica/{elemento_id}/desassociar")
+def desassociar_elemento_equipa_tecnica(
+    equipa_id: int,
+    elemento_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    verificar_ou_negar_equipa(utilizador, equipa_id, db)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    elemento = db.query(Treinador).filter(Treinador.id == elemento_id).first()
+    if equipa and elemento and elemento in equipa.treinadores:
+        equipa.treinadores.remove(elemento)
+        db.commit()
+        set_flash(request, f"{elemento.nome} deixou de estar associado(a) a esta equipa.")
+    return RedirectResponse(url=f"/equipas/{equipa_id}/equipa-tecnica", status_code=303)
 
 
 @router.get("/{equipa_id}/eventos", response_class=HTMLResponse)

@@ -172,6 +172,7 @@ async def criar_jogador(
     naturalidade: str = Form(""),
     morada: str = Form(""),
     numero_camisola: str = Form(""),
+    numero_licenca_fpb: str = Form(""),
     posicao: str = Form(""),
     posicao_secundaria: str = Form(""),
     telefone: str = Form(""),
@@ -200,6 +201,7 @@ async def criar_jogador(
         naturalidade=naturalidade or None,
         morada=morada or None,
         numero_camisola=int(numero_camisola) if numero_camisola else None,
+        numero_licenca_fpb=numero_licenca_fpb.strip() or None,
         posicao=posicao or None,
         posicao_secundaria=posicao_secundaria if posicao_secundaria and posicao_secundaria != posicao else None,
         telefone=telefone or None,
@@ -461,6 +463,7 @@ async def editar_jogador(
     naturalidade: str = Form(""),
     morada: str = Form(""),
     numero_camisola: str = Form(""),
+    numero_licenca_fpb: str = Form(""),
     posicao: str = Form(""),
     posicao_secundaria: str = Form(""),
     telefone: str = Form(""),
@@ -488,6 +491,7 @@ async def editar_jogador(
     jogador.naturalidade = naturalidade or None
     jogador.morada = morada or None
     jogador.numero_camisola = int(numero_camisola) if numero_camisola else None
+    jogador.numero_licenca_fpb = numero_licenca_fpb.strip() or None
     jogador.posicao = posicao or None
     jogador.posicao_secundaria = posicao_secundaria if posicao_secundaria and posicao_secundaria != posicao else None
     jogador.telefone = telefone or None

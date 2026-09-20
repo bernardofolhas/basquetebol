@@ -26,6 +26,7 @@ class Treinador(Base):
     email = Column(String, nullable=True)
     numero_cedula = Column(String, nullable=True)
     numero_fpb = Column(String, nullable=True)
+    funcao = Column(String, nullable=False, default="Treinador", server_default="Treinador")
     observacoes = Column(String, nullable=True)
 
     # Relação com equipas através da tabela de associação

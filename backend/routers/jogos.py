@@ -12,6 +12,7 @@ from flash import set_flash
 from models.equipa import Equipa
 from models.jogador import Jogador
 from models.jogo import Convocado, Jogo, PlanoJogo
+from models.treinador import Treinador
 from paths import TEMPLATES_DIR
 from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.pdf_service import content_disposition_pdf, renderizar_pdf
@@ -82,6 +83,26 @@ def _confrontos(jogos: list[Jogo], nome_clube: str) -> dict[int, str]:
         jogo.id: formatar_confronto(nome_clube, jogo.adversario, jogo.em_casa)
         for jogo in jogos
     }
+
+
+def _jogadores_ficha(jogadores):
+    """Expõe a última altura registada sem alterar o perfil do atleta."""
+    for jogador in jogadores:
+        registos = sorted(
+            jogador.registos_antropometricos or [],
+            key=lambda item: item.data,
+            reverse=True,
+        )
+        jogador.altura_ficha = registos[0].altura if registos else None
+    return jogadores
+
+
+def _elementos_equipa_ficha(db: Session, equipa_id: int):
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    return sorted(
+        list(equipa.treinadores if equipa else []),
+        key=lambda elemento: ((elemento.funcao or "Treinador"), (elemento.nome or "").lower()),
+    )
 
 
 @router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
@@ -156,6 +177,7 @@ async def criar_jogo(
     local: str = Form(""),
     adversario: str = Form(...),
     competicao: str = Form(""),
+    numero_jogo: str = Form(""),
     em_casa: str = Form("true"),
     observacoes: str = Form(""),
 ):
@@ -167,6 +189,7 @@ async def criar_jogo(
         local=local or None,
         adversario=adversario,
         competicao=competicao or None,
+        numero_jogo=numero_jogo.strip() or None,
         em_casa=em_casa == "true",
         observacoes=observacoes or None,
         equipa_id=equipa_id,
@@ -250,6 +273,7 @@ async def editar_jogo(
     local: str = Form(""),
     adversario: str = Form(...),
     competicao: str = Form(""),
+    numero_jogo: str = Form(""),
     em_casa: str = Form("true"),
     observacoes: str = Form(""),
 ):
@@ -259,6 +283,7 @@ async def editar_jogo(
     verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
 
     _atualizar_campos_jogo(jogo, data, hora, local, adversario, competicao, em_casa, observacoes)
+    jogo.numero_jogo = numero_jogo.strip() or None
     db.commit()
     set_flash(request, "Jogo atualizado.")
     return RedirectResponse(url=f"/jogos/{jogo.id}", status_code=303)
@@ -496,6 +521,80 @@ def exportar_pdf_convocatoria(
     })
     nome = f"convocatoria_{jogo.equipa.nome}_{jogo.data}.pdf".replace(" ", "_")
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nome}"})
+
+
+@router.get("/{jogo_id}/ficha-jogo", response_class=HTMLResponse)
+def selecionar_ficha_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    jogadores = db.query(Jogador).filter(
+        Jogador.equipa_id == jogo.equipa_id,
+        Jogador.ativo.is_(True),
+    ).order_by(Jogador.numero_camisola, Jogador.nome).all()
+    return templates.TemplateResponse(request, "jogos/ficha_jogo.html", {
+        "utilizador": utilizador,
+        "jogo": jogo,
+        "jogadores": _jogadores_ficha(jogadores),
+        "elementos_tecnicos": _elementos_equipa_ficha(db, jogo.equipa_id),
+        "cores_equipamento": ("Branco", "Escuro", "Vermelho", "Azul", "Preto", "Amarelo", "Outro"),
+    })
+
+
+@router.post("/{jogo_id}/ficha-jogo/pdf")
+async def exportar_ficha_jogo(
+    jogo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    jogo = _obter_jogo(db, jogo_id)
+    if not jogo:
+        return RedirectResponse(url="/equipas")
+    verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    dados = await request.form()
+    jogadores_ids = {int(valor) for valor in dados.getlist("jogadores_ids") if str(valor).isdigit()}
+    elementos_ids = {int(valor) for valor in dados.getlist("elementos_ids") if str(valor).isdigit()}
+    capitao_id = int(dados.get("capitao_id")) if str(dados.get("capitao_id", "")).isdigit() else None
+    cor_equipamento = str(dados.get("cor_equipamento", "")).strip()
+
+    jogadores = db.query(Jogador).filter(
+        Jogador.equipa_id == jogo.equipa_id,
+        Jogador.id.in_(jogadores_ids),
+        Jogador.ativo.is_(True),
+    ).order_by(Jogador.numero_camisola, Jogador.nome).all() if jogadores_ids else []
+    elementos_disponiveis = _elementos_equipa_ficha(db, jogo.equipa_id)
+    elementos = [elemento for elemento in elementos_disponiveis if elemento.id in elementos_ids]
+
+    if not jogadores:
+        set_flash(request, "Seleciona pelo menos um jogador para a ficha de jogo.", "error")
+        return RedirectResponse(url=f"/jogos/{jogo_id}/ficha-jogo", status_code=303)
+    if capitao_id not in {jogador.id for jogador in jogadores}:
+        set_flash(request, "O capitão deve ser um dos jogadores selecionados.", "error")
+        return RedirectResponse(url=f"/jogos/{jogo_id}/ficha-jogo", status_code=303)
+    if not cor_equipamento:
+        set_flash(request, "Seleciona a cor do equipamento.", "error")
+        return RedirectResponse(url=f"/jogos/{jogo_id}/ficha-jogo", status_code=303)
+
+    pdf = renderizar_pdf(request, "jogos/ficha_jogo_pdf.html", {
+        "utilizador": utilizador,
+        "jogo": jogo,
+        "jogadores": _jogadores_ficha(jogadores),
+        "elementos_tecnicos": elementos,
+        "capitao_id": capitao_id,
+        "cor_equipamento": cor_equipamento,
+    })
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": content_disposition_pdf(f"Ficha de jogo {jogo.equipa.nome} {jogo.data}")},
+    )
 
 
 @router.get("/{jogo_id}/plano/print", response_class=HTMLResponse)
