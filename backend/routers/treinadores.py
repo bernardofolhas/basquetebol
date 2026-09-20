@@ -6,7 +6,7 @@ from template_config import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from auth import encriptar_password, verificar_perfil
-from auth_deps import AcessoNegado, exigir_autenticacao
+from auth_deps import AcessoNegado, exigir_autenticacao, exigir_coordenacao
 from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
