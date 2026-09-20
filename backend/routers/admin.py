@@ -21,6 +21,11 @@ from services.recuperacao_password_service import criar_token_recuperacao
 router = APIRouter(prefix="/admin")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+FUNCOES_EQUIPE_TECNICA = (
+    "Treinador", "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
+    "Presidente", "Vice-Presidente",
+)
+
 
 def _contexto_formulario_utilizador(db: Session, utilizador, utilizador_editar=None, erro=None, modo=None):
     """Mantém o formulário de contas coerente para perfis e equipas de staff."""
@@ -28,6 +33,7 @@ def _contexto_formulario_utilizador(db: Session, utilizador, utilizador_editar=N
         "utilizador": utilizador,
         "utilizador_editar": utilizador_editar,
         "perfis": [p for p in PerfilEnum if p != PerfilEnum.superadministrador],
+        "funcoes_equipa_tecnica": FUNCOES_EQUIPE_TECNICA,
         "treinadores": db.query(Treinador).order_by(Treinador.nome).all(),
         "equipas": db.query(Equipa).order_by(Equipa.nome).all(),
         "erro": erro,
@@ -58,8 +64,8 @@ def _validar_atribuicoes_utilizador(
         if perfil in {PerfilEnum.staff, PerfilEnum.fisioterapeuta}
         else []
     )
-    if perfil == PerfilEnum.fisioterapeuta and not equipas:
-        raise ValueError("Seleciona pelo menos uma equipa para a conta de fisioterapeuta.")
+    if perfil in {PerfilEnum.staff, PerfilEnum.fisioterapeuta} and not equipas:
+        raise ValueError("Seleciona pelo menos uma equipa para esta função técnica.")
 
     treinador_associado = None
     if perfil == PerfilEnum.treinador and treinador_id:
@@ -68,6 +74,41 @@ def _validar_atribuicoes_utilizador(
             raise ValueError("Seleciona um treinador do teu clube.")
         treinador_associado = treinador.id
     return equipas, treinador_associado
+
+
+def _funcao_tecnica(perfil: PerfilEnum, funcao: str) -> str | None:
+    if perfil == PerfilEnum.fisioterapeuta:
+        return "Fisioterapeuta"
+    if perfil == PerfilEnum.staff:
+        return funcao if funcao in FUNCOES_EQUIPE_TECNICA else "Seccionista"
+    return None
+
+
+def _sincronizar_elemento_tecnico(
+    db: Session,
+    conta: Utilizador,
+    equipas: list[Equipa],
+    funcao: str | None,
+) -> None:
+    """Mantém uma conta técnica visível na equipa e na ficha de jogo."""
+    if not funcao:
+        return
+    elemento = conta.treinador
+    if elemento is None:
+        elemento = Treinador(
+            clube_id=conta.clube_id,
+            nome=conta.nome,
+            email=conta.email,
+            funcao=funcao,
+        )
+        db.add(elemento)
+        db.flush()
+        conta.treinador_id = elemento.id
+    else:
+        elemento.nome = conta.nome
+        elemento.email = conta.email
+        elemento.funcao = funcao
+    elemento.equipas = equipas
 
 
 @router.get("/auditoria", response_class=HTMLResponse)
@@ -149,6 +190,7 @@ async def criar_utilizador(
     nome: str = Form(...),
     email: str = Form(...),
     perfil: str = Form(...),
+    funcao_equipa: str = Form(""),
     treinador_id: str = Form(""),
     equipa_ids: list[str] = Form([]),
 ):
@@ -175,11 +217,18 @@ async def criar_utilizador(
         email=email,
         perfil=perfil_enum,
         treinador_id=treinador_associado,
+        clube_id=utilizador.clube_id,
         deve_alterar_password=perfil_enum == PerfilEnum.fisioterapeuta,
     )
-    novo_utilizador.equipas_staff = equipas_staff
-
     db.add(novo_utilizador)
+    db.flush()
+    novo_utilizador.equipas_staff = equipas_staff
+    _sincronizar_elemento_tecnico(
+        db,
+        novo_utilizador,
+        equipas_staff,
+        _funcao_tecnica(perfil_enum, funcao_equipa),
+    )
     from services.auditoria_service import registar_auditoria
     registar_auditoria(db, utilizador, "criar", "utilizador", None, f"Username: {username}", request)
     db.commit()
@@ -211,6 +260,7 @@ async def editar_utilizador(
     nome: str = Form(...),
     email: str = Form(...),
     perfil: str = Form(...),
+    funcao_equipa: str = Form(""),
     treinador_id: str = Form(""),
     equipa_ids: list[str] = Form([]),
     ativo: str = Form("true"),
@@ -249,6 +299,12 @@ async def editar_utilizador(
     utilizador_editar.ativo = (ativo == "true")
     utilizador_editar.treinador_id = treinador_associado
     utilizador_editar.equipas_staff = equipas_staff
+    _sincronizar_elemento_tecnico(
+        db,
+        utilizador_editar,
+        equipas_staff,
+        _funcao_tecnica(perfil_enum, funcao_equipa),
+    )
 
     if password and password.strip():
         utilizador_editar.password_hash = encriptar_password(password)

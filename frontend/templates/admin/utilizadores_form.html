@@ -58,6 +58,18 @@
                 <p class="mt-1 text-sm leading-6 text-emerald-800">A página inicial destaca respostas aos questionários, alertas de bem-estar, carga semanal e treino físico. A conta fica limitada às equipas escolhidas e deverá alterar a palavra-passe no primeiro acesso.</p>
             </div>
 
+            <div id="funcao-equipa" hidden class="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <label for="funcao-equipa-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Função na equipa *</label>
+                <p class="mb-3 text-sm text-slate-500">Esta função aparece na equipa técnica e pode ser selecionada na ficha de jogo.</p>
+                <select id="funcao-equipa-conta" name="funcao_equipa" class="ds-input">
+                    {% set funcao_atual = utilizador_editar.treinador.funcao if modo == 'editar' and utilizador_editar.treinador else '' %}
+                    <option value="">Selecionar função</option>
+                    {% for funcao in funcoes_equipa_tecnica %}
+                    <option value="{{ funcao }}" {% if funcao_atual == funcao %}selected{% endif %}>{{ funcao }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <div id="equipas-staff" hidden class="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <label for="equipas-conta" class="mb-1.5 block text-sm font-bold text-slate-700">Equipas atribuídas <span id="equipas-obrigatorias" hidden>*</span></label>
                 <p class="mb-3 text-sm text-slate-500">A conta só poderá consultar e editar informação das equipas selecionadas. Usa Ctrl ou Cmd para selecionar várias.</p>
@@ -120,15 +132,21 @@ document.addEventListener("DOMContentLoaded", function () {
     const equipasObrigatorias = document.getElementById("equipas-obrigatorias");
     const treinador = document.getElementById("treinador-associado");
     const explicacaoFisio = document.getElementById("explicacao-fisio");
+    const funcaoEquipa = document.getElementById("funcao-equipa");
+    const seletorFuncao = document.getElementById("funcao-equipa-conta");
 
     function atualizarCamposDoPerfil() {
         const eFisio = perfil.value === "fisioterapeuta";
         const eStaff = perfil.value === "staff";
-        equipas.hidden = !(eFisio || eStaff);
+        const eTecnico = eFisio || eStaff;
+        equipas.hidden = !eTecnico;
         treinador.hidden = perfil.value !== "treinador";
         explicacaoFisio.hidden = !eFisio;
-        equipasObrigatorias.hidden = !eFisio;
-        seletorEquipas.required = eFisio;
+        funcaoEquipa.hidden = !eTecnico;
+        equipasObrigatorias.hidden = !eTecnico;
+        seletorEquipas.required = eTecnico;
+        seletorFuncao.required = eTecnico;
+        if (eFisio) seletorFuncao.value = "Fisioterapeuta";
     }
 
     perfil.addEventListener("change", atualizarCamposDoPerfil);

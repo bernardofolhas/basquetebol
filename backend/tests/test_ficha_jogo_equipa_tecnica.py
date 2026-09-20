@@ -7,6 +7,8 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from routers.equipas import FUNCOES_EQUIPE_TECNICA, _agrupar_equipa_tecnica
 from routers.jogos import _jogadores_ficha
+from routers.admin import _funcao_tecnica
+from models.utilizador import PerfilEnum
 
 
 def test_equipa_tecnica_agrupa_apenas_funcoes_com_elementos():
@@ -19,6 +21,12 @@ def test_equipa_tecnica_agrupa_apenas_funcoes_com_elementos():
 
     assert [funcao for funcao, _ in grupos] == ["Treinador", "Fisioterapeuta"]
     assert all(funcao in FUNCOES_EQUIPE_TECNICA for funcao, _ in grupos)
+
+
+def test_perfis_tecnicos_usam_funcoes_da_equipa_sem_criar_novos_logins():
+    assert _funcao_tecnica(PerfilEnum.fisioterapeuta, "Médico") == "Fisioterapeuta"
+    assert _funcao_tecnica(PerfilEnum.staff, "Médico") == "Médico"
+    assert _funcao_tecnica(PerfilEnum.staff, "") == "Seccionista"
 
 
 def test_ficha_jogo_usa_a_ultima_altura_sem_gravar_no_perfil():

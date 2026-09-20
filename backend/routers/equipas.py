@@ -24,6 +24,7 @@ from models.planeamento import Macrociclo
 from models.planeamento_clube import EventoPlaneamentoClube
 from models.playbook import Playbook
 from models.treinador import Treinador
+from models.utilizador import PerfilEnum, Utilizador
 from paths import TEMPLATES_DIR
 from services.desenho_service import imagem_estatica_data_uri
 from services.fotografia_jogador_service import caminho_fotografia
@@ -65,6 +66,37 @@ def _agrupar_equipa_tecnica(elementos):
         funcao = elemento.funcao or "Treinador"
         grupos.setdefault(funcao, []).append(elemento)
     return [(funcao, _ordenar_treinadores(grupos[funcao])) for funcao in FUNCOES_EQUIPE_TECNICA if grupos.get(funcao)]
+
+
+def _sincronizar_utilizadores_tecnicos(db: Session) -> None:
+    """Expõe contas técnicas já existentes como elementos selecionáveis."""
+    contas = db.query(Utilizador).filter(
+        Utilizador.perfil.in_([PerfilEnum.staff, PerfilEnum.fisioterapeuta])
+    ).all()
+    alterado = False
+    for conta in contas:
+        funcao = "Fisioterapeuta" if conta.perfil == PerfilEnum.fisioterapeuta else "Seccionista"
+        elemento = conta.treinador
+        if elemento is None:
+            elemento = Treinador(
+                clube_id=conta.clube_id,
+                nome=conta.nome,
+                email=conta.email,
+                funcao=funcao,
+            )
+            db.add(elemento)
+            db.flush()
+            conta.treinador_id = elemento.id
+            alterado = True
+        if conta.perfil == PerfilEnum.fisioterapeuta and elemento.funcao != funcao:
+            elemento.funcao = funcao
+            alterado = True
+        for equipa in conta.equipas_staff:
+            if equipa not in elemento.equipas:
+                elemento.equipas.append(equipa)
+                alterado = True
+    if alterado:
+        db.commit()
 
 
 def _calcular_idade(data_nascimento: date | None, hoje: date | None = None) -> int | None:
@@ -184,6 +216,8 @@ def detalhe_equipa(
     utilizador=Depends(exigir_autenticacao),
 ):
     verificar_ou_negar_equipa(utilizador, equipa_id, db)
+
+    _sincronizar_utilizadores_tecnicos(db)
 
     equipa = _carregar_equipa_detalhe(equipa_id, db)
     if not equipa:
