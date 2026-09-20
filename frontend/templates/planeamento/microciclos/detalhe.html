@@ -58,16 +58,13 @@
             </div>
             {% if sugestoes_conteudos.itens %}
             <div class="grid gap-3 p-4 md:grid-cols-2">
-                {% for sugestao in sugestoes_conteudos.itens[:8] %}
+                {% for sugestao in sugestoes_conteudos.itens %}
                 <article class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
                     <span class="shrink-0 rounded-full px-2 py-1 text-xs font-bold {% if sugestao.prioridade == 1 %}bg-amber-200 text-amber-950{% else %}bg-white text-slate-600 ring-1 ring-slate-200{% endif %}">P{{ sugestao.prioridade }}</span>
                     <div class="min-w-0"><p class="text-sm font-bold text-slate-800">{{ sugestao.nome }}</p><p class="mt-0.5 text-xs text-slate-500">{{ sugestao.area }}</p></div>
                 </article>
                 {% endfor %}
             </div>
-            {% if sugestoes_conteudos.itens|length > 8 %}
-            <p class="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">São apresentadas as 8 prioridades principais. Consulte o mapa anual para ver todas.</p>
-            {% endif %}
             {% else %}
             <p class="p-4 text-sm text-slate-600">Ainda não há conteúdos prioritários definidos para esta semana no mapa anual.</p>
             {% endif %}
