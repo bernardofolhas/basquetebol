@@ -135,12 +135,12 @@ def test_relatorios_faceis_validam_fotografias_antes_de_renderizar():
 
 def test_quadro_individual_permite_escolher_blocos_no_pendente():
     html = (TEMPLATES / "scouting" / "individual.html").read_text(encoding="utf-8")
-    script = (ROOT / "frontend" / "static" / "js" / "scouting-individual-config.js").read_text(encoding="utf-8")
-    assert "Configurar quadro" in html
-    assert "data-reading-toggle" in html
-    assert "data-reading-category" in html
-    assert "localStorage" in script
-    assert "card.hidden=!active.has" in script
+    script = (ROOT / "frontend" / "static" / "js" / "dashboard-customization.js").read_text(encoding="utf-8")
+    assert "data-customizable-dashboard" in html
+    assert "data-dashboard-customizer-anchor" in html
+    assert 'data-dashboard-widget="leitura-{{ categoria }}"' in html
+    assert "dashboard-customizer-menu" in script
+    assert "/dashboard/preferencias" in script
 
 
 def test_formulario_dinamico_transporta_token_da_sessao():

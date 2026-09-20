@@ -78,46 +78,28 @@
         const bar = document.createElement('div');
         bar.className = 'dashboard-customizer-bar';
         bar.setAttribute('data-dashboard-fixed', '');
-        const summary = document.createElement('span');
-        summary.className = 'dashboard-customizer-summary';
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'ds-button ds-button-secondary ds-button-sm dashboard-customizer-open';
-        button.textContent = 'Personalizar página';
-        bar.append(summary, button);
+        const visibleSummary = document.createElement('span');
+        visibleSummary.className = 'dashboard-customizer-summary';
+        const menu = document.createElement('details');
+        menu.className = 'dashboard-customizer-menu';
+        const trigger = document.createElement('summary');
+        trigger.className = 'ds-button ds-button-secondary ds-button-sm dashboard-customizer-trigger';
+        trigger.innerHTML = '<span>Personalizar página</span><i aria-hidden="true"></i>';
+        const panel = document.createElement('div');
+        panel.className = 'dashboard-customizer-panel';
 
-        const firstContent = Array.from(root.children).find(element => !element.hasAttribute('data-dashboard-fixed'));
-        root.insertBefore(bar, firstContent || null);
-
-        function updateSummary() {
-            const visible = widgets.length - savedHidden.size;
-            summary.textContent = `${visible} de ${widgets.length} blocos visíveis`;
-        }
-        updateSummary();
-
-        const dialog = document.createElement('dialog');
-        dialog.className = 'dashboard-customizer-dialog';
-        dialog.setAttribute('aria-labelledby', `dashboard-customizer-title-${rootIndex}`);
-        const shell = document.createElement('div');
-        shell.className = 'dashboard-customizer-shell';
         const header = document.createElement('header');
         const headerText = document.createElement('div');
         const eyebrow = document.createElement('p');
         eyebrow.textContent = 'Preferências da página';
         const title = document.createElement('h2');
-        title.id = `dashboard-customizer-title-${rootIndex}`;
         title.textContent = 'Escolher informação visível';
         headerText.append(eyebrow, title);
-        const close = document.createElement('button');
-        close.type = 'button';
-        close.className = 'dashboard-customizer-close';
-        close.setAttribute('aria-label', 'Fechar');
-        close.textContent = '×';
-        header.append(headerText, close);
+        header.append(headerText);
 
         const intro = document.createElement('p');
         intro.className = 'dashboard-customizer-intro';
-        intro.textContent = 'Seleciona os blocos que queres manter nesta página. A escolha fica guardada na tua conta.';
+        intro.textContent = 'Seleciona os blocos que queres manter. A escolha fica guardada na tua conta.';
         const list = document.createElement('div');
         list.className = 'dashboard-customizer-list';
         const checkboxes = new Map();
@@ -140,16 +122,31 @@
         const footer = document.createElement('footer');
         const reset = document.createElement('button');
         reset.type = 'button';
-        reset.className = 'ds-button ds-button-secondary';
+        reset.className = 'ds-button ds-button-secondary ds-button-sm';
         reset.textContent = 'Repor padrão';
         const save = document.createElement('button');
         save.type = 'button';
-        save.className = 'ds-button ds-button-primary';
-        save.textContent = 'Guardar visualização';
+        save.className = 'ds-button ds-button-primary ds-button-sm';
+        save.textContent = 'Guardar';
         footer.append(reset, save);
-        shell.append(header, intro, list, feedback, footer);
-        dialog.append(shell);
-        document.body.append(dialog);
+        panel.append(header, intro, list, feedback, footer);
+        menu.append(trigger, panel);
+        bar.append(visibleSummary, menu);
+
+        const anchor = root.querySelector('[data-dashboard-customizer-anchor]');
+        if (anchor) {
+            bar.classList.add('is-inline');
+            anchor.append(bar);
+        } else {
+            const firstContent = Array.from(root.children).find(element => !element.hasAttribute('data-dashboard-fixed'));
+            root.insertBefore(bar, firstContent || null);
+        }
+
+        function updateSummary() {
+            const visible = widgets.length - savedHidden.size;
+            visibleSummary.textContent = `${visible} de ${widgets.length} blocos visíveis`;
+        }
+        updateSummary();
 
         function selectedHidden() {
             return new Set(Array.from(checkboxes.entries())
@@ -167,19 +164,16 @@
         checkboxes.forEach(checkbox => checkbox.addEventListener('change', () => {
             applyHidden(selectedHidden());
         }));
-        button.addEventListener('click', () => {
-            feedback.textContent = '';
-            restoreSaved();
-            dialog.showModal();
-        });
-        close.addEventListener('click', () => {
-            restoreSaved();
-            dialog.close();
-        });
-        dialog.addEventListener('cancel', event => {
-            event.preventDefault();
-            restoreSaved();
-            dialog.close();
+        menu.addEventListener('toggle', () => {
+            if (menu.open) {
+                document.querySelectorAll('.dashboard-customizer-menu[open]').forEach(other => {
+                    if (other !== menu) other.open = false;
+                });
+                feedback.textContent = '';
+                restoreSaved();
+            } else {
+                restoreSaved();
+            }
         });
         reset.addEventListener('click', () => {
             checkboxes.forEach(checkbox => { checkbox.checked = true; });
@@ -193,6 +187,7 @@
             try {
                 const response = await fetch('/dashboard/preferencias', {
                     method: 'POST',
+                    credentials: 'same-origin',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
@@ -206,12 +201,18 @@
                 preferences[dashboardKey] = Array.from(hidden);
                 applyHidden(savedHidden);
                 updateSummary();
-                dialog.close();
+                menu.open = false;
             } catch (error) {
                 feedback.textContent = error.message || 'Não foi possível guardar a visualização.';
             } finally {
                 save.disabled = false;
             }
+        });
+        document.addEventListener('click', event => {
+            if (menu.open && !menu.contains(event.target)) menu.open = false;
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && menu.open) menu.open = false;
         });
     });
 })();

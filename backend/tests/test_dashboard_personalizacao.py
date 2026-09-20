@@ -73,3 +73,32 @@ def test_dashboards_de_questionarios_tambem_sao_personalizaveis():
             encoding="utf-8"
         )
         assert "data-customizable-dashboard" in template
+
+
+def test_paginas_de_scouting_tem_personalizacao_no_canto_superior():
+    templates = ROOT / "frontend" / "templates" / "scouting"
+
+    for nome in (
+        "index.html",
+        "resumo.html",
+        "roster.html",
+        "individual_lista.html",
+        "individual.html",
+        "coletivo.html",
+    ):
+        html = (templates / nome).read_text(encoding="utf-8")
+        assert "data-customizable-dashboard" in html
+        assert "data-dashboard-key" in html
+        assert "data-dashboard-customizer-anchor" in html
+
+
+def test_personalizador_global_usa_menu_pendente_e_guarda_no_servidor():
+    script = (ROOT / "frontend" / "static" / "js" / "dashboard-customization.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "document.createElement('details')" in script
+    assert "dashboard-customizer-menu" in script
+    assert "data-dashboard-customizer-anchor" in script
+    assert "credentials: 'same-origin'" in script
+    assert "/dashboard/preferencias" in script
