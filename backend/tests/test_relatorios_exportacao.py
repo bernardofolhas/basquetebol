@@ -83,19 +83,47 @@ def test_estatisticas_sao_escolhidas_individualmente_antes_da_exportacao():
 
 def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
     html = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
-    assert 'class="players"' in html
-    assert 'class="player"' in html
+    assert 'class="player-sheet"' in html
+    assert "page-break-after:always" in html
     assert "fotografias.get(j.id)" in html
-    assert "truncate(180)" in html
     assert "stat_fields" in html
-    assert 'class="portrait"' in html
-    assert 'class="stats"' in html
-    assert "Pontos fortes" in html
-    assert "Pontos a explorar" in html
-    assert "Movimentos preferenciais" in html
-    assert "Como defender" in html
-    assert "j.idade" in html
+    assert "Média da época" in html
+    assert "Último jogo" in html
+    assert "Características individuais" in html
+    assert "Tipos de movimento" in html
+    assert "Estratégias defensivas" in html
+    assert "j.altura_cm" in html
     assert "j.peso_kg" in html
+
+
+def test_quatro_modelos_de_scouting_seguem_estrutura_de_exportacao_fornecida():
+    individual_completo = (TEMPLATES / "relatorios" / "scouting_individual_completo.html").read_text(encoding="utf-8")
+    coletivo_completo = (TEMPLATES / "relatorios" / "scouting_coletivo_completo.html").read_text(encoding="utf-8")
+    coletivo_facil = (TEMPLATES / "relatorios" / "scouting_coletivo_facil.html").read_text(encoding="utf-8")
+    rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+
+    for marcador in (
+        "Identificação",
+        "Análise estatística",
+        "Principais características individuais",
+        "Zonas de lançamento e ação",
+        "Tipos de movimento específicos",
+        "Principais estratégias defensivas",
+    ):
+        assert marcador in individual_completo
+    for marcador in (
+        "Resumo executivo",
+        "Últimos 5 resultados",
+        "Líderes estatísticos",
+        "Principais conceitos ofensivos",
+        "Principais opções defensivas utilizadas",
+        "Playbook coletivo do adversário",
+    ):
+        assert marcador in coletivo_completo
+    assert "Últimos 3 resultados" in coletivo_facil
+    assert "Guia de leitura rápida para jogadores" in coletivo_facil
+    assert "passos_setplay" in rota
+    assert "compor_desenho_sobre_campo" in rota
 
 
 def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
@@ -120,7 +148,11 @@ def test_relatorios_faceis_com_jogadores_apresentam_fotografias():
     ):
         html = (TEMPLATES / "relatorios" / ficheiro).read_text(encoding="utf-8")
         assert "fotografia" in html
-        assert "easy-photo" in html or 'class="photo"' in html
+        assert (
+            "easy-photo" in html
+            or 'class="photo"' in html
+            or "scout-photo" in html
+        )
 
 
 def test_relatorios_faceis_validam_fotografias_antes_de_renderizar():

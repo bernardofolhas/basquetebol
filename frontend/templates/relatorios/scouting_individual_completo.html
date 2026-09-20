@@ -1,1 +1,32 @@
-{% include "relatorios/_documento.html" %}
+{% from "partials/pdf_branding.html" import estilo_pdf, rodape_pdf with context %}
+<!doctype html>
+<html lang="pt"><head><meta charset="utf-8"><title>{{ titulo_relatorio }} · {{ alvo_nome }}</title>{{ estilo_pdf() }}
+<style>@page{size:A4 {{ 'landscape' if orientacao == 'paisagem' else 'portrait' }};margin:8mm}</style>
+{% include "relatorios/_scouting_estilos.html" %}</head><body>
+{% for j in atletas %}
+{% set grupos = itens_atletas[j.id] %}
+{% set caracteristicas = grupos.get('caracteristica', []) + grupos.get('ataque_forte', []) + grupos.get('ataque_fraco', []) + grupos.get('defesa_forte', []) + grupos.get('defesa_fraco', []) %}
+{% set movimentos = grupos.get('movimento', []) %}
+{% set estrategias = grupos.get('estrategia', []) %}
+{% set ultimo = ultimo_jogo.get(j.id) %}
+<main class="scout-page">
+  <header class="scout-cover"><div><div class="scout-kicker">{{ alvo_nome }}</div><h1>Relatório de Scouting Individual</h1><p>Modelo completo para treinadores e equipa técnica</p></div><div class="scout-cover-meta">Exportado em {{ data_exportacao }}<br>{{ nome_autor }}</div></header>
+
+  {% if 'identificacao' in secoes_set or 'fotografia' in secoes_set %}<section class="scout-section keep"><h2 class="scout-section-title">1. Identificação</h2><div class="scout-card scout-player">
+    {% if 'fotografia' in secoes_set %}{% if fotografias.get(j.id) %}<img class="scout-photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="scout-avatar">{{ j.nome[:2]|upper }}</div>{% endif %}{% endif %}
+    <div><h3>#{{ j.numero or '—' }} · {{ j.nome }}</h3><div class="scout-meta"><span>{{ j.posicao_principal }}{% if j.posicao_alternativa %} / {{ j.posicao_alternativa }}{% endif %}</span><span>{{ j.estado|replace('_',' ')|title }}</span>{% if j.altura_cm %}<span>{{ j.altura_cm|round|int }} cm</span>{% endif %}{% if j.peso_kg %}<span>{{ j.peso_kg|round(1) }} kg</span>{% endif %}{% if j.mao_dominante %}<span>Mão {{ j.mao_dominante }}</span>{% endif %}</div>{% if 'observacoes' in secoes_set and j.ficha and j.ficha.resumo %}<p style="margin:2mm 0 0">{{ j.ficha.resumo }}</p>{% endif %}</div>
+  </div></section>{% endif %}
+
+  {% if 'estatisticas' in secoes_set and stat_fields %}<section class="scout-section keep"><h2 class="scout-section-title">2. Análise estatística</h2><table class="scout-table"><thead><tr><th style="width:25mm">Comparação</th>{% for campo in stat_fields %}<th>{{ stat_labels.get(campo, campo|replace('_',' ')) }}</th>{% endfor %}</tr></thead><tbody><tr><td class="label">Média da época</td>{% for campo in stat_fields %}<td class="numeric">{{ j.media_epoca|attr(campo)|round(1) if j.media_epoca and j.media_epoca|attr(campo) is not none else '—' }}</td>{% endfor %}</tr><tr><td class="label">Último jogo{% if ultimo %}<br><small>{{ ultimo.data|data_pt }}</small>{% endif %}</td>{% for campo in stat_fields %}<td class="numeric">{{ ultimo|attr(campo)|round(1) if ultimo and ultimo|attr(campo) is not none else '—' }}</td>{% endfor %}</tr></tbody></table></section>{% endif %}
+
+  {% if ('pontos_fortes' in secoes_set or 'pontos_fracos' in secoes_set) and caracteristicas %}<section class="scout-section"><h2 class="scout-section-title">3. Principais características individuais</h2><table class="scout-table"><thead><tr><th style="width:36%">Característica</th><th>Observação específica</th></tr></thead><tbody>{% for rel in caracteristicas %}<tr><td><strong>{{ rel.item.nome }}</strong></td><td>{{ rel.observacao or '—' }}</td></tr>{% endfor %}</tbody></table></section>{% endif %}
+
+  {% if 'zonas' in secoes_set and j.zonas %}<section class="scout-section keep"><h2 class="scout-section-title">4. Zonas de lançamento e ação</h2><div class="scout-zone-layout"><div class="scout-court">{% if campo_meio %}<img src="{{ campo_meio }}" alt="">{% endif %}{% for zona in j.zonas %}<span class="scout-zone-dot zone-{{ zona.zona }}">{{ zona.zona|replace('_',' ')|title }}</span>{% endfor %}</div><table class="scout-table"><thead><tr><th>Zona</th><th>Observação</th></tr></thead><tbody>{% for zona in j.zonas %}<tr><td><strong>{{ zona.zona|replace('_',' ')|title }}</strong></td><td>{{ zona.observacao or '—' }}</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+
+  {% if 'tendencias' in secoes_set and movimentos %}<section class="scout-section"><h2 class="scout-section-title">5. Tipos de movimento específicos</h2><table class="scout-table"><thead><tr><th style="width:36%">Movimento</th><th>Observação específica</th></tr></thead><tbody>{% for rel in movimentos %}<tr><td><strong>{{ rel.item.nome }}</strong></td><td>{{ rel.observacao or '—' }}</td></tr>{% endfor %}</tbody></table></section>{% endif %}
+
+  {% if 'recomendacoes' in secoes_set and estrategias %}<section class="scout-section"><h2 class="scout-section-title">6. Principais estratégias defensivas</h2><table class="scout-table"><thead><tr><th style="width:36%">Estratégia defensiva</th><th>Observação específica</th></tr></thead><tbody>{% for rel in estrategias %}<tr><td><strong>{{ rel.item.nome }}</strong></td><td>{{ rel.observacao or '—' }}</td></tr>{% endfor %}</tbody></table></section>{% endif %}
+  {{ rodape_pdf(equipa.nome ~ ' · Scouting individual completo') }}
+</main>
+{% else %}<div class="scout-empty">Sem atletas selecionados.</div>{% endfor %}
+</body></html>

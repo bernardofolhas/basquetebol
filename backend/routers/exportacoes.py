@@ -63,7 +63,12 @@ from paths import STATIC_DIR, TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
 from services.fotografia_jogador_service import caminho_fotografia
 from services.identidade_clube_service import caminho_ficheiro_logo
-from services.desenho_service import imagem_estatica_data_uri
+from services.desenho_service import (
+    compor_desenho_sobre_campo,
+    decompor_desenho_editavel,
+    imagem_estatica_data_uri,
+    normalizar_data_uri,
+)
 from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
 
 router = APIRouter(prefix="/exportacoes", tags=["exportacoes"])
@@ -811,6 +816,27 @@ def _fotografia_embebida(url: str | None) -> str | None:
     return imagem_estatica_data_uri(caminho, mime)
 
 
+def _passos_setplay_pdf(setplay) -> list[dict]:
+    """Prepara imagens autónomas do Playbook para o HTML/PDF."""
+    campo = STATIC_DIR / "campos" / "campo_meio.png"
+    passos = []
+    for passo in getattr(setplay, "passos", []) or []:
+        desenho = decompor_desenho_editavel(passo.desenho)[0] if passo.desenho else None
+        imagem_coach = normalizar_data_uri(passo.imagem_coach) if passo.imagem_coach else None
+        if desenho and campo.is_file():
+            imagem = compor_desenho_sobre_campo(campo, desenho)
+        elif imagem_coach:
+            imagem = imagem_coach
+        else:
+            imagem = imagem_estatica_data_uri(campo) if campo.is_file() else None
+        passos.append({
+            "ordem": (passo.ordem or 0) + 1,
+            "observacao": passo.observacao,
+            "imagem": imagem,
+        })
+    return passos
+
+
 def _idade(data_nascimento) -> int | None:
     if not data_nascimento:
         return None
@@ -863,16 +889,26 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             atletas=atletas,
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in atletas},
             itens_atletas={j.id: _itens_por_categoria(j.itens) for j in atletas},
+            ultimo_jogo={j.id: (j.estatisticas[0] if j.estatisticas else None) for j in atletas},
+            campo_meio=imagem_estatica_data_uri(STATIC_DIR / "campos" / "campo_meio.png"),
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,
         )
     elif tipo == "scouting-coletivo":
+        setplays = [r.setplay for r in alvo.conceitos_ofensivos] + [r.setplay for r in alvo.momentos_playbook]
+        jogos_referencia = sorted(
+            [ligacao.jogo for ligacao in alvo.jogos if ligacao.jogo],
+            key=lambda jogo: (jogo.data or date.min, jogo.id),
+            reverse=True,
+        )
         contexto.update(
             adversario=alvo,
+            jogo_referencia=jogos_referencia[0] if jogos_referencia else None,
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in alvo.jogadores},
             itens_coletivos=_itens_por_categoria(alvo.itens_coletivos),
             cinco_previsto=[r for r in alvo.rotacao_prevista if r.papel == "titular"],
             rotacoes_previstas=[r for r in alvo.rotacao_prevista if r.papel != "titular"],
+            passos_setplay={setplay.id: _passos_setplay_pdf(setplay) for setplay in setplays},
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,
         )

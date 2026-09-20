@@ -1,89 +1,31 @@
-{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
-<!doctype html>
-<html lang="pt">
-<head>
-<meta charset="utf-8">
-<title>{{ titulo_relatorio }} · {{ alvo_nome }}</title>
-{{ estilo_pdf() }}
+{% from "partials/pdf_branding.html" import estilo_pdf with context %}
+<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>Scouting individual · cartões</title>{{ estilo_pdf() }}
 <style>
-@page{size:A4 {{ 'landscape' if orientacao == 'paisagem' else 'portrait' }};margin:10mm}
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;color:#172033;font-size:9px;line-height:1.35;background:#fff}
-.intro{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0 9px;color:#64748b}
-.intro strong{color:#172033;font-size:11px}
-.players{display:block}
-.player{display:grid;grid-template-columns:31mm minmax(0,1fr);gap:0;margin:0 0 8px;border:1px solid #d7e0eb;border-radius:12px;background:#fff;overflow:hidden;page-break-inside:avoid;box-shadow:0 2px 0 #e8edf3}
-.portrait{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:61mm;padding:9px 7px;background:linear-gradient(160deg,var(--pdf-primary-light),#fff 72%);border-right:1px solid var(--pdf-primary-border);text-align:center}
-.photo{display:block;width:25mm;height:25mm;border:3px solid #fff;border-radius:50%;object-fit:cover;background:#e2e8f0;box-shadow:0 0 0 1px var(--pdf-primary-border)}
-.photo.placeholder{display:grid;place-items:center;color:var(--pdf-primary-dark);font-size:18px;font-weight:900}
-.portrait h2{margin:7px 0 0;color:var(--pdf-primary-dark);font-size:14px;line-height:1.05;overflow-wrap:anywhere}
-.portrait .number{margin-top:3px;color:#64748b;font-size:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-.player-body{min-width:0;padding:8px 9px 8px}
-.identity{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;margin-bottom:7px}
-.pill{min-width:0;padding:4px 8px;border-radius:999px;font-size:8px;font-weight:800;line-height:1.1;text-align:center;white-space:nowrap}
-.pill.team{overflow:hidden;background:var(--pdf-primary);color:var(--pdf-on-primary);text-overflow:ellipsis}
-.pill.position{background:var(--pdf-secondary);color:var(--pdf-on-secondary)}
-.pill.physical{background:#eef2f7;color:#334155}
-.summary{margin:0 0 7px;padding:6px 8px;border-radius:7px;background:#f8fafc;color:#334155}
-.stats-wrap{margin-bottom:7px;overflow:hidden;border:1px solid #dbe3ee;border-radius:7px}
-.stats{width:100%;border-collapse:collapse;table-layout:fixed}
-.stats th,.stats td{padding:4px 3px;border-right:1px solid #dbe3ee;text-align:center}
-.stats th:last-child,.stats td:last-child{border-right:0}
-.stats th{background:#f1f5f9;color:#475569;font-size:7px;line-height:1.1;text-transform:uppercase}
-.stats td{color:var(--pdf-primary-dark);font-size:11px;font-weight:900}
-.insights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-.insight{min-width:0;padding:6px 7px;border:1px solid #e2e8f0;border-radius:7px;background:#fbfcfe}
-.insight h3{margin:-6px -7px 5px;padding:4px 7px;border-radius:7px 7px 0 0;background:#eef2f7;color:#334155;font-size:8px;letter-spacing:.04em;text-transform:uppercase}
-.insight.strengths h3{background:#e9f7ee;color:#17623a}
-.insight.weaknesses h3{background:#fff0ef;color:#9f2f2a}
-.insight p{margin:3px 0;color:#334155}
-.insight p strong{color:#172033}
-.zones{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:6px;padding-top:5px;border-top:1px solid #e2e8f0}
-.zones strong{color:#64748b;font-size:7px;text-transform:uppercase}
-.zones span{padding:2px 5px;border-radius:999px;background:var(--pdf-primary-light);color:var(--pdf-primary-dark);font-weight:800}
-.empty{padding:24px;text-align:center;color:#64748b;border:1px dashed #cbd5e1;border-radius:10px}
-@media print{.player{box-shadow:none}}
-</style>
-</head>
-<body>
-{{ cabecalho_pdf('Scouting individual · leitura fácil', alvo_nome, 'Exportado em ' ~ data_exportacao ~ ' · ' ~ nome_autor) }}
-<div class="intro"><strong>Cartões rápidos do adversário</strong><span>{{ atletas|length }} atleta(s) selecionado(s) · apenas a informação escolhida</span></div>
-<main class="players">
+@page{size:A4 landscape;margin:8mm}
+.player-sheet{position:relative;display:grid;height:194mm;grid-template-rows:auto auto auto 1fr;gap:5mm;border:1px solid #d7e0e8;border-radius:5mm;padding:0 7mm 7mm;overflow:hidden;page-break-after:always}.player-sheet:last-child{page-break-after:auto}
+.player-banner{margin:0 -7mm;padding:5mm 7mm;background:#17365d;color:#fff;font-size:20px;font-weight:900}.player-head{display:grid;grid-template-columns:34mm minmax(0,1fr);gap:5mm;align-items:start}.player-head .scout-photo,.player-head .scout-avatar{width:34mm;height:43mm}.player-name{margin:1mm 0 3mm;color:#17365d;font-size:19px}.player-facts{display:flex;flex-wrap:wrap;gap:2.5mm 5mm;margin-bottom:3mm}.player-facts span{font-size:10px}.player-facts b{color:#17365d}.player-zone-copy{padding:2.5mm 3mm;border-left:4px solid var(--pdf-primary);background:#eaf4f8;font-size:9px}.player-stats-title{display:flex;align-items:baseline;gap:3mm;margin-bottom:2mm;color:#17365d}.player-stats-title h2{margin:0;font-size:12px}.player-stats-title span{color:#64748b;font-size:8px;font-style:italic}.player-insights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5mm}.player-insights article{min-height:46mm;border:1px solid #d7e0e8;border-radius:3mm;background:#f7f9fb;padding:4mm}.player-insights h2{margin:0 0 3mm;color:#17365d;font-size:12px}.player-insights p{margin:0 0 2mm}.player-insights strong{color:#17365d}.player-footer{position:absolute;right:15mm;bottom:8mm;color:#64748b;font-size:7px}
+</style>{% include "relatorios/_scouting_estilos.html" %}</head><body>
 {% for j in atletas %}
 {% set grupos = itens_atletas[j.id] %}
-{% set fortes = grupos.get('ataque_forte', []) + grupos.get('defesa_forte', []) + grupos.get('caracteristica', []) %}
-{% set fracos = grupos.get('ataque_fraco', []) + grupos.get('defesa_fraco', []) %}
+{% set caracteristicas = grupos.get('caracteristica', []) + grupos.get('ataque_forte', []) + grupos.get('ataque_fraco', []) + grupos.get('defesa_forte', []) + grupos.get('defesa_fraco', []) %}
 {% set movimentos = grupos.get('movimento', []) %}
 {% set estrategias = grupos.get('estrategia', []) %}
-{% set stats = namespace(disponiveis=false) %}
-{% if j.media_epoca %}{% for campo in stat_fields %}{% if j.media_epoca|attr(campo) is not none %}{% set stats.disponiveis = true %}{% endif %}{% endfor %}{% endif %}
-<article class="player">
-  <aside class="portrait">
-    {% if fotografias.get(j.id) %}<img class="photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="photo placeholder">{{ j.nome[:2]|upper }}</div>{% endif %}
-    <h2>{{ j.nome }}</h2>
-    <div class="number">#{{ j.numero or '—' }}</div>
-  </aside>
-  <div class="player-body">
-    <div class="identity">
-      <span class="pill team">{{ alvo_nome }}</span>
-      <span class="pill position">{{ j.posicao_principal }}{% if j.posicao_alternativa %} / {{ j.posicao_alternativa }}{% endif %}</span>
-      {% if j.idade or j.altura_cm or j.peso_kg %}<span class="pill physical">{% if j.idade %}{{ j.idade }} anos{% endif %}{% if j.idade and (j.altura_cm or j.peso_kg) %} · {% endif %}{% if j.altura_cm %}{{ j.altura_cm|round|int }} cm{% endif %}{% if j.altura_cm and j.peso_kg %} · {% endif %}{% if j.peso_kg %}{{ j.peso_kg|round|int }} kg{% endif %}</span>{% endif %}
-    </div>
-    {% if 'observacoes' in secoes_set and j.ficha and j.ficha.resumo %}<p class="summary">{{ j.ficha.resumo|truncate(180) }}</p>{% endif %}
-    {% if 'estatisticas' in secoes_set and stat_fields and stats.disponiveis %}
-    <div class="stats-wrap"><table class="stats"><thead><tr>{% for campo in stat_fields if j.media_epoca|attr(campo) is not none %}<th>{{ stat_labels.get(campo, campo|replace('_',' ')) }}</th>{% endfor %}</tr></thead><tbody><tr>{% for campo in stat_fields if j.media_epoca|attr(campo) is not none %}<td>{{ j.media_epoca|attr(campo)|round(1) }}</td>{% endfor %}</tr></tbody></table></div>
-    {% endif %}
-    <div class="insights">
-      {% if 'pontos_fortes' in secoes_set and fortes %}<section class="insight strengths"><h3>Pontos fortes</h3>{% for rel in fortes[:3] %}<p><strong>{{ rel.item.nome }}.</strong>{% if rel.observacao %} {{ rel.observacao|truncate(105) }}{% endif %}</p>{% endfor %}</section>{% endif %}
-      {% if 'pontos_fracos' in secoes_set and fracos %}<section class="insight weaknesses"><h3>Pontos a explorar</h3>{% for rel in fracos[:3] %}<p><strong>{{ rel.item.nome }}.</strong>{% if rel.observacao %} {{ rel.observacao|truncate(105) }}{% endif %}</p>{% endfor %}</section>{% endif %}
-      {% if 'tendencias' in secoes_set and movimentos %}<section class="insight"><h3>Movimentos preferenciais</h3>{% for rel in movimentos[:3] %}<p><strong>{{ rel.item.nome }}.</strong>{% if rel.observacao %} {{ rel.observacao|truncate(105) }}{% endif %}</p>{% endfor %}</section>{% endif %}
-      {% if 'recomendacoes' in secoes_set and estrategias %}<section class="insight"><h3>Como defender</h3>{% for rel in estrategias[:3] %}<p><strong>{{ rel.item.nome }}.</strong>{% if rel.observacao %} {{ rel.observacao|truncate(105) }}{% endif %}</p>{% endfor %}</section>{% endif %}
-    </div>
-    {% if 'zonas' in secoes_set and j.zonas %}<div class="zones"><strong>Zonas preferenciais</strong>{% for z in j.zonas[:4] %}<span>{{ z.zona }}</span>{% endfor %}</div>{% endif %}
-  </div>
-</article>
-{% else %}<div class="empty">Sem atletas selecionados.</div>{% endfor %}
+{% set ultimo = ultimo_jogo.get(j.id) %}
+<main class="player-sheet">
+  <header class="player-banner">Scouting Individual — Cartão do Jogador</header>
+  <section class="player-head">
+    {% if fotografias.get(j.id) %}<img class="scout-photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="scout-avatar">{{ j.nome[:2]|upper }}</div>{% endif %}
+    <div><h1 class="player-name">{{ j.nome }}</h1><div class="player-facts"><span><b>Número</b> {{ j.numero or '—' }}</span><span><b>Posição</b> {{ j.posicao_principal }}{% if j.posicao_alternativa %} / {{ j.posicao_alternativa }}{% endif %}</span><span><b>Estado</b> {{ j.estado|replace('_',' ')|title }}</span></div><div class="player-facts"><span><b>Dados físicos</b></span>{% if j.altura_cm %}<span>Altura: {{ j.altura_cm|round|int }} cm</span>{% endif %}{% if j.peso_kg %}<span>Peso: {{ j.peso_kg|round(1) }} kg</span>{% endif %}{% if j.mao_dominante %}<span>Mão: {{ j.mao_dominante }}</span>{% endif %}</div>{% if 'zonas' in secoes_set and j.zonas %}<div class="player-zone-copy"><b>Zonas de lançamento e ação</b> · {% for zona in j.zonas %}{{ zona.zona|replace('_',' ')|title }}{% if zona.observacao %} ({{ zona.observacao|truncate(48) }}){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}</div>
+  </section>
+
+  {% if 'estatisticas' in secoes_set and stat_fields %}<section><div class="player-stats-title"><h2>Análise estatística</h2><span>indicadores selecionados pelo treinador</span></div><table class="scout-table"><thead><tr><th style="width:29mm">Comparação</th>{% for campo in stat_fields %}<th>{{ stat_labels.get(campo, campo|replace('_',' ')) }}</th>{% endfor %}</tr></thead><tbody><tr><td class="label">Média da época</td>{% for campo in stat_fields %}<td class="numeric">{{ j.media_epoca|attr(campo)|round(1) if j.media_epoca and j.media_epoca|attr(campo) is not none else '—' }}</td>{% endfor %}</tr><tr><td class="label">Último jogo</td>{% for campo in stat_fields %}<td class="numeric">{{ ultimo|attr(campo)|round(1) if ultimo and ultimo|attr(campo) is not none else '—' }}</td>{% endfor %}</tr></tbody></table></section>{% else %}<div></div>{% endif %}
+
+  <section class="player-insights">
+    <article><h2>Características individuais</h2>{% if ('pontos_fortes' in secoes_set or 'pontos_fracos' in secoes_set) and caracteristicas %}{% for rel in caracteristicas[:5] %}<p><strong>{{ rel.item.nome }}</strong>{% if rel.observacao %} — {{ rel.observacao|truncate(115) }}{% endif %}</p>{% endfor %}{% else %}<p class="scout-muted">Sem informação selecionada.</p>{% endif %}</article>
+    <article><h2>Tipos de movimento</h2>{% if 'tendencias' in secoes_set and movimentos %}{% for rel in movimentos[:5] %}<p><strong>{{ rel.item.nome }}</strong>{% if rel.observacao %} — {{ rel.observacao|truncate(115) }}{% endif %}</p>{% endfor %}{% else %}<p class="scout-muted">Sem informação selecionada.</p>{% endif %}</article>
+    <article><h2>Estratégias defensivas</h2>{% if 'recomendacoes' in secoes_set and estrategias %}{% for rel in estrategias[:5] %}<p><strong>{{ rel.item.nome }}</strong>{% if rel.observacao %} — {{ rel.observacao|truncate(115) }}{% endif %}</p>{% endfor %}{% else %}<p class="scout-muted">Sem informação selecionada.</p>{% endif %}</article>
+  </section>
+  <div class="player-footer">{{ alvo_nome }} · {{ data_exportacao }} · {{ nome_autor }}</div>
 </main>
-{{ rodape_pdf(equipa.nome ~ ' · Scouting individual') }}
-</body>
-</html>
+{% else %}<div class="scout-empty">Sem atletas selecionados.</div>{% endfor %}
+</body></html>
