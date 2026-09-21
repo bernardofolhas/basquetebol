@@ -415,6 +415,9 @@ async def guardar_convocatoria(
         jogador.id: jogador
         for jogador in _jogadores_disponiveis_jogo(db, jogo, incluir_escalhao_inferior=True)
     }
+    jogadores_ids = list(dict.fromkeys(jogadores_ids))
+    excede_limite = len(jogadores_ids) > 12
+    jogadores_ids = jogadores_ids[:12]
     for jogador_id in jogadores_ids:
         jogador = jogadores_permitidos.get(jogador_id)
         if not jogador:
@@ -428,7 +431,7 @@ async def guardar_convocatoria(
         ))
 
     db.commit()
-    set_flash(request, "Convocatória atualizada.")
+    set_flash(request, "Convocatória atualizada com os primeiros 12 atletas." if excede_limite else "Convocatória atualizada.")
     return RedirectResponse(url=f"/jogos/{jogo_id}", status_code=303)
 
 
@@ -565,6 +568,7 @@ def imprimir_convocatoria(
         "jogo": jogo,
         "jogadores_convocados": [c.jogador for c in jogo.convocados],
         "identidade": getattr(request.state, "identidade_clube", {}),
+        "nome_clube": _nome_clube_pedido(request, jogo.equipa),
     })
 
 
@@ -584,6 +588,7 @@ def exportar_pdf_convocatoria(
         "jogo": jogo,
         "jogadores_convocados": [c.jogador for c in jogo.convocados],
         "modo_pdf": True,
+        "nome_clube": _nome_clube_pedido(request, jogo.equipa),
     })
     nome = f"convocatoria_{jogo.equipa.nome}_{jogo.data}.pdf".replace(" ", "_")
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nome}"})
