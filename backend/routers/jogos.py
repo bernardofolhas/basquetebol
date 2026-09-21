@@ -22,7 +22,7 @@ from services.jogos_service import (
     preparar_epocas_calendario_jogos,
     preparar_linhas_calendario_jogos,
 )
-from services.escaloes_service import escalao_imediatamente_inferior
+from services.escaloes_service import escalao_imediatamente_inferior_da_equipa
 
 router = APIRouter(prefix="/jogos")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -100,7 +100,7 @@ def _jogadores_ficha(jogadores):
 
 def _jogadores_escalhao_inferior(db: Session, equipa: Equipa):
     """Devolve apenas reforços permitidos para treinos e jogos da equipa."""
-    escalao_origem = escalao_imediatamente_inferior(equipa.escalao)
+    escalao_origem = escalao_imediatamente_inferior_da_equipa(equipa)
     if not escalao_origem:
         return []
     return db.query(Jogador).join(Equipa, Jogador.equipa_id == Equipa.id).filter(

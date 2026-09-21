@@ -72,7 +72,7 @@ from services.sessao_workflow import (
     opcoes_transicao_sessao,
     transicao_sessao_valida,
 )
-from services.escaloes_service import escalao_imediatamente_inferior
+from services.escaloes_service import escalao_imediatamente_inferior_da_equipa
 
 router = APIRouter(prefix="/treino")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -123,7 +123,7 @@ def _atletas_disponiveis_plano(db: Session, equipa: Equipa, sessao_id: int) -> l
 
 def _atletas_escalhao_inferior_convocaveis(db: Session, equipa: Equipa, sessao_id: int) -> list[Jogador]:
     """Atletas do escalão imediatamente inferior, do mesmo género."""
-    escalao_origem = escalao_imediatamente_inferior(equipa.escalao)
+    escalao_origem = escalao_imediatamente_inferior_da_equipa(equipa)
     if not escalao_origem:
         return []
     convocados_ids = db.query(ConvocacaoAssiduidade.jogador_id).filter(
@@ -891,7 +891,7 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "hora_sugerida_exercicio": _hora_sugerida_exercicio(sessao, list(plano.exercicios)),
         "atletas_treino": atletas_treino,
         "atletas_escalhao_inferior_convocaveis": _atletas_escalhao_inferior_convocaveis(db, equipa, sessao.id),
-        "escalao_inferior_convocavel": escalao_imediatamente_inferior(equipa.escalao),
+        "escalao_inferior_convocavel": escalao_imediatamente_inferior_da_equipa(equipa),
         "atletas_previstos_ids": atletas_previstos_ids,
         "equipas_treino_estado": equipas_treino_estado,
     })
