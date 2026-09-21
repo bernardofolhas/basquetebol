@@ -35,6 +35,8 @@ def test_revisao_visual_cobre_shell_componentes_e_responsividade():
     assert "@media (max-width:640px)" in css
     assert "@media (prefers-reduced-motion:reduce)" in css
     assert "@media print" in css
+    assert "--vr-electric" in css
+    assert "linear-gradient(120deg,#0b1424" in css
 
 
 def test_documentos_partilham_identidade_e_regras_de_paginacao():
@@ -45,9 +47,36 @@ def test_documentos_partilham_identidade_e_regras_de_paginacao():
 
     assert "--pdf-night" in branding
     assert "linear-gradient(125deg, var(--pdf-night)" in branding
+    assert "@bottom-right" in branding
+    assert "counter(pages)" in branding
+    assert "Performance intelligence / documento oficial" in branding
+    assert "pdf-brand-signal" in branding
     assert "page-break-inside: avoid" in branding
     assert "thead { display: table-header-group; }" in branding
     assert "var(--pdf-line)" in documento
     assert "var(--pdf-surface)" in facil
     assert "var(--pdf-night)" in scouting
     assert "page-break-inside:avoid" in scouting
+
+
+def test_cartao_individual_inovador_preserva_uma_pagina_por_atleta():
+    cartao = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
+
+    assert "INTELIGÊNCIA DE JOGO / LEITURA RÁPIDA" in cartao
+    assert ".player-sheet:last-child{page-break-after:auto}" in cartao
+    assert ".player-sheet::after" not in cartao
+    assert "player-hotzone" in cartao
+
+
+def test_exportacoes_reais_usam_a_identidade_pdf_partilhada():
+    documentos = set(TEMPLATES.rglob("*pdf*.html")) | set(TEMPLATES.rglob("*print*.html"))
+    documentos = {ficheiro for ficheiro in documentos if "partials" not in ficheiro.parts}
+
+    sem_identidade = []
+    for ficheiro in documentos:
+        conteudo = ficheiro.read_text(encoding="utf-8")
+        if "estilo_pdf()" not in conteudo:
+            sem_identidade.append(ficheiro.relative_to(TEMPLATES).as_posix())
+
+    assert len(documentos) >= 30
+    assert sem_identidade == []

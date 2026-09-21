@@ -16,7 +16,26 @@
         --pdf-night: #101b2d;
     }
     * { box-sizing: border-box; }
+    @page {
+        @bottom-left {
+            content: "BASKETBALL INTELLIGENCE";
+            color: #8a98ab;
+            font-family: "Aptos", "Segoe UI", Arial, sans-serif;
+            font-size: 6px;
+            font-weight: 700;
+            letter-spacing: .12em;
+        }
+        @bottom-right {
+            content: "PÁGINA " counter(page) " / " counter(pages);
+            color: #8a98ab;
+            font-family: "Aptos", "Segoe UI", Arial, sans-serif;
+            font-size: 6px;
+            font-weight: 700;
+            letter-spacing: .08em;
+        }
+    }
     body {
+        background: #fff;
         color: var(--pdf-ink);
         font-family: "Aptos", "Segoe UI", Arial, sans-serif;
         font-variant-numeric: tabular-nums;
@@ -29,12 +48,13 @@
         align-items: center;
         justify-content: space-between;
         gap: 16px;
-        min-height: 60px;
+        min-height: 72px;
         border: 0;
         border-radius: 10px;
-        padding: 11px 14px;
-        margin: 0 0 12px;
-        background: linear-gradient(125deg, var(--pdf-night), #1b2a43);
+        padding: 13px 16px 12px;
+        margin: 0 0 15px;
+        background-color: var(--pdf-night);
+        background-image: linear-gradient(125deg, var(--pdf-night), #1b2a43);
         color: #fff;
         page-break-inside: avoid;
     }
@@ -49,14 +69,27 @@
         opacity: .24;
         content: "";
     }
+    .pdf-brand-header::before {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        background: linear-gradient(var(--pdf-primary), var(--pdf-accent));
+        content: "";
+    }
     .pdf-brand-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
     .pdf-brand-logo { width: 38px; height: 38px; object-fit: contain; border-radius: 7px; background: #fff; padding: 3px; }
     .pdf-brand-copy { min-width: 0; }
+    .pdf-brand-index { color: #7dd3fc; font-size: 6px; font-weight: 800; letter-spacing: .18em; margin-bottom: 3px; text-transform: uppercase; }
     .pdf-brand-name { color: #dbe5f2; font-size: 7px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-    .pdf-brand-title { color: #fff; font-size: 17px; font-weight: 850; letter-spacing: -.025em; line-height: 1.08; }
+    .pdf-brand-title { color: #fff; font-size: 18px; font-weight: 850; letter-spacing: -.035em; line-height: 1.05; string-set: document-title content(); }
     .pdf-brand-subtitle { color: #cbd5e1; font-size: 8px; margin-top: 3px; }
-    .pdf-brand-meta { position:relative;z-index:1;color: #d7e0eb; font-size: 7px; line-height: 1.45; text-align: right; }
+    .pdf-brand-meta { position:relative;z-index:1;max-width:38%;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(255,255,255,.07);color:#e5edf7;font-size:7px;line-height:1.35;padding:5px 9px;text-align:right; }
     .pdf-brand-meta .pdf-brand-logo { margin-left:auto; }
+    .pdf-brand-signal { display:flex;align-items:flex-end;gap:2px;height:11px;margin:0 0 5px auto;width:max-content; }
+    .pdf-brand-signal span { display:block;width:3px;border-radius:2px;background:var(--pdf-primary); }
+    .pdf-brand-signal span:nth-child(1) { height:4px;opacity:.55; }
+    .pdf-brand-signal span:nth-child(2) { height:7px;opacity:.75; }
+    .pdf-brand-signal span:nth-child(3) { height:11px; }
     .pdf-brand-footer {
         display: flex;
         justify-content: space-between;
@@ -76,6 +109,51 @@
     table { border-color: var(--pdf-line); }
     thead { display: table-header-group; }
     tr, article { page-break-inside: avoid; }
+    thead th {
+        background: var(--pdf-night) !important;
+        border-color: #2b3b54 !important;
+        color: #fff !important;
+        font-weight: 800 !important;
+        letter-spacing: .035em;
+    }
+    tbody tr:nth-child(even) td { background: var(--pdf-surface); }
+    :is(.card,.box,.panel,.section,.metric,.summary-card,.summary-box,.info-box,.header-stat) {
+        border-color: var(--pdf-line) !important;
+        border-radius: 8px !important;
+    }
+    :is(.summary,.stats,.cards,.stats-grid) > :is(.card,.box,.metric,.stat,.summary-card,.summary-box,.stat-box) {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(145deg,#fff,var(--pdf-surface)) !important;
+    }
+    :is(.summary,.stats,.cards,.stats-grid) > :is(.card,.box,.metric,.stat,.summary-card,.summary-box,.stat-box)::after {
+        position: absolute;
+        inset: auto 0 0;
+        height: 2px;
+        background: var(--pdf-primary);
+        content: "";
+    }
+    :is(.section-title,.ficha-title,.panel>.title) {
+        border-left: 4px solid var(--pdf-primary);
+        color: var(--pdf-ink) !important;
+        letter-spacing: -.02em;
+        padding-left: 8px;
+        page-break-after: avoid;
+    }
+    :is(.header,.cabecalho,.sheet-header) {
+        border: 0 !important;
+        border-radius: 10px !important;
+        background-color: var(--pdf-night) !important;
+        background-image: linear-gradient(125deg,var(--pdf-night),#1b2a43) !important;
+        color: #fff !important;
+    }
+    :is(.header,.cabecalho,.sheet-header) :is(h1,h2,h3,.club,.title,.period,.clube,.clube-nome,.epoca-nome,.contexto) { color: #fff !important; }
+    :is(.header,.cabecalho,.sheet-header) :is(.meta,.subtitle,.period) { color: #cbd5e1 !important; }
+    :is(.header,.cabecalho,.sheet-header) img { border-radius: 7px;background:#fff;padding:3px; }
+    :is(.footer,footer) { border-top-color: var(--pdf-primary) !important;color:var(--pdf-muted) !important; }
+    :is(.value,.metric-value,.summary-value,.stat-value) { color:var(--pdf-ink);font-variant-numeric:tabular-nums;font-weight:850;letter-spacing:-.035em; }
+    :is(.label,.metric-label,.summary-label,.stat-label) { letter-spacing:.04em;text-transform:uppercase; }
+    img { image-rendering: auto; }
     {% if pdf_filtros is defined and not pdf_filtros.observacoes %}
     .pdf-observacoes, .observacoes, .reflexao, .reflexao-box, [class*="observacao"], [class*="reflexao"] { display: none !important; }
     {% endif %}
@@ -103,12 +181,14 @@
     <div class="pdf-brand-main">
         {% if identidade.logo_principal %}<img class="pdf-brand-logo" src="{{ identidade.logo_principal }}" alt="Logotipo">{% endif %}
         <div class="pdf-brand-copy">
+            <div class="pdf-brand-index">Performance intelligence / documento oficial</div>
             <div class="pdf-brand-name">{{ identidade.nome_oficial|default('Clube de Basquetebol') }}</div>
             <div class="pdf-brand-title">{{ titulo }}</div>
             {% if subtitulo %}<div class="pdf-brand-subtitle">{{ subtitulo }}</div>{% endif %}
         </div>
     </div>
     <div class="pdf-brand-meta">
+        <div class="pdf-brand-signal" aria-hidden="true"><span></span><span></span><span></span></div>
         {% if identidade.logo_secundario %}<img class="pdf-brand-logo" src="{{ identidade.logo_secundario }}" alt="Logotipo secundário"><br>{% endif %}
         {{ meta or ('Exportado em ' ~ (data_exportacao or hoje)) }}
     </div>
