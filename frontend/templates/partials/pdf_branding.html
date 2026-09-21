@@ -53,9 +53,9 @@
         border-radius: 10px;
         padding: 13px 16px 12px;
         margin: 0 0 15px;
-        background-color: var(--pdf-night);
-        background-image: linear-gradient(125deg, var(--pdf-night), #1b2a43);
-        color: #fff;
+        background-color: var(--pdf-primary);
+        background-image: linear-gradient(125deg, var(--pdf-primary-dark), var(--pdf-primary));
+        color: var(--pdf-on-primary);
         page-break-inside: avoid;
     }
     .pdf-brand-header::after {
@@ -64,7 +64,7 @@
         bottom: -42px;
         width: 96px;
         height: 96px;
-        border: 16px solid var(--pdf-primary);
+        border: 16px solid var(--pdf-on-primary);
         border-radius: 50%;
         opacity: .24;
         content: "";
@@ -73,20 +73,20 @@
         position: absolute;
         inset: 0 auto 0 0;
         width: 4px;
-        background: linear-gradient(var(--pdf-primary), var(--pdf-accent));
+        background: linear-gradient(var(--pdf-on-primary), var(--pdf-accent));
         content: "";
     }
     .pdf-brand-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
     .pdf-brand-logo { width: 38px; height: 38px; object-fit: contain; border-radius: 7px; background: #fff; padding: 3px; }
     .pdf-brand-copy { min-width: 0; }
-    .pdf-brand-index { color: #7dd3fc; font-size: 6px; font-weight: 800; letter-spacing: .18em; margin-bottom: 3px; text-transform: uppercase; }
-    .pdf-brand-name { color: #dbe5f2; font-size: 7px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-    .pdf-brand-title { color: #fff; font-size: 18px; font-weight: 850; letter-spacing: -.035em; line-height: 1.05; string-set: document-title content(); }
-    .pdf-brand-subtitle { color: #cbd5e1; font-size: 8px; margin-top: 3px; }
-    .pdf-brand-meta { position:relative;z-index:1;max-width:38%;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(255,255,255,.07);color:#e5edf7;font-size:7px;line-height:1.35;padding:5px 9px;text-align:right; }
+    .pdf-brand-index { color: var(--pdf-on-primary); font-size: 6px; font-weight: 800; letter-spacing: .18em; margin-bottom: 3px; text-transform: uppercase; }
+    .pdf-brand-name { color: var(--pdf-on-primary); font-size: 7px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .pdf-brand-title { color: var(--pdf-on-primary); font-size: 18px; font-weight: 850; letter-spacing: -.035em; line-height: 1.05; string-set: document-title content(); }
+    .pdf-brand-subtitle { color: var(--pdf-on-primary); font-size: 8px; margin-top: 3px; }
+    .pdf-brand-meta { position:relative;z-index:1;max-width:38%;border:1px solid var(--pdf-on-primary);border-radius:999px;background:rgba(255,255,255,.10);color:var(--pdf-on-primary);font-size:7px;line-height:1.35;padding:5px 9px;text-align:right; }
     .pdf-brand-meta .pdf-brand-logo { margin-left:auto; }
     .pdf-brand-signal { display:flex;align-items:flex-end;gap:2px;height:11px;margin:0 0 5px auto;width:max-content; }
-    .pdf-brand-signal span { display:block;width:3px;border-radius:2px;background:var(--pdf-primary); }
+    .pdf-brand-signal span { display:block;width:3px;border-radius:2px;background:var(--pdf-on-primary); }
     .pdf-brand-signal span:nth-child(1) { height:4px;opacity:.55; }
     .pdf-brand-signal span:nth-child(2) { height:7px;opacity:.75; }
     .pdf-brand-signal span:nth-child(3) { height:11px; }
@@ -110,9 +110,9 @@
     thead { display: table-header-group; }
     tr, article { page-break-inside: avoid; }
     thead th {
-        background: var(--pdf-night) !important;
-        border-color: #2b3b54 !important;
-        color: #fff !important;
+        background: var(--pdf-primary) !important;
+        border-color: var(--pdf-primary-dark) !important;
+        color: var(--pdf-on-primary) !important;
         font-weight: 800 !important;
         letter-spacing: .035em;
     }
@@ -143,12 +143,12 @@
     :is(.header,.cabecalho,.sheet-header) {
         border: 0 !important;
         border-radius: 10px !important;
-        background-color: var(--pdf-night) !important;
-        background-image: linear-gradient(125deg,var(--pdf-night),#1b2a43) !important;
-        color: #fff !important;
+        background-color: var(--pdf-primary) !important;
+        background-image: linear-gradient(125deg,var(--pdf-primary-dark),var(--pdf-primary)) !important;
+        color: var(--pdf-on-primary) !important;
     }
-    :is(.header,.cabecalho,.sheet-header) :is(h1,h2,h3,.club,.title,.period,.clube,.clube-nome,.epoca-nome,.contexto) { color: #fff !important; }
-    :is(.header,.cabecalho,.sheet-header) :is(.meta,.subtitle,.period) { color: #cbd5e1 !important; }
+    :is(.header,.cabecalho,.sheet-header) :is(h1,h2,h3,.club,.title,.period,.clube,.clube-nome,.epoca-nome,.contexto) { color: var(--pdf-on-primary) !important; }
+    :is(.header,.cabecalho,.sheet-header) :is(.meta,.subtitle,.period) { color: var(--pdf-on-primary) !important; }
     :is(.header,.cabecalho,.sheet-header) img { border-radius: 7px;background:#fff;padding:3px; }
     :is(.footer,footer) { border-top-color: var(--pdf-primary) !important;color:var(--pdf-muted) !important; }
     :is(.value,.metric-value,.summary-value,.stat-value) { color:var(--pdf-ink);font-variant-numeric:tabular-nums;font-weight:850;letter-spacing:-.035em; }

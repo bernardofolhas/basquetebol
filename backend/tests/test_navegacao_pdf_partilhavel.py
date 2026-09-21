@@ -195,7 +195,7 @@ def test_microciclo_partilhavel_usa_modelo_semanal_legivel():
     assert "139 / (agenda.semanas_intervalo|length" in modelo
     assert '<table class="calendar"' in modelo
     assert ".brand { display:flex; flex:1 1 0%" in modelo
-    assert ".meta strong { display:block; max-width:100%; color:#fff !important" in modelo
+    assert ".meta strong { display:block; max-width:100%; color:var(--pdf-on-primary) !important" in modelo
     assert ".event { display:block; width:100%; max-width:100%" in modelo
     assert "summary-item" not in modelo
     assert "Sem atividade" not in modelo

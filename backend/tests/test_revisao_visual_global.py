@@ -45,8 +45,8 @@ def test_documentos_partilham_identidade_e_regras_de_paginacao():
     facil = (TEMPLATES / "relatorios" / "_facil_estilos.html").read_text(encoding="utf-8")
     scouting = (TEMPLATES / "relatorios" / "_scouting_estilos.html").read_text(encoding="utf-8")
 
-    assert "--pdf-night" in branding
-    assert "linear-gradient(125deg, var(--pdf-night)" in branding
+    assert "--pdf-primary" in branding
+    assert "linear-gradient(125deg, var(--pdf-primary-dark), var(--pdf-primary))" in branding
     assert "@bottom-right" in branding
     assert "counter(pages)" in branding
     assert "Performance intelligence / documento oficial" in branding
@@ -55,7 +55,8 @@ def test_documentos_partilham_identidade_e_regras_de_paginacao():
     assert "thead { display: table-header-group; }" in branding
     assert "var(--pdf-line)" in documento
     assert "var(--pdf-surface)" in facil
-    assert "var(--pdf-night)" in scouting
+    assert "var(--pdf-primary)" in scouting
+    assert "var(--pdf-on-primary)" in scouting
     assert "page-break-inside:avoid" in scouting
 
 
@@ -80,3 +81,18 @@ def test_exportacoes_reais_usam_a_identidade_pdf_partilhada():
 
     assert len(documentos) >= 30
     assert sem_identidade == []
+
+
+def test_calendarios_pdf_usam_a_cor_dominante_do_clube():
+    calendarios = (
+        TEMPLATES / "calendario_pdf.html",
+        TEMPLATES / "calendario_partilhavel_pdf.html",
+        TEMPLATES / "mesociclo_partilhavel_pdf.html",
+        TEMPLATES / "planeamento_clube" / "anual_calendario_pdf.html",
+    )
+
+    for calendario in calendarios:
+        conteudo = calendario.read_text(encoding="utf-8")
+        assert "var(--pdf-primary)" in conteudo
+        assert "var(--pdf-on-primary)" in conteudo
+        assert "--club-primary" not in conteudo
