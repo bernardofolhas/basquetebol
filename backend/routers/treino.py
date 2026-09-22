@@ -1792,9 +1792,19 @@ async def adicionar_exercicio(
     biblioteca_id: str = Form(""),
     origem_biblioteca: str = Form("novo"),
 ):
+    resposta_json = "application/json" in request.headers.get("accept", "").lower()
+
+    def responder_erro(mensagem: str, estado: int = 422):
+        if resposta_json:
+            return JSONResponse({"sucesso": False, "erro": mensagem}, status_code=estado)
+        set_flash(request, mensagem, "error")
+        return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
+
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
     plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
     if not plano:
+        if resposta_json:
+            return JSONResponse({"sucesso": False, "erro": "Plano de treino não encontrado."}, status_code=404)
         return RedirectResponse(url="/equipas", status_code=303)
 
     try:
@@ -1803,8 +1813,7 @@ async def adicionar_exercicio(
         bloco_dinamico_id = int(bloco_id) if bloco_id else None
         bloco = _normalizar_bloco(bloco) if not bloco_dinamico_id else None
     except ValueError as erro:
-        set_flash(request, str(erro), "error")
-        return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
+        return responder_erro(str(erro))
 
     total_no_bloco = db.query(ExercicioPlano).filter(
         ExercicioPlano.plano_id == plano_id,
@@ -1823,13 +1832,11 @@ async def adicionar_exercicio(
         except (TypeError, ValueError):
             biblioteca = None
         if not biblioteca:
-            set_flash(request, "O exercício selecionado já não está disponível na biblioteca.", "error")
-            return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
+            return responder_erro("O exercício selecionado já não está disponível na biblioteca.")
     elif copia_da_biblioteca:
         # Nunca guardar automaticamente um exercício se o formulário foi
         # marcado como cópia mas perdeu a referência à origem.
-        set_flash(request, "Seleciona novamente o exercício da biblioteca antes de o adicionar.", "error")
-        return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
+        return responder_erro("Seleciona novamente o exercício da biblioteca antes de o adicionar.")
 
     if biblioteca:
         # O formulário recebe uma cópia completa e pode adaptá-la, incluindo
@@ -1900,13 +1907,28 @@ async def adicionar_exercicio(
     db.commit()
 
     if nova_variante_da_biblioteca:
-        set_flash(request, "Exercício adicionado ao plano e guardado como novo exercício na biblioteca.", "success")
+        mensagem = "Exercício adicionado ao plano e guardado como novo exercício na biblioteca."
     elif biblioteca_solicitada:
-        set_flash(request, "Cópia adicionada ao plano. O exercício da biblioteca ficou inalterado.", "success")
+        mensagem = "Cópia adicionada ao plano. O exercício da biblioteca ficou inalterado."
     elif guardado_na_biblioteca:
-        set_flash(request, "Exercício adicionado ao plano e guardado automaticamente na biblioteca.", "success")
+        mensagem = "Exercício adicionado ao plano e guardado automaticamente na biblioteca."
     else:
-        set_flash(request, "Exercício adicionado ao plano.", "success")
+        mensagem = "Exercício adicionado ao plano."
+
+    if resposta_json:
+        db.refresh(exercicio)
+        exercicios_atualizados = db.query(ExercicioPlano).filter(
+            ExercicioPlano.plano_id == plano.id
+        ).all()
+        return JSONResponse({
+            "sucesso": True,
+            "mensagem": mensagem,
+            "exercicio_id": exercicio.id,
+            "pagina_url": f"/treino/sessoes/{plano.sessao_id}",
+            "proxima_hora": _hora_sugerida_exercicio(plano.sessao, exercicios_atualizados) or "",
+        })
+
+    set_flash(request, mensagem, "success")
 
     return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
 

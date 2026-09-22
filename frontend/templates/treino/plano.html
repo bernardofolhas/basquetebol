@@ -454,8 +454,8 @@
             <div data-training-block-only hidden>
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h2 class="text-xl font-semibold text-gray-800">Blocos do treino</h2><p class="mt-1 text-sm text-gray-500">Cria apenas os blocos necessários.</p></div><form method="POST" action="/treino/planos/{{ plano.id }}/blocos" class="flex flex-wrap gap-2"><input name="nome" required placeholder="Ex: Aquecimento" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><input name="tipo" placeholder="Tipo opcional" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><button class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white">Criar bloco</button></form></div>
             </div>
-            <p class="training-duration">{{ total_exercicios }} exercício(s) · {{ volume_planeado }}{% if duracao_prevista is not none %}/{{ duracao_prevista }}{% endif %} min planeados</p>
-            {% if not total_exercicios %}<p class="training-empty">Adiciona o primeiro exercício para começar.</p>{% endif %}
+            <p class="training-duration" data-training-plan-duration>{{ total_exercicios }} exercício(s) · {{ volume_planeado }}{% if duracao_prevista is not none %}/{{ duracao_prevista }}{% endif %} min planeados</p>
+            {% if not total_exercicios %}<p class="training-empty" data-training-plan-empty>Adiciona o primeiro exercício para começar.</p>{% endif %}
         </div>
 
         {% macro painel_adicionar_exercicio() %}
@@ -519,7 +519,8 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end gap-2">
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                    <span class="mr-auto text-sm font-medium text-gray-500" data-training-add-status aria-live="polite"></span>
                     <button type="button" class="ds-button ds-button-secondary" data-training-cancel>Cancelar</button>
                     <button type="submit" class="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600">+ Adicionar exercício</button>
                 </div>
@@ -535,8 +536,8 @@
                 <summary data-training-block-only hidden class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5">
                     <div class="flex flex-wrap items-center gap-3">
                         <span class="rounded-full bg-orange-100 px-3 py-1 text-sm font-bold text-orange-700">{{ bloco_ui.nome }}</span>
-                        <span class="text-sm text-gray-500">{{ exercicios_por_bloco[bloco_letra] | length }} exercício(s)</span>
-                        <span class="text-sm text-gray-400">{{ resumo_minutos }} min</span>
+                        <span class="text-sm text-gray-500" data-training-group-count>{{ exercicios_por_bloco[bloco_letra] | length }} exercício(s)</span>
+                        <span class="text-sm text-gray-400" data-training-group-duration>{{ resumo_minutos }} min</span>
                     </div>
                     <span class="text-sm text-gray-400">Abrir / fechar</span>
                 </summary>
@@ -680,7 +681,7 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <div data-training-block-only hidden class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-400">
+                    <div data-training-block-only data-training-group-empty hidden class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-400">
                         Ainda não tens exercícios neste bloco.
                     </div>
                     {% endif %}
@@ -1000,7 +1001,9 @@
     document.addEventListener('pointercancel', evento => terminarArrastoPonteiro(evento, true), {capture: true});
     window.addEventListener('blur', cancelarArrastoAoSair);
 
-    root.querySelectorAll('[data-training-exercise-drag]').forEach(pega => {
+    function ativarPegaTeclado(pega) {
+        if (!pega || pega.dataset.trainingKeyboardReady === 'true') return;
+        pega.dataset.trainingKeyboardReady = 'true';
         pega.setAttribute('aria-grabbed', 'false');
         pega.setAttribute('aria-pressed', 'false');
         pega.addEventListener('keydown', evento => {
@@ -1021,7 +1024,9 @@
             guardarNovaOrdem(anterior);
             pega.focus({preventScroll: true});
         });
-    });
+    }
+
+    root.querySelectorAll('[data-training-exercise-drag]').forEach(ativarPegaTeclado);
 
     renumerarExercicios();
     const panel = document.getElementById('training-add-panel');
@@ -1037,7 +1042,7 @@
         delete addForm.dataset.bibliotecaId;
         if (aviso) aviso.hidden = true;
     }
-    addForm?.addEventListener('submit', () => {
+    function prepararOrigemBiblioteca() {
         // O título pode ser alterado livremente, mas a origem da cópia tem de
         // continuar associada ao envio do formulário.
         const bibliotecaId = addForm.dataset.bibliotecaId;
@@ -1046,7 +1051,123 @@
         const origemEl = addForm.querySelector('[name="origem_biblioteca"]');
         if (idEl) idEl.value = bibliotecaId;
         if (origemEl) origemEl.value = 'biblioteca';
-    });
+    }
+
+    function sincronizarResumoExercicios(documentoAtualizado) {
+        const resumoAtualizado = documentoAtualizado.querySelector('[data-training-plan-duration]');
+        const resumoAtual = root.querySelector('[data-training-plan-duration]');
+        if (resumoAtual && resumoAtualizado) resumoAtual.textContent = resumoAtualizado.textContent;
+
+        const vazioAtual = root.querySelector('[data-training-plan-empty]');
+        const vazioAtualizado = documentoAtualizado.querySelector('[data-training-plan-empty]');
+        if (vazioAtual && !vazioAtualizado) vazioAtual.remove();
+
+        root.querySelectorAll('[data-training-group]').forEach(grupo => {
+            const grupoAtualizado = documentoAtualizado.getElementById(grupo.id);
+            if (!grupoAtualizado) return;
+            ['count', 'duration'].forEach(tipo => {
+                const atual = grupo.querySelector(`[data-training-group-${tipo}]`);
+                const atualizado = grupoAtualizado.querySelector(`[data-training-group-${tipo}]`);
+                if (atual && atualizado) atual.textContent = atualizado.textContent;
+            });
+        });
+    }
+
+    async function adicionarExercicioSemRecarregar(evento) {
+        evento.preventDefault();
+        if (!addForm || addForm.dataset.submitting === 'true') return;
+        prepararOrigemBiblioteca();
+
+        const botao = addForm.querySelector('button[type="submit"]');
+        const estado = addForm.querySelector('[data-training-add-status]');
+        const textoOriginal = botao?.textContent || '';
+        const fluxoAdicionar = root.querySelector('[data-training-add-flow]');
+        const topoAncora = fluxoAdicionar?.getBoundingClientRect().top;
+        addForm.dataset.submitting = 'true';
+        if (botao) {
+            botao.disabled = true;
+            botao.textContent = 'A adicionar...';
+        }
+        if (estado) {
+            estado.textContent = 'A adicionar exercício...';
+            estado.classList.remove('text-red-600', 'text-green-700');
+        }
+
+        try {
+            const resposta = await fetch(addForm.action, {
+                method: 'POST',
+                body: new FormData(addForm),
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+            });
+            const tipoResposta = resposta.headers.get('content-type') || '';
+            if (!tipoResposta.includes('application/json')) {
+                throw new Error('A sessão deixou de estar disponível. Atualiza a página e tenta novamente.');
+            }
+            const dados = await resposta.json();
+            if (!resposta.ok || !dados.sucesso) {
+                throw new Error(dados.erro || 'Não foi possível adicionar o exercício.');
+            }
+
+            const pagina = await fetch(dados.pagina_url, {headers: {'Accept': 'text/html'}});
+            if (!pagina.ok) throw new Error('O exercício foi guardado, mas não foi possível atualizar o cartão.');
+            const documentoAtualizado = new DOMParser().parseFromString(await pagina.text(), 'text/html');
+            const cartaoAtualizado = documentoAtualizado.getElementById(`exercicio-${dados.exercicio_id}`);
+            const grupoAtualizado = cartaoAtualizado?.closest('[data-training-group]');
+            const grupoAtual = grupoAtualizado ? document.getElementById(grupoAtualizado.id) : null;
+            if (!cartaoAtualizado || !grupoAtual) {
+                throw new Error('O exercício foi guardado, mas o novo cartão não ficou disponível.');
+            }
+
+            let listaAtual = grupoAtual.querySelector('[data-training-exercise-list]');
+            if (!listaAtual) {
+                listaAtual = document.createElement('div');
+                listaAtual.className = 'training-exercise-list space-y-5';
+                listaAtual.setAttribute('data-training-exercise-list', '');
+                grupoAtual.querySelector('[data-training-group-empty]')?.remove();
+                grupoAtual.querySelector('.training-group-body')?.appendChild(listaAtual);
+            }
+            const novoCartao = document.importNode(cartaoAtualizado, true);
+            listaAtual.appendChild(novoCartao);
+            ativarPegaTeclado(novoCartao.querySelector('[data-training-exercise-drag]'));
+            sincronizarResumoExercicios(documentoAtualizado);
+            renumerarExercicios();
+
+            addForm.reset();
+            limparOrigemBiblioteca();
+            const proximaHora = addForm.querySelector('[data-training-next-time]');
+            if (proximaHora) proximaHora.value = dados.proxima_hora || '';
+            if (estado) {
+                estado.textContent = dados.mensagem || 'Exercício adicionado.';
+                estado.classList.add('text-green-700');
+            }
+
+            requestAnimationFrame(() => {
+                if (fluxoAdicionar && Number.isFinite(topoAncora)) {
+                    window.scrollBy({top: fluxoAdicionar.getBoundingClientRect().top - topoAncora, behavior: 'auto'});
+                }
+                addForm.querySelector('[name="nome"]')?.focus({preventScroll: true});
+            });
+            window.setTimeout(() => {
+                if (estado) estado.textContent = '';
+            }, 2600);
+        } catch (erro) {
+            if (estado) {
+                estado.textContent = erro.message || 'Não foi possível adicionar o exercício.';
+                estado.classList.add('text-red-600');
+            }
+        } finally {
+            delete addForm.dataset.submitting;
+            if (botao) {
+                botao.disabled = false;
+                botao.textContent = textoOriginal;
+            }
+        }
+    }
+
+    addForm?.addEventListener('submit', adicionarExercicioSemRecarregar);
     add?.addEventListener('click', () => {
         panel.hidden = false;
         add.setAttribute('aria-expanded', 'true');

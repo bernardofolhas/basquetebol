@@ -68,6 +68,45 @@ def test_hora_do_novo_exercicio_continua_a_sequencia_do_plano(client_admin):
         db.close()
 
 
+def test_adicionar_exercicio_por_ajax_responde_sem_redirect_e_atualiza_o_plano(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={"nome": "Exercício sem refresh", "minutos": "18"},
+            headers={"Accept": "application/json"},
+            follow_redirects=False,
+        )
+
+        assert resposta.status_code == 200
+        dados = resposta.json()
+        assert dados["sucesso"] is True
+        assert dados["pagina_url"] == f"/treino/sessoes/{sessao.id}"
+        assert dados["proxima_hora"] == "18:18"
+        exercicio = db.query(ExercicioPlano).filter_by(id=dados["exercicio_id"]).one()
+        assert (exercicio.nome, exercicio.hora, exercicio.minutos) == (
+            "Exercício sem refresh", "18:00", 18
+        )
+
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert f'id="exercicio-{exercicio.id}"' in pagina.text
+        assert "adicionarExercicioSemRecarregar" in pagina.text
+        assert "new DOMParser()" in pagina.text
+        assert "window.location" not in pagina.text[
+            pagina.text.index("async function adicionarExercicioSemRecarregar"):
+            pagina.text.index("addForm?.addEventListener('submit'", pagina.text.index("async function adicionarExercicioSemRecarregar"))
+        ]
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_adicionar_exercicio_aparece_imediatamente_depois_dos_cartoes(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
