@@ -396,3 +396,24 @@ def test_plano_de_jogo_vive_no_dossier_e_importa_scouting_sem_substituir():
     assert "_preencher_se_vazio" in router
     assert "importar_scouting_para_plano" in router
     assert 'voltar.startswith("/scouting/")' in jogos
+
+
+def test_scouting_atualiza_acoes_locais_sem_refresh_da_pagina():
+    studio = (ROOT / "frontend" / "static" / "js" / "scouting-studio.js").read_text(encoding="utf-8")
+    individual = (TEMPLATES_DIR / "scouting" / "individual.html").read_text(encoding="utf-8")
+    coletivo = (TEMPLATES_DIR / "scouting" / "coletivo.html").read_text(encoding="utf-8")
+    roster = (TEMPLATES_DIR / "scouting" / "roster.html").read_text(encoding="utf-8")
+    itens = (TEMPLATES_DIR / "scouting" / "_collective_items.html").read_text(encoding="utf-8")
+
+    assert 'form[data-studio-async]' in studio
+    assert 'fetch(form.action' in studio
+    assert 'window.location.reload' not in studio
+    assert 'data-studio-region="individual-items-{{ categoria }}"' in individual
+    assert 'data-studio-refresh="individual-items-{{ categoria }}"' in individual
+    assert 'data-studio-region="collective-items-{{ categoria_atual }}"' in itens
+    assert 'data-studio-refresh="collective-items-{{ categoria }}"' in coletivo
+    assert 'data-studio-region="roster-list"' in roster
+    assert 'data-studio-refresh="roster-list"' in roster
+    plano = (TEMPLATES_DIR / "scouting" / "plano_jogo.html").read_text(encoding="utf-8")
+    assert 'data-studio-region="game-plan"' in plano
+    assert plano.count('data-studio-refresh="game-plan"') == 2
