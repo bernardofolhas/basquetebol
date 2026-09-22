@@ -38,6 +38,13 @@ body {
     background-attachment:fixed;
     background-size:auto,auto,32px 32px,32px 32px;
 }
+body.sidebar-hidden {
+    background-image:
+        radial-gradient(circle at 14% 84%,rgb(67 198 255 / .055),transparent 22rem),
+        linear-gradient(rgb(15 23 42 / .025) 1px,transparent 1px),
+        linear-gradient(90deg,rgb(15 23 42 / .025) 1px,transparent 1px);
+    background-size:auto,32px 32px,32px 32px;
+}
 
 #conteudo-principal { isolation:isolate; }
 #conteudo-principal::before {
@@ -48,6 +55,10 @@ body {
     background:linear-gradient(180deg,color-mix(in srgb,var(--clube-primary) 7%,#f8fbff),transparent);
     content:"";
     pointer-events:none;
+}
+body.sidebar-hidden #conteudo-principal::before {
+    inset:0 0 auto 0;
+    background:linear-gradient(180deg,#f8fbff,transparent);
 }
 
 /* Navegação: uma coluna de controlo estável e com contraste elevado. */

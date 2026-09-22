@@ -39,6 +39,15 @@ def test_revisao_visual_cobre_shell_componentes_e_responsividade():
     assert "linear-gradient(120deg,#0b1424" in css
 
 
+def test_fundo_decorativo_nao_deixa_faixa_da_marca_ao_recolher_sidebar():
+    css = VISUAL_REFRESH.read_text(encoding="utf-8")
+
+    assert "body.sidebar-hidden #conteudo-principal::before" in css
+    assert "body.sidebar-hidden {" in css
+    assert "inset:0 0 auto 0" in css
+    assert "background:linear-gradient(180deg,#f8fbff,transparent)" in css
+
+
 def test_documentos_partilham_identidade_e_regras_de_paginacao():
     branding = (TEMPLATES / "partials" / "pdf_branding.html").read_text(encoding="utf-8")
     documento = (TEMPLATES / "relatorios" / "_documento.html").read_text(encoding="utf-8")
