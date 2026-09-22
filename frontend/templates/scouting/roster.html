@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}Roster · {{ adversario.nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260916-customizer-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260922-studio-2">{% endblock %}
 {% block conteudo %}
 <div data-customizable-dashboard data-dashboard-key="scouting-roster-{{ adversario.id }}">
 <header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">{{ adversario.nome }}</p><h1>Roster do adversário</h1><p>Uma ficha permanente, reutilizada em todos os jogos.</p></div><div class="scouting-title-actions"><button type="button" class="ds-button-primary" onclick="document.getElementById('novo-atleta').showModal()">Adicionar atleta</button><aside data-dashboard-customizer-anchor></aside></div></header>

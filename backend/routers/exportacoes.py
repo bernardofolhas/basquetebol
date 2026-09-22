@@ -689,7 +689,7 @@ FORMATOS_RELATORIO = {
     },
     "a3": {
         "nome": "Poster A3",
-        "descricao": "Uma pagina de grande formato apenas com as mensagens essenciais e sem dados confidenciais.",
+        "descricao": "Poster editorial de alto impacto para balneario, com fotografias e mensagens essenciais.",
     },
 }
 
@@ -817,7 +817,7 @@ def _configuracao_relatorio(tipo: str, dados, utilizador) -> tuple[str, str, lis
     formato = dados.get("formato", "completo")
     if formato not in FORMATOS_RELATORIO:
         formato = "completo"
-    orientacao = dados.get("orientacao", "paisagem" if formato == "a3" else "retrato")
+    orientacao = "paisagem" if formato == "a3" else dados.get("orientacao", "retrato")
     if orientacao not in {"retrato", "paisagem"}:
         orientacao = "retrato"
     validas = {s["chave"] for s in RELATORIOS_CONFIG[tipo]["secoes"]}

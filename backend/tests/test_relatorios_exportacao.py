@@ -24,10 +24,27 @@ def test_quatro_tipos_e_tres_formatos_tem_template_proprio():
 
 
 def test_a3_usa_tamanho_fisico_a3_e_composicao_propria():
-    documento = (TEMPLATES / "relatorios" / "_documento.html").read_text(encoding="utf-8")
-    assert "A3" in documento
-    assert "size:" in documento
-    assert "formato == 'a3'" in documento
+    poster = (TEMPLATES / "relatorios" / "_poster.html").read_text(encoding="utf-8")
+    assert "size:A3 landscape" in poster
+    assert "SCOUTING STUDIO / POSTER" in poster
+    assert "poster-player-layout" in poster
+    assert "poster-collective-grid" in poster
+    assert "poster-game-grid" in poster
+    for tipo in ("roster", "scouting_individual", "scouting_coletivo", "plano_jogo"):
+        documento = (TEMPLATES / "relatorios" / f"{tipo}_a3.html").read_text(encoding="utf-8")
+        assert '_poster.html' in documento
+        assert '_documento.html' not in documento
+
+
+def test_scouting_studio_orienta_o_preenchimento_sem_alterar_os_formularios():
+    tabs = (TEMPLATES / "scouting" / "_departamento_tabs.html").read_text(encoding="utf-8")
+    script = (ROOT / "frontend" / "static" / "js" / "scouting-studio.js").read_text(encoding="utf-8")
+    estilos = (ROOT / "frontend" / "static" / "css" / "scouting-department.css").read_text(encoding="utf-8")
+    assert "scouting-studio.js" in tabs
+    assert "Próximo por preencher" in script
+    assert "dataset.studioState" in script
+    assert "studio-progress-strip" in estilos
+    assert "scouting-studio-mode" in estilos
 
 
 def test_contactos_sao_removidos_para_perfil_nao_autorizado():
@@ -52,6 +69,17 @@ def test_a3_nunca_inclui_contactos_mesmo_para_administrador():
     formato, _, secoes = _configuracao_relatorio("roster", dados, UtilizadorFalso(PerfilEnum.administrador))
     assert formato == "a3"
     assert secoes == ["fotografia", "identificacao"]
+
+
+def test_poster_a3_forca_orientacao_paisagem():
+    dados = FormData([
+        ("formato", "a3"),
+        ("orientacao", "retrato"),
+        ("secoes", "identificacao"),
+    ])
+    formato, orientacao, _ = _configuracao_relatorio("roster", dados, UtilizadorFalso(PerfilEnum.administrador))
+    assert formato == "a3"
+    assert orientacao == "paisagem"
 
 
 def test_ordem_escolhida_e_preservada_e_vazios_usam_padrao():
