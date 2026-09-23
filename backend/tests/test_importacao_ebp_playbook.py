@@ -10,7 +10,7 @@ from database import SessionLocal
 from models.equipa import Equipa
 from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.utilizador import Utilizador
-from services.importacao_ebp_service import interpretar_ebp, renderizar_sequencia_ebp
+from services.importacao_ebp_service import _ponto, interpretar_ebp, renderizar_sequencia_ebp
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -66,7 +66,15 @@ def test_interpreta_e_renderiza_cada_sequencia_do_ebp():
     imagem = renderizar_sequencia_ebp(jogada.sequencias[0])
     assert imagem.startswith("data:image/png;base64,")
     with Image.open(io.BytesIO(base64.b64decode(imagem.split(",", 1)[1]))) as desenho:
-        assert desenho.size == (1400, 1200)
+        assert desenho.size == (1400, 1225)
+
+
+def test_converte_coordenadas_para_a_area_util_real_do_campo_ebp():
+    # Coordenadas reais do Flex 5: antes da correcao, o jogador 1 era cortado
+    # no fundo e os jogadores 2/3 surgiam demasiado abaixo no campo.
+    assert _ponto(816, 1970) == (95, 103)
+    assert _ponto(3484, 5894) == (660, 926)
+    assert _ponto(6644, 1970) == (1328, 103)
 
 
 @pytest.mark.parametrize("conteudo", (b"", b"nao-e-ebp", b"EBP\x04invalido"))
