@@ -386,6 +386,7 @@ def test_scouting_coletivo_guarda_cinco_inicial_e_rotacoes_previstas():
 def test_plano_de_jogo_vive_no_dossier_e_importa_scouting_sem_substituir():
     tabs = (TEMPLATES_DIR / "scouting" / "_departamento_tabs.html").read_text(encoding="utf-8")
     plano = (TEMPLATES_DIR / "scouting" / "plano_jogo.html").read_text(encoding="utf-8")
+    biblioteca = (TEMPLATES_DIR / "jogos" / "_plano_biblioteca.html").read_text(encoding="utf-8")
     router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
     jogos = (ROOT / "backend" / "routers" / "jogos.py").read_text(encoding="utf-8")
 
@@ -397,8 +398,8 @@ def test_plano_de_jogo_vive_no_dossier_e_importa_scouting_sem_substituir():
     assert "importar_scouting_para_plano" in router
     assert 'voltar.startswith("/scouting/")' in jogos
     assert 'name="rotacao_{{ grupo }}_{{ posicao }}"' in plano
-    assert "Selecionar jogada da equipa" in plano
-    assert "Criar nova opção reutilizável" in plano
+    assert "Selecionar jogada da equipa" in biblioteca
+    assert "Criar e guardar uma nova opção" in biblioteca
 
 
 def test_scouting_atualiza_acoes_locais_sem_refresh_da_pagina():

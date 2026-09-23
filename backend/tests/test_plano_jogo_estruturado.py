@@ -19,12 +19,31 @@ def test_plano_jogo_tem_biblioteca_ordenada_e_jogadas_da_equipa():
     modelo = (ROOT / "backend" / "models" / "jogo.py").read_text(encoding="utf-8")
     rota = (ROOT / "backend" / "routers" / "jogos.py").read_text(encoding="utf-8")
     template = (ROOT / "frontend" / "templates" / "scouting" / "plano_jogo.html").read_text(encoding="utf-8")
+    biblioteca = (ROOT / "frontend" / "templates" / "jogos" / "_plano_biblioteca.html").read_text(encoding="utf-8")
 
     assert 'class ItemPlanoJogoBiblioteca' in modelo
     assert 'class PlanoJogoJogada' in modelo
     assert 'Playbook.equipa_id == jogo.equipa_id' in rota
-    assert '/plano/itens/{{ relacao.id }}/mover/cima' in template
-    assert '/plano/jogadas/{{ relacao.id }}/mover/baixo' in template
+    assert 'include "jogos/_plano_biblioteca.html"' in template
+    assert '/plano/itens/{{ relacao.id }}/mover/cima' in biblioteca
+    assert '/plano/jogadas/{{ relacao.id }}/mover/baixo' in biblioteca
+
+
+def test_biblioteca_e_usada_nos_dois_acessos_e_mantem_memoria():
+    direto = (ROOT / "frontend" / "templates" / "jogos" / "plano_jogo.html").read_text(encoding="utf-8")
+    scouting = (ROOT / "frontend" / "templates" / "scouting" / "plano_jogo.html").read_text(encoding="utf-8")
+    biblioteca = (ROOT / "frontend" / "templates" / "jogos" / "_plano_biblioteca.html").read_text(encoding="utf-8")
+    rota = (ROOT / "backend" / "routers" / "jogos.py").read_text(encoding="utf-8")
+
+    assert 'include "jogos/_plano_biblioteca.html"' in direto
+    assert 'include "jogos/_plano_biblioteca.html"' in scouting
+    assert 'name="chaves_ataque"' not in direto
+    assert 'name="bloqueio_direto_lateral"' not in direto
+    assert "Escolher da memória da equipa" in biblioteca
+    assert "Criar e guardar uma nova opção" in biblioteca
+    assert "Apagar da memória da equipa" in biblioteca
+    assert '/plano/biblioteca/{{ item.id }}/eliminar' in biblioteca
+    assert 'item.ativo = False' in rota
 
 
 def test_pdfs_colocam_rotacoes_e_graficos_no_final():

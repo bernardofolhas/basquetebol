@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Plano de Jogo — {{ jogo.adversario }}{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260923-game-plan-2">{% endblock %}
 {% block conteudo %}
 
 {{ equipa_contexto(
@@ -12,95 +13,66 @@
     "Voltar ao jogo"
 ) }}
 
-<form method="POST" action="/jogos/{{ jogo.id }}/plano">
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-    <!-- 5 Inicial -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 class="font-semibold text-gray-700 mb-1">5 Inicial + 3 Rotações</h2>
-        <p class="text-xs text-gray-500 mb-4">Apenas atletas convocados para este jogo.</p>
-        {% if jogadores %}
-        <h3 class="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Cinco inicial</h3>
-        {% for i in range(1, 6) %}
-        <div class="flex items-center gap-2 mb-2">
-            <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full w-6 text-center">{{ i }}</span>
-            <select name="titular_{{ i }}" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                <option value="">Seleciona {{ termo_jogador(jogo.equipa, capitalizar=False) }}</option>
-                {% for jogador in jogadores %}
-                <option value="{{ jogador.id }}" {% if plano and plano['titular_' ~ i]|string == jogador.id|string %}selected{% endif %}>
-                    {% if jogador.numero_camisola %}#{{ jogador.numero_camisola }} — {% endif %}{{ jogador.nome }}
-                </option>
+{% set voltar = '/jogos/' ~ jogo.id ~ '/plano' %}
+{% set plano_async = false %}
+<div data-game-plan-root>
+<div data-plan-region="game-plan">
+    <form method="POST" action="/jogos/{{ jogo.id }}/plano" data-game-plan-async>
+        <input type="hidden" name="voltar" value="{{ voltar }}">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <h2 class="font-semibold text-gray-700 mb-1">5 Inicial + 3 Rotações</h2>
+                <p class="text-xs text-gray-500 mb-4">Apenas atletas convocados para este jogo.</p>
+                {% if jogadores %}
+                <h3 class="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Cinco inicial</h3>
+                {% for i in range(1, 6) %}
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full w-6 text-center">{{ i }}</span>
+                    <select name="titular_{{ i }}" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        <option value="">Seleciona {{ termo_jogador(jogo.equipa, capitalizar=False) }}</option>
+                        {% for jogador in jogadores %}
+                        <option value="{{ jogador.id }}" {% if plano and plano['titular_' ~ i]|string == jogador.id|string %}selected{% endif %}>{{ jogador.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 {% endfor %}
-            </select>
-        </div>
-        {% endfor %}
-        {% for grupo in range(1,4) %}
-        <h3 class="text-xs font-bold text-gray-600 uppercase tracking-wide mt-4 mb-2">Rotação {{ grupo }}</h3>
-        {% for posicao in range(1,6) %}{% set atual=rotacoes_equipa[grupo]|selectattr('ordem','equalto',posicao)|first %}
-        <div class="flex items-center gap-2 mb-2"><span class="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded-full w-6 text-center">{{ posicao }}</span><select name="rotacao_{{ grupo }}_{{ posicao }}" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="">Seleciona {{ termo_jogador(jogo.equipa, capitalizar=False) }}</option>{% for jogador in jogadores %}<option value="{{ jogador.id }}" {% if atual and atual.jogador_id == jogador.id %}selected{% endif %}>{{ jogador.nome }}</option>{% endfor %}</select></div>
-        {% endfor %}{% endfor %}
-        {% else %}<div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-5 text-center text-sm text-gray-500">Ainda não existem atletas convocados para este jogo.</div>{% endif %}
-    </div>
+                {% for grupo in range(1, 4) %}
+                <h3 class="text-xs font-bold text-gray-600 uppercase tracking-wide mt-4 mb-2">Rotação {{ grupo }}</h3>
+                {% for posicao in range(1, 6) %}
+                {% set atual = rotacoes_equipa[grupo]|selectattr('ordem', 'equalto', posicao)|first %}
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded-full w-6 text-center">{{ posicao }}</span>
+                    <select name="rotacao_{{ grupo }}_{{ posicao }}" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">Seleciona {{ termo_jogador(jogo.equipa, capitalizar=False) }}</option>
+                        {% for jogador in jogadores %}<option value="{{ jogador.id }}" {% if atual and atual.jogador_id == jogador.id %}selected{% endif %}>{{ jogador.nome }}</option>{% endfor %}
+                    </select>
+                </div>
+                {% endfor %}
+                {% endfor %}
+                {% else %}
+                <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-5 text-center text-sm text-gray-500">Ainda não existem atletas convocados para este jogo.</div>
+                {% endif %}
+            </div>
 
-    <!-- Chaves do jogo -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 class="font-semibold text-gray-700 mb-4">Chaves do Jogo</h2>
-        <div class="mb-3">
-            <label class="block text-xs font-semibold text-orange-600 mb-1">Ataque</label>
-            <textarea name="chaves_ataque" rows="3" placeholder="Chaves ofensivas..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.chaves_ataque if plano and plano.chaves_ataque else '' }}</textarea>
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <h2 class="font-semibold text-gray-700 mb-4">Reflexão</h2>
+                <p class="mb-3 text-xs leading-5 text-slate-500">Também pode ser preenchida diretamente na página do jogo. O conteúdo fica sincronizado nos dois locais.</p>
+                <textarea name="reflexao" rows="8" maxlength="20000" placeholder="Reflexão pós-jogo..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.reflexao if plano and plano.reflexao else '' }}</textarea>
+            </div>
         </div>
-        <div class="mb-3">
-            <label class="block text-xs font-semibold text-blue-600 mb-1">Defesa</label>
-            <textarea name="chaves_defesa" rows="3" placeholder="Chaves defensivas..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.chaves_defesa if plano and plano.chaves_defesa else '' }}</textarea>
-        </div>
-        <div>
-            <label class="block text-xs font-semibold text-green-600 mb-1">Movimentos Ofensivos</label>
-            <textarea name="movimentos_ofensivos" rows="3" placeholder="Movimentos ofensivos..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.movimentos_ofensivos if plano and plano.movimentos_ofensivos else '' }}</textarea>
-        </div>
-    </div>
 
-    <!-- Estratégias Defensivas -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 class="font-semibold text-gray-700 mb-4">Estratégias Defensivas</h2>
-        {% for campo, label in [
-            ('bloqueio_direto_lateral', 'Bloqueio Direto Lateral'),
-            ('bloqueio_direto_central', 'Bloqueio Direto Central'),
-            ('handoff', 'Handoff'),
-            ('indiretos_entrada', 'Indiretos de Entrada'),
-            ('indiretos_saida', 'Indiretos de Saída'),
-            ('bola_dentro', 'Bola Dentro'),
-            ('situacoes_especiais', 'Situações Especiais')
-        ] %}
-        <div class="mb-3">
-            <label class="block text-xs font-semibold text-gray-500 mb-1">{{ label }}</label>
-            <textarea name="{{ campo }}" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano[campo] if plano and plano[campo] else '' }}</textarea>
+        <div class="mt-6">
+            <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">Guardar cinco, rotações e reflexão</button>
         </div>
-        {% endfor %}
-    </div>
+    </form>
 
-    <!-- Reflexão -->
-    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 class="font-semibold text-gray-700 mb-4">Reflexão</h2>
-        <p class="mb-3 text-xs leading-5 text-slate-500">Também pode ser preenchida diretamente na página do jogo. O conteúdo fica sincronizado nos dois locais.</p>
-        <textarea name="reflexao" rows="8" maxlength="20000" placeholder="Reflexão pós-jogo..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">{{ plano.reflexao if plano and plano.reflexao else '' }}</textarea>
-    </div>
+    {% include "jogos/_plano_biblioteca.html" %}
 
+    <div class="mt-4">
+        <a href="/jogos/{{ jogo.id }}/plano/print" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">Imprimir Plano de Jogo</a>
+        <a href="/jogos/{{ jogo.id }}/plano/pdf" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">PDF Plano de Jogo</a>
+    </div>
 </div>
-
-<div class="mt-6">
-    <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition">
-        Guardar Plano de Jogo
-    </button>
-</div>
-</form>
-<div class="mt-4">
-    <a href="/jogos/{{ jogo.id }}/plano/print"
-       class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
-        🖨️ Imprimir Plano de Jogo
-    </a>
-    <a href="/jogos/{{ jogo.id }}/plano/pdf"
-       class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-        📄 PDF Plano de Jogo
-    </a>
 </div>
 {% endblock %}
+{% block scripts_extra %}<script src="/static/js/game-plan-async.js?v=20260923-1"></script>{% endblock %}

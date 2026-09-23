@@ -665,6 +665,8 @@ async def adicionar_item_plano(jogo_id: int, request: Request, db: Session = Dep
             )
             db.add(item)
             db.flush()
+        elif not item.ativo:
+            item.ativo = True
     if item and not db.query(PlanoJogoItem).filter(
         PlanoJogoItem.plano_jogo_id == plano.id,
         PlanoJogoItem.item_id == item.id,
@@ -678,6 +680,24 @@ async def adicionar_item_plano(jogo_id: int, request: Request, db: Session = Dep
         db.expire(plano, ["itens"])
         sincronizar_campos_legados(plano)
     db.commit()
+    return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+
+
+@router.post("/{jogo_id}/plano/biblioteca/{item_id}/eliminar")
+async def eliminar_item_biblioteca_plano(jogo_id: int, item_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    jogo = _obter_jogo(db, jogo_id)
+    dados = await request.form()
+    if not jogo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+    item = db.query(ItemPlanoJogoBiblioteca).filter(
+        ItemPlanoJogoBiblioteca.id == item_id,
+        ItemPlanoJogoBiblioteca.equipa_id == jogo.equipa_id,
+    ).first()
+    if item:
+        # A remoção é lógica para preservar planos antigos que já usam esta opção.
+        item.ativo = False
+        db.commit()
     return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
 
 
