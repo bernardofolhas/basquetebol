@@ -45,6 +45,16 @@ from paths import TEMPLATES_DIR
 from services.pdf_service import content_disposition_pdf, renderizar_pdf
 from services.fotografia_jogador_service import apagar_fotografia, guardar_fotografia
 from services.desenho_service import decompor_desenho_editavel
+from services.plano_jogo_service import (
+    CATEGORIAS_PLANO,
+    biblioteca_por_categoria,
+    convocados_plano,
+    itens_por_categoria,
+    jogadas_disponiveis,
+    materializar_campos_legados,
+    preview_jogada,
+    rotacoes_por_grupo,
+)
 from template_config import Jinja2Templates
 
 
@@ -478,13 +488,21 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
     if separador == "plano-jogo":
         jogo_id = _int(request.query_params.get("jogo_id"))
         jogo = _jogo_plano_adversario(adversario, db, utilizador, jogo_id)
-        jogadores = (
-            db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).order_by(Jogador.numero_camisola, Jogador.nome).all()
-            if jogo else []
-        )
+        plano = jogo.plano if jogo else None
+        if plano and materializar_campos_legados(db, plano, jogo.equipa_id):
+            db.commit()
+        jogadas_plano = list(plano.jogadas) if plano else []
+        for relacao in jogadas_plano:
+            relacao.preview_imagem = preview_jogada(relacao.setplay)
         return templates.TemplateResponse(request, "scouting/plano_jogo.html", _contexto_departamento(
             request, utilizador, adversario, separador=separador, jogos=jogos, jogo=jogo,
-            plano=jogo.plano if jogo else None, jogadores=jogadores,
+            plano=plano, jogadores=convocados_plano(jogo) if jogo else [],
+            rotacoes_equipa=rotacoes_por_grupo(plano),
+            categorias_plano=CATEGORIAS_PLANO,
+            itens_plano=itens_por_categoria(plano),
+            biblioteca_plano=biblioteca_por_categoria(db, jogo.equipa_id) if jogo else {},
+            jogadas_disponiveis=jogadas_disponiveis(db, jogo.equipa_id) if jogo else [],
+            jogadas_plano=jogadas_plano,
             cinco_previsto=[item for item in adversario.rotacao_prevista if item.papel == "titular"],
             rotacoes_previstas=[item for item in adversario.rotacao_prevista if item.papel == "rotacao"],
         ))
@@ -669,6 +687,8 @@ def importar_scouting_para_plano(adversario_id: int, jogo_id: int, request: Requ
         for campo, (utilizada, notas, titulo) in mapa.items():
             bloco = f"Scouting adversário — {titulo}: utilizada" + (f"\n{notas}" if notas else "") if utilizada else None
             alterados += _preencher_se_vazio(plano, campo, [bloco])
+    db.flush()
+    materializar_campos_legados(db, plano, jogo.equipa_id)
     db.commit()
     mensagem = f"Scouting importado para {alterados} campo(s) vazio(s) do plano." if alterados else "O plano já tinha conteúdo nos campos disponíveis; nada foi substituído."
     set_flash(request, mensagem)

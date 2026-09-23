@@ -11,7 +11,16 @@ from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
 from models.jogador import Jogador
-from models.jogo import Convocado, Jogo, PlanoJogo
+from models.jogo import (
+    Convocado,
+    ItemPlanoJogoBiblioteca,
+    Jogo,
+    PlanoJogo,
+    PlanoJogoItem,
+    PlanoJogoJogada,
+    PlanoJogoRotacao,
+)
+from models.playbook import Playbook, SetPlay
 from models.treinador import Treinador
 from paths import TEMPLATES_DIR
 from services.notificacoes_service import criar_notificacoes_para_equipa
@@ -23,6 +32,21 @@ from services.jogos_service import (
     preparar_linhas_calendario_jogos,
 )
 from services.escaloes_service import escalao_imediatamente_inferior_da_equipa
+from services.plano_jogo_service import (
+    CAMPOS_POR_CATEGORIA,
+    CATEGORIAS_PLANO,
+    biblioteca_por_categoria,
+    convocados_plano,
+    graficos_plano,
+    itens_por_categoria,
+    jogadas_disponiveis,
+    materializar_campos_legados,
+    normalizar_texto,
+    preview_jogada,
+    rotacoes_por_grupo,
+    sincronizar_campos_legados,
+    sincronizar_rotacoes_legadas,
+)
 
 router = APIRouter(prefix="/jogos")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -40,6 +64,28 @@ def _obter_ou_criar_plano_jogo(db: Session, jogo: Jogo) -> PlanoJogo:
     plano = PlanoJogo(jogo_id=jogo.id, clube_id=jogo.clube_id)
     db.add(plano)
     return plano
+
+
+def _destino_plano(dados, jogo_id: int) -> str:
+    voltar = str(dados.get("voltar") or "")
+    return voltar if voltar.startswith("/scouting/") and "//" not in voltar else f"/jogos/{jogo_id}/plano"
+
+
+def _contexto_plano_estruturado(db: Session, jogo: Jogo, plano: PlanoJogo | None) -> dict:
+    if plano and materializar_campos_legados(db, plano, jogo.equipa_id):
+        db.commit()
+    jogadas = list(plano.jogadas) if plano else []
+    for relacao in jogadas:
+        relacao.preview_imagem = preview_jogada(relacao.setplay)
+    return {
+        "jogadores": convocados_plano(jogo),
+        "rotacoes_equipa": rotacoes_por_grupo(plano),
+        "categorias_plano": CATEGORIAS_PLANO,
+        "itens_plano": itens_por_categoria(plano),
+        "biblioteca_plano": biblioteca_por_categoria(db, jogo.equipa_id),
+        "jogadas_disponiveis": jogadas_disponiveis(db, jogo.equipa_id),
+        "jogadas_plano": jogadas,
+    }
 
 
 def _verificar_acesso_plano_jogo(
@@ -504,15 +550,14 @@ def pagina_plano_jogo(
         return RedirectResponse(url="/equipas")
     _verificar_acesso_plano_jogo(utilizador, jogo, db)
 
-    jogadores = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).order_by(Jogador.nome).all()
     plano = db.query(PlanoJogo).filter(PlanoJogo.jogo_id == jogo_id).first()
-
-    return templates.TemplateResponse(request, "jogos/plano_jogo.html", {
+    contexto = {
         "utilizador": utilizador,
         "jogo": jogo,
-        "jogadores": jogadores,
         "plano": plano,
-    })
+    }
+    contexto.update(_contexto_plano_estruturado(db, jogo, plano))
+    return templates.TemplateResponse(request, "jogos/plano_jogo.html", contexto)
 
 
 @router.post("/{jogo_id}/plano")
@@ -538,17 +583,198 @@ async def guardar_plano_jogo(
         "situacoes_especiais", "reflexao",
     ]
     for campo in campos_texto:
-        setattr(plano, campo, dados.get(campo) or None)
+        if campo in dados:
+            setattr(plano, campo, dados.get(campo) or None)
 
+    convocados_ids = {jogador.id for jogador in convocados_plano(jogo)}
+    titulares_usados = set()
     for i in range(1, 6):
         val = dados.get(f"titular_{i}")
-        setattr(plano, f"titular_{i}", int(val) if val else None)
+        jogador_id = int(val) if str(val or "").isdigit() else None
+        if jogador_id not in convocados_ids or jogador_id in titulares_usados:
+            jogador_id = None
+        if jogador_id:
+            titulares_usados.add(jogador_id)
+        setattr(plano, f"titular_{i}", jogador_id)
+
+    if any(f"rotacao_{grupo}_{ordem}" in dados for grupo in range(1, 4) for ordem in range(1, 6)):
+        db.flush()
+        db.query(PlanoJogoRotacao).filter(PlanoJogoRotacao.plano_jogo_id == plano.id).delete()
+        for grupo in range(1, 4):
+            usados = set()
+            for ordem in range(1, 6):
+                valor = dados.get(f"rotacao_{grupo}_{ordem}")
+                jogador_id = int(valor) if str(valor or "").isdigit() else None
+                if jogador_id not in convocados_ids or jogador_id in usados:
+                    continue
+                usados.add(jogador_id)
+                db.add(PlanoJogoRotacao(
+                    clube_id=jogo.clube_id,
+                    plano_jogo_id=plano.id,
+                    grupo=grupo,
+                    ordem=ordem,
+                    jogador_id=jogador_id,
+                ))
+        db.flush()
+        db.expire(plano, ["grupos_rotacao"])
+        sincronizar_rotacoes_legadas(plano)
 
     db.commit()
     set_flash(request, "Plano de jogo guardado.")
-    voltar = str(dados.get("voltar") or "")
-    destino = voltar if voltar.startswith("/scouting/") and "//" not in voltar else f"/jogos/{jogo_id}/plano"
-    return RedirectResponse(url=destino, status_code=303)
+    return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+
+
+@router.post("/{jogo_id}/plano/itens")
+async def adicionar_item_plano(jogo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    jogo = _obter_jogo(db, jogo_id)
+    dados = await request.form()
+    if not jogo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+    categoria = str(dados.get("categoria") or "")
+    if categoria not in CAMPOS_POR_CATEGORIA:
+        return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+    plano = _obter_ou_criar_plano_jogo(db, jogo)
+    db.flush()
+    if materializar_campos_legados(db, plano, jogo.equipa_id):
+        db.flush()
+        db.expire(plano, ["itens"])
+    item_id = int(dados.get("item_id")) if str(dados.get("item_id") or "").isdigit() else None
+    texto = str(dados.get("novo_texto") or "").strip()
+    item = None
+    if item_id:
+        item = db.query(ItemPlanoJogoBiblioteca).filter(
+            ItemPlanoJogoBiblioteca.id == item_id,
+            ItemPlanoJogoBiblioteca.equipa_id == jogo.equipa_id,
+            ItemPlanoJogoBiblioteca.categoria == categoria,
+        ).first()
+    elif texto:
+        normalizado = normalizar_texto(texto)
+        item = db.query(ItemPlanoJogoBiblioteca).filter(
+            ItemPlanoJogoBiblioteca.equipa_id == jogo.equipa_id,
+            ItemPlanoJogoBiblioteca.categoria == categoria,
+            ItemPlanoJogoBiblioteca.texto_normalizado == normalizado,
+        ).first()
+        if not item:
+            item = ItemPlanoJogoBiblioteca(
+                clube_id=jogo.clube_id,
+                equipa_id=jogo.equipa_id,
+                categoria=categoria,
+                texto=texto,
+                texto_normalizado=normalizado,
+            )
+            db.add(item)
+            db.flush()
+    if item and not db.query(PlanoJogoItem).filter(
+        PlanoJogoItem.plano_jogo_id == plano.id,
+        PlanoJogoItem.item_id == item.id,
+    ).first():
+        atuais = [rel for rel in plano.itens if rel.item and rel.item.categoria == categoria]
+        for ordem_atual, relacao_atual in enumerate(atuais):
+            relacao_atual.ordem = ordem_atual
+        ordem = len(atuais)
+        db.add(PlanoJogoItem(clube_id=jogo.clube_id, plano_jogo_id=plano.id, item_id=item.id, ordem=ordem))
+        db.flush()
+        db.expire(plano, ["itens"])
+        sincronizar_campos_legados(plano)
+    db.commit()
+    return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+
+
+@router.post("/{jogo_id}/plano/itens/{relacao_id}/mover/{direcao}")
+async def mover_item_plano(jogo_id: int, relacao_id: int, direcao: str, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    jogo = _obter_jogo(db, jogo_id)
+    dados = await request.form()
+    if not jogo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+    relacao = db.query(PlanoJogoItem).join(PlanoJogo).filter(PlanoJogoItem.id == relacao_id, PlanoJogo.jogo_id == jogo.id).first()
+    if relacao and direcao in {"cima", "baixo"}:
+        pares = [item for item in relacao.plano.itens if item.item.categoria == relacao.item.categoria]
+        for ordem, item in enumerate(pares):
+            item.ordem = ordem
+        indice = pares.index(relacao)
+        destino = indice - 1 if direcao == "cima" else indice + 1
+        if 0 <= destino < len(pares):
+            relacao.ordem, pares[destino].ordem = pares[destino].ordem, relacao.ordem
+            sincronizar_campos_legados(relacao.plano)
+            db.commit()
+    return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+
+
+@router.post("/{jogo_id}/plano/itens/{relacao_id}/eliminar")
+async def eliminar_item_plano(jogo_id: int, relacao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    jogo = _obter_jogo(db, jogo_id)
+    dados = await request.form()
+    if not jogo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+    relacao = db.query(PlanoJogoItem).join(PlanoJogo).filter(PlanoJogoItem.id == relacao_id, PlanoJogo.jogo_id == jogo.id).first()
+    if relacao:
+        plano = relacao.plano
+        categoria = relacao.item.categoria
+        db.delete(relacao)
+        db.flush()
+        restantes = [item for item in plano.itens if item.id != relacao_id and item.item.categoria == categoria]
+        for ordem, item in enumerate(restantes):
+            item.ordem = ordem
+        db.expire(plano, ["itens"])
+        sincronizar_campos_legados(plano)
+        db.commit()
+    return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+
+
+@router.post("/{jogo_id}/plano/jogadas")
+async def adicionar_jogada_plano(jogo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    jogo = _obter_jogo(db, jogo_id)
+    dados = await request.form()
+    if not jogo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+    setplay_id = int(dados.get("setplay_id")) if str(dados.get("setplay_id") or "").isdigit() else None
+    setplay = db.query(SetPlay).join(Playbook).filter(SetPlay.id == setplay_id, Playbook.equipa_id == jogo.equipa_id).first()
+    plano = _obter_ou_criar_plano_jogo(db, jogo)
+    db.flush()
+    if setplay and not db.query(PlanoJogoJogada).filter_by(plano_jogo_id=plano.id, setplay_id=setplay.id).first():
+        db.add(PlanoJogoJogada(clube_id=jogo.clube_id, plano_jogo_id=plano.id, setplay_id=setplay.id, ordem=len(plano.jogadas)))
+        db.commit()
+    return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+
+
+@router.post("/{jogo_id}/plano/jogadas/{relacao_id}/mover/{direcao}")
+async def mover_jogada_plano(jogo_id: int, relacao_id: int, direcao: str, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    jogo = _obter_jogo(db, jogo_id)
+    dados = await request.form()
+    if not jogo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+    relacao = db.query(PlanoJogoJogada).join(PlanoJogo).filter(PlanoJogoJogada.id == relacao_id, PlanoJogo.jogo_id == jogo.id).first()
+    if relacao and direcao in {"cima", "baixo"}:
+        pares = list(relacao.plano.jogadas)
+        indice = pares.index(relacao)
+        destino = indice - 1 if direcao == "cima" else indice + 1
+        if 0 <= destino < len(pares):
+            relacao.ordem, pares[destino].ordem = pares[destino].ordem, relacao.ordem
+            db.commit()
+    return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+
+
+@router.post("/{jogo_id}/plano/jogadas/{relacao_id}/eliminar")
+async def eliminar_jogada_plano(jogo_id: int, relacao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    jogo = _obter_jogo(db, jogo_id)
+    dados = await request.form()
+    if not jogo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+    relacao = db.query(PlanoJogoJogada).join(PlanoJogo).filter(PlanoJogoJogada.id == relacao_id, PlanoJogo.jogo_id == jogo.id).first()
+    if relacao:
+        plano = relacao.plano
+        db.delete(relacao)
+        db.flush()
+        for ordem, item in enumerate([item for item in plano.jogadas if item.id != relacao_id]):
+            item.ordem = ordem
+        db.commit()
+    return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
 
 
 @router.get("/{jogo_id}/convocatoria/print", response_class=HTMLResponse)
@@ -681,7 +907,7 @@ def imprimir_plano_jogo(
         return RedirectResponse(url="/equipas")
     _verificar_acesso_plano_jogo(utilizador, jogo, db)
 
-    jogadores = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).all()
+    jogadores = convocados_plano(jogo)
     jogadores_dict = {j.id: j for j in jogadores}
 
     return templates.TemplateResponse(request, "jogos/plano_jogo_print.html", {
@@ -689,6 +915,8 @@ def imprimir_plano_jogo(
         "jogo": jogo,
         "plano": jogo.plano,
         "jogadores_dict": jogadores_dict,
+        "rotacoes_equipa": rotacoes_por_grupo(jogo.plano),
+        "graficos_plano": graficos_plano(jogo.plano),
         "identidade": getattr(request.state, "identidade_clube", {}),
     })
 
@@ -704,13 +932,15 @@ def exportar_pdf_plano_jogo(
     if not jogo:
         return RedirectResponse(url="/equipas")
     _verificar_acesso_plano_jogo(utilizador, jogo, db)
-    jogadores = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id).all()
+    jogadores = convocados_plano(jogo)
     jogadores_dict = {j.id: j for j in jogadores}
     pdf_bytes = renderizar_pdf(request, "jogos/plano_jogo_print.html", {
         "utilizador": utilizador,
         "jogo": jogo,
         "plano": jogo.plano,
         "jogadores_dict": jogadores_dict,
+        "rotacoes_equipa": rotacoes_por_grupo(jogo.plano),
+        "graficos_plano": graficos_plano(jogo.plano),
         "modo_pdf": True,
     })
     nome = f"plano_jogo_{jogo.equipa.nome}_{jogo.adversario}_{jogo.data}.pdf".replace(" ", "_")

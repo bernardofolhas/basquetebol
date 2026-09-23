@@ -70,6 +70,7 @@ from services.desenho_service import (
     normalizar_data_uri,
 )
 from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
+from services.plano_jogo_service import graficos_plano, rotacoes_por_grupo
 
 router = APIRouter(prefix="/exportacoes", tags=["exportacoes"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -953,6 +954,8 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             plano=plano,
             convocados=alvo.convocados,
             titulares=titulares_ordenados,
+            rotacoes_equipa=rotacoes_por_grupo(plano),
+            graficos_plano=graficos_plano(plano),
             fotografias_equipa={
                 j.id: _fotografia_embebida(j.fotografia)
                 for j in {c.jogador for c in alvo.convocados} | set(titulares_ordenados)

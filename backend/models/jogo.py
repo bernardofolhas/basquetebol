@@ -3,7 +3,7 @@
 # Representa um jogo oficial no calendário da equipa
 # ─────────────────────────────────────────────────────────────
 
-from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import backref, relationship
 from database import Base
 
@@ -106,3 +106,88 @@ class PlanoJogo(Base):
     reflexao = Column(Text, nullable=True)
 
     jogo = relationship("Jogo", back_populates="plano")
+    grupos_rotacao = relationship(
+        "PlanoJogoRotacao",
+        back_populates="plano",
+        cascade="all, delete-orphan",
+        order_by="PlanoJogoRotacao.grupo, PlanoJogoRotacao.ordem",
+    )
+    itens = relationship(
+        "PlanoJogoItem",
+        back_populates="plano",
+        cascade="all, delete-orphan",
+        order_by="PlanoJogoItem.ordem, PlanoJogoItem.id",
+    )
+    jogadas = relationship(
+        "PlanoJogoJogada",
+        back_populates="plano",
+        cascade="all, delete-orphan",
+        order_by="PlanoJogoJogada.ordem, PlanoJogoJogada.id",
+    )
+
+
+class PlanoJogoRotacao(Base):
+    __tablename__ = "plano_jogo_rotacoes"
+    __table_args__ = (
+        UniqueConstraint("plano_jogo_id", "grupo", "ordem", name="uq_plano_rotacao_posicao"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
+    plano_jogo_id = Column(Integer, ForeignKey("planos_jogo.id", ondelete="CASCADE"), nullable=False, index=True)
+    grupo = Column(Integer, nullable=False)
+    ordem = Column(Integer, nullable=False)
+    jogador_id = Column(Integer, ForeignKey("jogadores.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    plano = relationship("PlanoJogo", back_populates="grupos_rotacao")
+    jogador = relationship("Jogador")
+
+
+class ItemPlanoJogoBiblioteca(Base):
+    __tablename__ = "plano_jogo_biblioteca"
+    __table_args__ = (
+        UniqueConstraint("equipa_id", "categoria", "texto_normalizado", name="uq_plano_biblioteca_item"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
+    equipa_id = Column(Integer, ForeignKey("equipas.id", ondelete="CASCADE"), nullable=False, index=True)
+    categoria = Column(String(48), nullable=False, index=True)
+    texto = Column(Text, nullable=False)
+    texto_normalizado = Column(String(240), nullable=False)
+    ativo = Column(Boolean, nullable=False, default=True)
+
+    equipa = relationship("Equipa")
+    utilizacoes = relationship("PlanoJogoItem", back_populates="item")
+
+
+class PlanoJogoItem(Base):
+    __tablename__ = "plano_jogo_itens"
+    __table_args__ = (
+        UniqueConstraint("plano_jogo_id", "item_id", name="uq_plano_jogo_item"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
+    plano_jogo_id = Column(Integer, ForeignKey("planos_jogo.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_id = Column(Integer, ForeignKey("plano_jogo_biblioteca.id", ondelete="CASCADE"), nullable=False, index=True)
+    ordem = Column(Integer, nullable=False, default=0)
+
+    plano = relationship("PlanoJogo", back_populates="itens")
+    item = relationship("ItemPlanoJogoBiblioteca", back_populates="utilizacoes")
+
+
+class PlanoJogoJogada(Base):
+    __tablename__ = "plano_jogo_jogadas"
+    __table_args__ = (
+        UniqueConstraint("plano_jogo_id", "setplay_id", name="uq_plano_jogo_setplay"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
+    plano_jogo_id = Column(Integer, ForeignKey("planos_jogo.id", ondelete="CASCADE"), nullable=False, index=True)
+    setplay_id = Column(Integer, ForeignKey("setplays.id", ondelete="CASCADE"), nullable=False, index=True)
+    ordem = Column(Integer, nullable=False, default=0)
+
+    plano = relationship("PlanoJogo", back_populates="jogadas")
+    setplay = relationship("SetPlay")

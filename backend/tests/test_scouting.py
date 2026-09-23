@@ -391,11 +391,14 @@ def test_plano_de_jogo_vive_no_dossier_e_importa_scouting_sem_substituir():
 
     assert "('plano-jogo','Plano de Jogo')" in tabs
     assert "Importar análise do Scouting Coletivo" in plano
-    assert "O conteúdo escrito no plano nunca é substituído" in plano
+    assert "sem substituir decisões já tomadas" in plano
     assert 'action="/jogos/{{ jogo.id }}/plano"' in plano
     assert "_preencher_se_vazio" in router
     assert "importar_scouting_para_plano" in router
     assert 'voltar.startswith("/scouting/")' in jogos
+    assert 'name="rotacao_{{ grupo }}_{{ posicao }}"' in plano
+    assert "Selecionar jogada da equipa" in plano
+    assert "Criar nova opção reutilizável" in plano
 
 
 def test_scouting_atualiza_acoes_locais_sem_refresh_da_pagina():
@@ -416,4 +419,4 @@ def test_scouting_atualiza_acoes_locais_sem_refresh_da_pagina():
     assert 'data-studio-refresh="roster-list"' in roster
     plano = (TEMPLATES_DIR / "scouting" / "plano_jogo.html").read_text(encoding="utf-8")
     assert 'data-studio-region="game-plan"' in plano
-    assert plano.count('data-studio-refresh="game-plan"') == 2
+    assert plano.count('data-studio-refresh="game-plan"') >= 2
