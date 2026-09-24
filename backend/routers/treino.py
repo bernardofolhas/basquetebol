@@ -565,18 +565,39 @@ def _somar_minutos_hora(hora: str | None, minutos: int | None) -> str | None:
 
 
 def _hora_sugerida_exercicio(sessao: SessaoTreino, exercicios: list[ExercicioPlano]) -> str | None:
-    """Sugere o início do próximo exercício a partir da sequência já inserida."""
+    """Sugere o início seguinte ao término cronologicamente mais tardio."""
     hora_inicio = normalizar_hora(sessao.hora_inicio, permitir_vazio=False)
     if not exercicios:
         return hora_inicio
 
-    ultimo = max(exercicios, key=lambda ex: (ex.ordem or 0, ex.id or 0))
-    hora_ultimo = normalizar_hora(ultimo.hora, permitir_vazio=False)
-    if hora_ultimo:
-        return _somar_minutos_hora(hora_ultimo, ultimo.minutos)
+    if hora_inicio:
+        inicio_h, inicio_m = map(int, hora_inicio.split(":"))
+        inicio_minutos = inicio_h * 60 + inicio_m
+        terminos = []
+        for exercicio in exercicios:
+            hora_exercicio = normalizar_hora(exercicio.hora, permitir_vazio=False)
+            if not hora_exercicio:
+                continue
+            hora_h, hora_m = map(int, hora_exercicio.split(":"))
+            minutos_exercicio = hora_h * 60 + hora_m
+            deslocamento = (minutos_exercicio - inicio_minutos) % (24 * 60)
+            terminos.append(deslocamento + max(exercicio.minutos or 0, 0))
+        if terminos:
+            return _somar_minutos_hora(hora_inicio, max(terminos))
 
     if hora_inicio:
         return _somar_minutos_hora(hora_inicio, sum(ex.minutos or 0 for ex in exercicios))
+
+    exercicios_com_hora = [
+        exercicio for exercicio in exercicios
+        if normalizar_hora(exercicio.hora, permitir_vazio=False)
+    ]
+    if exercicios_com_hora:
+        ultimo = max(
+            exercicios_com_hora,
+            key=lambda ex: normalizar_hora(ex.hora, permitir_vazio=False),
+        )
+        return _somar_minutos_hora(ultimo.hora, ultimo.minutos)
     return None
 
 

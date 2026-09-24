@@ -68,6 +68,57 @@ def test_hora_do_novo_exercicio_continua_a_sequencia_do_plano(client_admin):
         db.close()
 
 
+def test_hora_do_novo_exercicio_usa_o_termino_mais_tardio_entre_blocos(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        db.add_all([
+            ExercicioPlano(
+                clube_id=plano.clube_id,
+                plano_id=plano.id,
+                bloco="A",
+                ordem=4,
+                nome="Exercício anterior com ordem superior",
+                hora="18:20",
+                minutos=20,
+            ),
+            ExercicioPlano(
+                clube_id=plano.clube_id,
+                plano_id=plano.id,
+                bloco="B",
+                ordem=1,
+                nome="Último exercício cronológico",
+                hora="19:00",
+                minutos=8,
+            ),
+        ])
+        db.commit()
+
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert 'name="hora" value="19:08" data-training-next-time' in pagina.text
+
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={"nome": "Novo exercício", "minutos": "10"},
+            headers={"Accept": "application/json"},
+        )
+
+        assert resposta.status_code == 200
+        assert resposta.json()["proxima_hora"] == "19:18"
+        exercicio = db.query(ExercicioPlano).filter_by(
+            plano_id=plano.id,
+            nome="Novo exercício",
+        ).one()
+        assert exercicio.hora == "19:08"
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_adicionar_exercicio_por_ajax_responde_sem_redirect_e_atualiza_o_plano(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
