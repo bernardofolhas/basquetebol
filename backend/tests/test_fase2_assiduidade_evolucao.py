@@ -7,7 +7,11 @@ from models.fisico import TesteFisico as ModeloTesteFisico
 from models.jogador import Jogador, RegistoAntropometrico
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.utilizador import Utilizador
-from services.assiduidade_service import calcular_pse_real, calcular_resumo_assiduidade
+from services.assiduidade_service import (
+    calcular_pse_real,
+    calcular_resumo_assiduidade,
+    estados_assiduidade_visuais,
+)
 from services.carga_real_service import analisar_carga_jogador, analisar_carga_sessoes
 import routers.assiduidade as assiduidade_router
 
@@ -132,6 +136,57 @@ def test_calcula_estados_detalhados_sem_perder_compatibilidade_booleana():
     assert resumo["percentagem"] == 66.7
     assert resumo["rpe_medio"] == 7.5
     assert resumo["rpe_registados"] == 2
+
+
+def test_lesionado_conta_como_presenca_e_lesionado_falta_como_ausencia():
+    resumo = calcular_resumo_assiduidade([
+        RegistoAssiduidade(presente=True, estado="lesionado", rpe_individual=4),
+        RegistoAssiduidade(presente=False, estado="lesionada"),
+    ])
+
+    assert resumo["presentes"] == 1
+    assert resumo["por_estado"]["lesionado"] == 1
+    assert resumo["por_estado"]["lesionada"] == 1
+    assert resumo["percentagem"] == 50.0
+    assert resumo["rpe_medio"] == 4.0
+
+
+def test_etiquetas_de_assiduidade_respeitam_genero_da_equipa():
+    masculina = Equipa(genero=GeneroEnum.masculino)
+    feminina = Equipa(genero=GeneroEnum.feminino)
+
+    etiquetas_masculinas = estados_assiduidade_visuais(masculina)
+    etiquetas_femininas = estados_assiduidade_visuais(feminina)
+
+    assert etiquetas_masculinas["atrasada"]["label"] == "Atrasado"
+    assert etiquetas_masculinas["lesionado"]["label"] == "Lesionado"
+    assert etiquetas_masculinas["lesionada"]["label"] == "Lesionado + Falta"
+    assert etiquetas_masculinas["dispensada"]["label"] == "Dispensado"
+    assert etiquetas_femininas["lesionado"]["label"] == "Lesionada"
+    assert etiquetas_femininas["lesionada"]["label"] == "Lesionada + Falta"
+
+
+def test_folha_de_assiduidade_masculina_apresenta_estados_no_masculino(client_admin):
+    db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id = _criar_contexto()
+    try:
+        equipa = db.query(Equipa).filter(Equipa.id == equipa_id).one()
+        equipa.genero = GeneroEnum.masculino
+        db.commit()
+        sessao_id = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).first().id
+
+        resposta = client_admin.get(f"/assiduidade/sessoes/{sessao_id}")
+
+        assert resposta.status_code == 200
+        assert ">Atrasado<" in resposta.text
+        assert ">Lesionado<" in resposta.text
+        assert ">Lesionado + Falta<" in resposta.text
+        assert ">Dispensado<" in resposta.text
+        assert ">Lesionada<" not in resposta.text
+    finally:
+        _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
+        db.close()
 
 
 def test_rpe_pos_treino_alimenta_carga_real_dos_ciclos_e_do_atleta():
@@ -327,6 +382,9 @@ def test_pse_rapida_abre_treino_do_dia_e_guarda_valores_individuais(client_admin
             RegistoAssiduidade.jogador_id == jogadora_id,
         ).one()
         assert registo.rpe_individual == 8.5
+        registo.estado = "lesionado"
+        registo.presente = True
+        db.commit()
 
         resposta = client_admin.post(
             f"/assiduidade/sessoes/{sessao_id}/pse",
@@ -340,6 +398,8 @@ def test_pse_rapida_abre_treino_do_dia_e_guarda_valores_individuais(client_admin
             RegistoAssiduidade.jogador_id == jogadora_id,
         ).one()
         assert registo.rpe_individual == 9
+        assert registo.estado == "lesionado"
+        assert registo.presente is True
     finally:
         _limpar_contexto(db, equipa_id, jogadora_id, segunda_jogadora_id, macro_id)
         db.close()

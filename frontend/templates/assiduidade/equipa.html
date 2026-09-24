@@ -75,7 +75,7 @@
         <div><span>Sessões</span><strong>{{ sessoes_total }}</strong><small>{{ sessoes_com_registo }} com registos</small></div>
         <div class="is-positive"><span>Presenças</span><strong>{{ resumo.presentes }}</strong><small>{{ resumo.percentagem }}% dos registos</small></div>
         <div class="is-info"><span>Justificadas</span><strong>{{ resumo.por_estado.justificada }}</strong><small>Ausências justificadas</small></div>
-        <div class="is-injury"><span>Por lesão</span><strong>{{ resumo.por_estado.lesionada }}</strong><small>A acompanhar</small></div>
+        <div class="is-injury"><span>Por lesão</span><strong>{{ resumo.por_estado.lesionado + resumo.por_estado.lesionada }}</strong><small>{{ resumo.por_estado.lesionado }} com presença · {{ resumo.por_estado.lesionada }} faltas</small></div>
         <div class="is-rpe"><span>RPE médio</span><strong>{{ resumo.rpe_medio if resumo.rpe_medio is not none else '—' }}</strong><small>{{ resumo.rpe_registados }} respostas</small></div>
     </div>
 
@@ -91,7 +91,7 @@
         <div class="overflow-x-auto">
             <table class="ds-attendance-report-table">
                 <thead>
-                    <tr><th>{{ termo_jogador(equipa) }}</th><th>Registos</th><th>Presenças</th><th>Atrasadas</th><th>Ausências</th><th>RPE médio</th><th>Taxa</th></tr>
+                    <tr><th>{{ termo_jogador(equipa) }}</th><th>Registos</th><th>Presenças</th><th>{{ estados_assiduidade_visual.atrasada.plural }}</th><th>Ausências</th><th>RPE médio</th><th>Taxa</th></tr>
                 </thead>
                 <tbody>
                     {% for linha in linhas %}
@@ -99,7 +99,7 @@
                         <td data-label="{{ termo_jogador(equipa) }}"><a href="/jogadores/{{ linha.jogador.id }}">{{ linha.jogador.nome }}</a>{% if linha.jogador.numero_camisola %}<small>#{{ linha.jogador.numero_camisola }}</small>{% endif %}</td>
                         <td data-label="Registos">{{ linha.total }}</td>
                         <td data-label="Presenças" class="is-positive">{{ linha.presentes }}</td>
-                        <td data-label="Atrasadas">{{ linha.por_estado.atrasada }}</td>
+                        <td data-label="{{ estados_assiduidade_visual.atrasada.plural }}">{{ linha.por_estado.atrasada }}</td>
                         <td data-label="Ausências" class="is-negative">{{ linha.por_estado.ausente + linha.por_estado.justificada + linha.por_estado.lesionada }}</td>
                         <td data-label="RPE médio">{{ linha.rpe_medio if linha.rpe_medio is not none else '—' }}</td>
                         <td data-label="Taxa"><strong>{{ linha.percentagem }}%</strong></td>
@@ -113,6 +113,6 @@
         {% endif %}
     </div>
 
-    <p class="ds-attendance-report-note"><strong>Como é calculado:</strong> Presente e Atrasada contam como participação; Dispensada não conta como falta.</p>
+    <p class="ds-attendance-report-note"><strong>Como é calculado:</strong> Presente, {{ estados_assiduidade_visual.atrasada.label }} e {{ estados_assiduidade_visual.lesionado.label }} contam como participação; {{ estados_assiduidade_visual.lesionada.label }} conta como ausência; {{ estados_assiduidade_visual.dispensada.label }} não conta como falta.</p>
 </section>
 {% endblock %}

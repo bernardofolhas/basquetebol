@@ -18,10 +18,10 @@ from services.sincronizacao_ui import enriquecer_sessao_para_ui
 from services.pdf_service import renderizar_pdf
 from services.assiduidade_service import (
     ESTADOS_ASSIDUIDADE,
-    ESTADOS_ASSIDUIDADE_VISUAL,
     calcular_resumo_assiduidade,
     estado_assiduidade_visual,
     estado_para_presenca,
+    estados_assiduidade_visuais,
     normalizar_estado_assiduidade,
     obter_relatorio_assiduidade_equipa,
 )
@@ -58,7 +58,7 @@ def _contexto_relatorio_equipa(request: Request, equipa, relatorio: dict, utiliz
         "equipa": equipa,
         **relatorio,
         "estados_assiduidade": ESTADOS_ASSIDUIDADE,
-        "estados_assiduidade_visual": ESTADOS_ASSIDUIDADE_VISUAL,
+        "estados_assiduidade_visual": estados_assiduidade_visuais(equipa),
         "request": request,
     }
 
@@ -254,7 +254,8 @@ async def guardar_pse_individual(
             registo.rpe_individual = rpe
             if rpe is not None:
                 registo.presente = True
-                registo.estado = "presente"
+                if not estado_para_presenca(registo.estado, registo.presente):
+                    registo.estado = "presente"
 
     db.commit()
     if pedido_ajax:
@@ -407,7 +408,7 @@ def pagina_assiduidade(
         1,
     ) if jogadores else 0
     for registo in registos:
-        registo.estado_visual = estado_assiduidade_visual(registo.estado, registo.presente)
+        registo.estado_visual = estado_assiduidade_visual(registo.estado, registo.presente, equipa)
 
     return templates.TemplateResponse(request, "assiduidade/sessao.html", {
         "utilizador": utilizador,
@@ -423,7 +424,7 @@ def pagina_assiduidade(
         "percentagem": resumo["percentagem"],
         "resumo_assiduidade": resumo,
         "estados_assiduidade": ESTADOS_ASSIDUIDADE,
-        "estados_assiduidade_visual": ESTADOS_ASSIDUIDADE_VISUAL,
+        "estados_assiduidade_visual": estados_assiduidade_visuais(equipa),
     })
 
 

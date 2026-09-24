@@ -31,7 +31,7 @@
         <div class="card"><div class="label">Faltas justificadas</div><div class="value">{{ resumo.por_estado.justificada }}</div></div>
     </div>
     <table>
-        <thead><tr><th>{{ termo_jogador(equipa) }}</th><th class="number">Registos</th><th class="number">Presenças</th><th class="number">Atrasadas</th><th class="number">Ausentes</th><th class="number">Justificadas</th><th class="number">Por lesão</th><th class="number">Taxa</th></tr></thead>
+        <thead><tr><th>{{ termo_jogador(equipa) }}</th><th class="number">Registos</th><th class="number">Presenças</th><th class="number">{{ estados_assiduidade_visual.atrasada.plural }}</th><th class="number">Ausentes</th><th class="number">Justificadas</th><th class="number">{{ estados_assiduidade_visual.lesionado.plural }}</th><th class="number">{{ estados_assiduidade_visual.lesionada.plural }}</th><th class="number">Taxa</th></tr></thead>
         <tbody>
         {% for linha in linhas %}
             <tr>
@@ -41,13 +41,14 @@
                 <td class="number">{{ linha.por_estado.atrasada }}</td>
                 <td class="number">{{ linha.por_estado.ausente }}</td>
                 <td class="number">{{ linha.por_estado.justificada }}</td>
+                <td class="number">{{ linha.por_estado.lesionado }}</td>
                 <td class="number">{{ linha.por_estado.lesionada }}</td>
                 <td class="number">{{ linha.percentagem }}%</td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
-    <div class="footer">A taxa considera Presente e Atrasada como participação. Registos não criados não são contabilizados.</div>
+    <div class="footer">A taxa considera Presente, {{ estados_assiduidade_visual.atrasada.label }} e {{ estados_assiduidade_visual.lesionado.label }} como participação. {{ estados_assiduidade_visual.lesionada.label }} conta como ausência. Registos não criados não são contabilizados.</div>
     {{ rodape_pdf(equipa.nome ~ ' · Assiduidade') }}
 </body>
 </html>

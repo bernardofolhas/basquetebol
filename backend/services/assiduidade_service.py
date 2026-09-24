@@ -16,19 +16,34 @@ ESTADOS_ASSIDUIDADE = (
     "atrasada",
     "ausente",
     "justificada",
+    "lesionado",
     "lesionada",
     "dispensada",
 )
 ESTADOS_ASSIDUIDADE_VISUAL = {
-    "por_registar": {"label": "Por registar", "classes": "bg-slate-100 text-slate-600"},
-    "presente": {"label": "Presente", "classes": "bg-green-100 text-green-700"},
-    "atrasada": {"label": "Atrasada", "classes": "bg-amber-100 text-amber-700"},
-    "ausente": {"label": "Ausente", "classes": "bg-red-100 text-red-700"},
-    "justificada": {"label": "Falta justificada", "classes": "bg-blue-100 text-blue-700"},
-    "lesionada": {"label": "Lesionada", "classes": "bg-purple-100 text-purple-700"},
-    "dispensada": {"label": "Dispensada", "classes": "bg-gray-200 text-gray-700"},
+    "por_registar": {"label": "Por registar", "plural": "Por registar", "classes": "bg-slate-100 text-slate-600"},
+    "presente": {"label": "Presente", "plural": "Presentes", "classes": "bg-green-100 text-green-700"},
+    "atrasada": {"label": "Atrasada", "plural": "Atrasadas", "classes": "bg-amber-100 text-amber-700"},
+    "ausente": {"label": "Ausente", "plural": "Ausentes", "classes": "bg-red-100 text-red-700"},
+    "justificada": {"label": "Falta justificada", "plural": "Faltas justificadas", "classes": "bg-blue-100 text-blue-700"},
+    "lesionado": {"label": "Lesionada", "plural": "Lesionadas", "classes": "bg-purple-100 text-purple-700"},
+    "lesionada": {"label": "Lesionada + Falta", "plural": "Lesionadas + Falta", "classes": "bg-rose-100 text-rose-700"},
+    "dispensada": {"label": "Dispensada", "plural": "Dispensadas", "classes": "bg-gray-200 text-gray-700"},
 }
-ESTADOS_PRESENTES = {"presente", "atrasada"}
+ESTADOS_PRESENTES = {"presente", "atrasada", "lesionado"}
+
+
+def estados_assiduidade_visuais(equipa=None) -> dict[str, dict]:
+    """Adapta as etiquetas ao género da equipa sem alterar os códigos históricos."""
+    genero = getattr(getattr(equipa, "genero", None), "value", getattr(equipa, "genero", None))
+    masculino = str(genero or "").strip().casefold() == "masculino"
+    resultado = {codigo: dados.copy() for codigo, dados in ESTADOS_ASSIDUIDADE_VISUAL.items()}
+    if masculino:
+        resultado["atrasada"].update(label="Atrasado", plural="Atrasados")
+        resultado["lesionado"].update(label="Lesionado", plural="Lesionados")
+        resultado["lesionada"].update(label="Lesionado + Falta", plural="Lesionados + Falta")
+        resultado["dispensada"].update(label="Dispensado", plural="Dispensados")
+    return resultado
 
 
 def normalizar_estado_assiduidade(estado: str | None, presente: bool = False) -> str:
@@ -39,9 +54,9 @@ def normalizar_estado_assiduidade(estado: str | None, presente: bool = False) ->
     return "presente" if presente else "ausente"
 
 
-def estado_assiduidade_visual(estado: str | None, presente: bool = False) -> dict:
+def estado_assiduidade_visual(estado: str | None, presente: bool = False, equipa=None) -> dict:
     codigo = normalizar_estado_assiduidade(estado, presente)
-    return {"codigo": codigo, **ESTADOS_ASSIDUIDADE_VISUAL[codigo]}
+    return {"codigo": codigo, **estados_assiduidade_visuais(equipa)[codigo]}
 
 
 def estado_para_presenca(estado: str | None, presente: bool = False) -> bool:
@@ -55,7 +70,7 @@ def calcular_resumo_assiduidade(registos: list[RegistoAssiduidade]) -> dict:
     ]
     contagem = Counter(estados)
     total = len(estados)
-    # Uma dispensa não é uma falta nem uma presença esperada: a atleta ficou
+    # Uma dispensa não é uma falta nem uma presença esperada: o atleta ficou
     # formalmente dispensada daquela sessão e não deve reduzir a percentagem.
     total_elegivel = total - contagem["dispensada"]
     total_presentes = sum(contagem[estado] for estado in ESTADOS_PRESENTES)
@@ -157,5 +172,9 @@ def obter_relatorio_assiduidade_jogador(db: Session, jogador_id: int) -> dict:
         .all()
     )
     for registo in registos:
-        registo.estado_visual = estado_assiduidade_visual(registo.estado, registo.presente)
+        registo.estado_visual = estado_assiduidade_visual(
+            registo.estado,
+            registo.presente,
+            getattr(registo.jogador, "equipa", None),
+        )
     return {"registos": registos, **calcular_resumo_assiduidade(registos)}

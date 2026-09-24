@@ -126,11 +126,11 @@
                 <div class="ds-attendance-fields">
                     <label class="ds-attendance-rpe">
                         <span>RPE individual <small>0–10</small></span>
-                        <input type="number" inputmode="decimal" name="rpe_{{ jogador.id }}" min="0" max="10" step="0.5" value="{{ registo.rpe_individual if registo and registo.rpe_individual is not none else '' }}" placeholder="—" {% if estado_atual not in ('presente', 'atrasada') %}disabled{% endif %}>
+                        <input type="number" inputmode="decimal" name="rpe_{{ jogador.id }}" min="0" max="10" step="0.5" value="{{ registo.rpe_individual if registo and registo.rpe_individual is not none else '' }}" placeholder="—" {% if estado_atual not in ('presente', 'atrasada', 'lesionado') %}disabled{% endif %}>
                     </label>
                     <label class="ds-attendance-note">
                         <span>Nota <small>opcional</small></span>
-                        <input type="text" name="motivo_{{ jogador.id }}" value="{{ registo.motivo_falta if registo and registo.motivo_falta else '' }}" placeholder="Motivo da ausência" {% if estado_atual in ('presente', 'atrasada', 'por_registar') %}disabled{% endif %}>
+                        <input type="text" name="motivo_{{ jogador.id }}" value="{{ registo.motivo_falta if registo and registo.motivo_falta else '' }}" placeholder="Motivo da ausência" {% if estado_atual in ('presente', 'atrasada', 'lesionado', 'por_registar') %}disabled{% endif %}>
                     </label>
                 </div>
             </article>
@@ -152,7 +152,7 @@
 <script>
 (function () {
     const linhas = Array.from(document.querySelectorAll('[data-attendance-row]'));
-    const estadosParticipacao = new Set(['presente', 'atrasada']);
+    const estadosParticipacao = new Set(['presente', 'atrasada', 'lesionado']);
     const pesquisaConvocatoria = document.querySelector('[data-convocatoria-search]');
     if (pesquisaConvocatoria) {
         pesquisaConvocatoria.addEventListener('input', function () {
@@ -174,7 +174,7 @@
     }
 
     function atualizarResumo() {
-        const contagem = { presente: 0, atrasada: 0, ausente: 0, justificada: 0, lesionada: 0, por_registar: 0 };
+        const contagem = { presente: 0, atrasada: 0, ausente: 0, justificada: 0, lesionado: 0, lesionada: 0, dispensada: 0, por_registar: 0 };
         const rpes = [];
         linhas.forEach(function (linha) {
             atualizarLinha(linha);
