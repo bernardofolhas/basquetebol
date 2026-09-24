@@ -3,6 +3,38 @@
 
 {% block titulo %}Planos de treino - {{ equipa.nome }}{% endblock %}
 {% block conteudo %}
+{% macro cartao_plano(sessao, destaque=false) %}
+<article class="rounded-2xl border bg-white p-4 shadow-sm sm:p-5 {% if destaque %}ring-1{% else %}border-slate-200{% endif %}"
+         {% if destaque %}style="border-color:var(--clube-primary-border);box-shadow:0 18px 44px color-mix(in srgb,var(--clube-primary) 14%,transparent)" data-training-today-card{% endif %}
+         data-training-card-id="{{ sessao.id }}" data-training-card-number="{{ sessao.numero_treino or '' }}">
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-full px-3 py-1 text-xs font-bold {% if destaque %}text-white{% else %}bg-orange-50 text-orange-700{% endif %}" {% if destaque %}style="background:var(--clube-primary)"{% endif %}>Treino {{ sessao.numero_treino or 'sem número' }}</span>
+                {% if sessao.plano_treino and sessao.plano_treino.exercicios %}
+                <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Preparado · {{ sessao.plano_treino.exercicios|length }} exercício(s)</span>
+                {% elif sessao.plano_treino %}
+                <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Em preparação</span>
+                {% else %}
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Por preparar</span>
+                {% endif %}
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ sessao.estado|replace('_', ' ')|title }}</span>
+            </div>
+            <p class="mt-3 font-bold text-slate-900">{{ sessao.data|data_pt }}{% if sessao.hora_inicio %} · {{ sessao.hora_inicio }}{% if sessao.hora_fim %}-{{ sessao.hora_fim }}{% endif %}{% endif %}</p>
+            <p class="mt-1 text-sm text-slate-500">{{ sessao.local or 'Local por definir' }} · Micro {{ sessao.microciclo.numero }}</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="/treino/sessoes/{{ sessao.id }}" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white" style="background:var(--clube-primary)">{{ 'Editar plano' if sessao.plano_treino else 'Preparar plano' }}</a>
+            {% if sessao.plano_treino %}<a href="/treino/sessoes/{{ sessao.id }}/pdf" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">PDF</a>{% endif %}
+            <form method="POST" action="/treino/sessoes/{{ sessao.id }}/eliminar" onsubmit="return confirm('Eliminar definitivamente este treino e toda a ficha associada?')">
+                <input type="hidden" name="retorno" value="/treino/equipas/{{ equipa.id }}/planos">
+                <button class="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50">Eliminar treino</button>
+            </form>
+        </div>
+    </div>
+</article>
+{% endmacro %}
+
 {{ equipa_contexto(
     equipa,
     "Planos de treino",
@@ -11,6 +43,22 @@
     "/equipas/" ~ equipa.id,
     "Voltar à equipa"
 ) }}
+
+{% if sessoes_hoje %}
+<section class="mb-6 overflow-hidden rounded-[28px] border" style="border-color:var(--clube-primary-border)" data-training-today>
+    <header class="flex flex-col gap-3 px-5 py-5 text-white sm:flex-row sm:items-center sm:justify-between" style="background:linear-gradient(120deg,var(--clube-primary-dark),var(--clube-primary))">
+        <div>
+            <p class="text-xs font-black uppercase tracking-[0.18em] opacity-75">Prioridade do dia</p>
+            <h2 class="mt-1 text-2xl font-black">Treino de hoje</h2>
+            <p class="mt-1 text-sm opacity-80">Acesso imediato à preparação da sessão atual.</p>
+        </div>
+        <span class="w-fit rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-bold">{{ hoje|data_pt }}</span>
+    </header>
+    <div class="space-y-3 bg-white/80 p-3 sm:p-4">
+        {% for sessao in sessoes_hoje %}{{ cartao_plano(sessao, true) }}{% endfor %}
+    </div>
+</section>
+{% endif %}
 
 <div class="mb-6 flex justify-end">
     <a href="/exportacoes/equipas/{{ equipa.id }}/planeamento" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Selecionar para exportar</a>
@@ -22,35 +70,12 @@
 
 {% if sessoes %}
 <div class="space-y-3" data-training-list>
-    {% for sessao in sessoes %}
-    <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" data-training-card-number="{{ sessao.numero_treino or '' }}">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">Treino {{ sessao.numero_treino or 'sem número' }}</span>
-                    {% if sessao.plano_treino and sessao.plano_treino.exercicios %}
-                    <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Preparado · {{ sessao.plano_treino.exercicios|length }} exercício(s)</span>
-                    {% elif sessao.plano_treino %}
-                    <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Em preparação</span>
-                    {% else %}
-                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Por preparar</span>
-                    {% endif %}
-                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ sessao.estado|replace('_', ' ')|title }}</span>
-                </div>
-                <p class="mt-3 font-bold text-slate-900">{{ sessao.data|data_pt }}{% if sessao.hora_inicio %} · {{ sessao.hora_inicio }}{% if sessao.hora_fim %}-{{ sessao.hora_fim }}{% endif %}{% endif %}</p>
-                <p class="mt-1 text-sm text-slate-500">{{ sessao.local or 'Local por definir' }} · Micro {{ sessao.microciclo.numero }}</p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <a href="/treino/sessoes/{{ sessao.id }}" class="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600">{{ 'Editar plano' if sessao.plano_treino else 'Preparar plano' }}</a>
-                {% if sessao.plano_treino %}<a href="/treino/sessoes/{{ sessao.id }}/pdf" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">PDF</a>{% endif %}
-                <form method="POST" action="/treino/sessoes/{{ sessao.id }}/eliminar" onsubmit="return confirm('Eliminar definitivamente este treino e toda a ficha associada?')">
-                    <input type="hidden" name="retorno" value="/treino/equipas/{{ equipa.id }}/planos">
-                    <button class="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50">Eliminar treino</button>
-                </form>
-            </div>
-        </div>
-    </article>
-    {% endfor %}
+    {% if sessoes_restantes %}
+    {% if sessoes_hoje %}<h2 class="pt-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500">Outros treinos</h2>{% endif %}
+    {% for sessao in sessoes_restantes %}{{ cartao_plano(sessao) }}{% endfor %}
+    {% elif sessoes_hoje %}
+    <p class="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-6 text-center text-sm text-slate-500">Não existem outros treinos nesta listagem.</p>
+    {% endif %}
 </div>
 {% else %}
 <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">

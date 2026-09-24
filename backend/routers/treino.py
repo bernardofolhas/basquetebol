@@ -815,11 +815,17 @@ def listar_planos_treino_equipa(
         SessaoTreino.hora_inicio.asc(),
         SessaoTreino.id.asc(),
     ).all()
+    sessoes_ui = [enriquecer_sessao_para_ui(sessao) for sessao in sessoes]
+    hoje = date.today()
+    sessoes_hoje = [sessao for sessao in sessoes_ui if sessao.data == hoje]
+    sessoes_restantes = [sessao for sessao in sessoes_ui if sessao.data != hoje]
     return templates.TemplateResponse(request, "treino/lista_equipa.html", {
         "utilizador": utilizador,
         "equipa": equipa,
-        "sessoes": [enriquecer_sessao_para_ui(sessao) for sessao in sessoes],
-        "hoje": date.today(),
+        "sessoes": sessoes_ui,
+        "sessoes_hoje": sessoes_hoje,
+        "sessoes_restantes": sessoes_restantes,
+        "hoje": hoje,
     })
 
 

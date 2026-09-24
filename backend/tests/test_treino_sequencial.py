@@ -1,3 +1,5 @@
+from datetime import date
+
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.treino import BibliotecoExercicio, PlanoTreino, ExercicioPlano
 from test_fase2_assiduidade_evolucao import _criar_contexto, _limpar_contexto
@@ -33,6 +35,28 @@ def test_exercicios_sem_blocos_persistem_e_podem_ser_editados(client_admin):
         assert pagina.status_code == 200
         assert "Passe em movimento" in pagina.text
         assert "Finalizacao" in pagina.text
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
+def test_listagem_destaca_treino_de_hoje_sem_o_duplicar(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        sessao.data = date.today()
+        db.commit()
+
+        pagina = client_admin.get(f"/treino/equipas/{equipa_id}/planos")
+
+        assert pagina.status_code == 200
+        assert 'data-training-today' in pagina.text
+        assert 'data-training-today-card' in pagina.text
+        assert "Treino de hoje" in pagina.text
+        assert pagina.text.count(f'data-training-card-id="{sessao.id}"') == 1
+        assert pagina.text.index('data-training-today') < pagina.text.index('Selecionar para exportar')
     finally:
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()
