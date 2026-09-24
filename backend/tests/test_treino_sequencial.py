@@ -96,8 +96,11 @@ def test_adicionar_exercicio_por_ajax_responde_sem_redirect_e_atualiza_o_plano(c
 
         pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
         assert f'id="exercicio-{exercicio.id}"' in pagina.text
+        assert f'data-training-refresh-url="/treino/sessoes/{sessao.id}"' in pagina.text
         assert "adicionarExercicioSemRecarregar" in pagina.text
         assert "new DOMParser()" in pagina.text
+        assert "cache: 'no-store'" in pagina.text
+        assert "credentials: 'same-origin'" in pagina.text
         assert "window.location" not in pagina.text[
             pagina.text.index("async function adicionarExercicioSemRecarregar"):
             pagina.text.index("addForm?.addEventListener('submit'", pagina.text.index("async function adicionarExercicioSemRecarregar"))

@@ -398,6 +398,7 @@ def test_upload_autenticado_aplica_plano_e_abre_dashboard_editavel(client_admin)
         assert editor_importado.status_code == 200
         assert "Voltar ao resumo" in editor_importado.text
         assert "Adicionar exercício" in editor_importado.text
+        assert f'data-training-refresh-url="/treino/sessoes/{sessao.id}?editar=1"' in editor_importado.text
 
         repeticao = client_admin.post(
             f"/treino/importacoes/{importacao_id}/aplicar",

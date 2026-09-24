@@ -470,7 +470,7 @@
                 </button>
             </div>
 
-            <form id="form_adicionar_exercicio" method="POST" action="/treino/planos/{{ plano.id }}/exercicios" class="mt-5 space-y-4" data-library-add-form>
+            <form id="form_adicionar_exercicio" method="POST" action="/treino/planos/{{ plano.id }}/exercicios" class="mt-5 space-y-4" data-library-add-form data-training-refresh-url="/treino/sessoes/{{ sessao.id }}{% if modo_edicao_importacao %}?editar=1{% endif %}">
                 <input type="hidden" name="biblioteca_id" id="biblioteca_id_form_adicionar_exercicio" value="">
                 <input type="hidden" name="origem_biblioteca" value="novo">
                 <p data-library-copy-notice hidden class="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">Será criada uma cópia independente no plano. As alterações feitas aqui não modificam a biblioteca.</p>
@@ -1111,7 +1111,13 @@
                 throw new Error(dados.erro || 'Não foi possível adicionar o exercício.');
             }
 
-            const pagina = await fetch(dados.pagina_url, {headers: {'Accept': 'text/html'}});
+            const paginaUrl = new URL(addForm.dataset.trainingRefreshUrl || dados.pagina_url, document.baseURI);
+            paginaUrl.searchParams.set('_atualizacao', Date.now().toString());
+            const pagina = await fetch(paginaUrl.toString(), {
+                headers: {'Accept': 'text/html'},
+                cache: 'no-store',
+                credentials: 'same-origin',
+            });
             if (!pagina.ok) throw new Error('O exercício foi guardado, mas não foi possível atualizar o cartão.');
             const documentoAtualizado = new DOMParser().parseFromString(await pagina.text(), 'text/html');
             const cartaoAtualizado = documentoAtualizado.getElementById(`exercicio-${dados.exercicio_id}`);
