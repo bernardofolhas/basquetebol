@@ -425,7 +425,7 @@ def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador, db: Se
     caminho_campo_completo = STATIC_DIR / "campos" / "campo_completo.png"
     exercicios_por_bloco = {f"d{bloco.id}": [] for bloco in plano.blocos} if plano else {}
     exercicios = list(plano.exercicios or []) if plano else []
-    testes_fisicos = list(plano.testes_fisicos or []) if plano else []
+    testes_fisicos = list(getattr(plano, "testes_fisicos", []) or []) if plano else []
     nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
     if not nome_treinador and getattr(equipa, "treinadores", None):
         nome_treinador = equipa.treinadores[0].nome
@@ -446,6 +446,7 @@ def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador, db: Se
 
     usa_blocos = bool(plano and plano.blocos)
     resumo_blocos = _construir_resumo_blocos(plano)
+    resumo_conteudos = _resumo_conteudos_plano(exercicios, testes_fisicos)
     return {
         "utilizador": utilizador,
         "sessao": sessao,
@@ -456,9 +457,10 @@ def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador, db: Se
         "blocos_ui": ([{"key": f"d{bloco.id}", "id": bloco.id, "nome": bloco.nome, "tipo": bloco.tipo, "legado": False} for bloco in plano.blocos] if plano else []) + [{"key": letra, "id": None, "nome": "Exercícios sem bloco", "tipo": None, "legado": True} for letra in ["A", "B", "C", "D"] if letra in exercicios_por_bloco],
         "exercicios_lista": sorted(exercicios, key=lambda ex: (ex.ordem or 0, ex.id or 0)),
         "usa_blocos": usa_blocos,
-        "total_exercicios": len(exercicios),
+        "total_exercicios": resumo_conteudos["total_exercicios"],
+        "total_conteudos": resumo_conteudos["total_conteudos"],
         "testes_fisicos_plano": testes_fisicos,
-        "volume_planeado": sum(ex.minutos or 0 for ex in exercicios) + sum(teste.minutos or 0 for teste in testes_fisicos),
+        "volume_planeado": resumo_conteudos["volume_planeado"],
         "rpe_geral": sessao.intensidade_rpe,
         "campo_meio_data_uri": imagem_estatica_data_uri(caminho_campo_meio),
         "campo_completo_data_uri": imagem_estatica_data_uri(caminho_campo_completo),
@@ -566,6 +568,19 @@ def _somar_minutos_hora(hora: str | None, minutos: int | None) -> str | None:
     hora_h, hora_m = map(int, hora_normalizada.split(":"))
     total = (hora_h * 60 + hora_m + minutos) % (24 * 60)
     return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def _resumo_conteudos_plano(exercicios: list, testes_fisicos: list) -> dict[str, int]:
+    """Resume todo o conteúdo temporizado, incluindo as baterias físicas."""
+    total_exercicios = len(exercicios)
+    total_testes_fisicos = len(testes_fisicos)
+    volume_planeado = sum(item.minutos or 0 for item in exercicios + testes_fisicos)
+    return {
+        "total_exercicios": total_exercicios,
+        "total_testes_fisicos": total_testes_fisicos,
+        "total_conteudos": total_exercicios + total_testes_fisicos,
+        "volume_planeado": volume_planeado,
+    }
 
 
 def _hora_sugerida_exercicio(sessao: SessaoTreino, exercicios: list) -> str | None:
@@ -743,10 +758,12 @@ def _dados_horas_conteudos(db: Session, plano: PlanoTreino, proxima_hora: str | 
     """Prepara as horas recalculadas para atualização imediata da página."""
     exercicios = db.query(ExercicioPlano).filter(ExercicioPlano.plano_id == plano.id).all()
     testes = db.query(TesteFisicoPlano).filter(TesteFisicoPlano.plano_id == plano.id).all()
+    resumo = _resumo_conteudos_plano(exercicios, testes)
     return {
         "proxima_hora": proxima_hora or _hora_sugerida_exercicio(plano.sessao, exercicios + testes) or "",
         "exercicios": [{"id": exercicio.id, "hora": exercicio.hora or ""} for exercicio in exercicios],
         "testes_fisicos": [{"id": teste.id, "hora": teste.hora or ""} for teste in testes],
+        **resumo,
     }
 
 
@@ -996,9 +1013,8 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
 
     testes_fisicos_plano = list(plano.testes_fisicos or [])
     conteudos_agendados = list(plano.exercicios) + testes_fisicos_plano
-    volume_planeado = sum(ex.minutos or 0 for ex in plano.exercicios) + sum(
-        teste.minutos or 0 for teste in testes_fisicos_plano
-    )
+    resumo_conteudos = _resumo_conteudos_plano(list(plano.exercicios), testes_fisicos_plano)
+    volume_planeado = resumo_conteudos["volume_planeado"]
     definicoes_testes_fisicos = db.query(DefinicaoTesteFisico).filter(
         DefinicaoTesteFisico.clube_id == equipa.clube_id,
         DefinicaoTesteFisico.ativo.is_(True),
@@ -1040,7 +1056,8 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "categorias_exercicio": CATEGORIAS_EXERCICIO,
         "resumo_blocos": _construir_resumo_blocos(plano),
         "blocos_ui": [{"key": f"d{bloco.id}", "id": bloco.id, "nome": bloco.nome, "tipo": bloco.tipo, "legado": False} for bloco in plano.blocos] + [{"key": letra, "id": None, "nome": f"Bloco {letra}", "tipo": "Legado", "legado": True} for letra in ["A", "B", "C", "D"] if letra in exercicios_por_bloco],
-        "total_exercicios": len(plano.exercicios),
+        "total_exercicios": resumo_conteudos["total_exercicios"],
+        "total_conteudos": resumo_conteudos["total_conteudos"],
         "testes_fisicos_plano": testes_fisicos_plano,
         "definicoes_testes_fisicos": definicoes_testes_fisicos,
         "volume_planeado": volume_planeado,

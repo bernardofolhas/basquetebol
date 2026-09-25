@@ -167,12 +167,18 @@ def test_teste_fisico_novo_cria_bateria_sem_criar_exercicio(client_admin):
         assert (teste.definicao_id, teste.hora, teste.minutos) == (definicao.id, "18:10", 12)
         assert db.query(ExercicioPlano).filter_by(plano_id=plano.id, nome=nome).count() == 0
         assert dados["proxima_hora"] == "18:22"
+        assert dados["total_exercicios"] == 0
+        assert dados["total_testes_fisicos"] == 1
+        assert dados["total_conteudos"] == 1
+        assert dados["volume_planeado"] == 12
 
         pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
         assert f'id="teste-fisico-plano-{teste.id}"' in pagina.text
         assert f"?definicao_id={definicao.id}" in pagina.text
         assert f"data={sessao.data.isoformat()}#testes-fisicos" in pagina.text
         assert "1 teste(s) físico(s)" in pagina.text
+        assert 'data-training-stat="testes-fisicos">1<' in pagina.text
+        assert 'data-training-stat="minutos">12<' in pagina.text
         db.refresh(sessao)
         assert sessao.min_fisicos == 12
 
@@ -186,6 +192,8 @@ def test_teste_fisico_novo_cria_bateria_sem_criar_exercicio(client_admin):
             headers={"Accept": "application/json"},
         )
         assert apagar.status_code == 200
+        assert apagar.json()["total_testes_fisicos"] == 0
+        assert apagar.json()["volume_planeado"] == 0
         assert db.query(ModeloTesteFisicoPlano).filter_by(id=teste.id).count() == 0
         db.refresh(sessao)
         assert sessao.min_fisicos == 0

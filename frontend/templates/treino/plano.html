@@ -355,8 +355,9 @@
                 <h2>Dados do treino</h2>
                 <dl class="training-session-stats">
                     <div data-training-block-only hidden><dt>Blocos</dt><dd>{{ resumo_blocos | length }}</dd></div>
-                    <div><dt>Exercícios</dt><dd>{{ total_exercicios }}</dd></div>
-                    <div><dt>Minutos</dt><dd>{{ volume_planeado if volume_planeado else "—" }}</dd></div>
+                    <div><dt>Exercícios</dt><dd data-training-stat="exercicios">{{ total_exercicios }}</dd></div>
+                    <div><dt>Testes físicos</dt><dd data-training-stat="testes-fisicos">{{ testes_fisicos_plano|length }}</dd></div>
+                    <div><dt>Minutos planeados</dt><dd data-training-stat="minutos">{{ volume_planeado }}</dd></div>
                     <div><dt>PSE planeada</dt><dd>{{ sessao.intensidade_rpe if sessao.intensidade_rpe is not none else "—" }}</dd></div>
                     <div><dt>PSE real</dt><dd>{{ pse_real if pse_real is not none else "—" }}</dd><small>{{ pse_real_respostas }} resposta(s)</small></div>
                     <div><dt>Carga real</dt><dd>{{ carga_real if carga_real is not none else "—" }}</dd><small>min × PSE</small></div>
@@ -1119,6 +1120,12 @@
         const vazioAtual = root.querySelector('[data-training-plan-empty]');
         const vazioAtualizado = documentoAtualizado.querySelector('[data-training-plan-empty]');
         if (vazioAtual && !vazioAtualizado) vazioAtual.remove();
+
+        root.querySelectorAll('[data-training-stat]').forEach(valorAtual => {
+            const chave = valorAtual.dataset.trainingStat;
+            const valorAtualizado = documentoAtualizado.querySelector(`[data-training-stat="${chave}"]`);
+            if (valorAtualizado) valorAtual.textContent = valorAtualizado.textContent;
+        });
 
         root.querySelectorAll('[data-training-group]').forEach(grupo => {
             const grupoAtualizado = documentoAtualizado.getElementById(grupo.id);
