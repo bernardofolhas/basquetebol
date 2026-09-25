@@ -572,9 +572,9 @@
                 <header><div><p class="ds-kicker">Baterias da sessão</p><h2>Testes físicos</h2></div><span>{{ testes_fisicos_plano|length }} agendado(s)</span></header>
                 <div class="training-physical-test-list" data-training-physical-test-list>
                     {% for teste in testes_fisicos_plano %}
-                    <article id="teste-fisico-plano-{{ teste.id }}" class="training-exercise-card training-physical-test-card">
+                    <article id="teste-fisico-plano-{{ teste.id }}" class="training-exercise-card training-physical-test-card" data-training-physical-test-id="{{ teste.id }}" data-training-content-duration="{{ teste.minutos or 0 }}">
                         <header class="training-exercise-card-head"><div class="training-exercise-title"><span class="training-physical-test-icon" aria-hidden="true">FT</span><div><span class="training-exercise-number">Teste físico</span><h3>{{ teste.definicao.nome }}</h3></div></div><div class="training-exercise-actions"><a class="ds-button ds-button-primary ds-button-sm" href="/fisico/equipas/{{ equipa.id }}?definicao_id={{ teste.definicao_id }}&data={{ sessao.data.isoformat() }}#testes-fisicos">Registar resultados</a><form method="POST" action="/treino/testes-fisicos-plano/{{ teste.id }}/apagar" data-training-physical-delete><button type="submit" class="ds-button ds-button-danger ds-button-sm">Retirar</button></form></div></header>
-                        <dl class="training-exercise-meta"><div><dt>Hora</dt><dd>{{ teste.hora or '-' }}</dd></div><div><dt>Duração</dt><dd>{{ teste.minutos }} min</dd></div><div><dt>Tipo</dt><dd>{{ 'Unilateral' if teste.definicao.lateralidade == 'unilateral' else 'Bilateral' }}</dd></div><div><dt>Bateria</dt><dd>Catálogo físico</dd></div></dl>
+                        <dl class="training-exercise-meta"><div><dt>Hora</dt><dd data-training-physical-time>{{ teste.hora or '-' }}</dd></div><div><dt>Duração</dt><dd>{{ teste.minutos }} min</dd></div><div><dt>Tipo</dt><dd>{{ 'Unilateral' if teste.definicao.lateralidade == 'unilateral' else 'Bilateral' }}</dd></div><div><dt>Bateria</dt><dd>Catálogo físico</dd></div></dl>
                         {% if teste.observacoes %}<div class="training-physical-test-notes"><h4>Notas para a sessão</h4><p>{{ teste.observacoes }}</p></div>{% endif %}
                     </article>
                     {% endfor %}
@@ -616,8 +616,8 @@
                                     <form method="POST" action="/treino/exercicios/{{ ex.id }}/duplicar">
                                         <button type="submit" class="ds-button ds-button-secondary ds-button-sm">Duplicar</button>
                                     </form>
-                                    <form method="POST" action="/treino/exercicios/{{ ex.id }}/apagar">
-                                        <button type="button" onclick="if(confirm('Apagar este exercício?')) this.closest('form').submit()" class="ds-button ds-button-danger ds-button-sm">Apagar</button>
+                                    <form method="POST" action="/treino/exercicios/{{ ex.id }}/apagar" data-training-exercise-delete>
+                                        <button type="submit" class="ds-button ds-button-danger ds-button-sm">Apagar</button>
                                     </form>
                                 </div>
                             </header>
@@ -1122,12 +1122,34 @@
 
         root.querySelectorAll('[data-training-group]').forEach(grupo => {
             const grupoAtualizado = documentoAtualizado.getElementById(grupo.id);
-            if (!grupoAtualizado) return;
+            if (!grupoAtualizado) {
+                if (!grupo.querySelector('[data-training-exercise-id]')) grupo.remove();
+                return;
+            }
             ['count', 'duration'].forEach(tipo => {
                 const atual = grupo.querySelector(`[data-training-group-${tipo}]`);
                 const atualizado = grupoAtualizado.querySelector(`[data-training-group-${tipo}]`);
                 if (atual && atualizado) atual.textContent = atualizado.textContent;
             });
+        });
+    }
+
+    function aplicarHorasConteudos(dados) {
+        (dados.exercicios || []).forEach(exercicio => {
+            const cartao = root.querySelector(`[data-training-exercise-id="${exercicio.id}"]`);
+            if (!cartao) return;
+            const valor = cartao.querySelector('[data-training-exercise-time]');
+            const input = cartao.querySelector('[data-training-exercise-time-input]');
+            if (valor) valor.textContent = exercicio.hora || '-';
+            if (input) input.value = exercicio.hora || '';
+        });
+        (dados.testes_fisicos || []).forEach(teste => {
+            const cartao = root.querySelector(`[data-training-physical-test-id="${teste.id}"]`);
+            const valor = cartao?.querySelector('[data-training-physical-time]');
+            if (valor) valor.textContent = teste.hora || '-';
+        });
+        root.querySelectorAll('[data-training-next-time]').forEach(input => {
+            input.value = dados.proxima_hora || '';
         });
     }
 
@@ -1210,9 +1232,7 @@
 
             addForm.reset();
             limparOrigemBiblioteca();
-            const proximaHora = addForm.querySelector('[data-training-next-time]');
-            if (proximaHora) proximaHora.value = dados.proxima_hora || '';
-            physicalForm?.querySelectorAll('[data-training-next-time]').forEach(input => input.value = dados.proxima_hora || '');
+            aplicarHorasConteudos(dados);
             if (estado) {
                 estado.textContent = dados.mensagem || 'Exercício adicionado.';
                 estado.classList.add('text-green-700');
@@ -1302,7 +1322,7 @@
             sincronizarResumoExercicios(atualizado);
             physicalForm.reset();
             sincronizarCamposTesteFisico();
-            root.querySelectorAll('[data-training-next-time]').forEach(input => input.value = dados.proxima_hora || '');
+            aplicarHorasConteudos(dados);
             if (estado) { estado.textContent = dados.mensagem; estado.classList.add('text-green-700'); }
         } catch (erro) {
             if (estado) { estado.textContent = erro.message; estado.classList.add('text-red-600'); }
@@ -1330,18 +1350,41 @@
         physicalAdd?.focus({preventScroll: true});
     });
     root.addEventListener('submit', async evento => {
-        const formulario = evento.target.closest('[data-training-physical-delete]');
+        const formularioFisico = evento.target.closest('[data-training-physical-delete]');
+        const formularioExercicio = evento.target.closest('[data-training-exercise-delete]');
+        const formulario = formularioFisico || formularioExercicio;
         if (!formulario) return;
         evento.preventDefault();
-        if (!confirm('Retirar este teste físico do plano?')) return;
-        const resposta = await fetch(formulario.action, {method: 'POST', headers: {'Accept': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''}});
-        const dados = await resposta.json();
-        if (!resposta.ok || !dados.sucesso) { alert(dados.erro || 'Não foi possível retirar o teste.'); return; }
-        formulario.closest('.training-physical-test-card')?.remove();
-        const lista = root.querySelector('[data-training-physical-test-list]');
-        if (lista && !lista.children.length) root.querySelector('[data-training-physical-tests]').hidden = true;
-        const pagina = await fetch(`${window.location.pathname}?_atualizacao=${Date.now()}`, {cache: 'no-store', credentials: 'same-origin'});
-        if (pagina.ok) sincronizarResumoExercicios(new DOMParser().parseFromString(await pagina.text(), 'text/html'));
+        const descricao = formularioFisico ? 'este teste físico' : 'este exercício';
+        if (!confirm(`Retirar ${descricao} do plano?`)) return;
+        const botao = formulario.querySelector('button[type="submit"]');
+        if (botao) botao.disabled = true;
+        try {
+            const resposta = await fetch(formulario.action, {method: 'POST', headers: {'Accept': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''}});
+            const dados = await resposta.json();
+            if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || `Não foi possível retirar ${descricao}.`);
+
+            formulario.closest('.training-exercise-card')?.remove();
+            renumerarExercicios();
+            aplicarHorasConteudos(dados);
+
+            const listaFisica = root.querySelector('[data-training-physical-test-list]');
+            if (listaFisica && !listaFisica.children.length) root.querySelector('[data-training-physical-tests]').hidden = true;
+
+            const pagina = await fetch(`${window.location.pathname}?_atualizacao=${Date.now()}`, {headers: {'Accept': 'text/html'}, cache: 'no-store', credentials: 'same-origin'});
+            if (pagina.ok) {
+                const atualizado = new DOMParser().parseFromString(await pagina.text(), 'text/html');
+                sincronizarResumoExercicios(atualizado);
+                const contador = root.querySelector('[data-training-physical-tests] header > span');
+                const contadorAtualizado = atualizado.querySelector('[data-training-physical-tests] header > span');
+                if (contador && contadorAtualizado) contador.textContent = contadorAtualizado.textContent;
+            }
+            definirEstado(formularioFisico ? 'Teste físico retirado e horas atualizadas.' : 'Exercício retirado e horas atualizadas.', 'success');
+            window.setTimeout(() => definirEstado(''), 1800);
+        } catch (erro) {
+            if (botao) botao.disabled = false;
+            alert(erro.message || `Não foi possível retirar ${descricao}.`);
+        }
     });
 })();
 document.querySelectorAll('form').forEach(function(formulario) {

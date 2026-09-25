@@ -654,6 +654,58 @@ def _aplicar_ordem_e_horas_exercicios(
     return hora_corrente
 
 
+def _recalcular_horas_apos_remocao(
+    db: Session,
+    plano: PlanoTreino,
+    hora_removida: str | None,
+) -> str | None:
+    """Fecha o intervalo removido sem alterar conteúdos anteriores."""
+    exercicios = db.query(ExercicioPlano).filter(ExercicioPlano.plano_id == plano.id).all()
+    testes = db.query(TesteFisicoPlano).filter(TesteFisicoPlano.plano_id == plano.id).all()
+    conteudos = exercicios + testes
+    hora_inicio = normalizar_hora(
+        plano.sessao.hora_inicio or plano.hora_inicio,
+        permitir_vazio=False,
+    )
+    hora_ancora = normalizar_hora(hora_removida, permitir_vazio=False) or hora_inicio
+    if not hora_inicio or not hora_ancora:
+        return _hora_sugerida_exercicio(plano.sessao, conteudos)
+
+    inicio_h, inicio_m = map(int, hora_inicio.split(":"))
+    inicio_minutos = inicio_h * 60 + inicio_m
+
+    def deslocamento(hora: str | None) -> int:
+        hora_normalizada = normalizar_hora(hora, permitir_vazio=False)
+        if not hora_normalizada:
+            return 24 * 60
+        hora_h, hora_m = map(int, hora_normalizada.split(":"))
+        return ((hora_h * 60 + hora_m) - inicio_minutos) % (24 * 60)
+
+    def chave(conteudo):
+        tipo = 0 if isinstance(conteudo, ExercicioPlano) else 1
+        ordem = conteudo.ordem if isinstance(conteudo, ExercicioPlano) else conteudo.id
+        return deslocamento(conteudo.hora), tipo, ordem or 0, conteudo.id or 0
+
+    deslocamento_ancora = deslocamento(hora_ancora)
+    posteriores = [conteudo for conteudo in conteudos if deslocamento(conteudo.hora) >= deslocamento_ancora]
+    hora_corrente = hora_ancora
+    for conteudo in sorted(posteriores, key=chave):
+        conteudo.hora = hora_corrente
+        hora_corrente = _somar_minutos_hora(hora_corrente, conteudo.minutos)
+    return _hora_sugerida_exercicio(plano.sessao, conteudos)
+
+
+def _dados_horas_conteudos(db: Session, plano: PlanoTreino, proxima_hora: str | None = None) -> dict:
+    """Prepara as horas recalculadas para atualização imediata da página."""
+    exercicios = db.query(ExercicioPlano).filter(ExercicioPlano.plano_id == plano.id).all()
+    testes = db.query(TesteFisicoPlano).filter(TesteFisicoPlano.plano_id == plano.id).all()
+    return {
+        "proxima_hora": proxima_hora or _hora_sugerida_exercicio(plano.sessao, exercicios + testes) or "",
+        "exercicios": [{"id": exercicio.id, "hora": exercicio.hora or ""} for exercicio in exercicios],
+        "testes_fisicos": [{"id": teste.id, "hora": teste.hora or ""} for teste in testes],
+    }
+
+
 def _normalizar_bloco(bloco: str | None) -> str:
     valor = (bloco or "A").strip().upper()
     if valor not in {"A", "B", "C", "D"}:
@@ -1911,15 +1963,12 @@ async def adicionar_teste_fisico_plano(
     db.flush()
     sincronizar_minutos_categorias(plano, db)
     db.commit()
-    conteudos_atualizados = db.query(ExercicioPlano).filter(ExercicioPlano.plano_id == plano.id).all()
-    conteudos_atualizados += db.query(TesteFisicoPlano).filter(TesteFisicoPlano.plano_id == plano.id).all()
-    proxima_hora = _hora_sugerida_exercicio(plano.sessao, conteudos_atualizados) or ""
     dados = {
         "sucesso": True,
         "mensagem": "Teste físico adicionado ao plano.",
         "teste_id": teste.id,
         "pagina_url": f"/treino/sessoes/{plano.sessao_id}",
-        "proxima_hora": proxima_hora,
+        **_dados_horas_conteudos(db, plano),
     }
     if resposta_json:
         return JSONResponse(dados)
@@ -1939,12 +1988,19 @@ async def apagar_teste_fisico_plano(
         return JSONResponse({"sucesso": False, "erro": "Teste físico não encontrado."}, status_code=404)
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, teste.plano_id), db)
     plano = teste.plano
+    hora_removida = teste.hora
+    _marcar_sessao_como_alterada_manual(plano.sessao)
     db.delete(teste)
     db.flush()
+    proxima_hora = _recalcular_horas_apos_remocao(db, plano, hora_removida)
     sincronizar_minutos_categorias(plano, db)
     db.commit()
     if "application/json" in request.headers.get("accept", "").lower():
-        return JSONResponse({"sucesso": True, "mensagem": "Teste físico retirado do plano."})
+        return JSONResponse({
+            "sucesso": True,
+            "mensagem": "Teste físico retirado do plano.",
+            **_dados_horas_conteudos(db, plano, proxima_hora),
+        })
     set_flash(request, "Teste físico retirado do plano.", "success")
     return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
 
@@ -2095,18 +2151,12 @@ async def adicionar_exercicio(
 
     if resposta_json:
         db.refresh(exercicio)
-        exercicios_atualizados = db.query(ExercicioPlano).filter(
-            ExercicioPlano.plano_id == plano.id
-        ).all()
         return JSONResponse({
             "sucesso": True,
             "mensagem": mensagem,
             "exercicio_id": exercicio.id,
             "pagina_url": f"/treino/sessoes/{plano.sessao_id}",
-            "proxima_hora": _hora_sugerida_exercicio(
-                plano.sessao,
-                exercicios_atualizados + list(plano.testes_fisicos),
-            ) or "",
+            **_dados_horas_conteudos(db, plano),
         })
 
     set_flash(request, mensagem, "success")
@@ -2184,14 +2234,23 @@ async def apagar_exercicio(exercicio_id: int, request: Request, db: Session = De
 
     if exercicio:
         sessao_id = exercicio.plano.sessao_id
+        plano = exercicio.plano
         plano_id = exercicio.plano_id
         bloco = exercicio.bloco or "A"
-        _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+        hora_removida = exercicio.hora
+        _marcar_sessao_como_alterada_manual(plano.sessao)
         db.delete(exercicio)
         db.flush()
-        sincronizar_minutos_categorias(exercicio.plano, db)
+        proxima_hora = _recalcular_horas_apos_remocao(db, plano, hora_removida)
+        sincronizar_minutos_categorias(plano, db)
         _reordenar_exercicios_bloco(db, plano_id, bloco)
         db.commit()
+        if "application/json" in request.headers.get("accept", "").lower():
+            return JSONResponse({
+                "sucesso": True,
+                "mensagem": "Exercício retirado do plano.",
+                **_dados_horas_conteudos(db, plano, proxima_hora),
+            })
         return RedirectResponse(url=f"/treino/sessoes/{sessao_id}", status_code=303)
 
     return RedirectResponse(url="/equipas")

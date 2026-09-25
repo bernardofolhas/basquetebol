@@ -235,6 +235,69 @@ def test_teste_fisico_reutiliza_bateria_e_define_hora_automatica(client_admin):
         db.close()
 
 
+def test_remover_exercicio_ou_teste_recalcula_toda_a_sequencia(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        definicao = DefinicaoTesteFisico(
+            clube_id=plano.clube_id,
+            nome=f"Sequência física {equipa_id}",
+            lateralidade="bilateral",
+            ativo=True,
+        )
+        db.add(definicao)
+        db.commit()
+
+        primeiro = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={"nome": "Primeiro conteúdo", "minutos": "10"},
+            headers={"Accept": "application/json"},
+        ).json()
+        teste = client_admin.post(
+            f"/treino/planos/{plano.id}/testes-fisicos",
+            data={"definicao_id": str(definicao.id), "minutos": "5"},
+            headers={"Accept": "application/json"},
+        ).json()
+        segundo = client_admin.post(
+            f"/treino/planos/{plano.id}/exercicios",
+            data={"nome": "Terceiro conteúdo", "minutos": "20"},
+            headers={"Accept": "application/json"},
+        ).json()
+
+        assert segundo["proxima_hora"] == "18:35"
+        assert [(item.hora, item.minutos) for item in (
+            db.query(ExercicioPlano).filter_by(plano_id=plano.id).order_by(ExercicioPlano.hora).all()
+        )] == [("18:00", 10), ("18:15", 20)]
+        assert db.query(ModeloTesteFisicoPlano).filter_by(id=teste["teste_id"]).one().hora == "18:10"
+
+        resposta_exercicio = client_admin.post(
+            f"/treino/exercicios/{primeiro['exercicio_id']}/apagar",
+            headers={"Accept": "application/json"},
+        )
+        assert resposta_exercicio.status_code == 200
+        dados_exercicio = resposta_exercicio.json()
+        assert dados_exercicio["proxima_hora"] == "18:25"
+        assert dados_exercicio["testes_fisicos"] == [{"id": teste["teste_id"], "hora": "18:00"}]
+        assert dados_exercicio["exercicios"] == [{"id": segundo["exercicio_id"], "hora": "18:05"}]
+
+        resposta_teste = client_admin.post(
+            f"/treino/testes-fisicos-plano/{teste['teste_id']}/apagar",
+            headers={"Accept": "application/json"},
+        )
+        assert resposta_teste.status_code == 200
+        dados_teste = resposta_teste.json()
+        assert dados_teste["proxima_hora"] == "18:20"
+        assert dados_teste["testes_fisicos"] == []
+        assert dados_teste["exercicios"] == [{"id": segundo["exercicio_id"], "hora": "18:00"}]
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_adicionar_exercicio_por_ajax_responde_sem_redirect_e_atualiza_o_plano(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
