@@ -57,6 +57,12 @@ class PlanoTreino(Base):
         cascade="all, delete-orphan",
         order_by="ImportacaoPlanoTreino.criado_em.desc()",
     )
+    testes_fisicos = relationship(
+        "TesteFisicoPlano",
+        back_populates="plano",
+        cascade="all, delete-orphan",
+        order_by="TesteFisicoPlano.hora, TesteFisicoPlano.id",
+    )
 
 
 class ImportacaoPlanoTreino(Base):
@@ -148,6 +154,28 @@ class ExercicioPlano(Base):
     # Relação com o plano
     plano = relationship("PlanoTreino", back_populates="exercicios")
     bloco_dinamico = relationship("BlocoTreino", back_populates="exercicios")
+
+
+class TesteFisicoPlano(Base):
+    """Agendamento de uma bateria física dentro de uma sessão de treino."""
+
+    __tablename__ = "testes_fisicos_plano"
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
+    plano_id = Column(Integer, ForeignKey("planos_treino.id", ondelete="CASCADE"), nullable=False, index=True)
+    definicao_id = Column(
+        Integer,
+        ForeignKey("definicoes_testes_fisicos.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    hora = Column(String, nullable=True)
+    minutos = Column(Integer, nullable=False)
+    observacoes = Column(Text, nullable=True)
+
+    plano = relationship("PlanoTreino", back_populates="testes_fisicos")
+    definicao = relationship("DefinicaoTesteFisico")
 
 
 class BibliotecoExercicio(Base):

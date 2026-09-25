@@ -981,6 +981,22 @@ table tbody tr:hover { background:#fafbfd; }
 .training-add-divider::before,.training-add-divider::after { height:1px;flex:1;background:var(--border-strong);content:""; }
 .training-add-trigger { display:grid;width:2rem;height:2rem;flex:none;place-items:center;border:1px solid var(--clube-primary);border-radius:999px;background:#fff;color:var(--clube-primary);font-size:1.25rem;font-weight:800;line-height:1;box-shadow:0 2px 7px rgb(15 23 42 / .08);transition:background .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease; }
 .training-add-trigger:hover,.training-add-trigger:focus-visible { background:var(--clube-primary);color:#fff;outline:0;box-shadow:0 0 0 4px var(--clube-primary-soft);transform:scale(1.04); }
+.training-add-physical { display:inline-flex;min-height:2rem;align-items:center;gap:.45rem;border:1px solid var(--clube-primary-border);border-radius:999px;background:var(--clube-primary-surface);padding:.32rem .75rem;color:var(--clube-primary-dark);font-size:.7rem;font-weight:850;transition:background .18s ease,color .18s ease,transform .18s ease; }
+.training-add-physical span { display:grid;width:1.35rem;height:1.35rem;place-items:center;border-radius:999px;background:var(--clube-primary);color:var(--clube-on-primary);font-size:.55rem; }
+.training-add-physical:hover,.training-add-physical:focus-visible { outline:0;background:var(--clube-primary);color:var(--clube-on-primary);transform:translateY(-1px); }
+.training-physical-tests { overflow:hidden;border:1px solid var(--clube-primary-border);border-radius:var(--radius-card);background:linear-gradient(145deg,var(--clube-primary-surface),#fff 42%);padding:1rem;box-shadow:var(--shadow-card); }
+.training-physical-tests>header { display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.8rem;padding:.1rem .15rem; }
+.training-physical-tests>header h2 { margin-top:.15rem;color:var(--text-main);font-size:1.05rem;font-weight:850; }
+.training-physical-tests>header>span { border-radius:999px;background:#fff;padding:.35rem .65rem;color:var(--clube-primary-dark);font-size:.68rem;font-weight:800; }
+.training-physical-test-list { display:grid;gap:.8rem; }
+.training-physical-test-card { border-color:var(--clube-primary-border); }
+.training-physical-test-icon { display:grid;width:2rem;height:2rem;flex:none;place-items:center;border-radius:.65rem;background:var(--clube-primary);color:var(--clube-on-primary);font-size:.62rem;font-weight:900;letter-spacing:.04em; }
+.training-physical-test-notes { padding:1rem 1.15rem; }
+.training-physical-test-notes h4 { color:var(--text-soft);font-size:.62rem;font-weight:800;letter-spacing:.075em;text-transform:uppercase; }
+.training-physical-test-notes p { margin-top:.4rem;white-space:pre-wrap;color:var(--text-main);font-size:.82rem;line-height:1.5; }
+.training-physical-definition-fields { display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:1rem; }
+.training-physical-definition-fields label { color:var(--text-muted);font-size:.72rem;font-weight:650; }
+.training-physical-definition-fields input,.training-physical-definition-fields select { display:block;width:100%;margin-top:.3rem;border:1px solid var(--border-strong);border-radius:.75rem;padding:.55rem .7rem;background:#fff;color:var(--text-main); }
 .training-workspace:not(.training-with-blocks) [data-training-group] { border:0;border-radius:0;box-shadow:none;background:transparent; }
 .training-workspace:not(.training-with-blocks) .training-group-body { border:0;padding:0; }
 .training-session-heading { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;padding:1rem 1.2rem;border-bottom:1px solid var(--border-soft);background:var(--surface-subtle);color:var(--text-main); }

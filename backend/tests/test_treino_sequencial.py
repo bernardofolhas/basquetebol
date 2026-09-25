@@ -1,7 +1,8 @@
 from datetime import date
 
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
-from models.treino import BibliotecoExercicio, PlanoTreino, ExercicioPlano
+from models.fisico import DefinicaoTesteFisico
+from models.treino import BibliotecoExercicio, PlanoTreino, ExercicioPlano, TesteFisicoPlano as ModeloTesteFisicoPlano
 from test_fase2_assiduidade_evolucao import _criar_contexto, _limpar_contexto
 
 
@@ -139,6 +140,97 @@ def test_hora_do_novo_exercicio_usa_o_termino_mais_tardio_entre_blocos(client_ad
         ).one()
         assert exercicio.hora == "19:08"
     finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
+def test_teste_fisico_novo_cria_bateria_sem_criar_exercicio(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    nome = f"Sprint planeado {equipa_id}"
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/testes-fisicos",
+            data={"nome": nome, "hora": "18:10", "minutos": "12", "unidade_total": "s"},
+            headers={"Accept": "application/json"},
+        )
+
+        assert resposta.status_code == 200
+        dados = resposta.json()
+        definicao = db.query(DefinicaoTesteFisico).filter_by(nome=nome).one()
+        teste = db.query(ModeloTesteFisicoPlano).filter_by(id=dados["teste_id"]).one()
+        assert (teste.definicao_id, teste.hora, teste.minutos) == (definicao.id, "18:10", 12)
+        assert db.query(ExercicioPlano).filter_by(plano_id=plano.id, nome=nome).count() == 0
+        assert dados["proxima_hora"] == "18:22"
+
+        pagina = client_admin.get(f"/treino/sessoes/{sessao.id}")
+        assert f'id="teste-fisico-plano-{teste.id}"' in pagina.text
+        assert f"?definicao_id={definicao.id}" in pagina.text
+        assert f"data={sessao.data.isoformat()}#testes-fisicos" in pagina.text
+        assert "1 teste(s) físico(s)" in pagina.text
+        db.refresh(sessao)
+        assert sessao.min_fisicos == 12
+
+        impressao = client_admin.get(f"/treino/sessoes/{sessao.id}/print")
+        assert impressao.status_code == 200
+        assert "Testes físicos da sessão" in impressao.text
+        assert nome in impressao.text
+
+        apagar = client_admin.post(
+            f"/treino/testes-fisicos-plano/{teste.id}/apagar",
+            headers={"Accept": "application/json"},
+        )
+        assert apagar.status_code == 200
+        assert db.query(ModeloTesteFisicoPlano).filter_by(id=teste.id).count() == 0
+        db.refresh(sessao)
+        assert sessao.min_fisicos == 0
+    finally:
+        db.query(ModeloTesteFisicoPlano).filter(ModeloTesteFisicoPlano.plano_id.in_(
+            db.query(PlanoTreino.id).join(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(Macrociclo.id == macro_id)
+        )).delete(synchronize_session=False)
+        definicao = db.query(DefinicaoTesteFisico).filter_by(nome=nome).first()
+        if definicao:
+            db.delete(definicao)
+        db.commit()
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
+def test_teste_fisico_reutiliza_bateria_e_define_hora_automatica(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    definicao = None
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        definicao = DefinicaoTesteFisico(clube_id=plano.clube_id, nome=f"CMJ {equipa_id}", lateralidade="bilateral", ativo=True)
+        db.add(definicao)
+        db.add(ExercicioPlano(clube_id=plano.clube_id, plano_id=plano.id, bloco="A", ordem=1, nome="Aquecimento", hora="18:00", minutos=15))
+        db.commit()
+
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/testes-fisicos",
+            data={"definicao_id": str(definicao.id), "minutos": "10"},
+            headers={"Accept": "application/json"},
+        )
+
+        assert resposta.status_code == 200
+        teste = db.query(ModeloTesteFisicoPlano).filter_by(id=resposta.json()["teste_id"]).one()
+        assert teste.hora == "18:15"
+        assert db.query(DefinicaoTesteFisico).filter_by(clube_id=plano.clube_id, nome=definicao.nome).count() == 1
+        assert resposta.json()["proxima_hora"] == "18:25"
+    finally:
+        if definicao:
+            db.query(ModeloTesteFisicoPlano).filter_by(definicao_id=definicao.id).delete(synchronize_session=False)
+            db.delete(definicao)
+            db.commit()
         _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
         db.close()
 

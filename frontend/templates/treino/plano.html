@@ -454,8 +454,8 @@
             <div data-training-block-only hidden>
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h2 class="text-xl font-semibold text-gray-800">Blocos do treino</h2><p class="mt-1 text-sm text-gray-500">Cria apenas os blocos necessários.</p></div><form method="POST" action="/treino/planos/{{ plano.id }}/blocos" class="flex flex-wrap gap-2"><input name="nome" required placeholder="Ex: Aquecimento" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><input name="tipo" placeholder="Tipo opcional" class="rounded-xl border border-gray-300 px-3 py-2 text-sm"><button class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white">Criar bloco</button></form></div>
             </div>
-            <p class="training-duration" data-training-plan-duration>{{ total_exercicios }} exercício(s) · {{ volume_planeado }}{% if duracao_prevista is not none %}/{{ duracao_prevista }}{% endif %} min planeados</p>
-            {% if not total_exercicios %}<p class="training-empty" data-training-plan-empty>Adiciona o primeiro exercício para começar.</p>{% endif %}
+            <p class="training-duration" data-training-plan-duration>{{ total_exercicios }} exercício(s) · {{ testes_fisicos_plano|length }} teste(s) físico(s) · {{ volume_planeado }}{% if duracao_prevista is not none %}/{{ duracao_prevista }}{% endif %} min planeados</p>
+            {% if not total_exercicios and not testes_fisicos_plano %}<p class="training-empty" data-training-plan-empty>Adiciona o primeiro conteúdo para começar.</p>{% endif %}
         </div>
 
         {% macro painel_adicionar_exercicio() %}
@@ -528,7 +528,58 @@
         </section>
         {% endmacro %}
 
+        <section id="training-physical-test-panel" hidden class="training-physical-test-form rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm">
+            <div>
+                <p class="ds-kicker">Avaliação física</p>
+                <h2 class="text-xl font-semibold text-gray-800">Adicionar teste físico</h2>
+                <p class="mt-1 text-sm text-gray-500">Reutiliza uma bateria do clube ou cria uma nova. O teste não será guardado como exercício.</p>
+            </div>
+            <form id="form_adicionar_teste_fisico" method="POST" action="/treino/planos/{{ plano.id }}/testes-fisicos" class="mt-5 space-y-4" data-training-refresh-url="/treino/sessoes/{{ sessao.id }}{% if modo_edicao_importacao %}?editar=1{% endif %}">
+                <div class="training-exercise-fields">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Bateria existente</label>
+                        <select name="definicao_id" data-training-physical-definition class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
+                            <option value="">+ Criar novo teste</option>
+                            {% for definicao in definicoes_testes_fisicos %}<option value="{{ definicao.id }}">{{ definicao.nome }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div data-training-new-physical-test>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Nome do novo teste</label>
+                        <input type="text" name="nome" placeholder="Ex.: Sprint 20 m, CMJ, Yo-Yo" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Hora</label>
+                        <input type="time" name="hora" value="{{ hora_sugerida_exercicio or '' }}" data-training-next-time class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Duração prevista</label>
+                        <input type="number" name="minutos" min="1" max="240" required placeholder="15" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
+                    </div>
+                </div>
+                <div class="training-physical-definition-fields" data-training-new-physical-test>
+                    <label>Tipo<select name="lateralidade" data-training-physical-laterality><option value="bilateral">Bilateral</option><option value="unilateral">Unilateral</option></select></label>
+                    <label>Unidade do resultado<input type="text" name="unidade_total" placeholder="s, cm, kg, W..."></label>
+                    <label data-training-unilateral hidden>Unidade esquerda<input type="text" name="unidade_esquerda"></label>
+                    <label data-training-unilateral hidden>Unidade direita<input type="text" name="unidade_direita"></label>
+                </div>
+                <label class="block text-xs font-medium text-gray-500">Notas para a sessão<textarea name="observacoes" rows="2" placeholder="Protocolo, organização ou material necessário" class="mt-1 w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm"></textarea></label>
+                <div class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-sm font-medium text-gray-500" data-training-physical-status aria-live="polite"></span><button type="button" class="ds-button ds-button-secondary" data-training-physical-cancel>Cancelar</button><button type="submit" class="ds-button ds-button-primary">+ Adicionar teste físico</button></div>
+            </form>
+        </section>
+
         <div data-workspace-panel="treino:exercicios" role="tabpanel" class="mt-6 space-y-4">
+            <section class="training-physical-tests" data-training-physical-tests {% if not testes_fisicos_plano %}hidden{% endif %}>
+                <header><div><p class="ds-kicker">Baterias da sessão</p><h2>Testes físicos</h2></div><span>{{ testes_fisicos_plano|length }} agendado(s)</span></header>
+                <div class="training-physical-test-list" data-training-physical-test-list>
+                    {% for teste in testes_fisicos_plano %}
+                    <article id="teste-fisico-plano-{{ teste.id }}" class="training-exercise-card training-physical-test-card">
+                        <header class="training-exercise-card-head"><div class="training-exercise-title"><span class="training-physical-test-icon" aria-hidden="true">FT</span><div><span class="training-exercise-number">Teste físico</span><h3>{{ teste.definicao.nome }}</h3></div></div><div class="training-exercise-actions"><a class="ds-button ds-button-primary ds-button-sm" href="/fisico/equipas/{{ equipa.id }}?definicao_id={{ teste.definicao_id }}&data={{ sessao.data.isoformat() }}#testes-fisicos">Registar resultados</a><form method="POST" action="/treino/testes-fisicos-plano/{{ teste.id }}/apagar" data-training-physical-delete><button type="submit" class="ds-button ds-button-danger ds-button-sm">Retirar</button></form></div></header>
+                        <dl class="training-exercise-meta"><div><dt>Hora</dt><dd>{{ teste.hora or '-' }}</dd></div><div><dt>Duração</dt><dd>{{ teste.minutos }} min</dd></div><div><dt>Tipo</dt><dd>{{ 'Unilateral' if teste.definicao.lateralidade == 'unilateral' else 'Bilateral' }}</dd></div><div><dt>Bateria</dt><dd>Catálogo físico</dd></div></dl>
+                        {% if teste.observacoes %}<div class="training-physical-test-notes"><h4>Notas para a sessão</h4><p>{{ teste.observacoes }}</p></div>{% endif %}
+                    </article>
+                    {% endfor %}
+                </div>
+            </section>
             {% for bloco_ui in blocos_ui %}
             {% set bloco_letra = bloco_ui.key %}
             {% set resumo_minutos = exercicios_por_bloco[bloco_letra]|map(attribute='minutos')|select|sum %}
@@ -691,8 +742,10 @@
 
             <div class="space-y-4" data-training-add-flow>
                 {{ painel_adicionar_exercicio() }}
+                <div id="training-physical-test-form-slot"></div>
                 <div class="training-add-divider">
                     <button type="button" class="training-add-trigger" aria-controls="training-add-panel" aria-expanded="false" aria-label="Adicionar exercício" title="Adicionar exercício" data-training-add><span aria-hidden="true">+</span></button>
+                    <button type="button" class="training-add-physical" aria-controls="training-physical-test-panel" aria-expanded="false" data-training-add-physical><span aria-hidden="true">FT</span> Teste físico</button>
                 </div>
             </div>
         </div>
@@ -1032,6 +1085,11 @@
     const panel = document.getElementById('training-add-panel');
     const add = root.querySelector('[data-training-add]');
     const addForm = document.getElementById('form_adicionar_exercicio');
+    const physicalPanel = document.getElementById('training-physical-test-panel');
+    const physicalSlot = document.getElementById('training-physical-test-form-slot');
+    const physicalAdd = root.querySelector('[data-training-add-physical]');
+    const physicalForm = document.getElementById('form_adicionar_teste_fisico');
+    if (physicalPanel && physicalSlot) physicalSlot.appendChild(physicalPanel);
     function limparOrigemBiblioteca() {
         if (!addForm) return;
         const bibliotecaId = addForm.querySelector('[name="biblioteca_id"]');
@@ -1145,6 +1203,7 @@
             limparOrigemBiblioteca();
             const proximaHora = addForm.querySelector('[data-training-next-time]');
             if (proximaHora) proximaHora.value = dados.proxima_hora || '';
+            physicalForm?.querySelectorAll('[data-training-next-time]').forEach(input => input.value = dados.proxima_hora || '');
             if (estado) {
                 estado.textContent = dados.mensagem || 'Exercício adicionado.';
                 estado.classList.add('text-green-700');
@@ -1175,6 +1234,8 @@
 
     addForm?.addEventListener('submit', adicionarExercicioSemRecarregar);
     add?.addEventListener('click', () => {
+        physicalPanel.hidden = true;
+        physicalAdd?.setAttribute('aria-expanded', 'false');
         panel.hidden = false;
         add.setAttribute('aria-expanded', 'true');
         panel.querySelector('input[name="nome"]').focus({preventScroll: true});
@@ -1185,6 +1246,93 @@
         limparOrigemBiblioteca();
         add.setAttribute('aria-expanded', 'false');
         add.focus({preventScroll: true});
+    });
+
+    function sincronizarCamposTesteFisico() {
+        const definicao = physicalForm?.querySelector('[data-training-physical-definition]');
+        const novo = !definicao?.value;
+        physicalForm?.querySelectorAll('[data-training-new-physical-test]').forEach(campo => campo.hidden = !novo);
+        const nome = physicalForm?.querySelector('[name="nome"]');
+        if (nome) nome.required = novo;
+        const unilateral = physicalForm?.querySelector('[data-training-physical-laterality]')?.value === 'unilateral';
+        physicalForm?.querySelectorAll('[data-training-unilateral]').forEach(campo => campo.hidden = !novo || !unilateral);
+    }
+
+    async function adicionarTesteFisicoSemRecarregar(evento) {
+        evento.preventDefault();
+        if (!physicalForm || physicalForm.dataset.submitting === 'true') return;
+        const botao = physicalForm.querySelector('button[type="submit"]');
+        const estado = physicalForm.querySelector('[data-training-physical-status]');
+        const textoOriginal = botao?.textContent || '';
+        physicalForm.dataset.submitting = 'true';
+        if (botao) { botao.disabled = true; botao.textContent = 'A adicionar...'; }
+        if (estado) { estado.textContent = 'A guardar o teste físico...'; estado.classList.remove('text-red-600', 'text-green-700'); }
+        try {
+            const resposta = await fetch(physicalForm.action, {method: 'POST', body: new FormData(physicalForm), headers: {'Accept': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''}});
+            const dados = await resposta.json();
+            if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível adicionar o teste físico.');
+            const paginaUrl = new URL(physicalForm.dataset.trainingRefreshUrl || dados.pagina_url, document.baseURI);
+            paginaUrl.searchParams.set('_atualizacao', Date.now().toString());
+            const pagina = await fetch(paginaUrl.toString(), {headers: {'Accept': 'text/html'}, cache: 'no-store', credentials: 'same-origin'});
+            if (!pagina.ok) throw new Error('O teste foi guardado, mas não foi possível atualizar o cartão.');
+            const atualizado = new DOMParser().parseFromString(await pagina.text(), 'text/html');
+            const novoCartao = atualizado.getElementById(`teste-fisico-plano-${dados.teste_id}`);
+            const secaoAtualizada = atualizado.querySelector('[data-training-physical-tests]');
+            let secao = root.querySelector('[data-training-physical-tests]');
+            if (!novoCartao || !secaoAtualizada) throw new Error('O teste foi guardado, mas o novo cartão não ficou disponível.');
+            if (!secao) {
+                secao = document.importNode(secaoAtualizada, true);
+                root.querySelector('[data-training-group]')?.before(secao);
+            } else {
+                secao.hidden = false;
+                secao.querySelector('[data-training-physical-test-list]')?.appendChild(document.importNode(novoCartao, true));
+                const contador = secao.querySelector('header > span');
+                const novoContador = secaoAtualizada.querySelector('header > span');
+                if (contador && novoContador) contador.textContent = novoContador.textContent;
+            }
+            sincronizarResumoExercicios(atualizado);
+            physicalForm.reset();
+            sincronizarCamposTesteFisico();
+            root.querySelectorAll('[data-training-next-time]').forEach(input => input.value = dados.proxima_hora || '');
+            if (estado) { estado.textContent = dados.mensagem; estado.classList.add('text-green-700'); }
+        } catch (erro) {
+            if (estado) { estado.textContent = erro.message; estado.classList.add('text-red-600'); }
+        } finally {
+            delete physicalForm.dataset.submitting;
+            if (botao) { botao.disabled = false; botao.textContent = textoOriginal; }
+        }
+    }
+
+    physicalAdd?.addEventListener('click', () => {
+        panel.hidden = true;
+        add?.setAttribute('aria-expanded', 'false');
+        physicalPanel.hidden = false;
+        physicalAdd.setAttribute('aria-expanded', 'true');
+        sincronizarCamposTesteFisico();
+        physicalForm?.querySelector('select')?.focus({preventScroll: true});
+    });
+    physicalForm?.querySelector('[data-training-physical-definition]')?.addEventListener('change', sincronizarCamposTesteFisico);
+    physicalForm?.querySelector('[data-training-physical-laterality]')?.addEventListener('change', sincronizarCamposTesteFisico);
+    physicalForm?.addEventListener('submit', adicionarTesteFisicoSemRecarregar);
+    physicalForm?.querySelector('[data-training-physical-cancel]')?.addEventListener('click', () => {
+        physicalPanel.hidden = true;
+        physicalForm.reset();
+        physicalAdd?.setAttribute('aria-expanded', 'false');
+        physicalAdd?.focus({preventScroll: true});
+    });
+    root.addEventListener('submit', async evento => {
+        const formulario = evento.target.closest('[data-training-physical-delete]');
+        if (!formulario) return;
+        evento.preventDefault();
+        if (!confirm('Retirar este teste físico do plano?')) return;
+        const resposta = await fetch(formulario.action, {method: 'POST', headers: {'Accept': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''}});
+        const dados = await resposta.json();
+        if (!resposta.ok || !dados.sucesso) { alert(dados.erro || 'Não foi possível retirar o teste.'); return; }
+        formulario.closest('.training-physical-test-card')?.remove();
+        const lista = root.querySelector('[data-training-physical-test-list]');
+        if (lista && !lista.children.length) root.querySelector('[data-training-physical-tests]').hidden = true;
+        const pagina = await fetch(`${window.location.pathname}?_atualizacao=${Date.now()}`, {cache: 'no-store', credentials: 'same-origin'});
+        if (pagina.ok) sincronizarResumoExercicios(new DOMParser().parseFromString(await pagina.text(), 'text/html'));
     });
 })();
 document.querySelectorAll('form').forEach(function(formulario) {

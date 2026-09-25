@@ -34,6 +34,16 @@
     dialog.querySelectorAll('[data-close-physical-test]').forEach(button => button.addEventListener('click',()=>dialog.close()));
     dialog.querySelector('[data-select-athletes]').addEventListener('click',()=>dialog.querySelectorAll('[name="jogador_ids"]').forEach(input=>{input.checked=true;}));
     dialog.querySelector('[data-clear-athletes]').addEventListener('click',()=>dialog.querySelectorAll('[name="jogador_ids"]').forEach(input=>{input.checked=false;}));
+    const params = new URLSearchParams(window.location.search);
+    const plannedDefinition = params.get('definicao_id');
+    if (plannedDefinition && [...definition.options].some(option => option.value === plannedDefinition)) {
+      definition.value = plannedDefinition;
+      const plannedDate = params.get('data');
+      const dateInput = dialog.querySelector('[name="data"]');
+      if (plannedDate && dateInput) dateInput.value = plannedDate;
+      sync();
+      dialog.showModal();
+    }
   }
 
   const root = document.querySelector('.physical-analysis'); if (!root) return;

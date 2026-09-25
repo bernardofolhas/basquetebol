@@ -21,6 +21,7 @@ from flash import set_flash
 from horarios import hora_eh_anterior, hora_valida, normalizar_hora
 from models.equipa import Equipa
 from models.assiduidade import ConvocacaoAssiduidade, RegistoAssiduidade
+from models.fisico import DefinicaoTesteFisico
 from models.jogador import Jogador, RegistoAntropometrico
 from models.planeamento import Macrociclo, Mesociclo, Microciclo, SessaoTreino
 from models.planeamento_clube import EventoPlaneamentoClube
@@ -30,6 +31,7 @@ from models.treino import (
     ExercicioPlano,
     ImportacaoPlanoTreino,
     PlanoTreino,
+    TesteFisicoPlano,
 )
 from paths import STATIC_DIR, TEMPLATES_DIR
 from services.desenho_service import (
@@ -423,6 +425,7 @@ def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador, db: Se
     caminho_campo_completo = STATIC_DIR / "campos" / "campo_completo.png"
     exercicios_por_bloco = {f"d{bloco.id}": [] for bloco in plano.blocos} if plano else {}
     exercicios = list(plano.exercicios or []) if plano else []
+    testes_fisicos = list(plano.testes_fisicos or []) if plano else []
     nome_treinador = getattr(getattr(utilizador, "treinador", None), "nome", None)
     if not nome_treinador and getattr(equipa, "treinadores", None):
         nome_treinador = equipa.treinadores[0].nome
@@ -454,7 +457,8 @@ def _contexto_impressao_plano(request, sessao, equipa, plano, utilizador, db: Se
         "exercicios_lista": sorted(exercicios, key=lambda ex: (ex.ordem or 0, ex.id or 0)),
         "usa_blocos": usa_blocos,
         "total_exercicios": len(exercicios),
-        "volume_planeado": sum(ex.minutos or 0 for ex in exercicios),
+        "testes_fisicos_plano": testes_fisicos,
+        "volume_planeado": sum(ex.minutos or 0 for ex in exercicios) + sum(teste.minutos or 0 for teste in testes_fisicos),
         "rpe_geral": sessao.intensidade_rpe,
         "campo_meio_data_uri": imagem_estatica_data_uri(caminho_campo_meio),
         "campo_completo_data_uri": imagem_estatica_data_uri(caminho_campo_completo),
@@ -564,7 +568,7 @@ def _somar_minutos_hora(hora: str | None, minutos: int | None) -> str | None:
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
-def _hora_sugerida_exercicio(sessao: SessaoTreino, exercicios: list[ExercicioPlano]) -> str | None:
+def _hora_sugerida_exercicio(sessao: SessaoTreino, exercicios: list) -> str | None:
     """Sugere o início seguinte ao término cronologicamente mais tardio."""
     hora_inicio = normalizar_hora(sessao.hora_inicio, permitir_vazio=False)
     if not exercicios:
@@ -599,6 +603,38 @@ def _hora_sugerida_exercicio(sessao: SessaoTreino, exercicios: list[ExercicioPla
         )
         return _somar_minutos_hora(ultimo.hora, ultimo.minutos)
     return None
+
+
+def _obter_ou_criar_definicao_teste(
+    db: Session,
+    clube_id: int,
+    nome: str,
+    lateralidade: str = "bilateral",
+    unidade_total: str = "",
+    unidade_esquerda: str = "",
+    unidade_direita: str = "",
+) -> DefinicaoTesteFisico:
+    """Reutiliza a bateria física do clube ou cria-a quando ainda não existe."""
+    nome_limpo = (nome or "").strip()
+    definicao = db.query(DefinicaoTesteFisico).filter(
+        DefinicaoTesteFisico.clube_id == clube_id,
+        DefinicaoTesteFisico.nome.ilike(nome_limpo),
+    ).first()
+    if definicao:
+        definicao.ativo = True
+        return definicao
+    definicao = DefinicaoTesteFisico(
+        clube_id=clube_id,
+        nome=nome_limpo,
+        lateralidade="unilateral" if lateralidade == "unilateral" else "bilateral",
+        unidade_total=(unidade_total or "").strip() or None,
+        unidade_esquerda=(unidade_esquerda or "").strip() or None,
+        unidade_direita=(unidade_direita or "").strip() or None,
+        ativo=True,
+    )
+    db.add(definicao)
+    db.flush()
+    return definicao
 
 
 def _aplicar_ordem_e_horas_exercicios(
@@ -862,7 +898,15 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
     espacos_disponiveis = obter_previsao_equipa(db, equipa.id, sessao.data, sessao.data)
     validacao_local = validar_local_sessao(db, sessao, equipa.id)
 
-    volume_planeado = sum(ex.minutos or 0 for ex in plano.exercicios)
+    testes_fisicos_plano = list(plano.testes_fisicos or [])
+    conteudos_agendados = list(plano.exercicios) + testes_fisicos_plano
+    volume_planeado = sum(ex.minutos or 0 for ex in plano.exercicios) + sum(
+        teste.minutos or 0 for teste in testes_fisicos_plano
+    )
+    definicoes_testes_fisicos = db.query(DefinicaoTesteFisico).filter(
+        DefinicaoTesteFisico.clube_id == equipa.clube_id,
+        DefinicaoTesteFisico.ativo.is_(True),
+    ).order_by(DefinicaoTesteFisico.nome).all()
     registos_pse = db.query(RegistoAssiduidade).filter(
         RegistoAssiduidade.sessao_id == sessao_id,
         RegistoAssiduidade.rpe_individual.isnot(None),
@@ -901,6 +945,8 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "resumo_blocos": _construir_resumo_blocos(plano),
         "blocos_ui": [{"key": f"d{bloco.id}", "id": bloco.id, "nome": bloco.nome, "tipo": bloco.tipo, "legado": False} for bloco in plano.blocos] + [{"key": letra, "id": None, "nome": f"Bloco {letra}", "tipo": "Legado", "legado": True} for letra in ["A", "B", "C", "D"] if letra in exercicios_por_bloco],
         "total_exercicios": len(plano.exercicios),
+        "testes_fisicos_plano": testes_fisicos_plano,
+        "definicoes_testes_fisicos": definicoes_testes_fisicos,
         "volume_planeado": volume_planeado,
         "pse_real": pse_real,
         "carga_real": carga_real,
@@ -915,7 +961,7 @@ def pagina_plano_treino(sessao_id: int, request: Request, db: Session = Depends(
         "resumo_setores": _resumo_setores(sessao),
         "conteudos_previstos": conteudos_previstos,
         "prioridades_microciclo": prioridades_microciclo,
-        "hora_sugerida_exercicio": _hora_sugerida_exercicio(sessao, list(plano.exercicios)),
+        "hora_sugerida_exercicio": _hora_sugerida_exercicio(sessao, conteudos_agendados),
         "atletas_treino": atletas_treino,
         "atletas_escalhao_inferior_convocaveis": _atletas_escalhao_inferior_convocaveis(db, equipa, sessao.id),
         "escalao_inferior_convocavel": escalao_imediatamente_inferior_da_equipa(equipa),
@@ -1801,6 +1847,108 @@ async def reordenar_exercicios(
     })
 
 
+@router.post("/planos/{plano_id}/testes-fisicos")
+async def adicionar_teste_fisico_plano(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    """Agenda uma bateria existente ou cria-a no catálogo físico do clube."""
+    resposta_json = "application/json" in request.headers.get("accept", "").lower()
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, plano_id), db)
+    plano = db.query(PlanoTreino).filter(PlanoTreino.id == plano_id).first()
+    if not plano:
+        return JSONResponse({"sucesso": False, "erro": "Plano de treino não encontrado."}, status_code=404)
+
+    form = await request.form()
+    definicao_id = str(form.get("definicao_id") or "").strip()
+    nome = str(form.get("nome") or "").strip()
+    try:
+        minutos = _normalizar_minutos(str(form.get("minutos") or ""))
+    except ValueError as erro:
+        return JSONResponse({"sucesso": False, "erro": str(erro)}, status_code=422)
+    if minutos is None:
+        return JSONResponse({"sucesso": False, "erro": "Indica a duração prevista do teste."}, status_code=422)
+
+    definicao = None
+    if definicao_id.isdigit():
+        definicao = db.query(DefinicaoTesteFisico).filter(
+            DefinicaoTesteFisico.id == int(definicao_id),
+            DefinicaoTesteFisico.clube_id == plano.clube_id,
+            DefinicaoTesteFisico.ativo.is_(True),
+        ).first()
+        if not definicao:
+            return JSONResponse({"sucesso": False, "erro": "A bateria selecionada já não está disponível."}, status_code=404)
+    elif nome:
+        definicao = _obter_ou_criar_definicao_teste(
+            db,
+            plano.clube_id,
+            nome,
+            str(form.get("lateralidade") or "bilateral"),
+            str(form.get("unidade_total") or ""),
+            str(form.get("unidade_esquerda") or ""),
+            str(form.get("unidade_direita") or ""),
+        )
+    else:
+        return JSONResponse(
+            {"sucesso": False, "erro": "Seleciona uma bateria física ou indica o nome de um teste novo."},
+            status_code=422,
+        )
+
+    conteudos = list(plano.exercicios) + list(plano.testes_fisicos)
+    hora = normalizar_hora(str(form.get("hora") or "")) or _hora_sugerida_exercicio(plano.sessao, conteudos)
+    teste = TesteFisicoPlano(
+        clube_id=plano.clube_id,
+        plano_id=plano.id,
+        definicao_id=definicao.id,
+        hora=hora,
+        minutos=minutos,
+        observacoes=str(form.get("observacoes") or "").strip() or None,
+    )
+    db.add(teste)
+    _marcar_sessao_como_alterada_manual(plano.sessao)
+    db.flush()
+    sincronizar_minutos_categorias(plano, db)
+    db.commit()
+    conteudos_atualizados = db.query(ExercicioPlano).filter(ExercicioPlano.plano_id == plano.id).all()
+    conteudos_atualizados += db.query(TesteFisicoPlano).filter(TesteFisicoPlano.plano_id == plano.id).all()
+    proxima_hora = _hora_sugerida_exercicio(plano.sessao, conteudos_atualizados) or ""
+    dados = {
+        "sucesso": True,
+        "mensagem": "Teste físico adicionado ao plano.",
+        "teste_id": teste.id,
+        "pagina_url": f"/treino/sessoes/{plano.sessao_id}",
+        "proxima_hora": proxima_hora,
+    }
+    if resposta_json:
+        return JSONResponse(dados)
+    set_flash(request, dados["mensagem"], "success")
+    return RedirectResponse(url=dados["pagina_url"], status_code=303)
+
+
+@router.post("/testes-fisicos-plano/{teste_id}/apagar")
+async def apagar_teste_fisico_plano(
+    teste_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_autenticacao),
+):
+    teste = db.query(TesteFisicoPlano).filter(TesteFisicoPlano.id == teste_id).first()
+    if not teste:
+        return JSONResponse({"sucesso": False, "erro": "Teste físico não encontrado."}, status_code=404)
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_plano(db, teste.plano_id), db)
+    plano = teste.plano
+    db.delete(teste)
+    db.flush()
+    sincronizar_minutos_categorias(plano, db)
+    db.commit()
+    if "application/json" in request.headers.get("accept", "").lower():
+        return JSONResponse({"sucesso": True, "mensagem": "Teste físico retirado do plano."})
+    set_flash(request, "Teste físico retirado do plano.", "success")
+    return RedirectResponse(url=f"/treino/sessoes/{plano.sessao_id}", status_code=303)
+
+
 @router.post("/planos/{plano_id}/exercicios")
 async def adicionar_exercicio(
     plano_id: int,
@@ -1871,7 +2019,10 @@ async def adicionar_exercicio(
         nome = (nome or "").strip() or biblioteca.nome
 
     if not (hora or "").strip():
-        hora = _hora_sugerida_exercicio(plano.sessao, list(plano.exercicios)) or ""
+        hora = _hora_sugerida_exercicio(
+            plano.sessao,
+            list(plano.exercicios) + list(plano.testes_fisicos),
+        ) or ""
 
     exercicio = ExercicioPlano(
         plano_id=plano_id,
@@ -1952,7 +2103,10 @@ async def adicionar_exercicio(
             "mensagem": mensagem,
             "exercicio_id": exercicio.id,
             "pagina_url": f"/treino/sessoes/{plano.sessao_id}",
-            "proxima_hora": _hora_sugerida_exercicio(plano.sessao, exercicios_atualizados) or "",
+            "proxima_hora": _hora_sugerida_exercicio(
+                plano.sessao,
+                exercicios_atualizados + list(plano.testes_fisicos),
+            ) or "",
         })
 
     set_flash(request, mensagem, "success")

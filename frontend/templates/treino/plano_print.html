@@ -92,6 +92,15 @@
         .court { position: relative; background: #fff; padding: 0; overflow: hidden; text-align: center; }
         .court img { display: block; width: auto; height: auto; max-width: 100%; max-height: 27mm; margin: 0 auto; object-fit: contain; object-position: center; }
 
+        .physical-tests { margin-top: 7px; break-inside: avoid; page-break-inside: avoid; }
+        .physical-tests-title { border-left: 3px solid var(--pdf-primary); background: var(--pdf-secondary); color: var(--pdf-on-secondary); padding: 5px 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .1em; }
+        .physical-test { display: grid; grid-template-columns: 17mm 20mm minmax(0,1fr) 27mm; min-height: 14mm; align-items: stretch; border: .5px solid #dfe4eb; border-top: 0; background: #fff; break-inside: avoid; page-break-inside: avoid; }
+        .physical-test>div { display: flex; min-width: 0; flex-direction: column; justify-content: center; border-right: .5px solid #dfe4eb; padding: 2mm 2.3mm; }
+        .physical-test>div:last-child { border-right: 0; }
+        .physical-test label { color: #6b7280; font-size: 7px; font-weight: bold; letter-spacing: .08em; text-transform: uppercase; }
+        .physical-test strong { margin-top: 1mm; color: #111827; font-size: 9px; overflow-wrap: anywhere; }
+        .physical-test-notes { color: #475467; font-weight: normal!important; line-height: 1.35; }
+
         .reflection { margin-top: 16px; border: 1px solid #d1d5db; min-height: 90px; padding: 12px; }
         .reflection h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #6b7280; margin-bottom: 8px; }
         .reflection p { white-space: pre-line; line-height: 1.5; }
@@ -226,6 +235,13 @@
             {{ ficha_exercicio(ex, contador.valor) }}
             {% endfor %}
         </div>
+        {% endif %}
+
+        {% if testes_fisicos_plano %}
+        <section class="physical-tests">
+            <div class="physical-tests-title">Testes físicos da sessão</div>
+            {% for teste in testes_fisicos_plano %}<article class="physical-test"><div><label>Hora</label><strong>{{ teste.hora or '-' }}</strong></div><div><label>Duração</label><strong>{{ teste.minutos }} min</strong></div><div><label>Bateria física</label><strong>{{ teste.definicao.nome }}</strong></div><div><label>Notas</label><strong class="physical-test-notes">{{ teste.observacoes or 'Registar resultados na área física.' }}</strong></div></article>{% endfor %}
+        </section>
         {% endif %}
 
         {% if plano and plano.reflexao %}<div class="reflection">

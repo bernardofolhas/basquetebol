@@ -448,7 +448,7 @@ def interpretar_texto(texto: str) -> dict:
 
 
 def sincronizar_minutos_categorias(plano, db=None) -> dict[str, int]:
-    """Mantém o balanço da sessão coerente com os exercícios guardados."""
+    """Mantém o balanço da sessão coerente com exercícios e testes físicos."""
     totais = {categoria: 0 for categoria in CATEGORIAS_EXERCICIO}
     if db is not None:
         from models.treino import ExercicioPlano
@@ -460,6 +460,13 @@ def sincronizar_minutos_categorias(plano, db=None) -> dict[str, int]:
         categoria = normalizar_categoria(exercicio.categoria)
         if categoria:
             totais[categoria] += exercicio.minutos or 0
+    if db is not None:
+        from models.treino import TesteFisicoPlano
+
+        testes_fisicos = db.query(TesteFisicoPlano).filter(TesteFisicoPlano.plano_id == plano.id).all()
+    else:
+        testes_fisicos = getattr(plano, "testes_fisicos", []) or []
+    totais["FIS"] += sum(teste.minutos or 0 for teste in testes_fisicos)
     sessao = plano.sessao
     for categoria, campo in CAMPOS_CATEGORIA.items():
         setattr(sessao, campo, totais[categoria])
