@@ -1132,6 +1132,20 @@
                 if (atual && atualizado) atual.textContent = atualizado.textContent;
             });
         });
+
+        documentoAtualizado.querySelectorAll('[data-training-exercise-id]').forEach(cartaoAtualizado => {
+            const cartao = root.querySelector(`[data-training-exercise-id="${cartaoAtualizado.dataset.trainingExerciseId}"]`);
+            const horaAtualizada = cartaoAtualizado.querySelector('[data-training-exercise-time]')?.textContent || '-';
+            if (cartao?.querySelector('[data-training-exercise-time]')) cartao.querySelector('[data-training-exercise-time]').textContent = horaAtualizada;
+            if (cartao?.querySelector('[data-training-exercise-time-input]')) cartao.querySelector('[data-training-exercise-time-input]').value = horaAtualizada === '-' ? '' : horaAtualizada;
+        });
+        documentoAtualizado.querySelectorAll('[data-training-physical-test-id]').forEach(cartaoAtualizado => {
+            const cartao = root.querySelector(`[data-training-physical-test-id="${cartaoAtualizado.dataset.trainingPhysicalTestId}"]`);
+            const horaAtualizada = cartaoAtualizado.querySelector('[data-training-physical-time]')?.textContent || '-';
+            if (cartao?.querySelector('[data-training-physical-time]')) cartao.querySelector('[data-training-physical-time]').textContent = horaAtualizada;
+        });
+        const proximaHoraAtualizada = documentoAtualizado.querySelector('[data-training-next-time]')?.value || '';
+        root.querySelectorAll('[data-training-next-time]').forEach(input => { input.value = proximaHoraAtualizada; });
     }
 
     function aplicarHorasConteudos(dados) {

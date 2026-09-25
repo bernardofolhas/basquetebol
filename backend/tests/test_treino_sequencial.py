@@ -298,6 +298,61 @@ def test_remover_exercicio_ou_teste_recalcula_toda_a_sequencia(client_admin):
         db.close()
 
 
+def test_inserir_teste_no_meio_desloca_os_conteudos_seguintes(client_admin):
+    db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
+    try:
+        sessao = db.query(SessaoTreino).join(Microciclo).join(Mesociclo).join(Macrociclo).filter(
+            Macrociclo.id == macro_id
+        ).one()
+        client_admin.get(f"/treino/sessoes/{sessao.id}")
+        plano = db.query(PlanoTreino).filter_by(sessao_id=sessao.id).one()
+        definicao = DefinicaoTesteFisico(
+            clube_id=plano.clube_id,
+            nome=f"Teste intermédio {equipa_id}",
+            lateralidade="bilateral",
+            ativo=True,
+        )
+        db.add(definicao)
+        db.add_all([
+            ExercicioPlano(
+                clube_id=plano.clube_id,
+                plano_id=plano.id,
+                bloco="A",
+                ordem=1,
+                nome="Primeiro",
+                hora="18:00",
+                minutos=10,
+            ),
+            ExercicioPlano(
+                clube_id=plano.clube_id,
+                plano_id=plano.id,
+                bloco="A",
+                ordem=2,
+                nome="Segundo",
+                hora="18:10",
+                minutos=20,
+            ),
+        ])
+        db.commit()
+
+        resposta = client_admin.post(
+            f"/treino/planos/{plano.id}/testes-fisicos",
+            data={"definicao_id": str(definicao.id), "hora": "18:10", "minutos": "5"},
+            headers={"Accept": "application/json"},
+        )
+
+        assert resposta.status_code == 200
+        dados = resposta.json()
+        assert dados["proxima_hora"] == "18:35"
+        assert [(item.hora, item.minutos) for item in (
+            db.query(ExercicioPlano).filter_by(plano_id=plano.id).order_by(ExercicioPlano.ordem).all()
+        )] == [("18:00", 10), ("18:15", 20)]
+        assert db.query(ModeloTesteFisicoPlano).filter_by(id=dados["teste_id"]).one().hora == "18:10"
+    finally:
+        _limpar_contexto(db, equipa_id, jogador_id, outro_id, macro_id)
+        db.close()
+
+
 def test_adicionar_exercicio_por_ajax_responde_sem_redirect_e_atualiza_o_plano(client_admin):
     db, equipa_id, jogador_id, outro_id, macro_id = _criar_contexto()
     try:
