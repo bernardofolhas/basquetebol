@@ -1180,22 +1180,31 @@
             const documentoAtualizado = new DOMParser().parseFromString(await pagina.text(), 'text/html');
             const cartaoAtualizado = documentoAtualizado.getElementById(`exercicio-${dados.exercicio_id}`);
             const grupoAtualizado = cartaoAtualizado?.closest('[data-training-group]');
-            const grupoAtual = grupoAtualizado ? document.getElementById(grupoAtualizado.id) : null;
-            if (!cartaoAtualizado || !grupoAtual) {
+            if (!cartaoAtualizado || !grupoAtualizado) {
                 throw new Error('O exercício foi guardado, mas o novo cartão não ficou disponível.');
             }
 
-            let listaAtual = grupoAtual.querySelector('[data-training-exercise-list]');
-            if (!listaAtual) {
-                listaAtual = document.createElement('div');
-                listaAtual.className = 'training-exercise-list space-y-5';
-                listaAtual.setAttribute('data-training-exercise-list', '');
-                grupoAtual.querySelector('[data-training-group-empty]')?.remove();
-                grupoAtual.querySelector('.training-group-body')?.appendChild(listaAtual);
+            let grupoAtual = document.getElementById(grupoAtualizado.id);
+            let novoCartao = null;
+            if (!grupoAtual) {
+                grupoAtual = document.importNode(grupoAtualizado, true);
+                fluxoAdicionar?.before(grupoAtual);
+                novoCartao = grupoAtual.querySelector(`#exercicio-${dados.exercicio_id}`);
+                grupoAtual.querySelectorAll('[data-training-exercise-drag]').forEach(ativarPegaTeclado);
+            } else {
+                let listaAtual = grupoAtual.querySelector('[data-training-exercise-list]');
+                if (!listaAtual) {
+                    listaAtual = document.createElement('div');
+                    listaAtual.className = 'training-exercise-list space-y-5';
+                    listaAtual.setAttribute('data-training-exercise-list', '');
+                    grupoAtual.querySelector('[data-training-group-empty]')?.remove();
+                    grupoAtual.querySelector('.training-group-body')?.appendChild(listaAtual);
+                }
+                novoCartao = document.importNode(cartaoAtualizado, true);
+                listaAtual.appendChild(novoCartao);
+                ativarPegaTeclado(novoCartao.querySelector('[data-training-exercise-drag]'));
             }
-            const novoCartao = document.importNode(cartaoAtualizado, true);
-            listaAtual.appendChild(novoCartao);
-            ativarPegaTeclado(novoCartao.querySelector('[data-training-exercise-drag]'));
+            if (!novoCartao) throw new Error('O exercício foi guardado, mas não foi possível apresentar o cartão.');
             sincronizarResumoExercicios(documentoAtualizado);
             renumerarExercicios();
 
