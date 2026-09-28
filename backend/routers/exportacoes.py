@@ -844,6 +844,27 @@ def _configuracao_relatorio(tipo: str, dados, utilizador) -> tuple[str, str, lis
     return formato, orientacao, secoes
 
 
+def _configuracao_individual_por_atleta(dados, atletas, secoes_globais: list[str]) -> tuple[dict[int, set[str]], dict[int, list[str]]]:
+    """Resolve as escolhas individuais sem alterar o comportamento dos restantes relatórios."""
+    validas = {s["chave"] for s in RELATORIOS_CONFIG["scouting-individual"]["secoes"]}
+    configurados = {int(valor) for valor in dados.getlist("configurado_jogador") if str(valor).isdigit()}
+    ordem_base = [s for s in dados.get("ordem", "").split(",") if s in validas]
+    secoes_por_atleta: dict[int, set[str]] = {}
+    estatisticas_por_atleta: dict[int, list[str]] = {}
+    for atleta in atletas:
+        if atleta.id in configurados:
+            escolhidas = [s for s in dados.getlist(f"secoes_jogador_{atleta.id}") if s in validas]
+            ordenadas = [s for s in ordem_base if s in escolhidas]
+            ordenadas.extend(s for s in escolhidas if s not in ordenadas)
+            estatisticas = [s for s in dados.getlist(f"estatisticas_jogador_{atleta.id}") if s in STAT_FIELDS]
+        else:
+            ordenadas = list(secoes_globais)
+            estatisticas = [s for s in dados.getlist("estatisticas") if s in STAT_FIELDS]
+        secoes_por_atleta[atleta.id] = set(ordenadas)
+        estatisticas_por_atleta[atleta.id] = estatisticas
+    return secoes_por_atleta, estatisticas_por_atleta
+
+
 def _fotografia_embebida(url: str | None) -> str | None:
     caminho = caminho_fotografia(url)
     if not caminho or not caminho.is_file():
@@ -1078,6 +1099,14 @@ def _gerar_relatorio(tipo: str, alvo_id: int, request: Request, dados, db: Sessi
     alvo, equipa, alvo_nome = _alvo_relatorio(tipo, alvo_id, db, utilizador)
     formato, orientacao, secoes = _configuracao_relatorio(tipo, dados, utilizador)
     contexto = _contexto_relatorio(tipo, alvo, equipa, dados, db)
+    if tipo == "scouting-individual":
+        secoes_por_atleta, estatisticas_por_atleta = _configuracao_individual_por_atleta(
+            dados, contexto["atletas"], secoes
+        )
+        contexto.update(
+            secoes_por_atleta=secoes_por_atleta,
+            stat_fields_por_atleta=estatisticas_por_atleta,
+        )
     contexto.update(
         formato=formato,
         orientacao=orientacao,

@@ -1,9 +1,15 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 from starlette.datastructures import FormData
 
 from models.utilizador import PerfilEnum
-from routers.exportacoes import RELATORIOS_CONFIG, _configuracao_relatorio, _secoes_padrao
+from routers.exportacoes import (
+    RELATORIOS_CONFIG,
+    _configuracao_individual_por_atleta,
+    _configuracao_relatorio,
+    _secoes_padrao,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -287,3 +293,34 @@ def test_migracao_e_modelo_de_predefinicoes_estao_registados():
     main = (ROOT / "backend" / "main.py").read_text(encoding="utf-8")
     assert migracao.is_file()
     assert "import models.relatorio_exportacao" in main
+
+
+def test_scouting_individual_aceita_seccoes_e_estatisticas_diferentes_por_atleta():
+    dados = FormData([
+        ("configurado_jogador", "11"),
+        ("configurado_jogador", "22"),
+        ("ordem", "identificacao,avaliacoes,tendencias,game_plan,estatisticas"),
+        ("secoes_jogador_11", "identificacao"),
+        ("secoes_jogador_11", "avaliacoes"),
+        ("estatisticas_jogador_11", "pontos"),
+        ("secoes_jogador_22", "tendencias"),
+        ("secoes_jogador_22", "game_plan"),
+        ("estatisticas_jogador_22", "assistencias"),
+    ])
+    atletas = [SimpleNamespace(id=11), SimpleNamespace(id=22)]
+
+    secoes, estatisticas = _configuracao_individual_por_atleta(dados, atletas, ["identificacao"])
+
+    assert secoes[11] == {"identificacao", "avaliacoes"}
+    assert secoes[22] == {"tendencias", "game_plan"}
+    assert estatisticas == {11: ["pontos"], 22: ["assistencias"]}
+
+
+def test_configurador_individual_apresenta_paineis_por_jogador():
+    formulario = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
+    script = (ROOT / "frontend" / "static" / "js" / "report-export.js").read_text(encoding="utf-8")
+
+    assert 'name="configurado_jogador"' in formulario
+    assert 'name="secoes_jogador_{{ entidade.id }}"' in formulario
+    assert 'name="estatisticas_jogador_{{ entidade.id }}"' in formulario
+    assert "syncPlayerConfigs" in script

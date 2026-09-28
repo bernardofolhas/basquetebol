@@ -2,4 +2,4 @@
 {% block titulo %}Exportar relatório · {{ alvo_nome }}{% endblock %}
 {% block estilos_extra %}<link rel="stylesheet" href="/static/css/report-export.css?v=20260916-2">{% endblock %}
 {% block conteudo %}<main class="report-builder"><header class="report-builder-hero"><div><a href="javascript:history.back()">← Voltar</a><p class="ds-kicker">{{ equipa.nome }}</p><h1>Exportar relatório</h1><p>{{ config.nome }} · {{ alvo_nome }}</p></div><span>PDF configurável</span></header>{% include "exportacoes/_relatorio_formulario.html" %}</main>{% endblock %}
-{% block scripts_extra %}<script src="/static/js/report-export.js?v=20260916-1"></script><script>window.initReportBuilder(document);</script>{% endblock %}
+{% block scripts_extra %}<script src="/static/js/report-export.js?v=20260929-1"></script><script>window.initReportBuilder(document);</script>{% endblock %}
