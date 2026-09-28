@@ -1101,6 +1101,50 @@ def actualizar_estrutura_estatisticas() -> None:
                 ))
     logger.info("Estrutura de importação estatística atualizada.")
 
+
+def actualizar_estrutura_scouting_individual() -> None:
+    """Garante a estrutura do perfil individual em instalações sem Alembic automático."""
+    inspector = inspect(engine)
+    tabelas = {
+        "scouting_biblioteca_itens": {
+            "grupo_id": "INTEGER NULL REFERENCES scouting_grupos_avaliacao(id) ON DELETE SET NULL",
+            "ordem": "INTEGER NOT NULL DEFAULT 0",
+            "ativo": "BOOLEAN NOT NULL DEFAULT TRUE",
+        },
+        "scouting_jogadores_itens": {
+            "avaliacao": "INTEGER NULL",
+            "prioridade": "INTEGER NULL",
+            "ordem": "INTEGER NOT NULL DEFAULT 0",
+            "destaque": "BOOLEAN NOT NULL DEFAULT FALSE",
+            "ordem_destaque": "INTEGER NULL",
+        },
+    }
+    alterou = False
+    with engine.begin() as ligacao:
+        for tabela, definicoes in tabelas.items():
+            if not inspector.has_table(tabela):
+                continue
+            existentes = {coluna["name"] for coluna in inspector.get_columns(tabela)}
+            for coluna, definicao in definicoes.items():
+                if coluna in existentes:
+                    continue
+                if engine.dialect.name == "postgresql":
+                    ligacao.execute(text(
+                        f"ALTER TABLE {tabela} ADD COLUMN IF NOT EXISTS {coluna} {definicao}"
+                    ))
+                else:
+                    ligacao.execute(text(
+                        f"ALTER TABLE {tabela} ADD COLUMN {coluna} {definicao}"
+                    ))
+                alterou = True
+        if engine.dialect.name == "postgresql" and inspector.has_table("scouting_biblioteca_itens"):
+            ligacao.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_scouting_biblioteca_itens_grupo_id "
+                "ON scouting_biblioteca_itens (grupo_id)"
+            ))
+    if alterou:
+        logger.info("Estrutura do Scouting Individual atualizada.")
+
 # Função que abre e fecha sessões automaticamente
 # O "yield" faz com que a sessão seja fechada no final de cada pedido
 def get_db():
