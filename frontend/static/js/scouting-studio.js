@@ -73,7 +73,7 @@
     var root = document.querySelector("[data-scouting-studio-root], [data-customizable-dashboard]") || tabs.parentElement;
 
     function enhance(scope) {
-      var sections = Array.from(root.querySelectorAll(".scouting-section, .scouting-plan-card, .scouting-roster-group, .scouting-plan-lineups"));
+      var sections = Array.from(root.querySelectorAll(".scouting-section, .scouting-plan-card, .scouting-plan-lineups"));
       sections.forEach(function (section, index) {
         section.classList.add("studio-work-block");
         section.dataset.studioIndex = String(index + 1).padStart(2, "0");
@@ -181,8 +181,12 @@
       try {
         var body = new FormData(form);
         if (submitter && submitter.name && !body.has(submitter.name)) body.append(submitter.name, submitter.value);
-        var response = await fetch(form.action, {
-          method: (form.method || "POST").toUpperCase(), body: body, credentials: "same-origin",
+        var actionOverride = submitter ? submitter.getAttribute("formaction") : null;
+        var methodOverride = submitter ? submitter.getAttribute("formmethod") : null;
+        var action = actionOverride || form.action;
+        var method = methodOverride || form.method;
+        var response = await fetch(action, {
+          method: (method || "POST").toUpperCase(), body: body, credentials: "same-origin",
           headers: {"Accept": "text/html", "X-Requested-With": "XMLHttpRequest", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content || ""}
         });
         if (!response.ok) throw new Error("Não foi possível concluir a operação.");

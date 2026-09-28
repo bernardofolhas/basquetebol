@@ -109,6 +109,21 @@ def test_estatisticas_sao_escolhidas_individualmente_antes_da_exportacao():
     assert "campo in STAT_FIELDS" in rota
 
 
+def test_configurador_individual_transporta_avaliacoes_tendencias_e_game_plan():
+    secoes = {secao["chave"] for secao in RELATORIOS_CONFIG["scouting-individual"]["secoes"]}
+    assert {"avaliacoes", "tendencias", "game_plan"}.issubset(secoes)
+
+    facil = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
+    completo = (TEMPLATES / "relatorios" / "scouting_individual_completo.html").read_text(encoding="utf-8")
+    poster = (TEMPLATES / "relatorios" / "_poster.html").read_text(encoding="utf-8")
+    rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+    for documento in (facil, completo, poster):
+        assert "Game Plan" in documento
+        assert "perfil" in documento.lower()
+    assert "construir_perfil_individual" in rota
+    assert "destaques_atletas" in rota
+
+
 def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
     html = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
     assert 'class="player-sheet"' in html
@@ -135,8 +150,8 @@ def test_quatro_modelos_de_scouting_seguem_estrutura_de_exportacao_fornecida():
         "Análise estatística",
         "Principais características individuais",
         "Zonas de lançamento e ação",
-        "Tipos de movimento específicos",
-        "Principais estratégias defensivas",
+        "Tendências e tipos de movimento específicos",
+        "Game Plan · Principais estratégias defensivas",
     ):
         assert marcador in individual_completo
     for marcador in (
@@ -209,10 +224,11 @@ def test_relatorios_faceis_validam_fotografias_antes_de_renderizar():
 
 def test_quadro_individual_permite_escolher_blocos_no_pendente():
     html = (TEMPLATES / "scouting" / "individual.html").read_text(encoding="utf-8")
+    inteligencia = (TEMPLATES / "scouting" / "_individual_intelligence.html").read_text(encoding="utf-8")
     script = (ROOT / "frontend" / "static" / "js" / "dashboard-customization.js").read_text(encoding="utf-8")
     assert "data-customizable-dashboard" in html
     assert "data-dashboard-customizer-anchor" in html
-    assert 'data-dashboard-widget="leitura-{{ categoria }}"' in html
+    assert 'data-dashboard-widget="perfil-jogador"' in inteligencia
     assert "dashboard-customizer-menu" in script
     assert "/dashboard/preferencias" in script
 

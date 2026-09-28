@@ -6,11 +6,12 @@ import pytest
 
 from database import SessionLocal
 from models.equipa import Equipa
-from models.jogo import Jogo
+from models.jogo import ItemPlanoJogoBiblioteca, Jogo, PlanoJogoItem
 from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.scouting import (
     ScoutingAdversario,
     ScoutingAdversarioJogo,
+    ScoutingGrupoAvaliacao,
     ScoutingItemBiblioteca,
     ScoutingJogador,
     ScoutingJogadorItem,
@@ -104,7 +105,9 @@ def test_departamento_scouting_expoe_tabs_roster_e_ficha_individual():
         assert f'name="{nome}"' in campos
     assert 'action="/scouting/roster/' in roster
     assert "Média da época vs. jogo selecionado" in individual
-    assert "Biblioteca reutilizável" in individual
+    inteligencia = (TEMPLATES_DIR / "scouting" / "_individual_intelligence.html").read_text(encoding="utf-8")
+    assert "biblioteca reutilizável" in inteligencia.lower()
+    assert "Perfil operacional do jogador" in inteligencia
     assert 'name="zonas"' in individual
     assert "campo_meio.png" in individual
 
@@ -307,6 +310,170 @@ def test_movimento_especifico_e_associado_sem_bloquear_ficha(client_admin):
             db.close()
 
 
+def test_perfil_individual_estrutura_avaliacao_tendencia_game_plan_e_importacao(client_admin):
+    adversario_id, jogo_id, _, clube_id, _ = _criar_adversario_integracao()
+    sufixo = uuid4().hex[:8]
+    jogador_id = grupo_id = caracteristica_id = tendencia_id = game_plan_id = None
+    try:
+        db = SessionLocal()
+        try:
+            jogador = ScoutingJogador(
+                clube_id=clube_id,
+                adversario_id=adversario_id,
+                nome=f"Atleta KYP {sufixo}",
+                numero="11",
+                posicao_principal="Extremo",
+            )
+            db.add(jogador)
+            db.commit()
+            jogador_id = jogador.id
+        finally:
+            db.close()
+
+        resposta = client_admin.post(
+            f"/scouting/jogadores/{jogador_id}/grupos-avaliacao",
+            data={"nome": f"Shooting {sufixo}"},
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+
+        db = SessionLocal()
+        try:
+            grupo = db.query(ScoutingGrupoAvaliacao).filter(
+                ScoutingGrupoAvaliacao.clube_id == clube_id,
+                ScoutingGrupoAvaliacao.nome == f"Shooting {sufixo}",
+            ).one()
+            grupo_id = grupo.id
+        finally:
+            db.close()
+
+        resposta = client_admin.post(
+            f"/scouting/jogadores/{jogador_id}/itens",
+            data={
+                "categoria": "caracteristica",
+                "nome_novo": f"Catch and Shoot {sufixo}",
+                "grupo_id": str(grupo_id),
+                "avaliacao": "4",
+                "observacao": "Liberta rápido após kick-out.",
+                "destaque": "true",
+            },
+            follow_redirects=True,
+        )
+        assert resposta.status_code == 200
+        assert "4/5" in resposta.text
+
+        db = SessionLocal()
+        try:
+            caracteristica = db.query(ScoutingJogadorItem).join(ScoutingItemBiblioteca).filter(
+                ScoutingJogadorItem.jogador_id == jogador_id,
+                ScoutingItemBiblioteca.categoria == "caracteristica",
+            ).one()
+            caracteristica_id = caracteristica.id
+            assert caracteristica.avaliacao == 4
+            assert caracteristica.destaque is True
+            assert caracteristica.item.grupo_id == grupo_id
+        finally:
+            db.close()
+
+        invalida = client_admin.post(
+            f"/scouting/itens-associados/{caracteristica_id}/guardar",
+            data={"avaliacao": "7", "observacao": "Não deve gravar"},
+            follow_redirects=True,
+        )
+        assert "entre 1 e 5" in invalida.text
+        db = SessionLocal()
+        try:
+            assert db.get(ScoutingJogadorItem, caracteristica_id).avaliacao == 4
+        finally:
+            db.close()
+
+        client_admin.post(
+            f"/scouting/itens-associados/{caracteristica_id}/guardar",
+            data={"avaliacao": "", "observacao": "Ainda por confirmar"},
+            follow_redirects=False,
+        )
+        db = SessionLocal()
+        try:
+            assert db.get(ScoutingJogadorItem, caracteristica_id).avaliacao is None
+        finally:
+            db.close()
+
+        for categoria, titulo, observacao, prioridade in (
+            ("tendencia", f"Rejects PnR {sufixo}", "Rejeita para a mão direita.", ""),
+            ("game_plan", f"Force Left {sufixo}", "Retirar a mão direita.", "1"),
+        ):
+            resposta = client_admin.post(
+                f"/scouting/jogadores/{jogador_id}/itens",
+                data={
+                    "categoria": categoria,
+                    "nome_novo": titulo,
+                    "observacao": observacao,
+                    "prioridade": prioridade,
+                    "destaque": "true",
+                },
+                follow_redirects=False,
+            )
+            assert resposta.status_code == 303
+
+        db = SessionLocal()
+        try:
+            relacoes = db.query(ScoutingJogadorItem).join(ScoutingItemBiblioteca).filter(
+                ScoutingJogadorItem.jogador_id == jogador_id,
+                ScoutingItemBiblioteca.categoria.in_(("tendencia", "game_plan")),
+            ).all()
+            por_categoria = {rel.item.categoria: rel for rel in relacoes}
+            tendencia_id = por_categoria["tendencia"].id
+            game_plan_id = por_categoria["game_plan"].id
+            assert por_categoria["tendencia"].avaliacao is None
+            assert por_categoria["game_plan"].prioridade == 1
+        finally:
+            db.close()
+
+        resposta = client_admin.post(
+            f"/scouting/adversarios/{adversario_id}/plano-jogo/{jogo_id}/importar",
+            data={"individual_item_ids": str(game_plan_id)},
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        db = SessionLocal()
+        try:
+            importado = db.query(PlanoJogoItem).join(ItemPlanoJogoBiblioteca).filter(
+                ItemPlanoJogoBiblioteca.texto.contains(f"Force Left {sufixo}"),
+            ).one()
+            assert importado.item.categoria == "chave_defesa"
+        finally:
+            db.close()
+
+        client_admin.post(
+            f"/scouting/itens-associados/{tendencia_id}/eliminar",
+            follow_redirects=False,
+        )
+        db = SessionLocal()
+        try:
+            assert db.get(ScoutingJogadorItem, tendencia_id) is None
+        finally:
+            db.close()
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_id)
+        db = SessionLocal()
+        try:
+            for item in db.query(ScoutingItemBiblioteca).filter(
+                ScoutingItemBiblioteca.clube_id == clube_id,
+                ScoutingItemBiblioteca.nome.contains(sufixo),
+            ).all():
+                db.delete(item)
+            for item in db.query(ItemPlanoJogoBiblioteca).filter(
+                ItemPlanoJogoBiblioteca.clube_id == clube_id,
+                ItemPlanoJogoBiblioteca.texto.contains(sufixo),
+            ).all():
+                db.delete(item)
+            grupo = db.get(ScoutingGrupoAvaliacao, grupo_id) if grupo_id else None
+            if grupo:
+                db.delete(grupo)
+            db.commit()
+        finally:
+            db.close()
+
 def test_scouting_coletivo_separa_todos_os_dados_pedidos():
     modelo = (ROOT / "backend" / "models" / "scouting.py").read_text(encoding="utf-8")
     migracao = (ROOT / "backend" / "migrations" / "versions" / "0048_scouting_coletivo.py").read_text(encoding="utf-8")
@@ -354,8 +521,9 @@ def test_pagina_coletiva_tem_estatistica_leitura_e_playbook_completos():
 
 def test_ficha_individual_nao_renderiza_associacoes_orfas_diretamente():
     individual = (TEMPLATES_DIR / "scouting" / "individual.html").read_text(encoding="utf-8")
+    inteligencia = (TEMPLATES_DIR / "scouting" / "_individual_intelligence.html").read_text(encoding="utf-8")
 
-    assert "itens_por_categoria.get(categoria, [])" in individual
+    assert "itens_por_categoria.get(categoria, [])" in inteligencia
     assert "jogador.itens" not in individual
 
 
@@ -410,10 +578,14 @@ def test_scouting_atualiza_acoes_locais_sem_refresh_da_pagina():
     itens = (TEMPLATES_DIR / "scouting" / "_collective_items.html").read_text(encoding="utf-8")
 
     assert 'form[data-studio-async]' in studio
-    assert 'fetch(form.action' in studio
+    assert 'fetch(action' in studio
+    assert 'submitter.getAttribute("formaction")' in studio
+    assert 'submitter.getAttribute("formmethod")' in studio
+    assert "submitter.formAction" not in studio
     assert 'window.location.reload' not in studio
-    assert 'data-studio-region="individual-items-{{ categoria }}"' in individual
-    assert 'data-studio-refresh="individual-items-{{ categoria }}"' in individual
+    inteligencia = (TEMPLATES_DIR / "scouting" / "_individual_intelligence.html").read_text(encoding="utf-8")
+    assert 'data-studio-region="individual-profile"' in inteligencia
+    assert 'data-studio-refresh="individual-profile"' in inteligencia
     assert 'data-studio-region="collective-items-{{ categoria_atual }}"' in itens
     assert 'data-studio-refresh="collective-items-{{ categoria }}"' in coletivo
     assert 'data-studio-region="roster-list"' in roster

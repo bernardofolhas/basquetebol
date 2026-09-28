@@ -6,7 +6,7 @@ import unicodedata
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from auth import verificar_acesso_equipa
 from auth_deps import exigir_scouting, verificar_ou_negar_equipa
@@ -15,7 +15,7 @@ from database import get_db
 from flash import set_flash
 from logging_config import obter_logger
 from models.jogador import Jogador
-from models.jogo import Jogo, PlanoJogo
+from models.jogo import ItemPlanoJogoBiblioteca, Jogo, PlanoJogo, PlanoJogoItem
 from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.scouting import (
     STAT_FIELDS,
@@ -28,6 +28,7 @@ from models.scouting import (
     ScoutingEstatisticaJogo,
     ScoutingEstatisticaColetivaJogo,
     ScoutingFichaIndividual,
+    ScoutingGrupoAvaliacao,
     ScoutingItemBiblioteca,
     ScoutingJogador,
     ScoutingJogadorAdversario,
@@ -54,7 +55,9 @@ from services.plano_jogo_service import (
     materializar_campos_legados,
     preview_jogada,
     rotacoes_por_grupo,
+    normalizar_texto,
 )
+from services.scouting_individual_service import construir_perfil_individual
 from template_config import Jinja2Templates
 
 
@@ -68,6 +71,8 @@ POSICOES = ("Base", "Extremo", "Poste")
 ESTADOS_JOGADOR = ("ativo", "lesionado", "dúvida", "ausente")
 CATEGORIAS_BIBLIOTECA = {
     "caracteristica": "Características",
+    "tendencia": "Tendências",
+    "game_plan": "Game Plan",
     "movimento": "Movimentos preferenciais",
     "estrategia": "Estratégias defensivas",
     "estatistica_coletiva": "Características estatísticas",
@@ -344,14 +349,19 @@ def _itens_validos_jogador(
     """Agrupa apenas associações que ainda apontam para itens válidos do clube."""
     associacoes = (
         db.query(ScoutingJogadorItem)
-        .options(joinedload(ScoutingJogadorItem.item))
+        .options(joinedload(ScoutingJogadorItem.item).joinedload(ScoutingItemBiblioteca.grupo))
         .join(ScoutingItemBiblioteca, ScoutingJogadorItem.item_id == ScoutingItemBiblioteca.id)
         .filter(
             ScoutingJogadorItem.jogador_id == jogador.id,
             ScoutingItemBiblioteca.clube_id == jogador.clube_id,
             ScoutingItemBiblioteca.categoria.in_(tuple(CATEGORIAS_BIBLIOTECA)),
         )
-        .order_by(ScoutingItemBiblioteca.categoria, ScoutingItemBiblioteca.nome)
+        .order_by(
+            ScoutingItemBiblioteca.categoria,
+            ScoutingJogadorItem.ordem,
+            ScoutingItemBiblioteca.ordem,
+            ScoutingItemBiblioteca.nome,
+        )
         .all()
     )
     agrupados = {categoria: [] for categoria in CATEGORIAS_BIBLIOTECA}
@@ -478,8 +488,19 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             request, utilizador, adversario, separador=separador, grupos=grupos, jogos=jogos
         ))
     if separador == "individual":
+        jogadores = (
+            db.query(ScoutingJogador)
+            .options(
+                selectinload(ScoutingJogador.itens).joinedload(ScoutingJogadorItem.item).joinedload(ScoutingItemBiblioteca.grupo),
+                selectinload(ScoutingJogador.estatisticas),
+            )
+            .filter(ScoutingJogador.adversario_id == adversario.id)
+            .order_by(ScoutingJogador.numero, ScoutingJogador.nome)
+            .all()
+        )
         return templates.TemplateResponse(request, "scouting/individual_lista.html", _contexto_departamento(
-            request, utilizador, adversario, separador=separador, jogadores=adversario.jogadores, jogos=jogos
+            request, utilizador, adversario, separador=separador, jogadores=jogadores, jogos=jogos,
+            perfis_jogadores={jogador.id: construir_perfil_individual(jogador, apenas_destaques=True) for jogador in jogadores},
         ))
     if separador == "resumo":
         return templates.TemplateResponse(request, "scouting/resumo.html", _contexto_departamento(
@@ -494,6 +515,24 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
         jogadas_plano = list(plano.jogadas) if plano else []
         for relacao in jogadas_plano:
             relacao.preview_imagem = preview_jogada(relacao.setplay)
+        intel_individual = (
+            db.query(ScoutingJogadorItem)
+            .options(
+                joinedload(ScoutingJogadorItem.jogador),
+                joinedload(ScoutingJogadorItem.item).joinedload(ScoutingItemBiblioteca.grupo),
+            )
+            .join(ScoutingJogador, ScoutingJogadorItem.jogador_id == ScoutingJogador.id)
+            .join(ScoutingItemBiblioteca, ScoutingJogadorItem.item_id == ScoutingItemBiblioteca.id)
+            .filter(
+                ScoutingJogador.adversario_id == adversario.id,
+                ScoutingJogadorItem.clube_id == adversario.clube_id,
+                ScoutingJogadorItem.destaque.is_(True),
+                ScoutingItemBiblioteca.categoria.in_(("caracteristica", "tendencia", "movimento", "game_plan", "estrategia")),
+                ScoutingItemBiblioteca.ativo.is_(True),
+            )
+            .order_by(ScoutingJogadorItem.ordem_destaque, ScoutingJogadorItem.ordem, ScoutingJogadorItem.id)
+            .all()
+        )
         return templates.TemplateResponse(request, "scouting/plano_jogo.html", _contexto_departamento(
             request, utilizador, adversario, separador=separador, jogos=jogos, jogo=jogo,
             plano=plano, jogadores=convocados_plano(jogo) if jogo else [],
@@ -503,6 +542,7 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             biblioteca_plano=biblioteca_por_categoria(db, jogo.equipa_id) if jogo else {},
             jogadas_disponiveis=jogadas_disponiveis(db, jogo.equipa_id) if jogo else [],
             jogadas_plano=jogadas_plano,
+            intel_individual=intel_individual,
             cinco_previsto=[item for item in adversario.rotacao_prevista if item.papel == "titular"],
             rotacoes_previstas=[item for item in adversario.rotacao_prevista if item.papel == "rotacao"],
         ))
@@ -650,13 +690,14 @@ async def guardar_rotacao_prevista(adversario_id: int, request: Request, db: Ses
 
 
 @router.post("/adversarios/{adversario_id}/plano-jogo/{jogo_id}/importar")
-def importar_scouting_para_plano(adversario_id: int, jogo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+async def importar_scouting_para_plano(adversario_id: int, jogo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
     adversario = _adversario_acessivel(db, adversario_id, utilizador)
     jogo = _jogo_plano_adversario(adversario, db, utilizador, jogo_id) if adversario else None
     if not adversario or not jogo:
         return RedirectResponse(url="/scouting", status_code=303)
     plano = jogo.plano or PlanoJogo(clube_id=jogo.clube_id, jogo_id=jogo.id)
     db.add(plano)
+    dados = await request.form()
     conceitos = [
         f"• {elemento.setplay.nome}" + (f" — {elemento.setplay.descricao}" if elemento.setplay.descricao else "")
         for elemento in adversario.conceitos_ofensivos if elemento.setplay
@@ -689,6 +730,53 @@ def importar_scouting_para_plano(adversario_id: int, jogo_id: int, request: Requ
             alterados += _preencher_se_vazio(plano, campo, [bloco])
     db.flush()
     materializar_campos_legados(db, plano, jogo.equipa_id)
+    selecionados = {_int(valor) for valor in dados.getlist("individual_item_ids")}
+    selecionados.discard(None)
+    if selecionados:
+        relacoes = (
+            db.query(ScoutingJogadorItem)
+            .options(joinedload(ScoutingJogadorItem.jogador), joinedload(ScoutingJogadorItem.item))
+            .join(ScoutingJogador, ScoutingJogadorItem.jogador_id == ScoutingJogador.id)
+            .join(ScoutingItemBiblioteca, ScoutingJogadorItem.item_id == ScoutingItemBiblioteca.id)
+            .filter(
+                ScoutingJogadorItem.id.in_(selecionados),
+                ScoutingJogador.adversario_id == adversario.id,
+                ScoutingJogadorItem.clube_id == adversario.clube_id,
+            )
+            .all()
+        )
+        existentes = {relacao.item_id for relacao in plano.itens}
+        for relacao in relacoes:
+            prefixo = f"#{relacao.jogador.numero} " if relacao.jogador.numero else ""
+            texto = f"{prefixo}{relacao.jogador.nome} — {relacao.item.nome}"
+            if relacao.observacao:
+                texto += f": {relacao.observacao}"
+            categoria_plano = "chave_defesa"
+            normalizado = normalizar_texto(texto)
+            item_plano = db.query(ItemPlanoJogoBiblioteca).filter(
+                ItemPlanoJogoBiblioteca.equipa_id == jogo.equipa_id,
+                ItemPlanoJogoBiblioteca.categoria == categoria_plano,
+                ItemPlanoJogoBiblioteca.texto_normalizado == normalizado,
+            ).first()
+            if not item_plano:
+                item_plano = ItemPlanoJogoBiblioteca(
+                    clube_id=jogo.clube_id,
+                    equipa_id=jogo.equipa_id,
+                    categoria=categoria_plano,
+                    texto=texto,
+                    texto_normalizado=normalizado,
+                )
+                db.add(item_plano)
+                db.flush()
+            if item_plano.id not in existentes:
+                db.add(PlanoJogoItem(
+                    clube_id=jogo.clube_id,
+                    plano_jogo_id=plano.id,
+                    item_id=item_plano.id,
+                    ordem=len(existentes),
+                ))
+                existentes.add(item_plano.id)
+                alterados += 1
     db.commit()
     mensagem = f"Scouting importado para {alterados} campo(s) vazio(s) do plano." if alterados else "O plano já tinha conteúdo nos campos disponíveis; nada foi substituído."
     set_flash(request, mensagem)
@@ -1041,7 +1129,14 @@ def ficha_individual(jogador_id: int, request: Request, db: Session = Depends(ge
     biblioteca = db.query(ScoutingItemBiblioteca).filter(
         ScoutingItemBiblioteca.clube_id == jogador.clube_id,
         ScoutingItemBiblioteca.categoria.in_(tuple(CATEGORIAS_BIBLIOTECA)),
-    ).order_by(ScoutingItemBiblioteca.nome).all()
+        ScoutingItemBiblioteca.ativo.is_(True),
+    ).options(joinedload(ScoutingItemBiblioteca.grupo)).order_by(
+        ScoutingItemBiblioteca.categoria, ScoutingItemBiblioteca.ordem, ScoutingItemBiblioteca.nome
+    ).all()
+    grupos_avaliacao = db.query(ScoutingGrupoAvaliacao).filter(
+        ScoutingGrupoAvaliacao.clube_id == jogador.clube_id,
+        ScoutingGrupoAvaliacao.ativo.is_(True),
+    ).order_by(ScoutingGrupoAvaliacao.ordem, ScoutingGrupoAvaliacao.nome).all()
     jogos = sorted(
         [ligacao.jogo for ligacao in jogador.adversario.jogos if ligacao.jogo],
         key=lambda jogo: jogo.data or date.min,
@@ -1055,10 +1150,14 @@ def ficha_individual(jogador_id: int, request: Request, db: Session = Depends(ge
         ScoutingZonaAcao.jogador_id == jogador.id,
         ScoutingZonaAcao.zona.in_(tuple(zona for zona, _ in ZONAS_CAMPO)),
     ).all()
+    itens_por_categoria = _itens_validos_jogador(db, jogador)
+    db.refresh(jogador)
     return templates.TemplateResponse(request, "scouting/individual.html", _contexto_departamento(
         request, utilizador, jogador.adversario, separador="individual", jogador=jogador, biblioteca=biblioteca,
         jogos=jogos, stat_fields=STAT_FIELDS, ficha=ficha, media_epoca=media_epoca,
-        estatisticas=estatisticas, zonas=zonas, itens_por_categoria=_itens_validos_jogador(db, jogador),
+        estatisticas=estatisticas, zonas=zonas, itens_por_categoria=itens_por_categoria,
+        grupos_avaliacao=grupos_avaliacao,
+        perfil_individual=construir_perfil_individual(jogador),
     ))
 
 
@@ -1137,6 +1236,20 @@ async def associar_item(jogador_id: int, request: Request, db: Session = Depends
         set_flash(request, "O nome deve ter no máximo 160 caracteres.", "error")
         return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#leitura", status_code=303)
     item_id = _int(dados.get("item_id"))
+    grupo_id = _int(dados.get("grupo_id")) if categoria == "caracteristica" else None
+    grupo = db.query(ScoutingGrupoAvaliacao).filter(
+        ScoutingGrupoAvaliacao.id == grupo_id,
+        ScoutingGrupoAvaliacao.clube_id == jogador.clube_id,
+        ScoutingGrupoAvaliacao.ativo.is_(True),
+    ).first() if grupo_id else None
+    avaliacao = _int(dados.get("avaliacao"))
+    prioridade = _int(dados.get("prioridade"))
+    if avaliacao is not None and (categoria != "caracteristica" or avaliacao not in range(1, 6)):
+        set_flash(request, "A avaliação deve estar entre 1 e 5, ou ficar por avaliar.", "error")
+        return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+    if prioridade is not None and (categoria != "game_plan" or prioridade not in range(1, 4)):
+        set_flash(request, "A prioridade do Game Plan deve estar entre 1 e 3.", "error")
+        return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
     normalizado = _normalizar(nome) if nome else None
     try:
         item = db.query(ScoutingItemBiblioteca).filter(
@@ -1156,6 +1269,11 @@ async def associar_item(jogador_id: int, request: Request, db: Session = Depends
                     categoria=categoria,
                     nome=nome,
                     nome_normalizado=normalizado,
+                    grupo_id=grupo.id if grupo else None,
+                    ordem=db.query(ScoutingItemBiblioteca).filter(
+                        ScoutingItemBiblioteca.clube_id == jogador.clube_id,
+                        ScoutingItemBiblioteca.categoria == categoria,
+                    ).count(),
                 )
                 db.add(item)
                 db.flush()
@@ -1171,9 +1289,22 @@ async def associar_item(jogador_id: int, request: Request, db: Session = Depends
                     clube_id=jogador.clube_id,
                     jogador_id=jogador.id,
                     item_id=item.id,
+                    ordem=db.query(ScoutingJogadorItem).filter(
+                        ScoutingJogadorItem.jogador_id == jogador.id
+                    ).count(),
                 )
                 db.add(associacao)
             associacao.observacao = _limpo(dados.get("observacao"))
+            associacao.avaliacao = avaliacao if categoria == "caracteristica" else None
+            associacao.prioridade = prioridade if categoria == "game_plan" else None
+            associacao.destaque = dados.get("destaque") == "true"
+            if associacao.destaque and associacao.ordem_destaque is None:
+                associacao.ordem_destaque = db.query(ScoutingJogadorItem).filter(
+                    ScoutingJogadorItem.jogador_id == jogador.id,
+                    ScoutingJogadorItem.destaque.is_(True),
+                ).count()
+            if categoria == "caracteristica" and grupo:
+                item.grupo_id = grupo.id
             db.commit()
             set_flash(request, "Informação associada à ficha.")
     except IntegrityError:
@@ -1195,6 +1326,9 @@ async def associar_item(jogador_id: int, request: Request, db: Session = Depends
                     jogador_id=jogador.id,
                     item_id=item.id,
                     observacao=_limpo(dados.get("observacao")),
+                    avaliacao=avaliacao if categoria == "caracteristica" else None,
+                    prioridade=prioridade if categoria == "game_plan" else None,
+                    destaque=dados.get("destaque") == "true",
                 ))
                 db.commit()
             set_flash(request, "Informação associada à ficha.")
@@ -1204,7 +1338,7 @@ async def associar_item(jogador_id: int, request: Request, db: Session = Depends
         db.rollback()
         logger.exception("Falha ao associar item à ficha de scouting do jogador %s", jogador.id)
         set_flash(request, "Não foi possível associar esta informação. A ficha continua disponível.", "error")
-    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#leitura", status_code=303)
+    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
 
 
 @router.post("/itens-associados/{associacao_id}/eliminar")
@@ -1215,7 +1349,7 @@ def remover_item(associacao_id: int, request: Request, db: Session = Depends(get
         return RedirectResponse(url="/scouting", status_code=303)
     db.delete(associacao)
     db.commit()
-    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#leitura", status_code=303)
+    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
 
 
 @router.post("/itens-associados/{associacao_id}/guardar")
@@ -1225,10 +1359,166 @@ async def guardar_observacao_item(associacao_id: int, request: Request, db: Sess
     if not jogador:
         return RedirectResponse(url="/scouting", status_code=303)
     dados = await request.form()
+    nome_item = _limpo(dados.get("nome_item"))
+    if nome_item and nome_item != associacao.item.nome:
+        normalizado = _normalizar(nome_item)
+        conflito = db.query(ScoutingItemBiblioteca).filter(
+            ScoutingItemBiblioteca.clube_id == jogador.clube_id,
+            ScoutingItemBiblioteca.categoria == associacao.item.categoria,
+            ScoutingItemBiblioteca.nome_normalizado == normalizado,
+            ScoutingItemBiblioteca.id != associacao.item_id,
+        ).first()
+        if conflito or len(nome_item) > 160:
+            set_flash(request, "Já existe uma opção com esse nome ou o nome é demasiado longo.", "error")
+            return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+        associacao.item.nome = nome_item
+        associacao.item.nome_normalizado = normalizado
     associacao.observacao = _limpo(dados.get("observacao"))
+    categoria = associacao.item.categoria
+    avaliacao = _int(dados.get("avaliacao"))
+    prioridade = _int(dados.get("prioridade"))
+    if avaliacao is not None and (categoria != "caracteristica" or avaliacao not in range(1, 6)):
+        set_flash(request, "A avaliação deve estar entre 1 e 5, ou ficar por avaliar.", "error")
+        return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+    if prioridade is not None and (categoria not in {"game_plan", "estrategia"} or prioridade not in range(1, 4)):
+        set_flash(request, "A prioridade do Game Plan deve estar entre 1 e 3.", "error")
+        return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+    associacao.avaliacao = avaliacao if categoria == "caracteristica" else None
+    associacao.prioridade = prioridade if categoria in {"game_plan", "estrategia"} else None
+    associacao.destaque = dados.get("destaque") == "true"
+    associacao.ordem_destaque = _int(dados.get("ordem_destaque")) if associacao.destaque else None
+    grupo_id = _int(dados.get("grupo_id"))
+    if categoria == "caracteristica" and grupo_id:
+        grupo = db.query(ScoutingGrupoAvaliacao).filter(
+            ScoutingGrupoAvaliacao.id == grupo_id,
+            ScoutingGrupoAvaliacao.clube_id == jogador.clube_id,
+        ).first()
+        if grupo:
+            associacao.item.grupo_id = grupo.id
     db.commit()
-    set_flash(request, "Observação atualizada.")
-    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#leitura", status_code=303)
+    set_flash(request, "Informação atualizada.")
+    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+
+
+@router.post("/jogadores/{jogador_id}/grupos-avaliacao")
+async def criar_grupo_avaliacao(jogador_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    jogador = _jogador_acessivel(db, jogador_id, utilizador)
+    if not jogador:
+        return RedirectResponse(url="/scouting", status_code=303)
+    dados = await request.form()
+    nome = _limpo(dados.get("nome"))
+    if not nome or len(nome) > 120:
+        set_flash(request, "Indica um nome de grupo válido.", "error")
+        return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+    normalizado = _normalizar(nome)
+    grupo = db.query(ScoutingGrupoAvaliacao).filter(
+        ScoutingGrupoAvaliacao.clube_id == jogador.clube_id,
+        ScoutingGrupoAvaliacao.nome_normalizado == normalizado,
+    ).first()
+    if grupo:
+        grupo.ativo = True
+        grupo.nome = nome
+    else:
+        grupo = ScoutingGrupoAvaliacao(
+            clube_id=jogador.clube_id,
+            nome=nome,
+            nome_normalizado=normalizado,
+            ordem=db.query(ScoutingGrupoAvaliacao).filter(
+                ScoutingGrupoAvaliacao.clube_id == jogador.clube_id
+            ).count(),
+        )
+        db.add(grupo)
+    db.commit()
+    set_flash(request, "Grupo de avaliação disponível.")
+    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+
+
+@router.post("/biblioteca-itens/{item_id}/renomear")
+async def renomear_item_biblioteca(item_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    item = db.query(ScoutingItemBiblioteca).filter(
+        ScoutingItemBiblioteca.id == item_id,
+        ScoutingItemBiblioteca.clube_id == _clube_do_utilizador(utilizador),
+    ).first()
+    dados = await request.form()
+    jogador = _jogador_acessivel(db, _int(dados.get("jogador_id")) or 0, utilizador)
+    nome = _limpo(dados.get("nome"))
+    if not item or not jogador or not nome or len(nome) > 160:
+        set_flash(request, "Não foi possível editar esta opção da biblioteca.", "error")
+        return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil" if jogador else "/scouting", status_code=303)
+    normalizado = _normalizar(nome)
+    conflito = db.query(ScoutingItemBiblioteca).filter(
+        ScoutingItemBiblioteca.clube_id == item.clube_id,
+        ScoutingItemBiblioteca.categoria == item.categoria,
+        ScoutingItemBiblioteca.nome_normalizado == normalizado,
+        ScoutingItemBiblioteca.id != item.id,
+    ).first()
+    if conflito:
+        set_flash(request, "Já existe uma opção com esse nome nesta categoria.", "error")
+    else:
+        item.nome = nome
+        item.nome_normalizado = normalizado
+        db.commit()
+        set_flash(request, "Opção atualizada em todas as fichas que a reutilizam.")
+    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+
+
+@router.post("/grupos-avaliacao/{grupo_id}/guardar")
+async def guardar_grupo_avaliacao(grupo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    grupo = db.query(ScoutingGrupoAvaliacao).filter(
+        ScoutingGrupoAvaliacao.id == grupo_id,
+        ScoutingGrupoAvaliacao.clube_id == _clube_do_utilizador(utilizador),
+    ).first()
+    dados = await request.form()
+    jogador = _jogador_acessivel(db, _int(dados.get("jogador_id")) or 0, utilizador)
+    if not grupo or not jogador:
+        return RedirectResponse(url="/scouting", status_code=303)
+    nome = _limpo(dados.get("nome"))
+    if nome and len(nome) <= 120:
+        grupo.nome = nome
+        grupo.nome_normalizado = _normalizar(nome)
+    grupo.ordem = _int(dados.get("ordem")) or 0
+    try:
+        db.commit()
+        set_flash(request, "Grupo atualizado.")
+    except IntegrityError:
+        db.rollback()
+        set_flash(request, "Já existe um grupo com esse nome.", "error")
+    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+
+
+@router.post("/grupos-avaliacao/{grupo_id}/eliminar")
+async def eliminar_grupo_avaliacao(grupo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    grupo = db.query(ScoutingGrupoAvaliacao).filter(
+        ScoutingGrupoAvaliacao.id == grupo_id,
+        ScoutingGrupoAvaliacao.clube_id == _clube_do_utilizador(utilizador),
+    ).first()
+    dados = await request.form()
+    jogador = _jogador_acessivel(db, _int(dados.get("jogador_id")) or 0, utilizador)
+    if not grupo or not jogador:
+        return RedirectResponse(url="/scouting", status_code=303)
+    grupo.ativo = False
+    db.commit()
+    set_flash(request, "Grupo retirado das opções. As avaliações existentes foram preservadas.")
+    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+
+
+@router.post("/itens-associados/{associacao_id}/mover/{direcao}")
+def mover_item_jogador(associacao_id: int, direcao: str, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    associacao = db.query(ScoutingJogadorItem).filter(ScoutingJogadorItem.id == associacao_id).first()
+    jogador = _jogador_acessivel(db, associacao.jogador_id, utilizador) if associacao else None
+    if not jogador or direcao not in {"cima", "baixo"}:
+        return RedirectResponse(url="/scouting", status_code=303)
+    categoria = associacao.item.categoria
+    candidatas = [rel for rel in _itens_validos_jogador(db, jogador).get(categoria, [])]
+    indice = next((i for i, rel in enumerate(candidatas) if rel.id == associacao.id), None)
+    destino = indice - 1 if direcao == "cima" and indice is not None else indice + 1 if indice is not None else -1
+    if indice is not None and 0 <= destino < len(candidatas):
+        outra = candidatas[destino]
+        associacao.ordem, outra.ordem = outra.ordem, associacao.ordem
+        if associacao.ordem == outra.ordem:
+            associacao.ordem, outra.ordem = destino, indice
+        db.commit()
+    return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
 
 
 @router.post("/jogadores/{jogador_id}/zonas")

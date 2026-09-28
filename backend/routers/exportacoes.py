@@ -15,7 +15,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from pypdf import PdfReader, PdfWriter
 from sqlalchemy import and_, or_, select
 from sqlalchemy.inspection import inspect as sa_inspect
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from template_config import Jinja2Templates
 
 from auth import verificar_acesso_equipa
@@ -55,7 +55,14 @@ from models.planeamento_clube import (
 )
 from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.relatorio_exportacao import PredefinicaoRelatorio
-from models.scouting import ScoutingAdversario, ScoutingAdversarioJogo, ScoutingJogador, STAT_FIELDS
+from models.scouting import (
+    ScoutingAdversario,
+    ScoutingAdversarioJogo,
+    ScoutingItemBiblioteca,
+    ScoutingJogador,
+    ScoutingJogadorItem,
+    STAT_FIELDS,
+)
 from models.treinador import Treinador, treinador_equipa
 from models.treino import BibliotecoExercicio, BlocoTreino, ExercicioPlano, ImportacaoPlanoTreino, PlanoTreino
 from models.utilizador import Utilizador
@@ -71,6 +78,7 @@ from services.desenho_service import (
 )
 from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
 from services.plano_jogo_service import graficos_plano, rotacoes_por_grupo
+from services.scouting_individual_service import construir_perfil_individual
 
 router = APIRouter(prefix="/exportacoes", tags=["exportacoes"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -720,7 +728,9 @@ RELATORIOS_CONFIG = {
             _secao("fotografia", "Fotografia", "Referencia visual do atleta.", ("completo", "facil", "a3")),
             _secao("pontos_fortes", "Pontos fortes", "Caracteristicas que exigem maior atencao.", ("completo", "facil", "a3")),
             _secao("pontos_fracos", "Pontos a explorar", "Limitacoes e oportunidades identificadas.", ("completo", "facil", "a3")),
+            _secao("avaliacoes", "Avaliações 1–5", "Perfil por grupos e características configuráveis.", ("completo", "facil", "a3")),
             _secao("tendencias", "Tendencias", "Movimentos, decisoes e comportamentos recorrentes.", ("completo", "facil")),
+            _secao("game_plan", "Game Plan", "Instruções operacionais para enfrentar o jogador.", ("completo", "facil", "a3")),
             _secao("zonas", "Zonas de acao", "Locais preferenciais e observacoes por zona.", ("completo", "facil")),
             _secao("estatisticas", "Estatisticas", "Medias da epoca e indicadores principais.", ("completo", "facil")),
             _secao("observacoes", "Observacoes", "Resumo tecnico individual.", ("completo",)),
@@ -873,7 +883,19 @@ def _idade(data_nascimento) -> int | None:
 def _alvo_relatorio(tipo: str, alvo_id: int, db: Session, utilizador):
     clube_id = utilizador.clube_id
     if tipo in {"roster", "scouting-individual", "scouting-coletivo"}:
-        adversario = db.query(ScoutingAdversario).filter(ScoutingAdversario.id == alvo_id, ScoutingAdversario.clube_id == clube_id).first()
+        consulta = db.query(ScoutingAdversario)
+        if tipo in {"roster", "scouting-individual"}:
+            consulta = consulta.options(
+                selectinload(ScoutingAdversario.jogadores)
+                .selectinload(ScoutingJogador.itens)
+                .joinedload(ScoutingJogadorItem.item)
+                .joinedload(ScoutingItemBiblioteca.grupo),
+                selectinload(ScoutingAdversario.jogadores).selectinload(ScoutingJogador.estatisticas),
+                selectinload(ScoutingAdversario.jogadores).selectinload(ScoutingJogador.zonas),
+                selectinload(ScoutingAdversario.jogadores).selectinload(ScoutingJogador.media_epoca),
+                selectinload(ScoutingAdversario.jogadores).selectinload(ScoutingJogador.ficha),
+            )
+        adversario = consulta.filter(ScoutingAdversario.id == alvo_id, ScoutingAdversario.clube_id == clube_id).first()
         if not adversario:
             raise HTTPException(404, "Adversario nao encontrado.")
         equipas = [ligacao.jogo.equipa for ligacao in adversario.jogos if ligacao.jogo and verificar_acesso_equipa(utilizador, ligacao.jogo.equipa_id, db)]
@@ -916,6 +938,8 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             atletas=atletas,
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in atletas},
             itens_atletas={j.id: _itens_por_categoria(j.itens) for j in atletas},
+            perfis_atletas={j.id: construir_perfil_individual(j) for j in atletas},
+            destaques_atletas={j.id: construir_perfil_individual(j, apenas_destaques=True) for j in atletas},
             ultimo_jogo={j.id: (j.estatisticas[0] if j.estatisticas else None) for j in atletas},
             campo_meio=imagem_estatica_data_uri(STATIC_DIR / "campos" / "campo_meio.png"),
             stat_fields=stat_fields,

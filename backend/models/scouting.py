@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -158,6 +158,24 @@ class ScoutingJogador(Base):
     rotacoes_previstas = relationship("ScoutingRotacaoPrevista", back_populates="jogador", cascade="all, delete-orphan")
 
 
+class ScoutingGrupoAvaliacao(Base):
+    __tablename__ = "scouting_grupos_avaliacao"
+    __table_args__ = (
+        UniqueConstraint("clube_id", "nome_normalizado", name="uq_scouting_grupo_avaliacao_clube_nome"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    nome = Column(String(120), nullable=False)
+    nome_normalizado = Column(String(120), nullable=False)
+    ordem = Column(Integer, nullable=False, default=0)
+    ativo = Column(Boolean, nullable=False, default=True)
+    criado_em = Column(DateTime, nullable=False, default=datetime.now)
+    atualizado_em = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+
+    itens = relationship("ScoutingItemBiblioteca", back_populates="grupo")
+
+
 class ScoutingFichaIndividual(Base):
     __tablename__ = "scouting_fichas_individuais"
 
@@ -222,20 +240,33 @@ class ScoutingItemBiblioteca(Base):
     __table_args__ = (UniqueConstraint("clube_id", "categoria", "nome_normalizado", name="uq_scouting_biblioteca_item"),)
     id = Column(Integer, primary_key=True)
     clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    grupo_id = Column(Integer, ForeignKey("scouting_grupos_avaliacao.id", ondelete="SET NULL"), nullable=True, index=True)
     categoria = Column(String(32), nullable=False, index=True)
     nome = Column(String(160), nullable=False)
     nome_normalizado = Column(String(160), nullable=False)
+    ordem = Column(Integer, nullable=False, default=0)
+    ativo = Column(Boolean, nullable=False, default=True)
+    grupo = relationship("ScoutingGrupoAvaliacao", back_populates="itens")
     jogadores = relationship("ScoutingJogadorItem", back_populates="item", cascade="all, delete-orphan")
 
 
 class ScoutingJogadorItem(Base):
     __tablename__ = "scouting_jogadores_itens"
-    __table_args__ = (UniqueConstraint("jogador_id", "item_id", name="uq_scouting_jogador_item"),)
+    __table_args__ = (
+        UniqueConstraint("jogador_id", "item_id", name="uq_scouting_jogador_item"),
+        CheckConstraint("avaliacao IS NULL OR (avaliacao >= 1 AND avaliacao <= 5)", name="ck_scouting_jogador_item_avaliacao"),
+        CheckConstraint("prioridade IS NULL OR (prioridade >= 1 AND prioridade <= 3)", name="ck_scouting_jogador_item_prioridade"),
+    )
     id = Column(Integer, primary_key=True)
     clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
     jogador_id = Column(Integer, ForeignKey("scouting_roster_jogadores.id", ondelete="CASCADE"), nullable=False, index=True)
     item_id = Column(Integer, ForeignKey("scouting_biblioteca_itens.id", ondelete="CASCADE"), nullable=False, index=True)
     observacao = Column(Text, nullable=True)
+    avaliacao = Column(Integer, nullable=True)
+    prioridade = Column(Integer, nullable=True)
+    ordem = Column(Integer, nullable=False, default=0)
+    destaque = Column(Boolean, nullable=False, default=False)
+    ordem_destaque = Column(Integer, nullable=True)
     jogador = relationship("ScoutingJogador", back_populates="itens")
     item = relationship("ScoutingItemBiblioteca", back_populates="jogadores")
 
