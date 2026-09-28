@@ -72,7 +72,10 @@ def test_documentos_partilham_identidade_e_regras_de_paginacao():
 def test_cartao_individual_inovador_preserva_uma_pagina_por_atleta():
     cartao = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
 
-    assert "INTELIGÊNCIA DE JOGO / LEITURA RÁPIDA" in cartao
+    assert "INTELIGÊNCIA DE JOGO / LEITURA RÁPIDA" not in cartao
+    assert "identidade.logo_principal" in cartao
+    assert "identidade.nome_oficial" in cartao
+    assert "j.ficha.resumo" in cartao
     assert ".player-sheet:last-child{page-break-after:auto}" in cartao
     assert ".player-sheet::after" not in cartao
     assert "player-hotzone" in cartao

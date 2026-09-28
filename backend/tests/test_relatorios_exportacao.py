@@ -117,8 +117,10 @@ def test_configurador_individual_transporta_avaliacoes_tendencias_e_game_plan():
     completo = (TEMPLATES / "relatorios" / "scouting_individual_completo.html").read_text(encoding="utf-8")
     poster = (TEMPLATES / "relatorios" / "_poster.html").read_text(encoding="utf-8")
     rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
-    for documento in (facil, completo, poster):
+    assert "Plano de jogo" in facil
+    for documento in (completo, poster):
         assert "Game Plan" in documento
+    for documento in (facil, completo, poster):
         assert "perfil" in documento.lower()
     assert "construir_perfil_individual" in rota
     assert "destaques_atletas" in rota
@@ -132,9 +134,11 @@ def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
     assert "stat_fields" in html
     assert "Média da época" in html
     assert "Último jogo" in html
-    assert "Características individuais" in html
-    assert "Tipos de movimento" in html
-    assert "Estratégias defensivas" in html
+    assert "Características" in html
+    assert "Tendências" in html
+    assert "Plano de jogo" in html
+    assert "j.ficha.resumo" in html
+    assert "identidade.logo_principal" in html
     assert "j.altura_cm" in html
     assert "j.peso_kg" in html
 
