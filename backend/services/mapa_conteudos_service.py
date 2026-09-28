@@ -257,7 +257,7 @@ def obter_sugestoes_conteudos_microciclo(db: Session, microciclo: Microciclo) ->
     """Prepara sugestões sucintas do mapa anual para a semana do microciclo."""
     anual = microciclo.mesociclo.macrociclo.planeamento_anual_equipa
     if not anual:
-        return {"planeamento": None, "itens": []}
+        return {"planeamento": None, "itens": [], "grupos": []}
 
     sincronizar_prioridades_com_microciclos(db, anual)
     semanas = {item["inicio"] for item in construir_semanas(microciclo.data_inicio, microciclo.data_fim)}
@@ -296,7 +296,26 @@ def obter_sugestoes_conteudos_microciclo(db: Session, microciclo: Microciclo) ->
         itens_por_conteudo.values(),
         key=lambda item: (item["prioridade"], item["area"], item["subarea"] or "", item["nome"]),
     )
-    return {"planeamento": anual, "itens": itens}
+    grupos_por_area = OrderedDict()
+    for item in itens:
+        grupo = grupos_por_area.setdefault(item["area"], {
+            "nome": item["area"],
+            "itens": [],
+        })
+        grupo["itens"].append(item)
+
+    nomes_ordenados = [nome for nome, _ in AREAS_MAPA if nome in grupos_por_area]
+    nomes_ordenados.extend(sorted(nome for nome in grupos_por_area if nome not in nomes_ordenados))
+    grupos = []
+    for nome_area in nomes_ordenados:
+        grupo = grupos_por_area[nome_area]
+        prioridades = [item["prioridade"] for item in grupo["itens"]]
+        grupos.append({
+            **grupo,
+            "total": len(grupo["itens"]),
+            "prioridade_principal": min(prioridades) if prioridades else None,
+        })
+    return {"planeamento": anual, "itens": itens, "grupos": grupos}
 
 
 def _agrupar_catalogo(conteudos: list[ConteudoMapaAnual]) -> list[dict]:

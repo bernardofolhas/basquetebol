@@ -193,6 +193,10 @@ def test_cabecalho_semanal_liga_ao_plano_e_mostra_balanco_e_sugestoes():
     assert 'class="training-guidance-menu"' in conteudo
     assert "Sugestões da semana" in conteudo
     assert 'class="training-guidance-shell mb-6 flex justify-end"' in conteudo
+    assert "sugestoes_conteudos.grupos" in conteudo
+    assert 'class="micro-priority-board"' in conteudo
+    assert 'class="micro-priority-cards"' in conteudo
+    assert 'data-priority-group="{{ grupo.nome|e }}"' in conteudo
 
 
 def test_pdf_completo_do_microciclo_prioriza_carga_sem_detalhe_repetido():

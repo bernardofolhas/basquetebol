@@ -56,13 +56,26 @@
                 <p>Prioridades do mapa anual de conteúdos</p>
                 <a href="/planeamento/anuais/{{ sugestoes_conteudos.planeamento.id }}" class="ds-quiet-link">Abrir mapa anual →</a>
             </div>
-            {% if sugestoes_conteudos.itens %}
-            <div class="grid gap-3 p-4 md:grid-cols-2">
-                {% for sugestao in sugestoes_conteudos.itens %}
-                <article class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-                    <span class="shrink-0 rounded-full px-2 py-1 text-xs font-bold {% if sugestao.prioridade == 1 %}bg-amber-200 text-amber-950{% else %}bg-white text-slate-600 ring-1 ring-slate-200{% endif %}">P{{ sugestao.prioridade }}</span>
-                    <div class="min-w-0"><p class="text-sm font-bold text-slate-800">{{ sugestao.nome }}</p><p class="mt-0.5 text-xs text-slate-500">{{ sugestao.area }}</p></div>
-                </article>
+            {% if sugestoes_conteudos.grupos %}
+            <div class="micro-priority-board">
+                {% for grupo in sugestoes_conteudos.grupos %}
+                <section class="micro-priority-group" data-priority-group="{{ grupo.nome|e }}">
+                    <header class="micro-priority-group-head">
+                        <div>
+                            <span class="micro-priority-group-index">{{ "%02d"|format(loop.index) }}</span>
+                            <div><h3>{{ grupo.nome }}</h3><p>{{ grupo.total }} conteúdo{% if grupo.total != 1 %}s{% endif %} prioritário{% if grupo.total != 1 %}s{% endif %}</p></div>
+                        </div>
+                        <strong>Prioridade P{{ grupo.prioridade_principal }}</strong>
+                    </header>
+                    <div class="micro-priority-cards">
+                        {% for sugestao in grupo.itens %}
+                        <article class="micro-priority-card">
+                            <span class="micro-priority-level {% if sugestao.prioridade == 1 %}is-primary{% endif %}">P{{ sugestao.prioridade }}</span>
+                            <div><h4>{{ sugestao.nome }}</h4>{% if sugestao.subarea %}<p>{{ sugestao.subarea }}</p>{% endif %}</div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                </section>
                 {% endfor %}
             </div>
             {% else %}
