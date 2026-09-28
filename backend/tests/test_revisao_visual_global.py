@@ -74,7 +74,7 @@ def test_cartao_individual_inovador_preserva_uma_pagina_por_atleta():
 
     assert "INTELIGÊNCIA DE JOGO / LEITURA RÁPIDA" not in cartao
     assert "identidade.logo_principal" in cartao
-    assert "identidade.nome_oficial" in cartao
+    assert "Scouting Individual - {{ alvo_nome }}" in cartao
     assert "j.ficha.resumo" in cartao
     assert ".player-sheet:last-child{page-break-after:auto}" in cartao
     assert ".player-sheet::after" not in cartao

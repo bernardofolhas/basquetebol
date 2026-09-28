@@ -139,6 +139,8 @@ def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
     assert "Plano de jogo" in html
     assert "j.ficha.resumo" in html
     assert "identidade.logo_principal" in html
+    assert "Scouting Individual - {{ alvo_nome }}" in html
+    assert "{{ nome_autor }}" not in html
     assert "j.altura_cm" in html
     assert "j.peso_kg" in html
 
