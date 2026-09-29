@@ -6,7 +6,7 @@ from template_config import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from auth import verificar_perfil
-from auth_deps import exigir_autenticacao, verificar_ou_negar_equipa
+from auth_deps import AcessoNegado, exigir_autenticacao, verificar_ou_negar_equipa
 from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
@@ -39,6 +39,7 @@ from services.plano_jogo_service import (
     convocados_plano,
     graficos_plano,
     itens_por_categoria,
+    jogo_em_preparacao,
     jogadas_disponiveis,
     materializar_campos_legados,
     normalizar_texto,
@@ -89,10 +90,13 @@ def _contexto_plano_estruturado(db: Session, jogo: Jogo, plano: PlanoJogo | None
 
 
 def _verificar_acesso_plano_jogo(
-    utilizador, jogo: Jogo, db: Session, permitir_consulta_staff: bool = True
+    utilizador, jogo: Jogo, db: Session, permitir_consulta_staff: bool = True,
+    permitir_jogo_passado: bool = False,
 ) -> None:
     """O staff consulta o plano, mas não pode alterar o respetivo conteúdo."""
     verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+    if not permitir_jogo_passado and not jogo_em_preparacao(jogo):
+        raise AcessoNegado(f"/jogos/{jogo.id}")
     if utilizador.perfil.value == "staff" and not permitir_consulta_staff:
         from auth_deps import SemPermissao
         raise SemPermissao(f"/jogos/{jogo.id}", status_code=403)
@@ -320,6 +324,7 @@ def detalhe_jogo(
         "jogadores": jogadores,
         "convocados_ids": convocados_ids,
         "jogos_anteriores": jogos_anteriores,
+        "jogo_futuro": jogo_em_preparacao(jogo),
     })
 
 
@@ -424,7 +429,9 @@ def guardar_reflexao_jogo(
     jogo = _obter_jogo(db, jogo_id)
     if not jogo:
         return RedirectResponse(url="/equipas")
-    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+    _verificar_acesso_plano_jogo(
+        utilizador, jogo, db, permitir_consulta_staff=False, permitir_jogo_passado=True
+    )
 
     plano = _obter_ou_criar_plano_jogo(db, jogo)
     plano.reflexao = reflexao.strip() or None

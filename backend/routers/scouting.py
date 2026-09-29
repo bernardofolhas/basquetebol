@@ -51,6 +51,8 @@ from services.plano_jogo_service import (
     biblioteca_por_categoria,
     convocados_plano,
     itens_por_categoria,
+    jogo_em_preparacao,
+    jogos_em_preparacao,
     jogadas_disponiveis,
     materializar_campos_legados,
     preview_jogada,
@@ -375,13 +377,22 @@ def _jogo_plano_adversario(adversario: ScoutingAdversario, db: Session, utilizad
         ligacao.jogo for ligacao in adversario.jogos
         if ligacao.jogo and verificar_acesso_equipa(utilizador, ligacao.jogo.equipa_id, db)
     ]
-    if jogo_id:
-        selecionado = next((jogo for jogo in jogos if jogo.id == jogo_id), None)
-        if selecionado:
-            return selecionado
-    hoje = datetime.now().date()
-    futuros = sorted((jogo for jogo in jogos if jogo.data >= hoje), key=lambda jogo: (jogo.data, jogo.hora or ""))
-    return futuros[0] if futuros else (max(jogos, key=lambda jogo: jogo.data) if jogos else None)
+    futuros = jogos_em_preparacao(jogos)
+    if jogo_id is not None:
+        return next((jogo for jogo in futuros if jogo.id == jogo_id), None)
+    return futuros[0] if futuros else None
+
+
+def _ordenar_jogos_scouting(jogos: list[Jogo]) -> list[Jogo]:
+    """Mostra primeiro a preparação mais próxima e conserva o histórico depois."""
+    futuros = jogos_em_preparacao(jogos)
+    futuros_ids = {jogo.id for jogo in futuros}
+    passados = sorted(
+        (jogo for jogo in jogos if jogo.id not in futuros_ids),
+        key=lambda jogo: (jogo.data or date.min, jogo.hora or "", jogo.id or 0),
+        reverse=True,
+    )
+    return futuros + passados
 
 
 def _itens_coletivos_texto(adversario: ScoutingAdversario, categoria: str, titulo: str) -> str | None:
@@ -405,7 +416,7 @@ def _preencher_se_vazio(plano: PlanoJogo, campo: str, blocos: list[str | None]) 
 
 def _jogo_e_relatorio(db: Session, jogo_id: int, utilizador):
     jogo = db.query(Jogo).filter(Jogo.id == jogo_id).first()
-    if not jogo:
+    if not jogo or not jogo_em_preparacao(jogo):
         return None, None
     verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
     relatorio = db.query(RelatorioScouting).filter(RelatorioScouting.jogo_id == jogo.id).first()
@@ -419,7 +430,7 @@ def _jogo_e_relatorio(db: Session, jogo_id: int, utilizador):
 
 def _obter_relatorio(db: Session, relatorio_id: int, utilizador):
     relatorio = db.query(RelatorioScouting).filter(RelatorioScouting.id == relatorio_id).first()
-    if not relatorio or not relatorio.jogo:
+    if not relatorio or not relatorio.jogo or not jogo_em_preparacao(relatorio.jogo):
         return None
     verificar_ou_negar_equipa(utilizador, relatorio.jogo.equipa_id, db)
     return relatorio
@@ -459,7 +470,7 @@ def departamento_scouting(
     ).order_by(ScoutingAdversario.nome).all():
         jogos = [ligacao.jogo for ligacao in adversario.jogos if ligacao.jogo and verificar_acesso_equipa(utilizador, ligacao.jogo.equipa_id, db)]
         if jogos:
-            adversario.jogos_acessiveis = sorted(jogos, key=lambda jogo: jogo.data, reverse=True)
+            adversario.jogos_acessiveis = _ordenar_jogos_scouting(jogos)
             acessiveis.append(adversario)
     return templates.TemplateResponse(request, "scouting/index.html", _contexto_departamento(
         request, utilizador, adversarios=acessiveis, total_jogadores=sum(len(item.jogadores) for item in acessiveis)
@@ -478,10 +489,11 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
     adversario = _adversario_acessivel(db, adversario_id, utilizador)
     if not adversario:
         return RedirectResponse(url="/scouting", status_code=303)
-    jogos = sorted([
+    jogos = _ordenar_jogos_scouting([
         ligacao.jogo for ligacao in adversario.jogos
         if ligacao.jogo and verificar_acesso_equipa(utilizador, ligacao.jogo.equipa_id, db)
-    ], key=lambda jogo: jogo.data or date.min, reverse=True)
+    ])
+    jogos_futuros = jogos_em_preparacao(jogos)
     if separador == "roster":
         grupos = {posicao: [j for j in adversario.jogadores if j.posicao_principal == posicao] for posicao in POSICOES}
         return templates.TemplateResponse(request, "scouting/roster.html", _contexto_departamento(
@@ -509,6 +521,8 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
     if separador == "plano-jogo":
         jogo_id = _int(request.query_params.get("jogo_id"))
         jogo = _jogo_plano_adversario(adversario, db, utilizador, jogo_id)
+        if jogo_id is not None and not jogo:
+            jogo = _jogo_plano_adversario(adversario, db, utilizador)
         plano = jogo.plano if jogo else None
         if plano and materializar_campos_legados(db, plano, jogo.equipa_id):
             db.commit()
@@ -534,7 +548,7 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             .all()
         )
         return templates.TemplateResponse(request, "scouting/plano_jogo.html", _contexto_departamento(
-            request, utilizador, adversario, separador=separador, jogos=jogos, jogo=jogo,
+            request, utilizador, adversario, separador=separador, jogos=jogos_futuros, jogo=jogo,
             plano=plano, jogadores=convocados_plano(jogo) if jogo else [],
             rotacoes_equipa=rotacoes_por_grupo(plano),
             categorias_plano=CATEGORIAS_PLANO,
@@ -627,13 +641,13 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             rotacoes_previstas=[item for item in rotacoes if item.papel == "rotacao"],
         ))
     if separador == "relatorios":
-        equipas_relatorio = list({jogo.equipa.id: jogo.equipa for jogo in jogos}.values())
+        equipas_relatorio = list({jogo.equipa.id: jogo.equipa for jogo in jogos_futuros}.values())
         return templates.TemplateResponse(request, "scouting/relatorios.html", _contexto_departamento(
             request,
             utilizador,
             adversario,
             separador=separador,
-            jogos=jogos,
+            jogos=jogos_futuros,
             equipas_relatorio=equipas_relatorio,
         ))
     return templates.TemplateResponse(request, "scouting/em_desenvolvimento.html", _contexto_departamento(
@@ -642,7 +656,7 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
 
 
 @router.get("/jogos/{jogo_id}/plano-jogo")
-def abrir_plano_jogo_no_scouting(jogo_id: int, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+def abrir_plano_jogo_no_scouting(jogo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
     jogo = db.query(Jogo).filter(Jogo.id == jogo_id).first()
     if not jogo:
         return RedirectResponse(url="/scouting", status_code=303)
@@ -651,6 +665,12 @@ def abrir_plano_jogo_no_scouting(jogo_id: int, db: Session = Depends(get_db), ut
     ligacao = db.query(ScoutingAdversarioJogo).filter(ScoutingAdversarioJogo.jogo_id == jogo.id).first()
     if not ligacao:
         return RedirectResponse(url="/scouting", status_code=303)
+    if not jogo_em_preparacao(jogo):
+        set_flash(request, "Este jogo já foi realizado. Foi aberto o próximo jogo disponível.", "error")
+        return RedirectResponse(
+            url=f"/scouting/adversarios/{ligacao.adversario_id}/plano-jogo",
+            status_code=303,
+        )
     return RedirectResponse(
         url=f"/scouting/adversarios/{ligacao.adversario_id}/plano-jogo?jogo_id={jogo.id}",
         status_code=303,
@@ -1552,6 +1572,8 @@ def pagina_scouting(
     _sincronizar_adversarios(db, utilizador)
     ligacao = db.query(ScoutingAdversarioJogo).filter(ScoutingAdversarioJogo.jogo_id == jogo.id).first()
     if ligacao:
+        if not jogo_em_preparacao(jogo):
+            set_flash(request, "Não é possível preparar scouting para um jogo já realizado.", "error")
         return RedirectResponse(url=f"/scouting/adversarios/{ligacao.adversario_id}/resumo", status_code=303)
     return RedirectResponse(url="/scouting", status_code=303)
 

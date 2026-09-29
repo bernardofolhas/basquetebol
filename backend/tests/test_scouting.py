@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -185,6 +185,69 @@ def _eliminar_adversario_integracao(adversario_id, jogo_id, playbook_id=None):
         db.commit()
     finally:
         db.close()
+
+
+def test_scouting_escolhe_proximo_jogo_e_bloqueia_jogos_passados(client_admin):
+    adversario_id, jogo_passado_id, equipa_id, clube_id, nome = _criar_adversario_integracao()
+    jogos_extra_ids = []
+    hoje = date.today()
+    try:
+        db = SessionLocal()
+        try:
+            jogo_passado = db.get(Jogo, jogo_passado_id)
+            jogo_passado.data = hoje - timedelta(days=1)
+            jogo_passado.hora = "21:00"
+            for dias, hora in ((8, "20:00"), (3, "18:00")):
+                jogo = Jogo(
+                    clube_id=clube_id,
+                    equipa_id=equipa_id,
+                    data=hoje + timedelta(days=dias),
+                    hora=hora,
+                    adversario=nome,
+                    em_casa=True,
+                )
+                db.add(jogo)
+                db.flush()
+                jogos_extra_ids.append(jogo.id)
+                db.add(ScoutingAdversarioJogo(
+                    clube_id=clube_id,
+                    adversario_id=adversario_id,
+                    jogo_id=jogo.id,
+                ))
+            db.commit()
+        finally:
+            db.close()
+
+        jogo_distante_id, jogo_proximo_id = jogos_extra_ids
+        resposta = client_admin.get(f"/scouting/adversarios/{adversario_id}/plano-jogo")
+        assert resposta.status_code == 200
+        assert resposta.text.index(f'value="{jogo_proximo_id}" selected') < resposta.text.index(f'value="{jogo_distante_id}"')
+
+        relatorios = client_admin.get(f"/scouting/adversarios/{adversario_id}/relatorios")
+        assert relatorios.status_code == 200
+        assert (hoje - timedelta(days=1)).strftime("%d/%m/%Y") not in relatorios.text
+        assert f"data-report-options='[{jogo_proximo_id}, {jogo_distante_id}]'" in relatorios.text
+
+        bloqueado = client_admin.get(f"/jogos/{jogo_passado_id}/plano", follow_redirects=False)
+        assert bloqueado.status_code == 303
+        assert bloqueado.headers["location"] == f"/jogos/{jogo_passado_id}"
+
+        exportacao = client_admin.get(
+            f"/exportacoes/relatorios/plano-jogo/{jogo_passado_id}",
+            follow_redirects=False,
+        )
+        assert exportacao.status_code == 409
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_passado_id)
+        db = SessionLocal()
+        try:
+            for jogo_id in jogos_extra_ids:
+                jogo = db.get(Jogo, jogo_id)
+                if jogo:
+                    db.delete(jogo)
+            db.commit()
+        finally:
+            db.close()
 
 
 def test_primeira_abertura_do_scouting_coletivo_cria_dependencias_sem_erro(client_admin):

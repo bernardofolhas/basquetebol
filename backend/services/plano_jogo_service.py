@@ -1,6 +1,7 @@
 """Contexto e compatibilidade do plano de jogo estruturado."""
 
 import unicodedata
+from datetime import date
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -28,6 +29,21 @@ CATEGORIAS_PLANO = (
     ("situacoes_especiais", "Situações especiais", "situacoes_especiais"),
 )
 CAMPOS_POR_CATEGORIA = {categoria: campo for categoria, _, campo in CATEGORIAS_PLANO}
+
+
+def jogo_em_preparacao(jogo, hoje: date | None = None) -> bool:
+    """Um jogo pode ser preparado até ao próprio dia, nunca depois."""
+    referencia = hoje or date.today()
+    return bool(jogo and jogo.data and jogo.data >= referencia)
+
+
+def jogos_em_preparacao(jogos, hoje: date | None = None) -> list:
+    """Devolve apenas jogos não realizados, começando pelo mais próximo."""
+    referencia = hoje or date.today()
+    return sorted(
+        (jogo for jogo in jogos if jogo_em_preparacao(jogo, referencia)),
+        key=lambda jogo: (jogo.data, jogo.hora or "", jogo.id or 0),
+    )
 
 
 def normalizar_texto(valor: str | None) -> str:

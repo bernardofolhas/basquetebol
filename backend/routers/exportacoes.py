@@ -77,7 +77,7 @@ from services.desenho_service import (
     normalizar_data_uri,
 )
 from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
-from services.plano_jogo_service import graficos_plano, rotacoes_por_grupo
+from services.plano_jogo_service import graficos_plano, jogo_em_preparacao, jogos_em_preparacao, rotacoes_por_grupo
 from services.scouting_individual_service import construir_perfil_individual
 
 router = APIRouter(prefix="/exportacoes", tags=["exportacoes"])
@@ -919,15 +919,24 @@ def _alvo_relatorio(tipo: str, alvo_id: int, db: Session, utilizador):
         adversario = consulta.filter(ScoutingAdversario.id == alvo_id, ScoutingAdversario.clube_id == clube_id).first()
         if not adversario:
             raise HTTPException(404, "Adversario nao encontrado.")
-        equipas = [ligacao.jogo.equipa for ligacao in adversario.jogos if ligacao.jogo and verificar_acesso_equipa(utilizador, ligacao.jogo.equipa_id, db)]
-        if not equipas:
+        jogos = [
+            ligacao.jogo for ligacao in adversario.jogos
+            if ligacao.jogo and verificar_acesso_equipa(utilizador, ligacao.jogo.equipa_id, db)
+        ]
+        if not jogos:
             raise HTTPException(403, "Sem acesso a este adversario.")
-        return adversario, equipas[0], adversario.nome
+        futuros = jogos_em_preparacao(jogos)
+        if tipo in {"scouting-individual", "scouting-coletivo"} and not futuros:
+            raise HTTPException(409, "Nao existem jogos futuros para preparar este scouting.")
+        jogo_referencia = futuros[0] if futuros else max(jogos, key=lambda jogo: (jogo.data, jogo.id))
+        return adversario, jogo_referencia.equipa, adversario.nome
     if tipo == "plano-jogo":
         jogo = db.query(Jogo).filter(Jogo.id == alvo_id, Jogo.clube_id == clube_id).first()
         if not jogo:
             raise HTTPException(404, "Jogo nao encontrado.")
         verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
+        if not jogo_em_preparacao(jogo):
+            raise HTTPException(409, "Nao e possivel exportar um plano de jogo ja realizado.")
         return jogo, jogo.equipa, f"{jogo.equipa.nome} vs {jogo.adversario}"
     raise HTTPException(404, "Tipo de relatorio desconhecido.")
 
@@ -969,10 +978,8 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         )
     elif tipo == "scouting-coletivo":
         setplays = [r.setplay for r in alvo.conceitos_ofensivos] + [r.setplay for r in alvo.momentos_playbook]
-        jogos_referencia = sorted(
-            [ligacao.jogo for ligacao in alvo.jogos if ligacao.jogo],
-            key=lambda jogo: (jogo.data or date.min, jogo.id),
-            reverse=True,
+        jogos_referencia = jogos_em_preparacao(
+            [ligacao.jogo for ligacao in alvo.jogos if ligacao.jogo]
         )
         contexto.update(
             adversario=alvo,

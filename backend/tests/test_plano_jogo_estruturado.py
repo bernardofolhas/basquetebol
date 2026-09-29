@@ -1,7 +1,40 @@
+from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
+
+from services.plano_jogo_service import jogo_em_preparacao, jogos_em_preparacao
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_jogos_em_preparacao_excluem_passados_e_escolhem_o_mais_proximo():
+    hoje = date(2026, 9, 29)
+    jogos = [
+        SimpleNamespace(id=1, data=hoje - timedelta(days=1), hora="21:00"),
+        SimpleNamespace(id=4, data=hoje + timedelta(days=10), hora="18:00"),
+        SimpleNamespace(id=3, data=hoje + timedelta(days=2), hora="20:00"),
+        SimpleNamespace(id=2, data=hoje, hora="22:00"),
+    ]
+
+    ordenados = jogos_em_preparacao(jogos, hoje)
+
+    assert [jogo.id for jogo in ordenados] == [2, 3, 4]
+    assert jogo_em_preparacao(jogos[0], hoje) is False
+    assert jogo_em_preparacao(jogos[-1], hoje) is True
+
+
+def test_scouting_e_exportacao_bloqueiam_planos_de_jogos_passados():
+    scouting = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+    jogos = (ROOT / "backend" / "routers" / "jogos.py").read_text(encoding="utf-8")
+    exportacoes = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+    relatorios = (ROOT / "frontend" / "templates" / "scouting" / "relatorios.html").read_text(encoding="utf-8")
+
+    assert "jogos_futuros = jogos_em_preparacao(jogos)" in scouting
+    assert "not jogo_em_preparacao(relatorio.jogo)" in scouting
+    assert "not jogo_em_preparacao(jogo)" in jogos
+    assert "Nao e possivel exportar um plano de jogo ja realizado" in exportacoes
+    assert "Jogo associado automaticamente" in relatorios
 
 
 def test_plano_jogo_usa_apenas_convocados_e_tres_cincos():

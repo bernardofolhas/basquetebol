@@ -40,7 +40,7 @@
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="resultado">Resultado</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="reflexao">Reflexão</button>
         <button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="convocatoria">Convocatória</button>
-        {% if utilizador.perfil.value != 'staff' %}<button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="scouting">Scouting</button>{% endif %}
+        {% if utilizador.perfil.value != 'staff' and jogo_futuro %}<button type="button" class="ds-workspace-tab" role="tab" data-workspace-tab="scouting">Scouting</button>{% endif %}
     </div>
 </nav>
 
@@ -183,7 +183,7 @@
         {% endif %}
     </div>
 
-    {% if utilizador.perfil.value != 'staff' %}<div data-workspace-panel="jogo:scouting" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100" hidden>
+    {% if utilizador.perfil.value != 'staff' and jogo_futuro %}<div data-workspace-panel="jogo:scouting" role="tabpanel" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100" hidden>
         <p class="ds-kicker">Preparação do jogo</p>
         <h2 class="mt-1 text-xl font-extrabold text-slate-900">Scouting do adversário</h2>
         <p class="mt-2 max-w-2xl text-sm text-slate-600">Reúne identidade, atletas-chave, ações, respostas, prioridades e a revisão pós-jogo no mesmo dossier.</p>
@@ -192,7 +192,7 @@
 
 </div>
 <div data-workspace-panel="jogo:resultado" role="tabpanel" class="mt-6">
-    {% if utilizador.perfil.value != 'staff' %}<a href="/jogos/{{ jogo.id }}/plano"
+    {% if utilizador.perfil.value != 'staff' and jogo_futuro %}<a href="/jogos/{{ jogo.id }}/plano"
        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition">
          📋 Plano de Jogo
     </a>{% endif %}
