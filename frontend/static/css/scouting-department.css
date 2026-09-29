@@ -74,3 +74,13 @@ body.scouting-studio-mode .report-format-card:has(input[value="a3"]) i{backgroun
 .scouting-opponent-brand{display:flex;align-items:center;justify-content:space-between;gap:1.5rem}.scouting-opponent-brand>div:first-child{display:flex;align-items:center;gap:1rem}.scouting-opponent-brand img{width:72px;height:72px;border:0;border-radius:0;background:transparent;object-fit:contain;padding:0}.scouting-opponent-placeholder{display:grid;width:72px;height:72px;place-items:center;border:1px solid var(--ds-border,#dbe3ed);border-radius:18px;background:var(--clube-primary-surface);color:var(--clube-primary);font-size:1.2rem;font-weight:900}.scouting-opponent-actions{display:flex;align-items:center;gap:.65rem}.scouting-opponent-actions form{margin:0}.scouting-opponent-actions input[type=file]{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 @media(max-width:720px){.scouting-opponent-brand{align-items:flex-start;flex-direction:column}.scouting-opponent-actions{width:100%;flex-wrap:wrap}}
 .scouting-opponent-mark.has-image{border-radius:0;background:transparent}.scouting-opponent-mark img{display:block;width:100%;height:100%;object-fit:contain}
+
+/* Zonas são uma indicação visual, não uma grelha de dados. */
+.scouting-zones-visual{display:block;padding:0}
+.scouting-zones-visual label{position:absolute;width:clamp(54px,9vw,92px);height:clamp(54px,9vw,92px);border:2px solid #dc2626;border-radius:50%;background:#dc262633;opacity:.42;transform:translate(-50%,-50%)}
+.scouting-zones-visual label:hover{opacity:.72;transform:translate(-50%,-50%) scale(1.06)}
+.scouting-zones-visual label.is-active,.scouting-zones-visual label:has(input:checked){border:3px solid #991b1b;background:#dc262699;box-shadow:0 0 0 6px #dc262629;opacity:1}
+.scouting-zones-visual label.is-active::after,.scouting-zones-visual label:has(input:checked)::after{position:absolute;top:5px;right:8px;color:#fff;content:"\00d7";font-size:1rem;font-weight:900;line-height:1;text-shadow:0 1px 3px #0008}
+.scouting-zones-visual label span{display:none}
+.scouting-zones-visual .zone-canto_esquerdo{left:10%;top:13%}.scouting-zones-visual .zone-topo{left:50%;top:13%}.scouting-zones-visual .zone-ala_direita{left:90%;top:13%;right:auto}.scouting-zones-visual .zone-poste_baixo_esquerdo{left:22%;top:49%}.scouting-zones-visual .zone-zona_central{left:50%;top:49%}.scouting-zones-visual .zone-poste_baixo_direito{left:78%;top:49%;right:auto}.scouting-zones-visual .zone-ala_esquerda{left:12%;top:84%;bottom:auto}.scouting-zones-visual .zone-aro{left:50%;top:80%;bottom:auto}.scouting-zones-visual .zone-canto_direito{left:88%;top:84%;right:auto;bottom:auto}
+.scouting-zone-actions{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1rem}

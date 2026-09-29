@@ -1602,7 +1602,7 @@ async def guardar_zonas(jogador_id: int, request: Request, db: Session = Depends
     selecionadas = [zona for zona in dados.getlist("zonas") if zona in validas]
     db.query(ScoutingZonaAcao).filter(ScoutingZonaAcao.jogador_id == jogador.id).delete(synchronize_session=False)
     for zona in selecionadas:
-        db.add(ScoutingZonaAcao(clube_id=jogador.clube_id, jogador_id=jogador.id, zona=zona, observacao=_limpo(dados.get(f"observacao_{zona}"))))
+        db.add(ScoutingZonaAcao(clube_id=jogador.clube_id, jogador_id=jogador.id, zona=zona))
     db.commit()
     set_flash(request, "Zonas de ação atualizadas.")
     return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#zonas", status_code=303)
