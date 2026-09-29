@@ -227,6 +227,7 @@ def test_dossier_permite_guardar_simbolo_do_adversario_para_os_relatorios():
 
 def test_coletivo_facil_resume_jogadores_estatisticas_e_diagramas():
     html = (TEMPLATES / "relatorios" / "scouting_coletivo_facil.html").read_text(encoding="utf-8")
+    formulario = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
     rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
 
     assert "jogadores_prioritarios" in html
@@ -236,7 +237,11 @@ def test_coletivo_facil_resume_jogadores_estatisticas_e_diagramas():
     assert "caracteristicas_estatisticas_com_dados" in html
     assert "Principais características" in html
     assert 'class="tactical-board"' in html
+    assert 'class="tactical-board playbook-board"' in html
     assert "adversario.momentos_playbook" in html
+    assert 'name="jogadores_destaque"' in formulario
+    assert "data-highlight-player" in formulario
+    assert 'dados.getlist("jogadores_destaque")' in rota
     assert "_jogadores_prioritarios_coletivo" in rota
 
 
@@ -258,6 +263,21 @@ def test_jogadores_prioritarios_usam_a_caracteristica_com_maior_avaliacao():
     resultado = _jogadores_prioritarios_coletivo(adversario)
 
     assert resultado == [{"jogador": jogador, "caracteristica": "Jogo interior"}]
+
+
+def test_jogadores_prioritarios_respeitam_a_selecao_e_ordem_do_treinador():
+    caracteristica = SimpleNamespace(nome="Defesa do bloqueio", ativo=True, categoria="caracteristica")
+    jogador_um = SimpleNamespace(id=11, itens=[])
+    jogador_dois = SimpleNamespace(
+        id=22,
+        itens=[SimpleNamespace(item=caracteristica, avaliacao=4, destaque=False, ordem_destaque=None)],
+    )
+    adversario = SimpleNamespace(jogadores=[jogador_um, jogador_dois], lideres=[])
+
+    resultado = _jogadores_prioritarios_coletivo(adversario, [22, 11])
+
+    assert [entrada["jogador"].id for entrada in resultado] == [22, 11]
+    assert resultado[0]["caracteristica"] == "Defesa do bloqueio"
 
 
 def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():

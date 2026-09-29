@@ -14,6 +14,9 @@
     const syncPlayerConfigs=()=>form.querySelectorAll('[data-player-config]').forEach(config=>{const entity=form.querySelector(`input[name="entidades"][value="${config.dataset.playerConfig}"]`);config.hidden=Boolean(entity&&!entity.checked)});
     form.querySelectorAll('input[name="entidades"]').forEach(input=>input.addEventListener('change',syncPlayerConfigs));
     form.querySelectorAll('[data-entities]').forEach(button=>button.addEventListener('click',()=>{form.querySelectorAll('input[name="entidades"]').forEach(input=>input.checked=button.dataset.entities==='all');syncPlayerConfigs()}));
-    form.addEventListener('submit',sync);sync();syncOrientation();syncPlayerConfigs();
+    const highlightPlayers=[...form.querySelectorAll('[data-highlight-player]')],highlightCount=form.querySelector('[data-highlight-count]');
+    const syncHighlightPlayers=changed=>{const checked=highlightPlayers.filter(input=>input.checked);if(checked.length>4&&changed){changed.checked=false;return syncHighlightPlayers()}highlightPlayers.forEach(input=>input.disabled=!input.checked&&checked.length>=4);if(highlightCount){highlightCount.textContent=`${checked.length} / 4`;highlightCount.classList.toggle('is-full',checked.length>=4)}};
+    highlightPlayers.forEach(input=>input.addEventListener('change',()=>syncHighlightPlayers(input)));
+    form.addEventListener('submit',sync);sync();syncOrientation();syncPlayerConfigs();syncHighlightPlayers();
   };
 })();

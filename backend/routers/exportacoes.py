@@ -747,7 +747,7 @@ RELATORIOS_CONFIG = {
             _secao("defesa", "Defesa", "Comportamentos e opcoes defensivas esperadas.", ("completo", "facil", "a3")),
             _secao("jogadores_chave", "Jogadores-chave", "Lideres e prioridades individuais.", ("completo", "facil", "a3")),
             _secao("prioridades", "Prioridades", "Plano pratico para atacar e defender.", ("completo", "facil", "a3")),
-            _secao("diagramas", "Diagramas", "Conceitos e momentos associados ao Playbook.", ("completo",)),
+            _secao("diagramas", "Playbook", "Jogadas selecionadas, apresentadas no final do relatorio.", ("completo",)),
         ],
     },
     "plano-jogo": {
@@ -949,12 +949,21 @@ def _itens_por_categoria(itens) -> dict[str, list]:
     return resultado
 
 
-def _jogadores_prioritarios_coletivo(adversario) -> list[dict]:
-    """Resume os jogadores escolhidos pelo treinador sem repetir atletas."""
+def _jogadores_prioritarios_coletivo(adversario, jogador_ids: list[int] | None = None) -> list[dict]:
+    """Resume os jogadores escolhidos para os mini-cartoes do relatorio."""
     resultado = []
     vistos = set()
-    for lider in adversario.lideres or []:
-        jogador = lider.jogador
+    if jogador_ids is None:
+        candidatos = [
+            (lider.jogador, lider.tipo)
+            for lider in (adversario.lideres or [])
+            if lider.jogador
+        ]
+    else:
+        jogadores = {jogador.id: jogador for jogador in (adversario.jogadores or [])}
+        candidatos = [(jogadores.get(jogador_id), None) for jogador_id in jogador_ids]
+
+    for jogador, caracteristica_padrao in candidatos:
         if not jogador or jogador.id in vistos:
             continue
         vistos.add(jogador.id)
@@ -973,7 +982,11 @@ def _jogadores_prioritarios_coletivo(adversario) -> list[dict]:
         ))
         resultado.append({
             "jogador": jogador,
-            "caracteristica": caracteristicas[0].item.nome if caracteristicas else lider.tipo,
+            "caracteristica": (
+                caracteristicas[0].item.nome
+                if caracteristicas
+                else (caracteristica_padrao or "Sem caracteristica avaliada")
+            ),
         })
     return resultado[:4]
 
@@ -1008,6 +1021,14 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             stat_codes=STAT_CODES,
         )
     elif tipo == "scouting-coletivo":
+        jogadores_destaque_ids = None
+        if dados.get("configuracao_jogadores_destaque"):
+            jogadores_destaque_ids = []
+            for valor in dados.getlist("jogadores_destaque"):
+                if str(valor).isdigit() and int(valor) not in jogadores_destaque_ids:
+                    jogadores_destaque_ids.append(int(valor))
+                if len(jogadores_destaque_ids) == 4:
+                    break
         setplays = [r.setplay for r in alvo.conceitos_ofensivos] + [r.setplay for r in alvo.momentos_playbook]
         itens_coletivos = _itens_por_categoria(alvo.itens_coletivos)
         media = alvo.media_coletiva
@@ -1019,7 +1040,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             jogo_referencia=jogos_referencia[0] if jogos_referencia else None,
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in alvo.jogadores},
             itens_coletivos=itens_coletivos,
-            jogadores_prioritarios=_jogadores_prioritarios_coletivo(alvo),
+            jogadores_prioritarios=_jogadores_prioritarios_coletivo(alvo, jogadores_destaque_ids),
             stat_fields_com_dados=[
                 campo for campo in stat_fields
                 if media is not None and getattr(media, campo, None) is not None
@@ -1090,6 +1111,13 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
         entidades = [j for j in alvo.jogadores if j.estado != "arquivado"]
     elif tipo == "scouting-individual":
         entidades = alvo.jogadores
+    jogadores_mini_cartoes = []
+    jogadores_mini_cartoes_preselecionados = []
+    if tipo == "scouting-coletivo":
+        jogadores_mini_cartoes = sorted(alvo.jogadores, key=lambda jogador: jogador.nome.casefold())
+        jogadores_mini_cartoes_preselecionados = [
+            entrada["jogador"].id for entrada in _jogadores_prioritarios_coletivo(alvo)
+        ]
     return {
         "utilizador": utilizador,
         "tipo": tipo,
@@ -1099,6 +1127,8 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
         "config": RELATORIOS_CONFIG[tipo],
         "formatos": FORMATOS_RELATORIO,
         "entidades": entidades,
+        "jogadores_mini_cartoes": jogadores_mini_cartoes,
+        "jogadores_mini_cartoes_preselecionados": jogadores_mini_cartoes_preselecionados,
         "predefinicoes": predefinicoes,
         "predefinicao": predefinicao,
         "selecionadas": selecionadas,
