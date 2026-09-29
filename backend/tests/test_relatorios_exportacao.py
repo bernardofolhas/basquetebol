@@ -231,6 +231,23 @@ def test_resumo_individual_em_lista_e_mais_menos_aceita_sinal():
     assert "campo == 'mais_menos'" in facil
 
 
+def test_cartao_individual_alinha_cabecalho_resumo_e_percentagens():
+    completo = (TEMPLATES / "relatorios" / "scouting_individual_completo.html").read_text(encoding="utf-8")
+    facil = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
+    estilos = (TEMPLATES / "relatorios" / "_scouting_estilos.html").read_text(encoding="utf-8")
+
+    assert ".player-sheet>.scouting-report-header" in facil
+    assert "margin-right:-6mm" in facil
+    assert "margin-left:-6mm" in facil
+    assert "min-height:7mm" in facil
+    assert "overflow:hidden" in facil
+    for html in (completo, facil):
+        assert "pares_lancamento" in html
+        assert "(valor / tentativas) * 100" in html
+        assert 'class="stat-percentage"' in html
+    assert ".stat-percentage" in estilos
+
+
 def test_cabecalhos_de_scouting_usam_logotipos_e_titulo_unico():
     cabecalho = (TEMPLATES / "relatorios" / "_scouting_cabecalho.html").read_text(encoding="utf-8")
     assert "identidade.logo_principal" in cabecalho
