@@ -295,6 +295,16 @@ def test_coletivo_facil_resume_jogadores_estatisticas_e_diagramas():
     assert "_jogadores_prioritarios_coletivo" in rota
 
 
+def test_estatisticas_coletivas_ficam_numa_linha_e_calculam_percentagens():
+    html = (TEMPLATES / "relatorios" / "scouting_coletivo_facil.html").read_text(encoding="utf-8")
+
+    assert ".scout-stat-strip{display:flex;flex-wrap:nowrap" in html
+    assert "pares_lancamento" in html
+    assert "pares_lancamento[campo] in stat_fields_com_dados" in html
+    assert "(valor / tentativas) * 100" in html
+    assert 'class="stat-percentage"' in html
+
+
 def test_jogadores_prioritarios_usam_a_caracteristica_com_maior_avaliacao():
     caracteristica_fraca = SimpleNamespace(nome="Lançamento exterior", ativo=True, categoria="caracteristica")
     caracteristica_forte = SimpleNamespace(nome="Jogo interior", ativo=True, categoria="caracteristica")
