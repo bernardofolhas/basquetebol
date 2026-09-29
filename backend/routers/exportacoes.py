@@ -949,6 +949,35 @@ def _itens_por_categoria(itens) -> dict[str, list]:
     return resultado
 
 
+def _jogadores_prioritarios_coletivo(adversario) -> list[dict]:
+    """Resume os jogadores escolhidos pelo treinador sem repetir atletas."""
+    resultado = []
+    vistos = set()
+    for lider in adversario.lideres or []:
+        jogador = lider.jogador
+        if not jogador or jogador.id in vistos:
+            continue
+        vistos.add(jogador.id)
+        caracteristicas = [
+            relacao for relacao in (jogador.itens or [])
+            if relacao.item
+            and relacao.item.ativo
+            and relacao.item.categoria == "caracteristica"
+            and relacao.avaliacao is not None
+        ]
+        caracteristicas.sort(key=lambda relacao: (
+            -(relacao.avaliacao or 0),
+            not relacao.destaque,
+            relacao.ordem_destaque if relacao.ordem_destaque is not None else 10_000,
+            relacao.item.nome.casefold(),
+        ))
+        resultado.append({
+            "jogador": jogador,
+            "caracteristica": caracteristicas[0].item.nome if caracteristicas else lider.tipo,
+        })
+    return resultado[:4]
+
+
 def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> dict:
     contexto = {"tipo_relatorio": tipo, "equipa": equipa, "alvo": alvo}
     if tipo in {"scouting-individual", "scouting-coletivo"}:
@@ -980,6 +1009,8 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         )
     elif tipo == "scouting-coletivo":
         setplays = [r.setplay for r in alvo.conceitos_ofensivos] + [r.setplay for r in alvo.momentos_playbook]
+        itens_coletivos = _itens_por_categoria(alvo.itens_coletivos)
+        media = alvo.media_coletiva
         jogos_referencia = jogos_em_preparacao(
             [ligacao.jogo for ligacao in alvo.jogos if ligacao.jogo]
         )
@@ -987,7 +1018,20 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             adversario=alvo,
             jogo_referencia=jogos_referencia[0] if jogos_referencia else None,
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in alvo.jogadores},
-            itens_coletivos=_itens_por_categoria(alvo.itens_coletivos),
+            itens_coletivos=itens_coletivos,
+            jogadores_prioritarios=_jogadores_prioritarios_coletivo(alvo),
+            stat_fields_com_dados=[
+                campo for campo in stat_fields
+                if media is not None and getattr(media, campo, None) is not None
+            ],
+            caracteristicas_estatisticas_com_dados=[
+                relacao for relacao in itens_coletivos.get("estatistica_coletiva", [])
+                if str(relacao.valor or "").strip() or str(relacao.observacao or "").strip()
+            ],
+            principais_caracteristicas=(
+                itens_coletivos.get("ataque_forte", [])
+                + itens_coletivos.get("defesa_forte", [])
+            )[:6],
             cinco_previsto=[r for r in alvo.rotacao_prevista if r.papel == "titular"],
             rotacoes_previstas=[r for r in alvo.rotacao_prevista if r.papel != "titular"],
             passos_setplay={setplay.id: _passos_setplay_pdf(setplay) for setplay in setplays},

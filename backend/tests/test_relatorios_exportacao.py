@@ -8,6 +8,7 @@ from routers.exportacoes import (
     RELATORIOS_CONFIG,
     _configuracao_individual_por_atleta,
     _configuracao_relatorio,
+    _jogadores_prioritarios_coletivo,
     _secoes_padrao,
 )
 
@@ -224,10 +225,45 @@ def test_dossier_permite_guardar_simbolo_do_adversario_para_os_relatorios():
     assert 'contexto["simbolo_adversario"] = _fotografia_embebida(alvo.simbolo)' in rota_exportacao
 
 
+def test_coletivo_facil_resume_jogadores_estatisticas_e_diagramas():
+    html = (TEMPLATES / "relatorios" / "scouting_coletivo_facil.html").read_text(encoding="utf-8")
+    rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+
+    assert "jogadores_prioritarios" in html
+    assert "entrada.caracteristica" in html
+    assert "stat_fields_com_dados" in html
+    assert "stat_labels.get(campo" in html
+    assert "caracteristicas_estatisticas_com_dados" in html
+    assert "Principais características" in html
+    assert 'class="tactical-board"' in html
+    assert "adversario.momentos_playbook" in html
+    assert "_jogadores_prioritarios_coletivo" in rota
+
+
+def test_jogadores_prioritarios_usam_a_caracteristica_com_maior_avaliacao():
+    caracteristica_fraca = SimpleNamespace(nome="Lançamento exterior", ativo=True, categoria="caracteristica")
+    caracteristica_forte = SimpleNamespace(nome="Jogo interior", ativo=True, categoria="caracteristica")
+    jogador = SimpleNamespace(
+        id=17,
+        itens=[
+            SimpleNamespace(item=caracteristica_fraca, avaliacao=2, destaque=False, ordem_destaque=None),
+            SimpleNamespace(item=caracteristica_forte, avaliacao=5, destaque=True, ordem_destaque=1),
+        ],
+    )
+    adversario = SimpleNamespace(lideres=[
+        SimpleNamespace(jogador=jogador, tipo="Melhor marcador"),
+        SimpleNamespace(jogador=jogador, tipo="Mais ressaltos"),
+    ])
+
+    resultado = _jogadores_prioritarios_coletivo(adversario)
+
+    assert resultado == [{"jogador": jogador, "caracteristica": "Jogo interior"}]
+
+
 def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
     marcadores = {
         "roster_facil.html": ("easy-roster", "fotografias.get(j.id)", "Referência rápida"),
-        "scouting_coletivo_facil.html": ("Quando defendemos", "Quando atacamos", "Jogadores-chave"),
+        "scouting_coletivo_facil.html": ("Quando defendemos", "Quando atacamos", "Jogadores prioritários"),
         "plano_jogo_facil.html": ("briefing da equipa", "O nosso cinco", "Convocados"),
     }
     for ficheiro, esperados in marcadores.items():
