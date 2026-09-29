@@ -45,6 +45,7 @@ from models.scouting import (
 from paths import TEMPLATES_DIR
 from services.pdf_service import content_disposition_pdf, renderizar_pdf
 from services.fotografia_jogador_service import apagar_fotografia, guardar_fotografia
+from services.logo_service import apagar_logo_guardado, guardar_logo_transparente
 from services.desenho_service import decompor_desenho_editavel
 from services.plano_jogo_service import (
     CATEGORIAS_PLANO,
@@ -497,7 +498,10 @@ async def guardar_simbolo_adversario(
         set_flash(request, "Seleciona uma imagem PNG ou JPEG.", "error")
         return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/resumo", status_code=303)
     try:
-        novo_simbolo = await guardar_fotografia(simbolo)
+        novo_simbolo = await guardar_logo_transparente(
+            simbolo,
+            f"clube-{adversario.clube_id}-adversario-{adversario.id}",
+        )
     except ValueError as erro:
         set_flash(request, str(erro).replace("fotografia", "imagem").replace("Fotografia", "Imagem"), "error")
         return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/resumo", status_code=303)
@@ -505,7 +509,7 @@ async def guardar_simbolo_adversario(
     adversario.simbolo = novo_simbolo
     adversario.atualizado_em = datetime.now()
     db.commit()
-    apagar_fotografia(anterior)
+    apagar_logo_guardado(anterior)
     set_flash(request, "Símbolo do adversário atualizado.")
     return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/resumo", status_code=303)
 
@@ -524,7 +528,7 @@ def remover_simbolo_adversario(
     adversario.simbolo = None
     adversario.atualizado_em = datetime.now()
     db.commit()
-    apagar_fotografia(anterior)
+    apagar_logo_guardado(anterior)
     set_flash(request, "Símbolo do adversário removido.")
     return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/resumo", status_code=303)
 

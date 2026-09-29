@@ -5,7 +5,7 @@ body.sidebar-hidden #conteudo-principal { margin-left:0;padding-top:4.5rem; }
 body.sidebar-hidden #app-sidebar { display:none; }
 .sidebar-brand { display:flex;align-items:center;gap:.5rem;padding:1rem;background:#fff;color:var(--text-main);border-top:4px solid var(--clube-primary);border-bottom:1px solid var(--border-soft); }
 .sidebar-brand>a { display:flex;align-items:center;gap:.65rem;flex:1;min-width:0;font-size:.85rem; }
-.sidebar-brand img { width:36px;height:36px;object-fit:contain;background:#fff;border-radius:8px;padding:3px; }
+.sidebar-brand img { width:36px;height:36px;object-fit:contain;background:transparent;border-radius:0;padding:0; }
 .sidebar-brand strong { overflow-wrap:anywhere; }
 .sidebar-brand button { flex:none;width:40px;height:40px;font-size:1.6rem;border-radius:8px;background:var(--surface-muted); }
 #sidebar-scroll { flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;padding:.8rem; }

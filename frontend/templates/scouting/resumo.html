@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}{{ adversario.nome }} · Scouting{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260929-opponent-logo">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260929-transparent-logos-1">{% endblock %}
 {% block conteudo %}
 <div data-customizable-dashboard data-dashboard-key="scouting-resumo-{{ adversario.id }}">
 <header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">Dossier de adversário</p><h1>{{ adversario.nome }}</h1></div><div class="scouting-title-actions"><span>{{ adversario.jogadores|length }} atletas</span><aside data-dashboard-customizer-anchor></aside></div></header>

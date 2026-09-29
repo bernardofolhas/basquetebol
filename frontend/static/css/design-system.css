@@ -346,7 +346,16 @@ dialog[open],
 .ds-logo {
     width: 2rem;
     height: 2rem;
+    background: transparent;
     object-fit: contain;
+}
+
+img[alt^="Logótipo"],
+img[alt^="Logotipo"] {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
 }
 
 .ds-topbar { left:0;right:0;width:100%;max-width:none;background:var(--clube-primary);color:var(--clube-header-text);box-shadow:0 1px 0 color-mix(in srgb,var(--clube-header-text) 16%,transparent) inset,0 7px 22px rgb(15 23 42 / .16); }

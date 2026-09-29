@@ -1,29 +1,24 @@
 from datetime import datetime
-from io import BytesIO
-
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from template_config import Jinja2Templates
-from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
 from auth_deps import exigir_superadmin
 from database import get_db
 from flash import set_flash
-from paths import BRANDING_DIR, STATIC_DIR, TEMPLATES_DIR
+from paths import TEMPLATES_DIR
 from services.identidade_clube_service import (
     CORES_PADRAO,
-    caminho_ficheiro_logo,
     garantir_identidade_clube,
     identidade_para_contexto,
     normalizar_cor,
 )
+from services.logo_service import apagar_logo_guardado, guardar_logo_transparente
 
 
 router = APIRouter(prefix="/administracao/identidade")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-MAX_LOGO_BYTES = 2 * 1024 * 1024
-MAX_LOGO_DIMENSION = 4000
 
 
 def _validar_cor(valor: str, nome: str, fallback: str) -> str:
@@ -34,36 +29,11 @@ def _validar_cor(valor: str, nome: str, fallback: str) -> str:
 
 
 def _apagar_logo(url: str | None) -> None:
-    caminho = caminho_ficheiro_logo(STATIC_DIR, url)
-    if caminho and caminho.exists():
-        caminho.unlink()
+    apagar_logo_guardado(url)
 
 
 async def _guardar_logo(ficheiro: UploadFile | None, nome: str) -> str | None:
-    if not ficheiro or not ficheiro.filename:
-        return None
-    if ficheiro.content_type not in {"image/png", "image/jpeg"}:
-        raise ValueError("O logótipo deve estar em formato PNG ou JPEG.")
-    dados = await ficheiro.read(MAX_LOGO_BYTES + 1)
-    if len(dados) > MAX_LOGO_BYTES:
-        raise ValueError("O logótipo não pode ultrapassar 2 MB.")
-    try:
-        imagem = Image.open(BytesIO(dados))
-        imagem.verify()
-        imagem = Image.open(BytesIO(dados))
-    except (UnidentifiedImageError, OSError) as erro:
-        raise ValueError("O ficheiro enviado não é uma imagem válida.") from erro
-
-    if not imagem.width or not imagem.height or max(imagem.width, imagem.height) > MAX_LOGO_DIMENSION:
-        raise ValueError("O logótipo deve ter dimensões válidas e no máximo 4000 px.")
-    if imagem.mode not in {"RGB", "RGBA"}:
-        imagem = imagem.convert("RGBA" if "transparency" in imagem.info else "RGB")
-    imagem.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
-
-    BRANDING_DIR.mkdir(parents=True, exist_ok=True)
-    destino = BRANDING_DIR / f"{nome}.png"
-    imagem.save(destino, format="PNG", optimize=True)
-    return f"/static/uploads/branding/{destino.name}"
+    return await guardar_logo_transparente(ficheiro, nome)
 
 
 @router.get("", response_class=HTMLResponse)

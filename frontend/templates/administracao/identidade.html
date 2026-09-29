@@ -46,13 +46,13 @@
 
     <section class="ds-card p-6">
         <h2 class="text-lg font-semibold text-gray-800">Logótipos</h2>
-        <p class="mt-1 text-sm text-gray-500">PNG ou JPEG, até 2 MB e 4000 px. O sistema otimiza a imagem e não aceita SVG direto.</p>
+        <p class="mt-1 text-sm text-gray-500">PNG ou JPEG, até 2 MB e 4000 px. O sistema remove automaticamente o fundo ligado às margens.</p>
         <div class="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
             {% for campo, titulo, atual, remover in [('logo_principal', 'Logótipo principal', identidade.logo_principal, 'remover_logo_principal'), ('logo_secundario', 'Logótipo secundário', identidade.logo_secundario, 'remover_logo_secundario')] %}
             <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <p class="font-semibold text-gray-700">{{ titulo }}</p>
                 <div class="mt-3 flex min-h-20 items-center gap-4">
-                    {% if atual %}<img src="{{ atual }}" alt="{{ titulo }}" class="h-16 w-28 rounded-xl bg-white object-contain p-2">{% else %}<span class="text-sm text-gray-400">Ainda não definido</span>{% endif %}
+                    {% if atual %}<img src="{{ atual }}" alt="{{ titulo }}" class="h-16 w-28 object-contain" style="background:transparent">{% else %}<span class="text-sm text-gray-400">Ainda não definido</span>{% endif %}
                     <input type="file" name="{{ campo }}" accept="image/png,image/jpeg" class="min-w-0 text-sm text-gray-600">
                 </div>
                 <label class="mt-3 flex items-center gap-2 text-xs text-gray-500"><input type="checkbox" name="{{ remover }}" value="true"> Remover este logótipo</label>
