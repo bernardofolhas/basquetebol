@@ -1,10 +1,24 @@
 {% extends "base.html" %}
 {% block titulo %}{{ adversario.nome }} · Scouting{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260922-studio-3">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260929-opponent-logo">{% endblock %}
 {% block conteudo %}
 <div data-customizable-dashboard data-dashboard-key="scouting-resumo-{{ adversario.id }}">
 <header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">Dossier de adversário</p><h1>{{ adversario.nome }}</h1></div><div class="scouting-title-actions"><span>{{ adversario.jogadores|length }} atletas</span><aside data-dashboard-customizer-anchor></aside></div></header>
 {% include "scouting/_departamento_tabs.html" %}
+<section class="ds-card p-6 mt-5 scouting-opponent-brand" data-dashboard-widget="simbolo-adversario" data-dashboard-label="Símbolo do adversário">
+  <div>
+    {% if adversario.simbolo %}<img src="{{ adversario.simbolo }}" alt="Símbolo de {{ adversario.nome }}">{% else %}<div class="scouting-opponent-placeholder">{{ adversario.nome[:2]|upper }}</div>{% endif %}
+    <div><p class="ds-kicker">Identidade do adversário</p><h2 class="text-xl font-extrabold mt-1">Símbolo de {{ adversario.nome }}</h2><p>Usado automaticamente nos cabeçalhos dos relatórios.</p></div>
+  </div>
+  <div class="scouting-opponent-actions">
+    <form method="post" action="/scouting/adversarios/{{ adversario.id }}/simbolo" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ request.session.get('_csrf', '') }}">
+      <label class="ds-button ds-button-secondary" for="simbolo-adversario">Escolher imagem</label>
+      <input id="simbolo-adversario" name="simbolo" type="file" accept="image/png,image/jpeg" required onchange="this.form.submit()">
+    </form>
+    {% if adversario.simbolo %}<form method="post" action="/scouting/adversarios/{{ adversario.id }}/simbolo/remover"><input type="hidden" name="csrf_token" value="{{ request.session.get('_csrf', '') }}"><button class="ds-button ds-button-ghost" type="submit">Remover</button></form>{% endif %}
+  </div>
+</section>
 <div class="scouting-summary-grid" data-dashboard-widget="atalhos" data-dashboard-label="Atalhos de scouting"><a class="ds-card ds-card-link p-6" href="/scouting/adversarios/{{ adversario.id }}/roster"><p class="ds-kicker">Roster</p><h2>{{ adversario.jogadores|length }} atletas registados</h2><p>Gerir identificação, disponibilidade e posição.</p></a><a class="ds-card ds-card-link p-6" href="/scouting/adversarios/{{ adversario.id }}/individual"><p class="ds-kicker">Scouting individual</p><h2>Fichas e tendências</h2><p>Estatísticas, movimentos, respostas defensivas e zonas.</p></a></div>
 <section class="ds-card p-6 mt-5" data-dashboard-widget="jogos" data-dashboard-label="Jogos associados"><p class="ds-kicker">Jogos associados</p><h2 class="text-xl font-extrabold mt-1">Calendário contra {{ adversario.nome }}</h2><div class="scouting-game-list">{% for jogo in jogos %}<div><div><strong>{{ jogo.equipa.nome }} · {{ jogo.data|data_pt }}</strong><span>{{ jogo.hora or 'Hora por definir' }} · {{ jogo.local or 'Local por definir' }}</span></div><a href="/jogos/{{ jogo.id }}">Abrir jogo</a></div>{% else %}<p>Sem jogos associados.</p>{% endfor %}</div></section>
 </div>

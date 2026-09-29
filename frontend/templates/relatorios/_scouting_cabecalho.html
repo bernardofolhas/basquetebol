@@ -1,0 +1,7 @@
+{% macro cabecalho_scouting(tipo, adversario, identidade, simbolo_adversario) -%}
+<header class="scouting-report-header">
+  <div class="scouting-report-logo">{% if identidade.logo_principal %}<img src="{{ identidade.logo_principal }}" alt="Símbolo do clube">{% endif %}</div>
+  <h1>Scouting {{ tipo }} - {{ adversario }}</h1>
+  <div class="scouting-report-logo">{% if simbolo_adversario %}<img src="{{ simbolo_adversario }}" alt="Símbolo de {{ adversario }}">{% endif %}</div>
+</header>
+{%- endmacro %}

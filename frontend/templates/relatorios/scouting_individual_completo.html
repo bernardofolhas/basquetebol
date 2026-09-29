@@ -1,4 +1,5 @@
 {% from "partials/pdf_branding.html" import estilo_pdf, rodape_pdf with context %}
+{% from "relatorios/_scouting_cabecalho.html" import cabecalho_scouting %}
 <!doctype html>
 <html lang="pt"><head><meta charset="utf-8"><title>{{ titulo_relatorio }} · {{ alvo_nome }}</title>{{ estilo_pdf() }}
 <style>@page{size:A4 {{ 'landscape' if orientacao == 'paisagem' else 'portrait' }};margin:8mm}</style>
@@ -13,7 +14,7 @@
 {% set secoes_jogador = (secoes_por_atleta|default({})).get(j.id, secoes_set) %}
 {% set stats_jogador = (stat_fields_por_atleta|default({})).get(j.id, stat_fields) %}
 <main class="scout-page">
-  <header class="scout-cover"><div><div class="scout-kicker">{{ alvo_nome }}</div><h1>Relatório de Scouting Individual</h1><p>Modelo completo para treinadores e equipa técnica</p></div><div class="scout-cover-meta">Exportado em {{ data_exportacao }}<br>{{ nome_autor }}</div></header>
+  {{ cabecalho_scouting('Individual', alvo_nome, identidade, simbolo_adversario) }}
 
   {% if 'identificacao' in secoes_jogador or 'fotografia' in secoes_jogador or ('observacoes' in secoes_jogador and j.ficha and j.ficha.resumo) %}<section class="scout-section keep"><h2 class="scout-section-title">1. Identificação</h2><div class="scout-card scout-player">
     {% if 'fotografia' in secoes_jogador %}{% if fotografias.get(j.id) %}<img class="scout-photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="scout-avatar">{{ j.nome[:2]|upper }}</div>{% endif %}{% endif %}

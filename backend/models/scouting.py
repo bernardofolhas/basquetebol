@@ -97,6 +97,7 @@ class ScoutingAdversario(Base):
     clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
     nome = Column(String(160), nullable=False)
     nome_normalizado = Column(String(160), nullable=False)
+    simbolo = Column(String(255), nullable=True)
     observacoes = Column(Text, nullable=True)
     criado_em = Column(DateTime, nullable=False, default=datetime.now)
     atualizado_em = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)

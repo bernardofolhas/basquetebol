@@ -73,8 +73,9 @@ def test_cartao_individual_inovador_preserva_uma_pagina_por_atleta():
     cartao = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
 
     assert "INTELIGÊNCIA DE JOGO / LEITURA RÁPIDA" not in cartao
-    assert "identidade.logo_principal" in cartao
-    assert "Scouting Individual - {{ alvo_nome }}" in cartao
+    assert "cabecalho_scouting('Individual', alvo_nome, identidade, simbolo_adversario)" in cartao
+    cabecalho = (TEMPLATES / "relatorios" / "_scouting_cabecalho.html").read_text(encoding="utf-8")
+    assert "Scouting {{ tipo }} - {{ adversario }}" in cabecalho
     assert "j.ficha.resumo" in cartao
     assert ".player-sheet:last-child{page-break-after:auto}" in cartao
     assert ".player-sheet::after" not in cartao

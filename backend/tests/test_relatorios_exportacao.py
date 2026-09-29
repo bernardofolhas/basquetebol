@@ -144,8 +144,10 @@ def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
     assert "Tendências" in html
     assert "Plano de jogo" in html
     assert "j.ficha.resumo" in html
-    assert "identidade.logo_principal" in html
-    assert "Scouting Individual - {{ alvo_nome }}" in html
+    assert "cabecalho_scouting('Individual', alvo_nome, identidade, simbolo_adversario)" in html
+    assert "Scouting {{ tipo }} - {{ adversario }}" in (
+        TEMPLATES / "relatorios" / "_scouting_cabecalho.html"
+    ).read_text(encoding="utf-8")
     assert "{{ nome_autor }}" not in html
     assert "j.altura_cm" in html
     assert "j.peso_kg" in html
@@ -176,7 +178,7 @@ def test_quatro_modelos_de_scouting_seguem_estrutura_de_exportacao_fornecida():
     ):
         assert marcador in coletivo_completo
     assert "Últimos 3 resultados" in coletivo_facil
-    assert "Guia de leitura rápida para jogadores" in coletivo_facil
+    assert "cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario)" in coletivo_facil
     assert "passos_setplay" in rota
     assert "compor_desenho_sobre_campo" in rota
 
@@ -193,6 +195,33 @@ def test_exportacoes_de_scouting_usam_tabelas_simplificadas_e_hotzones():
     assert "player-hotzone" in individual_facil
     assert "Hotzones" in individual_facil
     assert "object-fit:contain" in estilos
+
+
+def test_cabecalhos_de_scouting_usam_logotipos_e_titulo_unico():
+    cabecalho = (TEMPLATES / "relatorios" / "_scouting_cabecalho.html").read_text(encoding="utf-8")
+    assert "identidade.logo_principal" in cabecalho
+    assert "simbolo_adversario" in cabecalho
+    assert "Scouting {{ tipo }} - {{ adversario }}" in cabecalho
+
+    for ficheiro, tipo in (
+        ("scouting_coletivo_completo.html", "Coletivo"),
+        ("scouting_coletivo_facil.html", "Coletivo"),
+        ("scouting_individual_completo.html", "Individual"),
+        ("scouting_individual_facil.html", "Individual"),
+    ):
+        html = (TEMPLATES / "relatorios" / ficheiro).read_text(encoding="utf-8")
+        assert f"cabecalho_scouting('{tipo}', alvo_nome, identidade, simbolo_adversario)" in html
+
+
+def test_dossier_permite_guardar_simbolo_do_adversario_para_os_relatorios():
+    resumo = (TEMPLATES / "scouting" / "resumo.html").read_text(encoding="utf-8")
+    rota_scouting = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+    rota_exportacao = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+
+    assert 'enctype="multipart/form-data"' in resumo
+    assert 'name="simbolo"' in resumo
+    assert '@router.post("/adversarios/{adversario_id}/simbolo")' in rota_scouting
+    assert 'contexto["simbolo_adversario"] = _fotografia_embebida(alvo.simbolo)' in rota_exportacao
 
 
 def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():

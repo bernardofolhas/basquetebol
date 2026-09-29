@@ -951,6 +951,8 @@ def _itens_por_categoria(itens) -> dict[str, list]:
 
 def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> dict:
     contexto = {"tipo_relatorio": tipo, "equipa": equipa, "alvo": alvo}
+    if tipo in {"scouting-individual", "scouting-coletivo"}:
+        contexto["simbolo_adversario"] = _fotografia_embebida(alvo.simbolo)
     ids = {int(v) for v in dados.getlist("entidades") if str(v).isdigit()}
     stat_fields = [campo for campo in dados.getlist("estatisticas") if campo in STAT_FIELDS]
     if tipo == "roster":

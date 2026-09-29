@@ -482,6 +482,53 @@ def abrir_adversario(adversario_id: int):
     return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/resumo", status_code=303)
 
 
+@router.post("/adversarios/{adversario_id}/simbolo")
+async def guardar_simbolo_adversario(
+    adversario_id: int,
+    request: Request,
+    simbolo: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_scouting),
+):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    if not simbolo or not simbolo.filename:
+        set_flash(request, "Seleciona uma imagem PNG ou JPEG.", "error")
+        return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/resumo", status_code=303)
+    try:
+        novo_simbolo = await guardar_fotografia(simbolo)
+    except ValueError as erro:
+        set_flash(request, str(erro).replace("fotografia", "imagem").replace("Fotografia", "Imagem"), "error")
+        return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/resumo", status_code=303)
+    anterior = adversario.simbolo
+    adversario.simbolo = novo_simbolo
+    adversario.atualizado_em = datetime.now()
+    db.commit()
+    apagar_fotografia(anterior)
+    set_flash(request, "Símbolo do adversário atualizado.")
+    return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/resumo", status_code=303)
+
+
+@router.post("/adversarios/{adversario_id}/simbolo/remover")
+def remover_simbolo_adversario(
+    adversario_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_scouting),
+):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    anterior = adversario.simbolo
+    adversario.simbolo = None
+    adversario.atualizado_em = datetime.now()
+    db.commit()
+    apagar_fotografia(anterior)
+    set_flash(request, "Símbolo do adversário removido.")
+    return RedirectResponse(url=f"/scouting/adversarios/{adversario_id}/resumo", status_code=303)
+
+
 @router.get("/adversarios/{adversario_id}/{separador}", response_class=HTMLResponse)
 def separador_adversario(adversario_id: int, separador: str, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
     if separador not in {"resumo", "roster", "individual", "coletivo", "plano-jogo", "relatorios"}:

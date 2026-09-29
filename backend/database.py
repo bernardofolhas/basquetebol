@@ -1106,6 +1106,9 @@ def actualizar_estrutura_scouting_individual() -> None:
     """Garante a estrutura do perfil individual em instalações sem Alembic automático."""
     inspector = inspect(engine)
     tabelas = {
+        "scouting_adversarios": {
+            "simbolo": "VARCHAR(255) NULL",
+        },
         "scouting_biblioteca_itens": {
             "grupo_id": "INTEGER NULL REFERENCES scouting_grupos_avaliacao(id) ON DELETE SET NULL",
             "ordem": "INTEGER NOT NULL DEFAULT 0",
