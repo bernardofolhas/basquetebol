@@ -19,12 +19,14 @@ from paths import TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
 from services.identidade_clube_service import normalizar_cor
 from config import config
+from logging_config import obter_logger
 from models.recuperacao_password import TokenRecuperacaoPassword
 from services.recuperacao_password_service import criar_token_recuperacao
 from routers.identidade import _apagar_logo, _guardar_logo
 
 router = APIRouter(prefix="/superadmin")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+logger = obter_logger(__name__)
 
 
 def _slug(valor: str) -> str:
@@ -274,37 +276,53 @@ async def criar_clube(
     if erro:
         return templates.TemplateResponse(request, "superadmin/clube_form.html", {"utilizador": utilizador, "erro": erro}, status_code=422)
 
-    principal = normalizar_cor(cor_principal, "#f97316")
-    clube = Clube(
-        nome_oficial=nome_oficial.strip(), nome_curto=nome_curto.strip(), identificador=identificador,
-        cor_principal=principal, cor_secundaria=normalizar_cor(cor_secundaria, "#1f2937"),
-        cor_destaque=normalizar_cor(cor_destaque, "#0ea5e9"), epoca_inicial=epoca_inicial or None,
-        estado=EstadoClubeEnum.ativo, tema_gerado=json.dumps({"principal": principal}),
-    )
-    db.add(clube)
-    db.flush()
+    logos_guardados = []
     try:
+        principal = normalizar_cor(cor_principal, "#f97316")
+        clube = Clube(
+            nome_oficial=nome_oficial.strip(), nome_curto=nome_curto.strip(), identificador=identificador,
+            cor_principal=principal, cor_secundaria=normalizar_cor(cor_secundaria, "#1f2937"),
+            cor_destaque=normalizar_cor(cor_destaque, "#0ea5e9"), epoca_inicial=epoca_inicial or None,
+            estado=EstadoClubeEnum.ativo, tema_gerado=json.dumps({"principal": principal}),
+        )
+        db.add(clube)
+        db.flush()
         clube.logo_principal = await _guardar_logo(logo_principal, f"clube-{clube.id}-logo-principal")
+        if clube.logo_principal:
+            logos_guardados.append(clube.logo_principal)
         clube.logo_secundario = await _guardar_logo(logo_secundario, f"clube-{clube.id}-logo-secundario")
+        if clube.logo_secundario:
+            logos_guardados.append(clube.logo_secundario)
+        admin = Utilizador(
+            nome=admin_nome.strip(), username=admin_username.strip(), email=admin_email.strip(),
+            password_hash=encriptar_password(admin_password), perfil=PerfilEnum.administrador,
+            ativo=True, clube_id=clube.id, deve_alterar_password=True,
+        )
+        db.add(admin)
+        db.flush()
+        clube.administrador_principal_id = admin.id
+        db.add(IdentidadeClube(
+            clube_id=clube.id, nome_oficial=clube.nome_oficial, nome_curto=clube.nome_curto,
+            logo_principal=clube.logo_principal, logo_secundario=clube.logo_secundario,
+            cor_principal=clube.cor_principal, cor_secundaria=clube.cor_secundaria,
+            cor_destaque=clube.cor_destaque, epoca_predefinida=clube.epoca_inicial,
+        ))
+        registar_auditoria(db, utilizador, "criar_clube", "clube", clube.id, f"Clube {clube.identificador}", request)
+        db.commit()
     except ValueError as exc:
         db.rollback()
+        for logo in logos_guardados:
+            _apagar_logo(logo)
         return templates.TemplateResponse(request, "superadmin/clube_form.html", {"utilizador": utilizador, "erro": str(exc)}, status_code=422)
-    admin = Utilizador(
-        nome=admin_nome.strip(), username=admin_username.strip(), email=admin_email.strip(),
-        password_hash=encriptar_password(admin_password), perfil=PerfilEnum.administrador,
-        ativo=True, clube_id=clube.id, deve_alterar_password=True,
-    )
-    db.add(admin)
-    db.flush()
-    clube.administrador_principal_id = admin.id
-    db.add(IdentidadeClube(
-        clube_id=clube.id, nome_oficial=clube.nome_oficial, nome_curto=clube.nome_curto,
-        logo_principal=clube.logo_principal, logo_secundario=clube.logo_secundario,
-        cor_principal=clube.cor_principal, cor_secundaria=clube.cor_secundaria,
-        cor_destaque=clube.cor_destaque, epoca_predefinida=clube.epoca_inicial,
-    ))
-    registar_auditoria(db, utilizador, "criar_clube", "clube", clube.id, f"Clube {clube.identificador}", request)
-    db.commit()
+    except Exception:
+        db.rollback()
+        for logo in logos_guardados:
+            _apagar_logo(logo)
+        logger.exception("Falha ao criar clube pelo superadministrador.")
+        return templates.TemplateResponse(request, "superadmin/clube_form.html", {
+            "utilizador": utilizador,
+            "erro": "Não foi possível criar o clube. Tenta novamente; se o erro persistir, consulta os registos da plataforma.",
+        }, status_code=500)
     set_flash(request, "Clube e administrador principal criados com sucesso.")
     return RedirectResponse("/superadmin/clubes", status_code=303)
 

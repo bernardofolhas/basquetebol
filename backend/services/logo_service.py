@@ -1,5 +1,6 @@
 """Validação e normalização de logótipos com fundo transparente."""
 
+import asyncio
 from collections import deque
 from io import BytesIO
 from pathlib import Path
@@ -13,6 +14,7 @@ from paths import BRANDING_DIR, JOGADORES_UPLOAD_DIR, STATIC_DIR
 
 MAX_LOGO_BYTES = 2 * 1024 * 1024
 MAX_LOGO_DIMENSION = 4000
+MAX_LOGO_OUTPUT_DIMENSION = 800
 
 
 def remover_fundo_ligado_as_margens(imagem: Image.Image, tolerancia: int = 48) -> Image.Image:
@@ -109,14 +111,8 @@ def apagar_logo_guardado(url: str | None) -> None:
         caminho.unlink()
 
 
-async def guardar_logo_transparente(ficheiro: UploadFile | None, nome: str) -> str | None:
-    if not ficheiro or not ficheiro.filename:
-        return None
-    if ficheiro.content_type not in {"image/png", "image/jpeg"}:
-        raise ValueError("O logótipo deve estar em formato PNG ou JPEG.")
-    dados = await ficheiro.read(MAX_LOGO_BYTES + 1)
-    if len(dados) > MAX_LOGO_BYTES:
-        raise ValueError("O logótipo não pode ultrapassar 2 MB.")
+def _normalizar_e_guardar_logo(dados: bytes, nome: str) -> str:
+    """Processa a imagem fora do ciclo async para não bloquear a aplicação."""
     try:
         imagem = Image.open(BytesIO(dados))
         imagem.verify()
@@ -126,9 +122,23 @@ async def guardar_logo_transparente(ficheiro: UploadFile | None, nome: str) -> s
     if not imagem.width or not imagem.height or max(imagem.size) > MAX_LOGO_DIMENSION:
         raise ValueError("O logótipo deve ter dimensões válidas e no máximo 4000 px.")
 
-    imagem.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+    imagem.thumbnail(
+        (MAX_LOGO_OUTPUT_DIMENSION, MAX_LOGO_OUTPUT_DIMENSION),
+        Image.Resampling.LANCZOS,
+    )
     imagem = remover_fundo_ligado_as_margens(imagem)
     BRANDING_DIR.mkdir(parents=True, exist_ok=True)
     destino = BRANDING_DIR / f"{nome}-{uuid4().hex[:12]}.png"
-    imagem.save(destino, format="PNG", optimize=True)
+    imagem.save(destino, format="PNG")
     return f"/static/uploads/branding/{destino.name}"
+
+
+async def guardar_logo_transparente(ficheiro: UploadFile | None, nome: str) -> str | None:
+    if not ficheiro or not ficheiro.filename:
+        return None
+    if ficheiro.content_type not in {"image/png", "image/jpeg"}:
+        raise ValueError("O logótipo deve estar em formato PNG ou JPEG.")
+    dados = await ficheiro.read(MAX_LOGO_BYTES + 1)
+    if len(dados) > MAX_LOGO_BYTES:
+        raise ValueError("O logótipo não pode ultrapassar 2 MB.")
+    return await asyncio.to_thread(_normalizar_e_guardar_logo, dados, nome)
