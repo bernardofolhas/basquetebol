@@ -999,6 +999,15 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
     stat_fields = [campo for campo in dados.getlist("estatisticas") if campo in STAT_FIELDS]
     if tipo == "roster":
         atletas = [j for j in alvo.jogadores if j.estado != "arquivado" and (not ids or j.id in ids)]
+        cinco_previsto = [r for r in alvo.rotacao_prevista if r.papel == "titular"]
+        rotacoes_previstas = [r for r in alvo.rotacao_prevista if r.papel != "titular"]
+        rotacoes_por_posicao = {}
+        for entrada in cinco_previsto + rotacoes_previstas:
+            posicao = (entrada.jogador.posicao_principal or "Sem posição").strip()
+            rotacoes_por_posicao.setdefault(posicao, [])
+        for entrada in rotacoes_previstas:
+            posicao = (entrada.jogador.posicao_principal or "Sem posição").strip()
+            rotacoes_por_posicao[posicao].append(entrada)
         contexto.update(
             atletas=sorted(atletas, key=lambda j: j.nome.lower()),
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in atletas},
@@ -1053,8 +1062,9 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
                 itens_coletivos.get("ataque_forte", [])
                 + itens_coletivos.get("defesa_forte", [])
             )[:6],
-            cinco_previsto=[r for r in alvo.rotacao_prevista if r.papel == "titular"],
-            rotacoes_previstas=[r for r in alvo.rotacao_prevista if r.papel != "titular"],
+            cinco_previsto=cinco_previsto,
+            rotacoes_previstas=rotacoes_previstas,
+            rotacoes_por_posicao=rotacoes_por_posicao,
             passos_setplay={setplay.id: _passos_setplay_pdf(setplay) for setplay in setplays},
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,

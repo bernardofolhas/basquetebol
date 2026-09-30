@@ -305,6 +305,21 @@ def test_estatisticas_coletivas_ficam_numa_linha_e_calculam_percentagens():
     assert 'class="stat-percentage"' in html
 
 
+def test_coletivo_facil_mostra_cinco_com_fotos_e_rotacoes_por_posicao():
+    html = (TEMPLATES / "relatorios" / "scouting_coletivo_facil.html").read_text(encoding="utf-8")
+    rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+
+    assert 'class="lineup-five"' in html
+    assert 'class="lineup-player"' in html
+    assert "fotografias.get(j.id)" in html
+    assert "j.posicao_principal" in html
+    assert 'class="rotation-tracks"' in html
+    assert 'class="rotation-player"' in html
+    assert 'content:"→"' in html
+    assert "rotacoes_por_posicao.items()" in html
+    assert "rotacoes_por_posicao=rotacoes_por_posicao" in rota
+
+
 def test_jogadores_prioritarios_usam_a_caracteristica_com_maior_avaliacao():
     caracteristica_fraca = SimpleNamespace(nome="Lançamento exterior", ativo=True, categoria="caracteristica")
     caracteristica_forte = SimpleNamespace(nome="Jogo interior", ativo=True, categoria="caracteristica")
