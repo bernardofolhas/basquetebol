@@ -991,6 +991,19 @@ def _jogadores_prioritarios_coletivo(adversario, jogador_ids: list[int] | None =
     return resultado[:4]
 
 
+def _rotacoes_coletivas_por_posicao(adversario):
+    cinco_previsto = [r for r in adversario.rotacao_prevista if r.papel == "titular"]
+    rotacoes_previstas = [r for r in adversario.rotacao_prevista if r.papel != "titular"]
+    rotacoes_por_posicao = {}
+    for entrada in cinco_previsto + rotacoes_previstas:
+        posicao = (entrada.jogador.posicao_principal or "Sem posição").strip()
+        rotacoes_por_posicao.setdefault(posicao, [])
+    for entrada in rotacoes_previstas:
+        posicao = (entrada.jogador.posicao_principal or "Sem posição").strip()
+        rotacoes_por_posicao[posicao].append(entrada)
+    return cinco_previsto, rotacoes_previstas, rotacoes_por_posicao
+
+
 def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> dict:
     contexto = {"tipo_relatorio": tipo, "equipa": equipa, "alvo": alvo}
     if tipo in {"scouting-individual", "scouting-coletivo"}:
@@ -999,15 +1012,6 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
     stat_fields = [campo for campo in dados.getlist("estatisticas") if campo in STAT_FIELDS]
     if tipo == "roster":
         atletas = [j for j in alvo.jogadores if j.estado != "arquivado" and (not ids or j.id in ids)]
-        cinco_previsto = [r for r in alvo.rotacao_prevista if r.papel == "titular"]
-        rotacoes_previstas = [r for r in alvo.rotacao_prevista if r.papel != "titular"]
-        rotacoes_por_posicao = {}
-        for entrada in cinco_previsto + rotacoes_previstas:
-            posicao = (entrada.jogador.posicao_principal or "Sem posição").strip()
-            rotacoes_por_posicao.setdefault(posicao, [])
-        for entrada in rotacoes_previstas:
-            posicao = (entrada.jogador.posicao_principal or "Sem posição").strip()
-            rotacoes_por_posicao[posicao].append(entrada)
         contexto.update(
             atletas=sorted(atletas, key=lambda j: j.nome.lower()),
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in atletas},
@@ -1044,6 +1048,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         jogos_referencia = jogos_em_preparacao(
             [ligacao.jogo for ligacao in alvo.jogos if ligacao.jogo]
         )
+        cinco_previsto, rotacoes_previstas, rotacoes_por_posicao = _rotacoes_coletivas_por_posicao(alvo)
         contexto.update(
             adversario=alvo,
             jogo_referencia=jogos_referencia[0] if jogos_referencia else None,

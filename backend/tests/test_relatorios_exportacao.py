@@ -9,6 +9,7 @@ from routers.exportacoes import (
     _configuracao_individual_por_atleta,
     _configuracao_relatorio,
     _jogadores_prioritarios_coletivo,
+    _rotacoes_coletivas_por_posicao,
     _secoes_padrao,
 )
 
@@ -321,6 +322,21 @@ def test_coletivo_facil_mostra_cinco_com_fotos_e_rotacoes_por_posicao():
     assert 'content:"→"' in html
     assert "rotacoes_por_posicao.items()" in html
     assert "rotacoes_por_posicao=rotacoes_por_posicao" in rota
+
+
+def test_rotacoes_coletivas_sao_preparadas_no_contexto_correto():
+    base = SimpleNamespace(posicao_principal="Base")
+    extremo = SimpleNamespace(posicao_principal="Extremo")
+    titular = SimpleNamespace(papel="titular", jogador=base)
+    suplente_base = SimpleNamespace(papel="rotacao", jogador=base)
+    suplente_extremo = SimpleNamespace(papel="rotacao", jogador=extremo)
+    adversario = SimpleNamespace(rotacao_prevista=[titular, suplente_base, suplente_extremo])
+
+    cinco, rotacoes, por_posicao = _rotacoes_coletivas_por_posicao(adversario)
+
+    assert cinco == [titular]
+    assert rotacoes == [suplente_base, suplente_extremo]
+    assert por_posicao == {"Base": [suplente_base], "Extremo": [suplente_extremo]}
 
 
 def test_jogadores_prioritarios_usam_a_caracteristica_com_maior_avaliacao():
