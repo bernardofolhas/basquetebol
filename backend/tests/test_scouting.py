@@ -614,6 +614,21 @@ def test_scouting_coletivo_guarda_cinco_inicial_e_rotacoes_previstas():
     assert "guardar_rotacao_prevista" in router
 
 
+def test_scouting_coletivo_guarda_ideia_chave_sem_refresh_e_exporta_no_cabecalho():
+    coletivo = (TEMPLATES_DIR / "scouting" / "coletivo.html").read_text(encoding="utf-8")
+    cabecalho = (TEMPLATES_DIR / "relatorios" / "_scouting_cabecalho.html").read_text(encoding="utf-8")
+    router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+
+    assert 'id="resumo-equipa"' in coletivo
+    assert 'name="observacoes"' in coletivo
+    assert 'data-studio-async' in coletivo
+    assert 'data-studio-refresh="collective-summary"' in coletivo
+    assert '@router.post("/adversarios/{adversario_id}/coletivo/resumo")' in router
+    assert "adversario.observacoes = _limpo" in router
+    assert "resumo=none" in cabecalho
+    assert "resumo|truncate(220)" in cabecalho
+
+
 def test_plano_de_jogo_vive_no_dossier_e_importa_scouting_sem_substituir():
     tabs = (TEMPLATES_DIR / "scouting" / "_departamento_tabs.html").read_text(encoding="utf-8")
     plano = (TEMPLATES_DIR / "scouting" / "plano_jogo.html").read_text(encoding="utf-8")

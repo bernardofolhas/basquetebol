@@ -179,7 +179,7 @@ def test_quatro_modelos_de_scouting_seguem_estrutura_de_exportacao_fornecida():
     ):
         assert marcador in coletivo_completo
     assert "Últimos 3 resultados" in coletivo_facil
-    assert "cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario)" in coletivo_facil
+    assert "cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes)" in coletivo_facil
     assert "passos_setplay" in rota
     assert "compor_desenho_sobre_campo" in rota
 
@@ -261,7 +261,10 @@ def test_cabecalhos_de_scouting_usam_logotipos_e_titulo_unico():
         ("scouting_individual_facil.html", "Individual"),
     ):
         html = (TEMPLATES / "relatorios" / ficheiro).read_text(encoding="utf-8")
-        assert f"cabecalho_scouting('{tipo}', alvo_nome, identidade, simbolo_adversario)" in html
+        if tipo == "Coletivo":
+            assert "cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes)" in html
+        else:
+            assert f"cabecalho_scouting('{tipo}', alvo_nome, identidade, simbolo_adversario)" in html
 
 
 def test_dossier_permite_guardar_simbolo_do_adversario_para_os_relatorios():

@@ -760,6 +760,19 @@ async def guardar_rotacao_prevista(adversario_id: int, request: Request, db: Ses
     return _voltar_coletivo(adversario.id, "#rotacao-prevista")
 
 
+@router.post("/adversarios/{adversario_id}/coletivo/resumo")
+async def guardar_resumo_coletivo(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    dados = await request.form()
+    adversario.observacoes = _limpo(dados.get("observacoes"))
+    adversario.atualizado_em = datetime.now()
+    db.commit()
+    set_flash(request, "Ideia-chave da equipa atualizada.")
+    return _voltar_coletivo(adversario.id, "#resumo-equipa")
+
+
 @router.post("/adversarios/{adversario_id}/plano-jogo/{jogo_id}/importar")
 async def importar_scouting_para_plano(adversario_id: int, jogo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
     adversario = _adversario_acessivel(db, adversario_id, utilizador)
