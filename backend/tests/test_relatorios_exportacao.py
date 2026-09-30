@@ -326,6 +326,9 @@ def test_scouting_coletivo_modular_guarda_e_recarrega_configuracao():
     assert "blocos_coletivos.get('perfil'" in facil
     assert "Plano de jogo · Nossa resposta" in facil
     assert "Perfil, chaves e plano de jogo estruturado" in completo
+    assert 'class="rating-bar"' in facil
+    assert "range(1,6)" in facil
+    assert "{{ valor }}/5" in facil
 
 
 def test_coletivo_facil_mostra_cinco_com_fotos_e_rotacoes_por_posicao():

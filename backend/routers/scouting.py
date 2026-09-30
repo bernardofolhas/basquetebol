@@ -801,11 +801,13 @@ async def guardar_bloco_coletivo(adversario_id: int, request: Request, db: Sessi
         bloco = ScoutingBlocoColetivo(clube_id=adversario.clube_id, adversario_id=adversario.id)
         db.add(bloco)
     nivel = _limpo(dados.get("nivel"))
+    avaliacao = _int(dados.get("avaliacao"))
     bloco.tipo = tipo
     bloco.categoria = _limpo(dados.get("categoria"))
     bloco.titulo = titulo
     bloco.descricao = _limpo(dados.get("descricao"))
     bloco.nivel = nivel if nivel in {"fraco", "medio", "forte"} else None
+    bloco.avaliacao = avaliacao if avaliacao is not None and 0 <= avaliacao <= 5 else None
     bloco.prioridade = max(1, min(3, _int(dados.get("prioridade")) or 2))
     bloco.ordem = max(0, _int(dados.get("ordem")) or 0)
     bloco.destaque = dados.get("destaque") == "true"

@@ -11,7 +11,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("predefinicoes_relatorios", sa.Column("configuracao", sa.Text(), nullable=True))
+    inspetor = sa.inspect(op.get_bind())
+    colunas = {coluna["name"] for coluna in inspetor.get_columns("predefinicoes_relatorios")}
+    if "configuracao" not in colunas:
+        op.add_column("predefinicoes_relatorios", sa.Column("configuracao", sa.Text(), nullable=True))
+    if "scouting_blocos_coletivos" in inspetor.get_table_names():
+        return
     op.create_table(
         "scouting_blocos_coletivos",
         sa.Column("id", sa.Integer(), primary_key=True),

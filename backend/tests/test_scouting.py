@@ -577,6 +577,20 @@ def test_scouting_coletivo_modular_e_transportavel_para_plano_de_jogo():
     assert "Mostrar na leitura fácil" in coletivo
 
 
+def test_perfil_coletivo_tem_avaliacao_de_zero_a_cinco():
+    modelo = (ROOT / "backend" / "models" / "scouting.py").read_text(encoding="utf-8")
+    migracao = (ROOT / "backend" / "migrations" / "versions" / "0058_scouting_coletivo_avaliacao.py").read_text(encoding="utf-8")
+    perfil = (TEMPLATES_DIR / "scouting" / "_collective_profile.html").read_text(encoding="utf-8")
+    router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+
+    assert "avaliacao >= 0 AND avaliacao <= 5" in modelo
+    assert 'op.add_column("scouting_blocos_coletivos"' in migracao
+    assert "range(0, 6)" in perfil
+    assert 'name="avaliacao"' in perfil
+    assert "Perfil coletivo 0–5" in perfil
+    assert "0 <= avaliacao <= 5" in router
+
+
 def test_pagina_coletiva_tem_estatistica_leitura_e_playbook_completos():
     coletivo = (TEMPLATES_DIR / "scouting" / "coletivo.html").read_text(encoding="utf-8")
     cartao = (TEMPLATES_DIR / "scouting" / "_drawn_card.html").read_text(encoding="utf-8")

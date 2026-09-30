@@ -408,6 +408,7 @@ class ScoutingBlocoColetivo(Base):
     __tablename__ = "scouting_blocos_coletivos"
     __table_args__ = (
         CheckConstraint("nivel IS NULL OR nivel IN ('fraco','medio','forte')", name="ck_scouting_bloco_coletivo_nivel"),
+        CheckConstraint("avaliacao IS NULL OR (avaliacao >= 0 AND avaliacao <= 5)", name="ck_scouting_bloco_coletivo_avaliacao"),
         CheckConstraint("prioridade IS NULL OR (prioridade >= 1 AND prioridade <= 3)", name="ck_scouting_bloco_coletivo_prioridade"),
     )
     id = Column(Integer, primary_key=True)
@@ -420,6 +421,7 @@ class ScoutingBlocoColetivo(Base):
     titulo = Column(String(160), nullable=False)
     descricao = Column(Text, nullable=True)
     nivel = Column(String(16), nullable=True)
+    avaliacao = Column(Integer, nullable=True)
     prioridade = Column(Integer, nullable=True)
     ordem = Column(Integer, nullable=False, default=0)
     destaque = Column(Boolean, nullable=False, default=False)
