@@ -2,6 +2,10 @@
   window.initReportBuilder=function(root){
     const form=root.querySelector('[data-report-form]');if(!form||form.dataset.ready)return;form.dataset.ready='true';
     const defaults=JSON.parse(form.dataset.reportDefaults||'{}'),list=form.querySelector('[data-report-sections]'),order=form.querySelector('[data-report-order]');
+    const presetStatistics=(form.querySelector('[data-preset-statistics]')?.value||'').split(',').filter(Boolean);
+    const presetHighlightPlayers=(form.querySelector('[data-preset-highlight-players]')?.value||'').split(',').filter(Boolean);
+    if(presetStatistics.length)form.querySelectorAll('input[name="estatisticas"]').forEach(input=>input.checked=presetStatistics.includes(input.value));
+    if(presetHighlightPlayers.length)form.querySelectorAll('[data-highlight-player]').forEach(input=>input.checked=presetHighlightPlayers.includes(input.value));
     const sync=()=>{if(order&&list)order.value=[...list.querySelectorAll('[data-section]')].map(el=>el.dataset.section).join(',')};let dragged=null;
     if(list)list.querySelectorAll('[draggable]').forEach(card=>{card.addEventListener('dragstart',()=>{dragged=card;card.classList.add('is-dragging')});card.addEventListener('dragend',()=>{card.classList.remove('is-dragging');dragged=null;sync()});card.addEventListener('dragover',event=>{event.preventDefault();if(!dragged||dragged===card)return;const box=card.getBoundingClientRect();list.insertBefore(dragged,event.clientY<box.top+box.height/2?card:card.nextSibling)})});
     const sectionChecks=()=>[...form.querySelectorAll('input[name="secoes"],input[data-player-section]')];

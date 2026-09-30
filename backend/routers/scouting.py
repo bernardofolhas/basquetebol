@@ -24,6 +24,7 @@ from models.scouting import (
     ScoutingAdversario,
     ScoutingAdversarioItem,
     ScoutingAdversarioJogo,
+    ScoutingBlocoColetivo,
     ScoutingConceitoOfensivo,
     ScoutingEstatisticaJogo,
     ScoutingEstatisticaColetivaJogo,
@@ -773,6 +774,60 @@ async def guardar_resumo_coletivo(adversario_id: int, request: Request, db: Sess
     return _voltar_coletivo(adversario.id, "#resumo-equipa")
 
 
+TIPOS_BLOCO_COLETIVO = {
+    "chave", "perfil", "resposta", "prioridade_ofensiva", "prioridade_defensiva",
+    "transicao", "ressalto", "situacao_especial",
+}
+
+
+@router.post("/adversarios/{adversario_id}/coletivo/blocos")
+async def guardar_bloco_coletivo(adversario_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    dados = await request.form()
+    bloco_id = _int(dados.get("bloco_id"))
+    tipo = _limpo(dados.get("tipo"))
+    titulo = _limpo(dados.get("titulo"))
+    if tipo not in TIPOS_BLOCO_COLETIVO or not titulo:
+        set_flash(request, "Indica um tipo e um título válidos.", "error")
+        return _voltar_coletivo(adversario.id, "#estrutura-coletiva")
+    bloco = db.query(ScoutingBlocoColetivo).filter(
+        ScoutingBlocoColetivo.id == bloco_id,
+        ScoutingBlocoColetivo.adversario_id == adversario.id,
+        ScoutingBlocoColetivo.clube_id == adversario.clube_id,
+    ).first() if bloco_id else None
+    if not bloco:
+        bloco = ScoutingBlocoColetivo(clube_id=adversario.clube_id, adversario_id=adversario.id)
+        db.add(bloco)
+    nivel = _limpo(dados.get("nivel"))
+    bloco.tipo = tipo
+    bloco.categoria = _limpo(dados.get("categoria"))
+    bloco.titulo = titulo
+    bloco.descricao = _limpo(dados.get("descricao"))
+    bloco.nivel = nivel if nivel in {"fraco", "medio", "forte"} else None
+    bloco.prioridade = max(1, min(3, _int(dados.get("prioridade")) or 2))
+    bloco.ordem = max(0, _int(dados.get("ordem")) or 0)
+    bloco.destaque = dados.get("destaque") == "true"
+    db.commit()
+    set_flash(request, "Elemento coletivo guardado.")
+    return _voltar_coletivo(adversario.id, "#estrutura-coletiva")
+
+
+@router.post("/coletivo/blocos/{bloco_id}/eliminar")
+def eliminar_bloco_coletivo(bloco_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    bloco = db.query(ScoutingBlocoColetivo).filter(
+        ScoutingBlocoColetivo.id == bloco_id,
+        ScoutingBlocoColetivo.clube_id == utilizador.clube_id,
+    ).first()
+    adversario = _adversario_acessivel(db, bloco.adversario_id, utilizador) if bloco else None
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    db.delete(bloco)
+    db.commit()
+    return _voltar_coletivo(adversario.id, "#estrutura-coletiva")
+
+
 @router.post("/adversarios/{adversario_id}/plano-jogo/{jogo_id}/importar")
 async def importar_scouting_para_plano(adversario_id: int, jogo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
     adversario = _adversario_acessivel(db, adversario_id, utilizador)
@@ -799,6 +854,28 @@ async def importar_scouting_para_plano(adversario_id: int, jogo_id: int, request
     ])
     alterados += _preencher_se_vazio(plano, "movimentos_ofensivos", [
         _itens_coletivos_texto(adversario, "defesa_fraco", "Soluções sugeridas pelo scouting"),
+        "Nossa resposta\n" + "\n".join(
+            f"• {bloco.titulo}" + (f" — {bloco.descricao}" if bloco.descricao else "")
+            for bloco in adversario.blocos_coletivos
+            if bloco.tipo in {"resposta", "prioridade_ofensiva"}
+        ) if any(bloco.tipo in {"resposta", "prioridade_ofensiva"} for bloco in adversario.blocos_coletivos) else None,
+    ])
+    alterados += _preencher_se_vazio(plano, "chaves_defesa", [
+        "Prioridades do scouting coletivo\n" + "\n".join(
+            f"• {bloco.titulo}" + (f" — {bloco.descricao}" if bloco.descricao else "")
+            for bloco in adversario.blocos_coletivos
+            if bloco.tipo in {"prioridade_defensiva", "transicao", "ressalto"}
+        ) if any(
+            bloco.tipo in {"prioridade_defensiva", "transicao", "ressalto"}
+            for bloco in adversario.blocos_coletivos
+        ) else None,
+    ])
+    alterados += _preencher_se_vazio(plano, "situacoes_especiais", [
+        "Situações identificadas\n" + "\n".join(
+            f"• {bloco.titulo}" + (f" — {bloco.descricao}" if bloco.descricao else "")
+            for bloco in adversario.blocos_coletivos
+            if bloco.tipo == "situacao_especial"
+        ) if any(bloco.tipo == "situacao_especial" for bloco in adversario.blocos_coletivos) else None,
     ])
     if opcoes:
         mapa = {

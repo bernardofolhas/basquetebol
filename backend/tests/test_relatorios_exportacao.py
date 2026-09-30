@@ -309,6 +309,25 @@ def test_estatisticas_coletivas_ficam_numa_linha_e_calculam_percentagens():
     assert 'class="stat-percentage"' in html
 
 
+def test_scouting_coletivo_modular_guarda_e_recarrega_configuracao():
+    formulario = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
+    javascript = (ROOT / "frontend" / "static" / "js" / "report-export.js").read_text(encoding="utf-8")
+    rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
+    facil = (TEMPLATES / "relatorios" / "scouting_coletivo_facil.html").read_text(encoding="utf-8")
+    completo = (TEMPLATES / "relatorios" / "scouting_coletivo_completo.html").read_text(encoding="utf-8")
+
+    for chave in ("chaves", "perfil", "resposta", "prioridades", "situacoes", "diagramas"):
+        assert f'_secao("{chave}"' in rota
+    assert 'data-preset-statistics' in formulario
+    assert 'data-preset-highlight-players' in formulario
+    assert "presetStatistics.includes(input.value)" in javascript
+    assert '"estatisticas": [campo for campo in dados.getlist("estatisticas")' in rota
+    assert "blocos_coletivos.get('chave'" in facil
+    assert "blocos_coletivos.get('perfil'" in facil
+    assert "Plano de jogo · Nossa resposta" in facil
+    assert "Perfil, chaves e plano de jogo estruturado" in completo
+
+
 def test_coletivo_facil_mostra_cinco_com_fotos_e_rotacoes_por_posicao():
     html = (TEMPLATES / "relatorios" / "scouting_coletivo_facil.html").read_text(encoding="utf-8")
     rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")

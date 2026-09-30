@@ -22,6 +22,7 @@ class PredefinicaoRelatorio(Base):
     formato = Column(String(24), nullable=False, default="completo")
     orientacao = Column(String(16), nullable=False, default="retrato")
     secoes = Column(Text, nullable=False)
+    configuracao = Column(Text, nullable=True)
     protegido = Column(Boolean, nullable=False, default=False)
     criado_em = Column(DateTime, nullable=False, default=datetime.now)
     atualizado_em = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)

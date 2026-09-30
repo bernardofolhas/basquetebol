@@ -57,10 +57,16 @@ from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.relatorio_exportacao import PredefinicaoRelatorio
 from models.scouting import (
     ScoutingAdversario,
+    ScoutingAdversarioItem,
     ScoutingAdversarioJogo,
+    ScoutingBlocoColetivo,
+    ScoutingConceitoOfensivo,
     ScoutingItemBiblioteca,
     ScoutingJogador,
     ScoutingJogadorItem,
+    ScoutingLiderEstatistico,
+    ScoutingMomentoPlaybook,
+    ScoutingRotacaoPrevista,
     STAT_FIELDS,
 )
 from models.treinador import Treinador, treinador_equipa
@@ -740,14 +746,18 @@ RELATORIOS_CONFIG = {
     "scouting-coletivo": {
         "nome": "Scouting coletivo",
         "secoes": [
-            _secao("identidade", "Identidade", "Perfil global, ritmo e contexto do adversario.", ("completo", "facil", "a3")),
-            _secao("estatisticas", "Estatisticas coletivas", "Medias e lideres estatisticos.", ("completo", "facil")),
-            _secao("cinco_rotacao", "Cinco e rotacoes", "Cinco inicial previsto e principais rotacoes.", ("completo", "facil", "a3")),
+            _secao("identidade", "Cabeçalho / identificação", "Equipa, jogo e ideia-chave.", ("completo", "facil", "a3")),
+            _secao("chaves", "Chaves da equipa", "Até três mensagens destacadas.", ("completo", "facil", "a3")),
+            _secao("cinco_rotacao", "Cinco e rotações", "Cinco inicial previsto e principais rotações.", ("completo", "facil", "a3")),
+            _secao("estatisticas", "Estatísticas da equipa", "Apenas os indicadores selecionados.", ("completo", "facil")),
+            _secao("perfil", "Perfil coletivo", "Como a equipa joga, com avaliação simples.", ("completo", "facil", "a3")),
             _secao("ataque", "Ataque", "Pontos fortes, fragilidades e conceitos ofensivos.", ("completo", "facil", "a3")),
             _secao("defesa", "Defesa", "Comportamentos e opcoes defensivas esperadas.", ("completo", "facil", "a3")),
             _secao("jogadores_chave", "Jogadores-chave", "Lideres e prioridades individuais.", ("completo", "facil", "a3")),
-            _secao("prioridades", "Prioridades", "Plano pratico para atacar e defender.", ("completo", "facil", "a3")),
-            _secao("diagramas", "Playbook", "Jogadas selecionadas, apresentadas no final do relatorio.", ("completo",)),
+            _secao("resposta", "Plano de jogo / nossa resposta", "Instruções operacionais destacadas.", ("completo", "facil", "a3")),
+            _secao("prioridades", "Prioridades", "Prioridades ofensivas e defensivas.", ("completo", "facil", "a3")),
+            _secao("situacoes", "Transição, ressalto e especiais", "Situações específicas destacadas.", ("completo", "facil")),
+            _secao("diagramas", "Ações principais / Playbook", "Jogadas selecionadas, apresentadas no final.", ("completo", "facil", "a3")),
         ],
     },
     "plano-jogo": {
@@ -916,6 +926,16 @@ def _alvo_relatorio(tipo: str, alvo_id: int, db: Session, utilizador):
                 selectinload(ScoutingAdversario.jogadores).selectinload(ScoutingJogador.media_epoca),
                 selectinload(ScoutingAdversario.jogadores).selectinload(ScoutingJogador.ficha),
             )
+        elif tipo == "scouting-coletivo":
+            consulta = consulta.options(
+                selectinload(ScoutingAdversario.blocos_coletivos),
+                selectinload(ScoutingAdversario.rotacao_prevista).joinedload(ScoutingRotacaoPrevista.jogador),
+                selectinload(ScoutingAdversario.itens_coletivos)
+                .joinedload(ScoutingAdversarioItem.item),
+                selectinload(ScoutingAdversario.lideres).joinedload(ScoutingLiderEstatistico.jogador),
+                selectinload(ScoutingAdversario.conceitos_ofensivos).joinedload(ScoutingConceitoOfensivo.setplay),
+                selectinload(ScoutingAdversario.momentos_playbook).joinedload(ScoutingMomentoPlaybook.setplay),
+            )
         adversario = consulta.filter(ScoutingAdversario.id == alvo_id, ScoutingAdversario.clube_id == clube_id).first()
         if not adversario:
             raise HTTPException(404, "Adversario nao encontrado.")
@@ -1045,6 +1065,9 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         setplays = [r.setplay for r in alvo.conceitos_ofensivos] + [r.setplay for r in alvo.momentos_playbook]
         itens_coletivos = _itens_por_categoria(alvo.itens_coletivos)
         media = alvo.media_coletiva
+        blocos_coletivos = {}
+        for bloco in alvo.blocos_coletivos:
+            blocos_coletivos.setdefault(bloco.tipo, []).append(bloco)
         jogos_referencia = jogos_em_preparacao(
             [ligacao.jogo for ligacao in alvo.jogos if ligacao.jogo]
         )
@@ -1067,6 +1090,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
                 itens_coletivos.get("ataque_forte", [])
                 + itens_coletivos.get("defesa_forte", [])
             )[:6],
+            blocos_coletivos=blocos_coletivos,
             cinco_previsto=cinco_previsto,
             rotacoes_previstas=rotacoes_previstas,
             rotacoes_por_posicao=rotacoes_por_posicao,
@@ -1121,6 +1145,10 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
     predefinicoes = _predefinicoes_relatorio(db, utilizador, tipo, equipa.id)
     predefinicao = next((p for p in predefinicoes if p.id == predefinicao_id), None)
     selecionadas = json.loads(predefinicao.secoes) if predefinicao else _secoes_padrao(tipo, "completo")
+    try:
+        configuracao_guardada = json.loads(predefinicao.configuracao or "{}") if predefinicao else {}
+    except (TypeError, ValueError):
+        configuracao_guardada = {}
     entidades = []
     if tipo == "roster":
         entidades = [j for j in alvo.jogadores if j.estado != "arquivado"]
@@ -1147,6 +1175,8 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
         "predefinicoes": predefinicoes,
         "predefinicao": predefinicao,
         "selecionadas": selecionadas,
+        "estatisticas_selecionadas": configuracao_guardada.get("estatisticas", []),
+        "jogadores_destaque_selecionados": configuracao_guardada.get("jogadores_destaque", []),
         "padroes": {f: _secoes_padrao(tipo, f) for f in FORMATOS_RELATORIO},
         "estatisticas_disponiveis": [(campo, STAT_LABELS[campo]) for campo in STAT_FIELDS]
         if any(secao["chave"] == "estatisticas" for secao in RELATORIOS_CONFIG[tipo]["secoes"])
@@ -1214,6 +1244,7 @@ def _gerar_relatorio(tipo: str, alvo_id: int, request: Request, dados, db: Sessi
         alvo_nome=alvo_nome,
         nome_autor=utilizador.nome,
         pode_ver_contactos=_perfil(utilizador) in PERFIS_CONTACTOS and formato != "a3",
+        ordem_secoes={chave: indice for indice, chave in enumerate(secoes)},
     )
     template = f"relatorios/{tipo.replace('-', '_')}_{formato}.html"
     nome = f"{RELATORIOS_CONFIG[tipo]['nome']} - {alvo_nome} - {date.today().isoformat()}"
@@ -1270,5 +1301,9 @@ async def guardar_predefinicao_relatorio(tipo: str, alvo_id: int, request: Reque
     registo.formato = formato
     registo.orientacao = orientacao
     registo.secoes = json.dumps(secoes)
+    registo.configuracao = json.dumps({
+        "estatisticas": [campo for campo in dados.getlist("estatisticas") if campo in STAT_FIELDS],
+        "jogadores_destaque": [int(valor) for valor in dados.getlist("jogadores_destaque") if str(valor).isdigit()][:4],
+    })
     db.commit()
     return RedirectResponse(f"/exportacoes/relatorios/{tipo}/{alvo_id}?predefinicao_id={registo.id}", status_code=303)

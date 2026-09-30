@@ -557,6 +557,26 @@ def test_scouting_coletivo_separa_todos_os_dados_pedidos():
         assert tabela in migracao
 
 
+def test_scouting_coletivo_modular_e_transportavel_para_plano_de_jogo():
+    modelo = (ROOT / "backend" / "models" / "scouting.py").read_text(encoding="utf-8")
+    migracao = (ROOT / "backend" / "migrations" / "versions" / "0057_scouting_coletivo_modular.py").read_text(encoding="utf-8")
+    router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
+    coletivo = (TEMPLATES_DIR / "scouting" / "coletivo.html").read_text(encoding="utf-8")
+
+    assert "class ScoutingBlocoColetivo" in modelo
+    assert 'CheckConstraint("nivel IS NULL OR nivel IN' in modelo
+    assert 'CheckConstraint("prioridade IS NULL OR' in modelo
+    assert 'op.create_table(\n        "scouting_blocos_coletivos"' in migracao
+    assert 'op.add_column("predefinicoes_relatorios"' in migracao
+    assert '@router.post("/adversarios/{adversario_id}/coletivo/blocos")' in router
+    assert '@router.post("/coletivo/blocos/{bloco_id}/eliminar")' in router
+    assert "ScoutingBlocoColetivo.clube_id == adversario.clube_id" in router
+    assert "ScoutingBlocoColetivo.clube_id == utilizador.clube_id" in router
+    assert 'bloco.tipo in {"resposta", "prioridade_ofensiva"}' in router
+    assert "Chaves, perfil e nossa resposta" in coletivo
+    assert "Mostrar na leitura fácil" in coletivo
+
+
 def test_pagina_coletiva_tem_estatistica_leitura_e_playbook_completos():
     coletivo = (TEMPLATES_DIR / "scouting" / "coletivo.html").read_text(encoding="utf-8")
     cartao = (TEMPLATES_DIR / "scouting" / "_drawn_card.html").read_text(encoding="utf-8")

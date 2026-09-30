@@ -113,6 +113,7 @@ class ScoutingAdversario(Base):
     conceitos_ofensivos = relationship("ScoutingConceitoOfensivo", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingConceitoOfensivo.ordem")
     momentos_playbook = relationship("ScoutingMomentoPlaybook", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingMomentoPlaybook.ordem")
     rotacao_prevista = relationship("ScoutingRotacaoPrevista", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingRotacaoPrevista.papel, ScoutingRotacaoPrevista.ordem")
+    blocos_coletivos = relationship("ScoutingBlocoColetivo", back_populates="adversario_scouting", cascade="all, delete-orphan", order_by="ScoutingBlocoColetivo.tipo, ScoutingBlocoColetivo.ordem, ScoutingBlocoColetivo.id")
 
 
 class ScoutingAdversarioJogo(Base):
@@ -401,3 +402,29 @@ class ScoutingRotacaoPrevista(Base):
     ordem = Column(Integer, nullable=False, default=0)
     adversario_scouting = relationship("ScoutingAdversario", back_populates="rotacao_prevista")
     jogador = relationship("ScoutingJogador", back_populates="rotacoes_previstas")
+
+
+class ScoutingBlocoColetivo(Base):
+    __tablename__ = "scouting_blocos_coletivos"
+    __table_args__ = (
+        CheckConstraint("nivel IS NULL OR nivel IN ('fraco','medio','forte')", name="ck_scouting_bloco_coletivo_nivel"),
+        CheckConstraint("prioridade IS NULL OR (prioridade >= 1 AND prioridade <= 3)", name="ck_scouting_bloco_coletivo_prioridade"),
+    )
+    id = Column(Integer, primary_key=True)
+    clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="CASCADE"), nullable=False, index=True)
+    adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    jogo_id = Column(Integer, ForeignKey("jogos.id", ondelete="CASCADE"), nullable=True, index=True)
+    item_id = Column(Integer, ForeignKey("scouting_biblioteca_itens.id", ondelete="SET NULL"), nullable=True, index=True)
+    tipo = Column(String(32), nullable=False, index=True)
+    categoria = Column(String(64), nullable=True)
+    titulo = Column(String(160), nullable=False)
+    descricao = Column(Text, nullable=True)
+    nivel = Column(String(16), nullable=True)
+    prioridade = Column(Integer, nullable=True)
+    ordem = Column(Integer, nullable=False, default=0)
+    destaque = Column(Boolean, nullable=False, default=False)
+    criado_em = Column(DateTime, nullable=False, default=datetime.now)
+    atualizado_em = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    adversario_scouting = relationship("ScoutingAdversario", back_populates="blocos_coletivos")
+    jogo = relationship("Jogo")
+    item = relationship("ScoutingItemBiblioteca")
