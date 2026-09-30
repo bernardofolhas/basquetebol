@@ -322,6 +322,9 @@ def test_coletivo_facil_mostra_cinco_com_fotos_e_rotacoes_por_posicao():
     assert 'content:"→"' in html
     assert "rotacoes_por_posicao.items()" in html
     assert "rotacoes_por_posicao=rotacoes_por_posicao" in rota
+    assert "grid-template-columns:repeat(5,31mm)" in html
+    assert "width:31mm;height:31mm" in html
+    assert "grid-template-columns:repeat(3,minmax(0,1fr))" in html
 
 
 def test_rotacoes_coletivas_sao_preparadas_no_contexto_correto():
