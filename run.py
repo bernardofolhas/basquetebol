@@ -1,5 +1,4 @@
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -10,19 +9,6 @@ BACKEND_DIR = RAIZ_PROJETO / "backend"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.append(str(BACKEND_DIR))
-
-
-def _aplicar_migrations_producao() -> None:
-    if os.getenv("APP_ENV", "development").lower() != "production":
-        return
-    subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", str(BACKEND_DIR / "alembic.ini"), "upgrade", "head"],
-        cwd=BACKEND_DIR,
-        check=True,
-    )
-
-
-_aplicar_migrations_producao()
 
 from logging_config import obter_logger
 from main import app
