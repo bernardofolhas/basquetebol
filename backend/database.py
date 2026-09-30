@@ -1148,6 +1148,28 @@ def actualizar_estrutura_scouting_individual() -> None:
     if alterou:
         logger.info("Estrutura do Scouting Individual atualizada.")
 
+
+def actualizar_estrutura_scouting_coletivo() -> None:
+    """Mantem instalacoes existentes compativeis com o perfil coletivo 0-5."""
+    inspector = inspect(engine)
+    tabelas = {
+        "scouting_blocos_coletivos": {"avaliacao": "INTEGER NULL"},
+        "predefinicoes_relatorios": {"configuracao": "TEXT NULL"},
+    }
+    with engine.begin() as ligacao:
+        for tabela, definicoes in tabelas.items():
+            if not inspector.has_table(tabela):
+                continue
+            existentes = {coluna["name"] for coluna in inspector.get_columns(tabela)}
+            for coluna, definicao in definicoes.items():
+                if coluna in existentes:
+                    continue
+                opcao = "IF NOT EXISTS " if engine.dialect.name == "postgresql" else ""
+                ligacao.execute(text(
+                    f"ALTER TABLE {tabela} ADD COLUMN {opcao}{coluna} {definicao}"
+                ))
+                logger.info("Coluna '%s' adicionada a %s.", coluna, tabela)
+
 # Função que abre e fecha sessões automaticamente
 # O "yield" faz com que a sessão seja fechada no final de cada pedido
 def get_db():
