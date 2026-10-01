@@ -16,9 +16,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/playbook-studio.css?v=20260909-2">
+  <link rel="stylesheet" href="/static/css/playbook-studio.css?v=20261001-1">
   <script defer src="/static/js/tactical-legacy.js?v=20260907-1"></script>
-  <script defer src="/static/js/playbook-studio.js?v=20261001-1"></script>
+  <script defer src="/static/js/playbook-studio.js?v=20261001-2"></script>
 </head>
 <body>
   <div class="pbs-app" data-playbook-studio data-setplay-id="{{ setplay.id }}" data-equipa-id="{{ equipa.id }}" data-imported="{{ 'true' if setplay.origem == 'ebp' else 'false' }}">
@@ -117,21 +117,20 @@
 
       <aside class="pbs-inspector" data-inspector>
         <div class="pbs-tabs" role="tablist">
-          <button type="button" class="is-active" data-panel-tab="timeline">Sequência</button>
+          <button type="button" class="is-active" data-panel-tab="timeline">Movimentos</button>
           <button type="button" data-panel-tab="instructions">Instruções</button>
         </div>
 
         <section class="pbs-panel-view is-active" data-panel="timeline">
           <div class="pbs-inspector-intro">
             <strong>Ações da cena</strong>
-            <span>Define o que acontece e o que ocorre ao mesmo tempo.</span>
+            <span>Todos os movimentos desta cena acontecem ao mesmo tempo. Cria outra cena para o momento seguinte.</span>
           </div>
           <div class="pbs-timeline" data-timeline></div>
           <div class="pbs-timeline-empty" data-timeline-empty>
             <b>A cena ainda está parada</b>
             <span>Adiciona movimentos, passes ou dribles ao campo.</span>
           </div>
-          <button type="button" class="pbs-group-action" data-group-selected disabled>Agrupar ações selecionadas</button>
         </section>
 
         <section class="pbs-panel-view" data-panel="instructions">

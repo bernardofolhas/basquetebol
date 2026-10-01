@@ -105,14 +105,14 @@ def test_editor_tatico_comum_e_animacao_por_passos_estao_disponiveis():
         assert f'data-ferramenta="{ferramenta}"' in toolbar
     assert 'data-ferramenta="caneta"' in toolbar
     assert "Caneta livre" in toolbar
-    assert "('seta_curva','⌒','Curva')" in toolbar
+    assert 'data-formato-linha="curva"' in toolbar
     assert "tactical_toolbar" in treino
     assert "data-playbook-studio" in playbook
     assert 'data-tool="jogador_ataque"' in playbook
     assert "data-preview-canvas" in playbook
     assert "renderPreview" in studio
     assert "actionPlan" in studio
-    assert "data-group-selected" in playbook
+    assert "Todos os movimentos desta cena acontecem ao mesmo tempo" in playbook
     assert "data-numero-jogador" in toolbar
     assert ">X</span><small>Defesa" not in toolbar
     assert "estadoDesenhoParaGuardar" in treino

@@ -158,22 +158,17 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline:3px solid 
 .pbs-timeline { position: relative; margin-top: 18px; padding-left: 20px; }
 .pbs-timeline::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 7px; width: 1px; background: #cbc9c0; }
 .pbs-action {
-  position: relative; display: grid; grid-template-columns: 18px minmax(0,1fr) 25px; align-items: center; gap: 7px;
+  position: relative; display: grid; grid-template-columns: minmax(0,1fr) 25px; align-items: center; gap: 7px;
   min-height: 48px; margin-bottom: 7px; padding: 7px; border: 1px solid #deddd6; border-radius: 9px; background: #fff;
 }
 .pbs-action::before { content: ""; position: absolute; left: -17px; top: 21px; width: 8px; height: 8px; border: 2px solid #fff; border-radius: 50%; background: var(--pbs-red); box-shadow: 0 0 0 1px #b8b6ae; }
-.pbs-action.is-grouped { border-left: 3px solid var(--pbs-yellow); }
-.pbs-action input { accent-color: var(--pbs-red); }
 .pbs-action-text { min-width: 0; }
 .pbs-action-text strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .pbs-action-text span { color: var(--pbs-muted); font-size: 9px; }
 .pbs-action button { width: 25px; height: 25px; border: 0; border-radius: 6px; color: #9f392b; background: #f8eee9; cursor: pointer; }
-.pbs-group-label { margin: 4px 0 6px; color: #9a7b22; font: 700 9px/1 "Barlow Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .pbs-timeline-empty { margin: 54px 12px 20px; color: var(--pbs-muted); text-align: center; }
 .pbs-timeline-empty b { display: block; margin-bottom: 5px; color: #55534d; font-size: 12px; }
 .pbs-timeline-empty span { font-size: 10px; line-height: 1.45; }
-.pbs-group-action { width: 100%; min-height: 36px; margin-top: 10px; border: 1px solid #cbc9bf; border-radius: 8px; background: #fff; font-size: 10px; font-weight: 700; cursor: pointer; }
-.pbs-group-action:disabled { opacity: .45; cursor: default; }
 .pbs-notes-label { display: block; margin-bottom: 8px; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .pbs-panel-view textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid #cbc9bf; border-radius: 9px; outline: none; background: #fff; font-size: 12px; line-height: 1.55; }
 .pbs-panel-view textarea:focus { border-color: var(--pbs-red); box-shadow: 0 0 0 3px rgba(233,77,51,.12); }

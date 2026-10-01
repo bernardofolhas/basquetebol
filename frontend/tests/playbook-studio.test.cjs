@@ -224,9 +224,9 @@ test('shot draws two separated shafts and moves only the ball', () => {
   assert.equal(next.length, 2);
 });
 
-test('preview reads each whole scene then hides drawings for all movements and preserves completed positions', () => {
+test('preview reads each scene then moves all its players together before advancing', () => {
   const api = studio();
-  const first = scene(1, [marker('p', 0, 0),
+  const first = scene(1, [marker('p', 0, 0), marker('other', 200, 0),
     action('a', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }]),
     action('b', 'seta', [{ x: 200, y: 0 }, { x: 400, y: 0 }]),
     action('note', 'caneta', [{ x: 0, y: 100 }, { x: 30, y: 100 }])]);
@@ -240,28 +240,32 @@ test('preview reads each whole scene then hides drawings for all movements and p
   assert.equal(movement.reading, false);
   assert.ok(movement.objects.filter(o => o.pontos).every(o => o.hidden));
   assert.equal(movement.objects.find(o => o.id === 'p').x, 100);
-  assert.equal(at(1550).objects.find(o => o.id === 'p').x, 200);
-  assert.equal(at(1975).objects.find(o => o.id === 'p').x, 300);
-  assert.equal(at(2400).scene.id, 2);
-  assert.equal(at(2400).reading, true);
-  assert.ok(at(2400).objects.every(o => !o.hidden));
+  assert.equal(movement.objects.find(o => o.id === 'other').x, 300);
+  assert.equal(api.previewDuration(), 2 * (api.times.read + api.times.move));
+  assert.equal(at(1550).scene.id, 2);
+  assert.equal(at(1550).reading, true);
+  assert.ok(at(1550).objects.every(o => !o.hidden));
+  assert.equal(at(2675).objects.find(o => o.id === 'q').x, 450);
   assert.equal(api.previewAt(1).objects.find(o => o.id === 'q').x, 500);
   assert.equal(JSON.stringify([first, second]), original);
 });
 
 test('compiled playback is repeatable when seeking backwards and leaves saved scenes untouched', () => {
   const api = studio();
-  const initial = scene(1, [marker('p', 0, 0),
+  const initial = scene(1, [marker('p', 0, 0), marker('other', 200, 0),
     action('a', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }]),
     action('b', 'seta_zigzag', [{ x: 200, y: 0 }, { x: 300, y: 100 }, { x: 400, y: 0 }])]);
   const original = JSON.stringify(initial);
   api.setScenes([initial]); api.preparePreview();
   const at = ms => api.previewAt(ms / api.previewDuration());
   assert.equal(at(1125).objects.find(o => o.id === 'p').x, 100);
-  assert.equal(api.previewAt(1).objects.find(o => o.id === 'p').x, 400);
+  assert.equal(at(1125).objects.find(o => o.id === 'other').x, 300);
+  assert.equal(at(1125).objects.find(o => o.id === 'other').y, 100);
+  assert.equal(api.previewAt(1).objects.find(o => o.id === 'p').x, 200);
+  assert.equal(api.previewAt(1).objects.find(o => o.id === 'other').x, 400);
   assert.equal(at(1125).objects.find(o => o.id === 'p').x, 100);
-  assert.equal(at(1975).objects.find(o => o.id === 'p').y, 100);
-  assert.ok(at(1975).objects.filter(o => o.pontos).every(o => o.hidden));
+  assert.equal(at(1125).objects.find(o => o.id === 'other').y, 100);
+  assert.ok(at(1125).objects.filter(o => o.pontos).every(o => o.hidden));
   assert.equal(at(100).reading, true);
   assert.equal(JSON.stringify(initial), original);
 });
@@ -271,14 +275,31 @@ test('short trajectory segments interpolate continuously', () => {
   assert.equal(api.pointAlong([{ x: 0, y: 0 }, { x: .5, y: 0 }], .5).x, .25);
 });
 
-test('simultaneous grouped movements start together and static scenes stay visible', () => {
+test('movements start together even with different legacy groups and static scenes stay visible', () => {
   const api = studio();
   const a = action('a', 'seta', [{ x: 0, y: 0 }, { x: 150, y: 0 }]);
   const b = action('b', 'seta', [{ x: 150, y: 0 }, { x: 300, y: 0 }]);
-  a.grupo = b.grupo = 'together';
+  a.grupo = 'first'; b.grupo = 'second';
   const output = api.animatedObjects(scene(1, [marker('p1', 0, 0), marker('p2', 150, 0), a, b]), 0, .5);
   assert.equal(output.find(o => o.id === 'p1').x, 75);
   assert.equal(output.find(o => o.id === 'p2').x, 225);
+  api.setScenes([scene(1, [marker('p1', 0, 0), marker('p2', 150, 0), a, b])]);
+  api.preparePreview();
+  assert.equal(api.previewDuration(), api.times.read + api.times.move);
+  assert.equal(api.previewAt(1125 / api.previewDuration()).objects.find(o => o.id === 'p2').x, 225);
   api.setScenes([scene(1, [marker('p', 10, 20)])]);
   assert.equal(api.previewAt(1).reading, true);
+});
+
+test('a player movement and a pass share the same playback interval', () => {
+  const api = studio();
+  api.setScenes([scene(1, [
+    marker('player', 0, 0), marker('ball', 300, 0, 'bola'),
+    action('run', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }]),
+    action('pass', 'seta_tracejada', [{ x: 300, y: 0 }, { x: 500, y: 0 }])
+  ])]);
+  api.preparePreview();
+  const halfway = api.previewAt(1125 / api.previewDuration()).objects;
+  assert.equal(halfway.find(o => o.id === 'player').x, 100);
+  assert.equal(halfway.find(o => o.id === 'ball').x, 400);
 });

@@ -801,34 +801,15 @@
     holder.innerHTML = "";
     const actions = activeScene()?.objects.filter((object) => movementTypes.has(object.tipo)) || [];
     empty.hidden = actions.length > 0;
-    let lastGroup = null;
     actions.forEach((object, index) => {
-      if (object.grupo && object.grupo !== lastGroup) {
-        const group = document.createElement("div"); group.className = "pbs-group-label"; group.textContent = "Ao mesmo tempo"; holder.append(group); lastGroup = object.grupo;
-      } else if (!object.grupo) lastGroup = null;
-      const row = document.createElement("div"); row.className = `pbs-action${object.grupo ? " is-grouped" : ""}`; row.dataset.actionId = object.id;
-      const check = document.createElement("input"); check.type = "checkbox"; check.ariaLabel = "Selecionar ação";
+      const row = document.createElement("div"); row.className = "pbs-action"; row.dataset.actionId = object.id;
       const text = document.createElement("span"); text.className = "pbs-action-text"; const info = movementLabel(object, index);
-      text.innerHTML = `<strong>${info.title}</strong><span>${object.grupo ? "Execução simultânea" : `Passo ${index + 1}`}</span>`;
+      text.innerHTML = `<strong>${info.title}</strong><span>Movimento simultâneo</span>`;
       const remove = document.createElement("button"); remove.type = "button"; remove.ariaLabel = "Eliminar ação"; remove.textContent = "×";
-      check.addEventListener("change", updateGroupButton);
-      row.addEventListener("click", (event) => { if (!event.target.closest("button,input")) { selectedId = object.id; render(); } });
+      row.addEventListener("click", (event) => { if (!event.target.closest("button")) { selectedId = object.id; render(); } });
       remove.addEventListener("click", () => { const scene = activeScene(); snapshot(scene); scene.objects.splice(scene.objects.indexOf(object), 1); if (selectedId === object.id) selectedId = null; render(); renderTimeline(); saveScene(scene); });
-      row.append(check, text, remove); holder.append(row);
+      row.append(text, remove); holder.append(row);
     });
-    updateGroupButton();
-  }
-
-  function updateGroupButton() {
-    const selected = [...document.querySelectorAll(".pbs-action input:checked")];
-    const button = document.querySelector("[data-group-selected]"); if (button) button.disabled = selected.length < 2;
-  }
-
-  function groupSelected() {
-    const ids = [...document.querySelectorAll(".pbs-action input:checked")].map((input) => input.closest(".pbs-action").dataset.actionId);
-    if (ids.length < 2) return;
-    const scene = activeScene(); snapshot(scene); const group = uid(); scene.objects.filter((object) => ids.includes(object.id)).forEach((object) => { object.grupo = group; });
-    renderTimeline(); saveScene(scene); toast("Ações agrupadas no mesmo momento.");
   }
 
   async function saveNotes(scene = activeScene(), value = notes?.value, immediate = false) {
@@ -863,15 +844,7 @@
 
   function actionPlan(scene) {
     const actions = scene.objects.filter((object) => movementTypes.has(object.tipo) && object.pontos?.length > 1);
-    const groups = [];
-    actions.forEach((object) => {
-      if (object.grupo) {
-        let group = groups.find((candidate) => candidate.key === object.grupo);
-        if (!group) { group = { key: object.grupo, actions: [] }; groups.push(group); }
-        group.actions.push(object);
-      } else groups.push({ key: object.id, actions: [object] });
-    });
-    return groups;
+    return actions.length ? [{ key: scene.id, actions }] : [];
   }
 
   function nearestMarker(objects, start, predicate) {
@@ -1090,7 +1063,6 @@
     canvas?.addEventListener("pointerup", pointerUp, { passive: false }); canvas?.addEventListener("pointercancel", pointerUp, { passive: false });
     canvas?.addEventListener("contextmenu", (event) => event.preventDefault());
     document.querySelector("[data-undo]")?.addEventListener("click", undo); document.querySelector("[data-redo]")?.addEventListener("click", redo); document.querySelector("[data-clear]")?.addEventListener("click", clearScene);
-    document.querySelector("[data-group-selected]")?.addEventListener("click", groupSelected);
     notes?.addEventListener("input", () => saveNotes()); notes?.addEventListener("blur", () => saveNotes(activeScene(), notes.value, true));
     document.querySelectorAll("[data-panel-tab]").forEach((button) => button.addEventListener("click", () => {
       document.querySelectorAll("[data-panel-tab]").forEach((item) => item.classList.toggle("is-active", item === button));

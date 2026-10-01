@@ -134,4 +134,4 @@ def test_interface_playbook_tem_biblioteca_cadernos_e_editor_unificado():
     assert "data-playbook-studio" in detalhe
     assert "data-scenes-list" in detalhe
     assert "data-preview-canvas" in detalhe
-    assert "data-group-selected" in detalhe
+    assert "Todos os movimentos desta cena acontecem ao mesmo tempo" in detalhe
