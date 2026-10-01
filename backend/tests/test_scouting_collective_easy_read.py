@@ -101,7 +101,16 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
         "cinco_previsto": titulares, "rotacoes_previstas": [Item(jogador=jogador(6))],
         "rotacoes_por_posicao": {"Base": [Item(jogador=jogador(6))]},
         "fotografias": {}, "caracteristicas_cinco": {1: ["P&R central", "Transição"]},
-        "jogadores_prioritarios": [{"jogador": jogador(numero), "caracteristica": "Lançamento exterior"} for numero in range(1, 5)], "indicadores_coletivos": [{"nome": nome, "valor": "85.0"} for nome in ("PTS", "2P%", "3P%", "LL%", "OREB", "DREB", "AST", "TOV", "STL", "EFF")],
+        "jogadores_prioritarios": [
+            {"jogador": Item(id=numero, nome=nome, posicao_principal=posicao), "caracteristica": caracteristica}
+            for numero, nome, posicao, caracteristica in (
+                (1, "Gus Goerzen", "Extremo", "Lançador Catch and Shoot"),
+                (2, "Lamine Banora", "Poste", "Participação no ressalto ofensivo"),
+                (3, "Thomas Jervis", "Poste", "Defesa a jogadores interiores"),
+                (4, "Miguel Carmine", "Base", "Criação de lançamento após bloqueio direto"),
+            )
+        ],
+        "indicadores_coletivos": [{"nome": nome, "valor": "85.0"} for nome in ("PTS", "2P%", "3P%", "LL%", "OREB", "DREB", "AST", "TOV", "STL", "EFF")],
         "principais_caracteristicas": [], "respostas_grupos": _grupos_resposta_coletiva(prioridades),
         "jogadas_coletivas": jogadas,
         "passos_setplay": {numero: [Item(imagem=campo, observacao="Movimento e leitura de ajudas")] for numero in range(1, 4)},
@@ -111,7 +120,11 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
     if destino := os.getenv("SCOUTING_QA_PDF"):
         Path(destino).write_bytes(pdf)
 
-    assert len(PdfReader(BytesIO(pdf)).pages) == 1
+    paginas = PdfReader(BytesIO(pdf)).pages
+    assert len(paginas) == 1
+    texto_pdf = " ".join(paginas[0].extract_text().split())
+    for texto in ("Gus Goerzen", "Lamine Banora", "Thomas Jervis", "Participação no ressalto ofensivo", "Criação de lançamento após bloqueio direto"):
+        assert texto in texto_pdf
     assert "Cinco inicial" in html
     assert "Números da equipa" in html
     assert "Perfil coletivo" in html
