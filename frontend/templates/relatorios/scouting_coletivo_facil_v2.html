@@ -21,9 +21,8 @@ body{margin:0;color:#10253a;font-family:Aptos,"Segoe UI",sans-serif;font-size:8p
 </style></head><body>
 {% if 'identidade' in secoes_set %}{{ cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes) }}<div class="report-meta"><span><small>Competição</small>{{ jogo_referencia.competicao or 'Por definir' if jogo_referencia else 'Por definir' }}</span><span><small>Jogo</small>{{ jogo_referencia.data|data_pt if jogo_referencia else 'Por definir' }}</span><span><small>Treinador</small>{{ nome_autor }}</span></div>{% endif %}
 {% set chaves_facil=blocos_coletivos.get('chave', [])|selectattr('destaque')|list %}
-{% if 'chaves' in secoes_set and chaves_facil %}<section class="report-section"><div class="signal-grid">{% for bloco in chaves_facil %}<article class="signal"><strong>{{ bloco.titulo }}</strong>{% if bloco.descricao %}<p>{{ bloco.descricao|truncate(100) }}</p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+{% if 'chaves' in secoes_set and chaves_facil %}<section class="report-section"><h2 class="report-title">Chaves da equipa</h2><div class="signal-grid">{% for bloco in chaves_facil %}<article class="signal"><strong>{{ bloco.titulo }}</strong>{% if bloco.descricao %}<p>{{ bloco.descricao|truncate(100) }}</p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
 {% set resposta=blocos_coletivos.get('resposta', [])|selectattr('destaque')|list %}
-{% if 'chaves' in secoes_set and (perfil_ataque or perfil_defesa or resposta) %}<section class="report-section"><h2 class="report-title">Identidade da equipa</h2><div class="identity-grid">{% if perfil_ataque %}<article class="identity-card"><strong>Ataque</strong><p>{{ perfil_ataque[0].titulo }}{% if perfil_ataque[0].descricao %} · {{ perfil_ataque[0].descricao|truncate(95) }}{% endif %}</p></article>{% endif %}{% if perfil_defesa %}<article class="identity-card defense"><strong>Defesa</strong><p>{{ perfil_defesa[0].titulo }}{% if perfil_defesa[0].descricao %} · {{ perfil_defesa[0].descricao|truncate(95) }}{% endif %}</p></article>{% endif %}{% if resposta %}<article class="identity-card response"><strong>Nossa resposta</strong><p>{{ resposta[0].titulo }}{% if resposta[0].descricao %} · {{ resposta[0].descricao|truncate(95) }}{% endif %}</p></article>{% endif %}</div></section>{% endif %}
 {% if 'cinco_rotacao' in secoes_set and (cinco_previsto or rotacoes_previstas) %}
 <section class="report-section">
   <h2 class="report-title">Cinco inicial + rotação</h2>
@@ -48,26 +47,31 @@ body{margin:0;color:#10253a;font-family:Aptos,"Segoe UI",sans-serif;font-size:8p
 </section>
 {% endif %}
 {% if 'jogadores_chave' in secoes_set and jogadores_prioritarios %}<section class="report-section"><h2 class="report-title">Jogadores a vigiar</h2><div class="priority-row">{% for entrada in jogadores_prioritarios %}{% set j=entrada.jogador %}<article class="priority-player">{% if fotografias.get(j.id) %}<img src="{{ fotografias.get(j.id) }}" alt="">{% else %}<span class="avatar">{{ j.nome[:2]|upper }}</span>{% endif %}<div><strong>{{ j.nome }} · {{ j.posicao_principal or '—' }}</strong><small>{{ entrada.caracteristica }}</small></div></article>{% endfor %}</div></section>{% endif %}
-{% if 'estatisticas' in secoes_set and indicadores_coletivos %}<section class="report-section"><h2 class="report-title">Números da equipa · média da época</h2><div class="stat-row">{% for indicador in indicadores_coletivos %}<div class="stat"><small>{{ indicador.nome }}</small><strong>{{ indicador.valor }}</strong></div>{% endfor %}</div></section>{% elif 'estatisticas' in secoes_set and principais_caracteristicas %}<section class="report-section"><h2 class="report-title">Principais características</h2><div class="signal-grid">{% for rel in principais_caracteristicas %}<article class="signal"><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %}<p>{{ (rel.observacao or rel.valor)|truncate(90) }}</p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+{% if 'estatisticas' in secoes_set and indicadores_coletivos %}<section class="report-section"><h2 class="report-title">Números da equipa · média da época</h2><div class="stat-row">{% for indicador in indicadores_coletivos %}<div class="stat"><small>{{ indicador.nome }}</small><strong>{{ indicador.valor }}</strong></div>{% endfor %}</div></section>{% endif %}
 {% if 'perfil' in secoes_set and (perfil_ataque or perfil_defesa) %}<section class="report-section"><h2 class="report-title">Perfil coletivo</h2><div class="profile-columns">{% for titulo, entradas, tom in [('Ataque · como jogam', perfil_ataque, 'attack'), ('Defesa · como defendem', perfil_defesa, 'defense')] %}{% if entradas %}<div class="profile-column {{ tom }}"><h3>{{ titulo }}</h3>{% for bloco in entradas %}{% set valor=bloco.avaliacao or 0 %}{% set cor='weak' if valor <= 2 else ('average' if valor == 3 else 'strong') %}<div class="profile-entry"><span>{{ bloco.titulo }}</span><div class="rating-bar" aria-label="{{ valor }} em 5">{% for indice in range(1,6) %}<i class="{% if indice <= valor %}on {{ cor }}{% endif %}"></i>{% endfor %}</div><b>{{ valor }}/5</b></div>{% endfor %}</div>{% endif %}{% endfor %}</div></section>{% endif %}
 {% set itens = itens_coletivos|default({}) %}
 {% set ataque_itens = itens.get('ataque_forte', []) + itens.get('ataque_fraco', []) %}
-{% set conceitos = adversario.conceitos_ofensivos|default([]) %}
-{% if 'ataque' in secoes_set and (ataque_itens or conceitos) %}
-<section class="report-section"><h2 class="report-title">Ataque · comportamentos e conceitos</h2><div class="detail-grid">
+{% if 'analise' in secoes_set and ataque_itens %}
+<section class="report-section"><h2 class="report-title">Análise técnico-tática · ataque</h2><div class="detail-grid">
   {% for rel in ataque_itens if rel.item %}<article class="detail-card attention"><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %}<p>{{ (rel.observacao or rel.valor)|truncate(125) }}</p>{% endif %}</article>{% endfor %}
-  {% for conceito in conceitos if conceito.setplay %}<article class="detail-card attention"><strong>{{ conceito.setplay.nome }}</strong>{% if conceito.setplay.descricao %}<p>{{ conceito.setplay.descricao|truncate(125) }}</p>{% endif %}</article>{% endfor %}
 </div></section>
 {% endif %}
 {% set defesa_itens = itens.get('defesa_forte', []) + itens.get('defesa_fraco', []) %}
 {% set opcoes_ativas = opcoes_defensivas_facil|default([]) %}
-{% if 'defesa' in secoes_set and (defesa_itens or opcoes_ativas) %}
-<section class="report-section"><h2 class="report-title">Defesa · regras e coberturas</h2><div class="detail-grid">
+{% if 'analise' in secoes_set and defesa_itens %}
+<section class="report-section"><h2 class="report-title">Análise técnico-tática · defesa</h2><div class="detail-grid">
   {% for rel in defesa_itens if rel.item %}<article class="detail-card defense"><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %}<p>{{ (rel.observacao or rel.valor)|truncate(125) }}</p>{% endif %}</article>{% endfor %}
+</div></section>
+{% endif %}
+{% if 'regras_coberturas' in secoes_set and opcoes_ativas %}
+<section class="report-section"><h2 class="report-title">Regras e coberturas</h2><div class="detail-grid">
   {% for opcao in opcoes_ativas %}<article class="detail-card defense"><strong>{{ opcao.nome }}</strong>{% if opcao.notas %}<p>{{ opcao.notas|truncate(125) }}</p>{% endif %}</article>{% endfor %}
 </div></section>
 {% endif %}
-{% set grupos_visiveis = respostas_grupos|selectattr('secao', 'in', secoes_set)|selectattr('blocos')|list %}
-{% if grupos_visiveis %}<section class="report-section"><h2 class="report-title">Plano de jogo · o que fazer</h2><div class="plan-grid">{% for grupo in grupos_visiveis %}<article class="plan-card"><h3>{{ grupo.nome }}</h3><ul>{% for bloco in grupo.blocos %}<li>{{ bloco.titulo }}{% if bloco.descricao %}: {{ bloco.descricao|truncate(85) }}{% endif %}</li>{% endfor %}</ul></article>{% endfor %}</div></section>{% endif %}
+{% if 'resposta' in secoes_set and resposta %}<section class="report-section"><h2 class="report-title">Nossa resposta</h2><div class="signal-grid">{% for bloco in resposta %}<article class="signal"><strong>{{ bloco.titulo }}</strong>{% if bloco.descricao %}<p>{{ bloco.descricao|truncate(100) }}</p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+{% for chave, titulo in [('prioridades', 'Prioridades'), ('situacoes', 'Transição, ressalto e situações especiais')] %}
+  {% set grupos_visiveis = respostas_grupos|selectattr('secao', 'equalto', chave)|selectattr('blocos')|list %}
+  {% if chave in secoes_set and grupos_visiveis %}<section class="report-section"><h2 class="report-title">{{ titulo }}</h2><div class="plan-grid">{% for grupo in grupos_visiveis %}<article class="plan-card"><h3>{{ grupo.nome }}</h3><ul>{% for bloco in grupo.blocos %}<li>{{ bloco.titulo }}{% if bloco.descricao %}: {{ bloco.descricao|truncate(85) }}{% endif %}</li>{% endfor %}</ul></article>{% endfor %}</div></section>{% endif %}
+{% endfor %}
 {% if 'diagramas' in secoes_set and jogadas_coletivas|default([]) %}<section class="report-section playbook-section"><h2 class="report-title">Ações principais / Playbook</h2><div class="play-grid">{% for momento in jogadas_coletivas|default([]) %}{% set setplay=momento.setplay %}{% set passos=passos_setplay.get(setplay.id, []) %}<article class="play-card"><h3>{{ loop.index }} · {{ setplay.nome }}</h3>{% if passos and passos[0].imagem %}<img src="{{ passos[0].imagem }}" alt="Diagrama de {{ setplay.nome }}">{% endif %}{% if setplay.descricao or (passos and passos[0].observacao) %}<p>{{ (setplay.descricao or passos[0].observacao)|truncate(110) }}</p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
 </body></html>

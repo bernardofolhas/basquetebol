@@ -10,7 +10,9 @@ from models.jogo import ItemPlanoJogoBiblioteca, Jogo, PlanoJogoItem
 from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.scouting import (
     ScoutingAdversario,
+    ScoutingAdversarioItem,
     ScoutingAdversarioJogo,
+    ScoutingBlocoColetivo,
     ScoutingGrupoAvaliacao,
     ScoutingItemBiblioteca,
     ScoutingJogador,
@@ -222,6 +224,90 @@ def test_coletivo_abre_e_exporta_leitura_facil(client_admin):
         assert poster.content.startswith(b"%PDF")
     finally:
         _eliminar_adversario_integracao(adversario_id, jogo_id)
+
+
+def test_blocos_coletivos_sao_independentes_nos_tres_formatos(client_admin):
+    adversario_id, jogo_id, _, clube_id, _ = _criar_adversario_integracao()
+    sufixo = uuid4().hex[:8]
+    nomes = {
+        "chaves": f"Ritmo chave {sufixo}",
+        "perfil": f"Transição perfil {sufixo}",
+        "resposta": f"Fechar resposta {sufixo}",
+        "analise": f"Ataque técnico {sufixo}",
+        "regras_coberturas": f"Push cobertura {sufixo}",
+    }
+    item_id = None
+    try:
+        db = SessionLocal()
+        try:
+            db.get(ScoutingAdversario, adversario_id).observacoes = f"Ideia identidade {sufixo}"
+            for tipo, chave in (("chave", "chaves"), ("perfil", "perfil"), ("resposta", "resposta")):
+                db.add(ScoutingBlocoColetivo(
+                    clube_id=clube_id, adversario_id=adversario_id,
+                    tipo=tipo, titulo=nomes[chave], destaque=True,
+                    avaliacao=4 if tipo == "perfil" else None,
+                    categoria="Ataque" if tipo == "perfil" else None,
+                ))
+            db.add(ScoutingBlocoColetivo(
+                clube_id=clube_id, adversario_id=adversario_id,
+                tipo="perfil", titulo=f"Sem avaliação {sufixo}",
+                avaliacao=0, nivel="forte", destaque=True,
+            ))
+            item = ScoutingItemBiblioteca(
+                clube_id=clube_id, categoria="ataque_forte", nome=nomes["analise"],
+                nome_normalizado=nomes["analise"].lower(), ativo=True,
+            )
+            db.add(item)
+            db.flush()
+            item_id = item.id
+            db.add(ScoutingAdversarioItem(
+                clube_id=clube_id, adversario_id=adversario_id,
+                item_id=item.id, observacao="Ataca cedo",
+            ))
+            db.add(ScoutingOpcoesDefensivas(
+                clube_id=clube_id, adversario_id=adversario_id,
+                bloqueio_central=True, bloqueio_central_notas=nomes["regras_coberturas"],
+            ))
+            db.commit()
+        finally:
+            db.close()
+
+        for formato in ("facil", "completo", "a3"):
+            for secao, marcador in nomes.items():
+                resposta = client_admin.post(
+                    f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}/previsualizar",
+                    data={"formato": formato, "secoes": [secao]},
+                )
+                assert resposta.status_code == 200, (formato, secao)
+                assert marcador in resposta.text, (formato, secao)
+                assert f"Ideia identidade {sufixo}" not in resposta.text
+                assert f"Sem avaliação {sufixo}" not in resposta.text
+                for outra_secao, outro_marcador in nomes.items():
+                    if outra_secao != secao:
+                        assert outro_marcador not in resposta.text, (formato, secao, outra_secao)
+            pdf = client_admin.post(
+                f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}/pdf",
+                data={"formato": formato, "secoes": list(nomes)},
+            )
+            assert pdf.status_code == 200, formato
+            assert pdf.content.startswith(b"%PDF"), formato
+        limpo = client_admin.post(
+            f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}/previsualizar",
+            data={"formato": "facil", "secoes_configuradas": "1"},
+        )
+        assert limpo.status_code == 200
+        assert all(marcador not in limpo.text for marcador in nomes.values())
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_id)
+        if item_id:
+            db = SessionLocal()
+            try:
+                item = db.get(ScoutingItemBiblioteca, item_id)
+                if item:
+                    db.delete(item)
+                    db.commit()
+            finally:
+                db.close()
 
 
 def test_scouting_escolhe_proximo_jogo_e_bloqueia_jogos_passados(client_admin):
@@ -612,7 +698,9 @@ def test_scouting_coletivo_modular_e_transportavel_para_plano_de_jogo():
     assert "ScoutingBlocoColetivo.clube_id == utilizador.clube_id" in router
     assert 'bloco.tipo in {"resposta", "prioridade_ofensiva"}' in router
     assert 'include "scouting/_collective_structure.html"' in coletivo
-    assert "Chaves e nossa resposta" in estrutura
+    assert "Mensagens coletivas" in estrutura
+    assert "Chaves da equipa" in estrutura
+    assert "Nossa resposta" in estrutura
     assert "Mostrar na leitura fácil" in estrutura
 
 

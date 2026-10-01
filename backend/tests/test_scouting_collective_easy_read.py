@@ -12,11 +12,11 @@ from formatacao import data_pt
 from models.scouting import STAT_FIELDS
 from paths import STATIC_DIR, TEMPLATES_DIR
 from routers.exportacoes import (
-    _blocos_coletivos_visiveis,
     _caracteristicas_cinco_coletivo,
     _grupos_resposta_coletiva,
     _indicadores_coletivos,
     _media_exibida_coletiva,
+    _normalizar_secoes_coletivas,
     _opcoes_defensivas_coletivas,
 )
 from services.desenho_service import imagem_estatica_data_uri
@@ -46,11 +46,9 @@ def test_respostas_agrupadas_ignoram_blocos_nao_destacados():
     assert grupos[2]["blocos"] == []
 
 
-def test_relatorio_completo_filtra_blocos_pelas_secoes_escolhidas():
-    blocos = {"chave": [Item(titulo="Ritmo")], "perfil": [Item(titulo="P&R")],
-              "situacao_especial": [Item(titulo="Fundo")], "resposta": []}
-    assert list(_blocos_coletivos_visiveis(blocos, ["chaves", "situacoes"])) == [
-        "chave", "situacao_especial"
+def test_predefinicoes_antigas_separam_analise_e_regras():
+    assert _normalizar_secoes_coletivas(["perfil", "ataque", "defesa", "resposta"]) == [
+        "perfil", "analise", "regras_coberturas", "resposta"
     ]
 
 
@@ -117,15 +115,16 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
     assert "Cinco inicial" in html
     assert "Números da equipa" in html
     assert "Perfil coletivo" in html
-    assert "Plano de jogo" in html
+    assert "Nossa resposta" in html
+    assert "Chaves da equipa" in html
     assert "P&amp;R central" in html
     assert "Forçar P&R lateral" not in html
-    assert "Defesa · regras e coberturas" not in html
+    assert "Regras e coberturas" not in html
 
-    contexto["secoes_set"].add("defesa")
+    contexto["secoes_set"].add("regras_coberturas")
     contexto["opcoes_defensivas_facil"] = [{"nome": "Bloqueios diretos centrais", "notas": "Push ou switch"}]
     com_defesa = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
-    assert "Defesa · regras e coberturas" in com_defesa
+    assert "Regras e coberturas" in com_defesa
     assert "Push ou switch" in com_defesa
     texto_pdf = "\n".join(
         pagina.extract_text() for pagina in PdfReader(BytesIO(HTML(string=com_defesa).write_pdf())).pages
@@ -133,12 +132,37 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
     assert "Push ou switch" in texto_pdf
     contexto["opcoes_defensivas_facil"] = []
     sem_dados = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
-    assert "Defesa · regras e coberturas" not in sem_dados
+    assert "Regras e coberturas" not in sem_dados
 
-    contexto["secoes_set"].add("ataque")
+    contexto["secoes_set"].add("analise")
     contexto["itens_coletivos"] = {
         "ataque_forte": [Item(item=Item(nome="Pressão após cesto"), observacao="Ataca cedo", valor=None)]
     }
     com_ataque = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
-    assert "Ataque · comportamentos e conceitos" in com_ataque
+    assert "Análise técnico-tática · ataque" in com_ataque
     assert "Pressão após cesto" in com_ataque
+
+    contexto["secoes_set"] = {"chaves"}
+    so_chaves = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert "Ritmo alto" in so_chaves
+    assert "Perfil coletivo" not in so_chaves
+    assert "Controlar transição" not in so_chaves
+    assert "Pressão após cesto" not in so_chaves
+
+    contexto["secoes_set"] = {"perfil"}
+    so_perfil = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert "Perfil coletivo" in so_perfil
+    assert "Ritmo alto" not in so_perfil
+    assert "Controlar transição" not in so_perfil
+
+    contexto["secoes_set"] = {"resposta"}
+    so_resposta = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert "Controlar transição" in so_resposta
+    assert "Ritmo alto" not in so_resposta
+    assert "Perfil coletivo" not in so_resposta
+
+    contexto["secoes_set"] = {"regras_coberturas"}
+    contexto["opcoes_defensivas_facil"] = [{"nome": "Bloqueios diretos centrais", "notas": "Push ou switch"}]
+    so_regras = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert "Push ou switch" in so_regras
+    assert "Pressão após cesto" not in so_regras

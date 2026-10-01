@@ -14,6 +14,7 @@
 /* Composição compatível com o motor de impressão, sem depender de frações aninhadas. */
 .poster{display:flex;flex-direction:column;background-image:linear-gradient(122deg,#07111f 0%,#07111f 62%,#0c1a2d 100%)}
 .poster-body{display:block;flex:1;width:100%;min-height:0}.poster-footer{margin-top:auto}.poster-player-layout{display:flex;height:auto}.poster-player-identity{flex:0 0 90mm}.poster-player-intel{flex:1}.poster-collective-grid{display:flex;height:auto}.poster-intel-grid{display:flex;flex:0 0 calc(60% - 2.5mm);flex-wrap:wrap;align-content:flex-start;gap:4mm}.poster-intel-grid>.poster-card{flex:1 1 calc(50% - 4mm)}.poster-intel-grid>.poster-card:first-child{flex-basis:100%}.poster-lineups{display:flex;flex:1;flex-direction:column}.poster-lineups>.poster-card:last-child{flex:1}.poster-game-grid{display:flex;height:auto}.poster-game-grid>.poster-card{flex:1}.poster-game-grid>.poster-card:first-child{flex:.82}.poster-vs,.poster-number,.poster-avatar,.poster-insights .poster-card>span{display:flex;align-items:center;justify-content:center}.poster::before{top:0;right:0;bottom:0;left:0}.poster-card::after{right:5mm;bottom:0;left:5mm}.poster::after{right:-42mm;bottom:-54mm}.poster-title,.poster-number,.poster-avatar{font-weight:900}.poster-badge,.poster-player-role{font-weight:800}
+.poster-collective .poster-list{gap:1mm}.poster-collective .poster-list li{padding:1.5mm 2mm;font-size:8px}.poster-collective .poster-card{padding:3mm}.poster-collective .poster-card h3{font-size:10px}
 </style></head><body>
 
 {% if tipo_relatorio == 'roster' %}
@@ -33,16 +34,22 @@
 
 {% elif tipo_relatorio == 'scouting-coletivo' %}
 <main class="poster poster-collective">
-  {{ cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes) }}
+  {{ cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes if 'identidade' in secoes_set else None) }}
   <section class="poster-body poster-collective-grid">
     <div class="poster-intel-grid">
       {% if 'identidade' in secoes_set and adversario.observacoes %}<article class="poster-card poster-highlight"><h2>Ideia principal</h2><p>{{ adversario.observacoes }}</p></article>{% endif %}
-      {% if 'ataque' in secoes_set and (itens_coletivos.get('ataque_forte') or itens_coletivos.get('ataque_fraco')) %}
-      <article class="poster-card"><div class="poster-kicker">Quando defendemos</div><ul class="poster-list">{% for categoria in ['ataque_forte','ataque_fraco'] %}{% for rel in itens_coletivos.get(categoria, [])[:4] %}<li><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %} · {{ (rel.observacao or rel.valor)|truncate(95) }}{% endif %}</li>{% endfor %}{% endfor %}</ul></article>
+      {% set chaves = blocos_coletivos.get('chave', [])|selectattr('destaque')|list %}
+      {% if 'chaves' in secoes_set and chaves %}<article class="poster-card"><h3>Chaves da equipa</h3><ul class="poster-list">{% for bloco in chaves %}<li><strong>{{ bloco.titulo }}</strong>{% if bloco.descricao %} · {{ bloco.descricao|truncate(90) }}{% endif %}</li>{% endfor %}</ul></article>{% endif %}
+      {% if 'perfil' in secoes_set and (perfil_ataque or perfil_defesa) %}<article class="poster-card"><h3>Perfil coletivo</h3><ul class="poster-list">{% for bloco in perfil_ataque + perfil_defesa %}<li><strong>{{ bloco.titulo }}</strong> · {{ bloco.avaliacao }}/5</li>{% endfor %}</ul></article>{% endif %}
+      {% if 'analise' in secoes_set and (itens_coletivos.get('ataque_forte') or itens_coletivos.get('ataque_fraco')) %}
+      <article class="poster-card"><h3>Análise técnico-tática · ataque</h3><ul class="poster-list">{% for categoria in ['ataque_forte','ataque_fraco'] %}{% for rel in itens_coletivos.get(categoria, []) %}<li><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %} · {{ (rel.observacao or rel.valor)|truncate(95) }}{% endif %}</li>{% endfor %}{% endfor %}</ul></article>
       {% endif %}
-      {% if 'defesa' in secoes_set and (itens_coletivos.get('defesa_forte') or itens_coletivos.get('defesa_fraco') or opcoes_defensivas_facil) %}
-      <article class="poster-card"><div class="poster-kicker">Quando atacamos</div><ul class="poster-list">{% for categoria in ['defesa_forte','defesa_fraco'] %}{% for rel in itens_coletivos.get(categoria, [])[:4] %}<li><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %} · {{ (rel.observacao or rel.valor)|truncate(95) }}{% endif %}</li>{% endfor %}{% endfor %}{% for opcao in opcoes_defensivas_facil %}<li><strong>{{ opcao.nome }}</strong> · {{ opcao.notas|truncate(95) }}</li>{% endfor %}</ul></article>
+      {% if 'analise' in secoes_set and (itens_coletivos.get('defesa_forte') or itens_coletivos.get('defesa_fraco')) %}
+      <article class="poster-card"><h3>Análise técnico-tática · defesa</h3><ul class="poster-list">{% for categoria in ['defesa_forte','defesa_fraco'] %}{% for rel in itens_coletivos.get(categoria, []) %}<li><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %} · {{ (rel.observacao or rel.valor)|truncate(95) }}{% endif %}</li>{% endfor %}{% endfor %}</ul></article>
       {% endif %}
+      {% if 'regras_coberturas' in secoes_set and opcoes_defensivas_facil %}<article class="poster-card"><h3>Regras e coberturas</h3><ul class="poster-list">{% for opcao in opcoes_defensivas_facil %}<li><strong>{{ opcao.nome }}</strong> · {{ opcao.notas|truncate(95) }}</li>{% endfor %}</ul></article>{% endif %}
+      {% set respostas = blocos_coletivos.get('resposta', [])|selectattr('destaque')|list %}
+      {% if 'resposta' in secoes_set and respostas %}<article class="poster-card"><h3>Nossa resposta</h3><ul class="poster-list">{% for bloco in respostas %}<li><strong>{{ bloco.titulo }}</strong>{% if bloco.descricao %} · {{ bloco.descricao|truncate(90) }}{% endif %}</li>{% endfor %}</ul></article>{% endif %}
     </div>
     <aside class="poster-lineups">
       {% if 'cinco_rotacao' in secoes_set and cinco_previsto %}<article class="poster-card"><h3>Cinco inicial previsto</h3><div class="poster-lineup">{% for r in cinco_previsto[:5] %}{% set j=r.jogador %}<article><div class="poster-lineup-photo">{% if fotografias.get(j.id) %}<img class="poster-photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="poster-avatar">{{ j.nome[:2]|upper }}</div>{% endif %}</div><strong>#{{ j.numero or '—' }} {{ j.nome }}</strong></article>{% endfor %}</div></article>{% endif %}

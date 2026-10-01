@@ -171,11 +171,14 @@ def test_quatro_modelos_de_scouting_seguem_estrutura_de_exportacao_fornecida():
     ):
         assert marcador in individual_completo
     for marcador in (
-        "Resumo executivo",
+        "Chaves da equipa",
+        "Perfil coletivo",
+        "Nossa resposta",
+        "Análise técnico-tática",
+        "Regras e coberturas do adversário",
         "Últimos 5 resultados",
         "Líderes estatísticos",
         "Principais conceitos ofensivos",
-        "Principais opções defensivas utilizadas",
         "Playbook coletivo do adversário",
     ):
         assert marcador in coletivo_completo
@@ -263,7 +266,7 @@ def test_cabecalhos_de_scouting_usam_logotipos_e_titulo_unico():
     ):
         html = (TEMPLATES / "relatorios" / ficheiro).read_text(encoding="utf-8")
         if tipo == "Coletivo":
-            assert "cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes)" in html
+            assert "cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes" in html
         else:
             assert f"cabecalho_scouting('{tipo}', alvo_nome, identidade, simbolo_adversario)" in html
 
@@ -313,19 +316,20 @@ def test_scouting_coletivo_modular_guarda_e_recarrega_configuracao():
     formulario = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
     javascript = (ROOT / "frontend" / "static" / "js" / "report-export.js").read_text(encoding="utf-8")
     rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
-    facil = (TEMPLATES / "relatorios" / "scouting_coletivo_facil.html").read_text(encoding="utf-8")
+    facil = (TEMPLATES / "relatorios" / "scouting_coletivo_facil_v2.html").read_text(encoding="utf-8")
     completo = (TEMPLATES / "relatorios" / "scouting_coletivo_completo.html").read_text(encoding="utf-8")
 
-    for chave in ("chaves", "perfil", "resposta", "prioridades", "situacoes", "diagramas"):
+    for chave in ("chaves", "perfil", "analise", "regras_coberturas", "resposta", "prioridades", "situacoes", "diagramas"):
         assert f'_secao("{chave}"' in rota
     assert 'data-preset-statistics' in formulario
     assert 'data-preset-highlight-players' in formulario
     assert "presetStatistics.includes(input.value)" in javascript
     assert '"estatisticas": [campo for campo in dados.getlist("estatisticas")' in rota
     assert "blocos_coletivos.get('chave'" in facil
-    assert "blocos_coletivos.get('perfil'" in facil
-    assert "Plano de jogo · Nossa resposta" in facil
-    assert "Perfil, chaves e plano de jogo estruturado" in completo
+    assert "perfil_ataque" in facil
+    assert "Nossa resposta" in facil
+    assert "Análise técnico-tática" in completo
+    assert "Regras e coberturas do adversário" in completo
     assert 'class="rating-bar"' in facil
     assert "range(1,6)" in facil
     assert "{{ valor }}/5" in facil

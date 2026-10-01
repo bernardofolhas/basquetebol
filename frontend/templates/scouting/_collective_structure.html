@@ -2,8 +2,8 @@
   <header>
     <div>
       <p class="ds-kicker">Informação reutilizável</p>
-      <h2>Chaves e nossa resposta</h2>
-      <p class="scouting-subtext">Regista as mensagens da equipa. As avaliações 0–5 são editadas na secção Perfil coletivo.</p>
+      <h2>Mensagens coletivas</h2>
+      <p class="scouting-subtext">Chaves, nossa resposta e prioridades são guardadas em grupos separados. As avaliações 0–5 são editadas na secção Perfil coletivo.</p>
     </div>
   </header>
   <div class="collective-structure-layout">
@@ -42,22 +42,31 @@
     </form>
     <div class="collective-structure-saved">
       <h3>Informação guardada</h3>
-      <div class="collective-structure-cards">
-        {% for bloco in adversario.blocos_coletivos %}
-        <article class="collective-structure-card">
-          <div class="collective-structure-card-head">
-            <span class="collective-structure-type">{{ bloco.tipo|replace('_',' ')|title }}</span>
-            {% if bloco.destaque %}<span class="collective-structure-visible">Leitura fácil</span>{% endif %}
+      {% for titulo, tipos in [('Chaves da equipa', ['chave']), ('Nossa resposta', ['resposta']), ('Prioridades e situações', ['prioridade_ofensiva', 'prioridade_defensiva', 'transicao', 'ressalto', 'situacao_especial']), ('Perfil anterior', ['perfil'])] %}
+        {% set entradas = adversario.blocos_coletivos|selectattr('tipo', 'in', tipos)|list %}
+        {% if entradas %}
+        <section class="collective-structure-group">
+          <h4>{{ titulo }} <span>{{ entradas|length }}</span></h4>
+          <div class="collective-structure-cards">
+            {% for bloco in entradas %}
+            <article class="collective-structure-card">
+              <div class="collective-structure-card-head">
+                <span class="collective-structure-type">{{ bloco.tipo|replace('_',' ')|title }}</span>
+                {% if bloco.destaque %}<span class="collective-structure-visible">Leitura fácil</span>{% endif %}
+              </div>
+              <h4>{{ bloco.titulo }}</h4>
+              {% if bloco.descricao %}<p>{{ bloco.descricao }}</p>{% endif %}
+              {% if bloco.categoria or bloco.nivel %}<small>{{ bloco.categoria or '' }}{% if bloco.categoria and bloco.nivel %} · {% endif %}{{ bloco.nivel|title if bloco.nivel else '' }}</small>{% endif %}
+              <form method="POST" action="/scouting/coletivo/blocos/{{ bloco.id }}/eliminar" data-studio-async data-studio-refresh="collective-structure" onsubmit="return confirm('Eliminar este apontamento?')">
+                <button class="scouting-icon-danger" type="submit" aria-label="Eliminar {{ bloco.titulo }}">×</button>
+              </form>
+            </article>
+            {% endfor %}
           </div>
-          <h4>{{ bloco.titulo }}</h4>
-          {% if bloco.descricao %}<p>{{ bloco.descricao }}</p>{% endif %}
-          {% if bloco.categoria or bloco.nivel %}<small>{{ bloco.categoria or '' }}{% if bloco.categoria and bloco.nivel %} · {% endif %}{{ bloco.nivel|title if bloco.nivel else '' }}</small>{% endif %}
-          <form method="POST" action="/scouting/coletivo/blocos/{{ bloco.id }}/eliminar" data-studio-async data-studio-refresh="collective-structure" onsubmit="return confirm('Eliminar este apontamento?')">
-            <button class="scouting-icon-danger" type="submit" aria-label="Eliminar {{ bloco.titulo }}">×</button>
-          </form>
-        </article>
-        {% else %}<p class="scouting-empty-inline">Ainda não há apontamentos guardados nesta secção.</p>{% endfor %}
-      </div>
+        </section>
+        {% endif %}
+      {% endfor %}
+      {% if not adversario.blocos_coletivos %}<p class="scouting-empty-inline">Ainda não há apontamentos guardados nesta secção.</p>{% endif %}
     </div>
   </div>
 </section>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}Scouting coletivo · {{ adversario.nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260922-studio-3"><link rel="stylesheet" href="/static/css/scouting-intelligence.css?v=20260928-1"><link rel="stylesheet" href="/static/css/scouting-collective-workflow.css?v=20261001-3">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260922-studio-3"><link rel="stylesheet" href="/static/css/scouting-intelligence.css?v=20260928-1"><link rel="stylesheet" href="/static/css/scouting-collective-workflow.css?v=20261001-4">{% endblock %}
 {% block conteudo %}
 <div data-customizable-dashboard data-dashboard-key="scouting-coletivo-{{ adversario.id }}">
 <header class="scouting-title"><div><a href="/scouting">← Departamento de Scouting</a><p class="ds-kicker">{{ adversario.nome }}</p><h1>Scouting coletivo</h1><p>Resultados, identidade estatística e leitura técnico-tática do adversário.</p></div><div class="scouting-title-actions"><span>{{ adversario.jogadores|length }} atletas no roster</span><aside data-dashboard-customizer-anchor></aside></div></header>

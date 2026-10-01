@@ -747,14 +747,14 @@ RELATORIOS_CONFIG = {
         "nome": "Scouting coletivo",
         "secoes": [
             _secao("identidade", "Cabeçalho / identificação", "Equipa, jogo e ideia-chave.", ("completo", "facil", "a3")),
-            _secao("chaves", "Chaves da equipa", "Até três mensagens destacadas.", ("completo", "facil", "a3")),
+            _secao("chaves", "Chaves da equipa", "Mensagens-chave selecionadas pelo treinador.", ("completo", "facil", "a3")),
             _secao("cinco_rotacao", "Cinco e rotações", "Cinco inicial previsto e principais rotações.", ("completo", "facil", "a3")),
             _secao("estatisticas", "Estatísticas da equipa", "Apenas os indicadores selecionados.", ("completo", "facil")),
             _secao("perfil", "Perfil coletivo", "Como a equipa joga, com avaliação simples.", ("completo", "facil", "a3")),
-            _secao("ataque", "Ataque", "Pontos fortes, fragilidades e conceitos ofensivos.", ("completo", "facil", "a3")),
-            _secao("defesa", "Defesa", "Comportamentos e opcoes defensivas esperadas.", ("completo", "facil", "a3")),
+            _secao("analise", "Análise técnico-tática", "Pontos fortes e fragilidades no ataque e na defesa.", ("completo",)),
+            _secao("regras_coberturas", "Regras e coberturas", "Opções defensivas usadas pelo adversário.", ("completo", "facil", "a3")),
             _secao("jogadores_chave", "Jogadores-chave", "Lideres e prioridades individuais.", ("completo", "facil", "a3")),
-            _secao("resposta", "Plano de jogo / nossa resposta", "Instruções operacionais destacadas.", ("completo", "facil", "a3")),
+            _secao("resposta", "Nossa resposta", "Instruções para contrariar o adversário.", ("completo", "facil", "a3")),
             _secao("prioridades", "Prioridades", "Prioridades ofensivas e defensivas.", ("completo", "facil", "a3")),
             _secao("situacoes", "Transição, ressalto e especiais", "Situações específicas destacadas.", ("completo", "facil")),
             _secao("diagramas", "Ações principais / Playbook", "Jogadas selecionadas, apresentadas no final.", ("completo", "facil", "a3")),
@@ -834,6 +834,16 @@ def _secoes_padrao(tipo: str, formato: str) -> list[str]:
     return [s["chave"] for s in RELATORIOS_CONFIG[tipo]["secoes"] if formato in s["formatos"]]
 
 
+def _normalizar_secoes_coletivas(secoes: list[str]) -> list[str]:
+    equivalencias = {"ataque": ("analise",), "defesa": ("analise", "regras_coberturas")}
+    resultado = []
+    for secao in secoes:
+        for atual in equivalencias.get(secao, (secao,)):
+            if atual not in resultado:
+                resultado.append(atual)
+    return resultado
+
+
 def _configuracao_relatorio(tipo: str, dados, utilizador) -> tuple[str, str, list[str]]:
     formato = dados.get("formato", "completo")
     if formato not in FORMATOS_RELATORIO:
@@ -842,10 +852,16 @@ def _configuracao_relatorio(tipo: str, dados, utilizador) -> tuple[str, str, lis
     if orientacao not in {"retrato", "paisagem"}:
         orientacao = "retrato"
     validas = {s["chave"] for s in RELATORIOS_CONFIG[tipo]["secoes"]}
-    escolhidas = [s for s in dados.getlist("secoes") if s in validas]
-    ordem = [s for s in dados.get("ordem", "").split(",") if s in escolhidas]
+    recebidas = dados.getlist("secoes")
+    if tipo == "scouting-coletivo":
+        recebidas = _normalizar_secoes_coletivas(recebidas)
+    escolhidas = [s for s in recebidas if s in validas]
+    ordem_recebida = dados.get("ordem", "").split(",")
+    if tipo == "scouting-coletivo":
+        ordem_recebida = _normalizar_secoes_coletivas(ordem_recebida)
+    ordem = [s for s in ordem_recebida if s in escolhidas]
     secoes = ordem + [s for s in escolhidas if s not in ordem]
-    if not secoes:
+    if not secoes and not (tipo == "scouting-coletivo" and dados.get("secoes_configuradas") == "1"):
         secoes = _secoes_padrao(tipo, formato)
     if tipo in {"roster", "scouting-individual"} and "fotografia" not in secoes:
         secoes.insert(0, "fotografia")
@@ -1047,19 +1063,6 @@ def _opcoes_defensivas_coletivas(opcoes) -> list[dict[str, str]]:
     ]
 
 
-def _blocos_coletivos_visiveis(blocos: dict[str, list], secoes: list[str]) -> dict[str, list]:
-    secao_por_tipo = {
-        "chave": "chaves", "perfil": "perfil", "resposta": "resposta",
-        "prioridade_ofensiva": "prioridades", "prioridade_defensiva": "prioridades",
-        "transicao": "situacoes", "ressalto": "situacoes",
-        "situacao_especial": "situacoes",
-    }
-    return {
-        tipo: entradas for tipo, entradas in blocos.items()
-        if entradas and secao_por_tipo.get(tipo) in secoes
-    }
-
-
 def _rotacoes_coletivas_por_posicao(adversario):
     cinco_previsto = [r for r in adversario.rotacao_prevista if r.papel == "titular"]
     rotacoes_previstas = [r for r in adversario.rotacao_prevista if r.papel != "titular"]
@@ -1166,8 +1169,12 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         blocos_coletivos = {}
         for bloco in alvo.blocos_coletivos:
             blocos_coletivos.setdefault(bloco.tipo, []).append(bloco)
+        perfil_preenchido = [
+            bloco for bloco in blocos_coletivos.get("perfil", [])
+            if (bloco.avaliacao > 0 if bloco.avaliacao is not None else bool(bloco.nivel))
+        ]
         perfil_facil = []
-        for bloco in blocos_coletivos.get("perfil", []):
+        for bloco in perfil_preenchido:
             avaliacao = bloco.avaliacao if bloco.avaliacao is not None else {"fraco": 2, "medio": 3, "forte": 4}.get(bloco.nivel)
             if bloco.destaque and avaliacao not in (None, 0):
                 perfil_facil.append({
@@ -1210,6 +1217,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
                 + itens_coletivos.get("defesa_forte", [])
             ),
             blocos_coletivos=blocos_coletivos,
+            perfil_preenchido=perfil_preenchido,
             cinco_previsto=cinco_previsto,
             rotacoes_previstas=rotacoes_previstas,
             rotacoes_por_posicao=rotacoes_por_posicao,
@@ -1265,6 +1273,8 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
     predefinicao = next((p for p in predefinicoes if p.id == predefinicao_id), None)
     formato_inicial = "facil" if tipo == "scouting-coletivo" else "completo"
     selecionadas = json.loads(predefinicao.secoes) if predefinicao else _secoes_padrao(tipo, formato_inicial)
+    if tipo == "scouting-coletivo":
+        selecionadas = _normalizar_secoes_coletivas(selecionadas)
     try:
         configuracao_guardada = json.loads(predefinicao.configuracao or "{}") if predefinicao else {}
     except (TypeError, ValueError):
@@ -1359,9 +1369,6 @@ def _gerar_relatorio(tipo: str, alvo_id: int, request: Request, dados, db: Sessi
         contexto["respostas_grupos"] = [
             grupo for grupo in contexto["respostas_grupos"] if grupo["secao"] in secoes
         ]
-        contexto["blocos_coletivos_visiveis"] = _blocos_coletivos_visiveis(
-            contexto["blocos_coletivos"], secoes
-        )
     contexto.update(
         formato=formato,
         orientacao=orientacao,

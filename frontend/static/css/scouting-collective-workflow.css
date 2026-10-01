@@ -63,5 +63,6 @@
 .collective-structure-card p{margin:0 0 .35rem;color:#445870;font-size:.72rem;line-height:1.4;overflow-wrap:anywhere}
 .collective-structure-card>small{color:#76869a;font-size:.63rem}
 .collective-structure-card form{position:absolute;top:.55rem;right:.55rem}.collective-structure-card .scouting-icon-danger{display:grid;width:25px;height:25px;place-items:center;border:1px solid #fecaca;border-radius:7px;background:#fff6f6;font-size:1rem}
+.collective-structure-group{display:grid;gap:.5rem;border-top:1px solid #dbe5ef;padding-top:.7rem}.collective-structure-group>h4{display:flex;align-items:center;gap:.4rem;margin:0;color:#20364d;font-size:.8rem;font-weight:850}.collective-structure-group>h4 span{border-radius:99px;background:#e6edf4;padding:.1rem .4rem;color:#63758a;font-size:.65rem}.collective-structure-group .collective-structure-card h4{display:block;margin:.55rem 0 .25rem;color:#172a40;font-size:.83rem}
 @media(max-width:1050px){.collective-structure-layout{grid-template-columns:1fr}}
 @media(max-width:620px){.collective-structure-cards,.collective-structure-extra>div{grid-template-columns:1fr}.collective-structure-extra>div label:last-child{grid-column:auto}}
