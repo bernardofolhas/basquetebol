@@ -38,3 +38,30 @@
 .collective-profile .collective-profile-add .ds-button-primary{justify-self:start;min-width:205px}
 @media(max-width:1180px){.collective-profile .collective-profile-row{grid-template-columns:minmax(170px,1fr) auto minmax(170px,1fr)}.collective-profile .collective-profile-field:nth-of-type(2){grid-column:1}.collective-profile .scout-highlight-toggle{grid-column:2}.collective-profile .scout-row-actions{grid-column:3;justify-self:end}}
 @media(max-width:760px){.collective-profile .scout-intelligence-header{align-items:stretch}.collective-profile .scout-intelligence-legend{max-width:none;justify-content:flex-start}.collective-profile .collective-profile-row{grid-template-columns:1fr 1fr;gap:.65rem}.collective-profile .scout-profile-main,.collective-profile .collective-profile-field:nth-of-type(1){grid-column:1/-1}.collective-profile .scout-rating-picker{grid-column:1/-1}.collective-profile .collective-profile-field:nth-of-type(2){grid-column:1}.collective-profile .scout-highlight-toggle{grid-column:2}.collective-profile .scout-row-actions{grid-column:1/-1;justify-self:start}.collective-profile .collective-profile-add{grid-template-columns:1fr}.collective-profile .collective-profile-observation{grid-column:1}.collective-profile .collective-profile-add .scout-highlight-toggle{align-self:start}}
+
+.collective-structure-layout{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(0,1.18fr);gap:1rem;align-items:start}
+.collective-structure-form,.collective-structure-saved{display:grid;gap:.8rem;min-width:0;border:1px solid #d9e3ee;border-radius:17px;background:#f8fafc;padding:1rem}
+.collective-structure-form h3,.collective-structure-saved h3{margin:0;color:#182d43;font-size:1rem;font-weight:850}
+.collective-structure-form .ds-label{display:grid;gap:.3rem;color:#40536b;font-size:.73rem;font-weight:800}
+.collective-structure-form .ds-input,.collective-structure-form .ds-textarea{width:100%;min-height:42px;border-color:#cbd8e6;background:#fff;font-size:.82rem}
+.collective-structure-form .ds-textarea{min-height:85px}
+.collective-structure-extra{border-top:1px solid #dbe5ef;padding-top:.6rem}
+.collective-structure-extra summary{display:flex;justify-content:space-between;cursor:pointer;color:#304861;font-size:.76rem;font-weight:800}
+.collective-structure-extra summary span{color:#8291a3;font-size:.65rem;font-weight:650}
+.collective-structure-extra>div{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-top:.75rem}
+.collective-structure-extra>div label:last-child{grid-column:1/-1}
+.collective-structure-highlight{display:flex;align-items:center;gap:.6rem;border:1px solid #dbe5ef;border-radius:12px;background:#fff;padding:.7rem;color:#26384f;cursor:pointer}
+.collective-structure-highlight input{width:18px;height:18px;accent-color:var(--clube-primary)}
+.collective-structure-highlight strong,.collective-structure-highlight small{display:block}.collective-structure-highlight strong{font-size:.76rem}.collective-structure-highlight small{margin-top:.1rem;color:#64748b;font-size:.64rem}
+.collective-structure-form>.ds-button-primary{justify-self:start}
+.collective-structure-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+.collective-structure-card{position:relative;min-width:0;border:1px solid #d9e3ee;border-left:4px solid var(--clube-primary);border-radius:12px;background:#fff;padding:.8rem 2rem .85rem .85rem;box-shadow:0 3px 10px #0f172a08}
+.collective-structure-card-head{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.collective-structure-type,.collective-structure-visible{border-radius:999px;background:#eaf0f6;padding:.2rem .5rem;color:#52667c;font-size:.6rem;font-weight:850}
+.collective-structure-visible{background:#eaf6ee;color:#176c42}
+.collective-structure-card h4{margin:.55rem 0 .25rem;color:#172a40;font-size:.83rem;font-weight:900}
+.collective-structure-card p{margin:0 0 .35rem;color:#445870;font-size:.72rem;line-height:1.4;overflow-wrap:anywhere}
+.collective-structure-card>small{color:#76869a;font-size:.63rem}
+.collective-structure-card form{position:absolute;top:.55rem;right:.55rem}.collective-structure-card .scouting-icon-danger{display:grid;width:25px;height:25px;place-items:center;border:1px solid #fecaca;border-radius:7px;background:#fff6f6;font-size:1rem}
+@media(max-width:1050px){.collective-structure-layout{grid-template-columns:1fr}}
+@media(max-width:620px){.collective-structure-cards,.collective-structure-extra>div{grid-template-columns:1fr}.collective-structure-extra>div label:last-child{grid-column:auto}}

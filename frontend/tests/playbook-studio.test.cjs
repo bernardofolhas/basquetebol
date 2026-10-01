@@ -179,6 +179,23 @@ test('curved dribble has a smooth oscillation on both sides of its trajectory', 
   assert.ok(ctx.strokes[0].length > 30);
 });
 
+test('a hand-drawn single bend becomes a regular curve with fixed endpoints', () => {
+  const api = studio();
+  const points = Array.from({ length: 25 }, (_, i) => ({
+    x: i * 10,
+    y: 55 * Math.sin(i / 24 * Math.PI) + (i % 3 - 1) * 4
+  }));
+  const object = action('arc', 'seta', points);
+  api.cleanDrawnLine(object);
+  assert.equal(object.curva, true);
+  assert.deepEqual(coordinates(object.pontos[0]), points[0]);
+  assert.deepEqual(coordinates(object.pontos.at(-1)), points.at(-1));
+  const secondDifferences = object.pontos.slice(2).map((p, i) =>
+    p.y - 2 * object.pontos[i + 1].y + object.pontos[i].y
+  );
+  assert.ok(Math.max(...secondDifferences) - Math.min(...secondDifferences) < 1e-6);
+});
+
 test('circular movement keeps its shape and saved geometry does not drift on reload', () => {
   const api = studio();
   const object = action('d', 'seta_zigzag', Array.from({ length: 61 }, (_, i) => ({ x: 150 + 70 * Math.cos(i / 60 * Math.PI * 2), y: 150 + 70 * Math.sin(i / 60 * Math.PI * 2) })));

@@ -375,7 +375,15 @@
       const length = Math.hypot(end.x - start.x, end.y - start.y);
       const deviation = object.pontos.slice(1, -1).reduce((max, point) => Math.max(max, distanceToSegment(point, start, end)), 0);
       object.curva = object.pontos.length > 2 && deviation > Math.max(8, length * .07);
-      object.pontos = object.curva ? smoothMovement(object.pontos) : [start, end];
+      if (!object.curva) object.pontos = [start, end];
+      else {
+        const signed = object.pontos.slice(1, -1).map(point =>
+          ((end.x - start.x) * (point.y - start.y) - (end.y - start.y) * (point.x - start.x)) / Math.max(1, length)
+        );
+        const singleBend = length > 8 && pathLength(object.pontos) < length * 2.2
+          && !(Math.max(...signed) > 8 && Math.min(...signed) < -8);
+        object.pontos = singleBend ? fitCurve(object.pontos) : smoothMovement(object.pontos);
+      }
     } else if (straightLineTypes.has(object.tipo)) object.pontos = [start, end];
   }
 

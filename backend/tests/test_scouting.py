@@ -206,6 +206,20 @@ def test_coletivo_abre_e_exporta_leitura_facil(client_admin):
         pdf = client_admin.post(f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}/pdf", data=dados)
         assert pdf.status_code == 200
         assert pdf.content.startswith(b"%PDF")
+
+        completo = client_admin.post(
+            f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}/pdf",
+            data={"formato": "completo", "secoes": ["identidade", "defesa", "perfil"]},
+        )
+        assert completo.status_code == 200
+        assert completo.content.startswith(b"%PDF")
+
+        poster = client_admin.post(
+            f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}/pdf",
+            data={"formato": "a3", "secoes": ["identidade", "cinco_rotacao", "defesa"]},
+        )
+        assert poster.status_code == 200
+        assert poster.content.startswith(b"%PDF")
     finally:
         _eliminar_adversario_integracao(adversario_id, jogo_id)
 
@@ -585,6 +599,7 @@ def test_scouting_coletivo_modular_e_transportavel_para_plano_de_jogo():
     migracao = (ROOT / "backend" / "migrations" / "versions" / "0057_scouting_coletivo_modular.py").read_text(encoding="utf-8")
     router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
     coletivo = (TEMPLATES_DIR / "scouting" / "coletivo.html").read_text(encoding="utf-8")
+    estrutura = (TEMPLATES_DIR / "scouting" / "_collective_structure.html").read_text(encoding="utf-8")
 
     assert "class ScoutingBlocoColetivo" in modelo
     assert 'CheckConstraint("nivel IS NULL OR nivel IN' in modelo
@@ -596,8 +611,9 @@ def test_scouting_coletivo_modular_e_transportavel_para_plano_de_jogo():
     assert "ScoutingBlocoColetivo.clube_id == adversario.clube_id" in router
     assert "ScoutingBlocoColetivo.clube_id == utilizador.clube_id" in router
     assert 'bloco.tipo in {"resposta", "prioridade_ofensiva"}' in router
-    assert "Chaves, perfil e nossa resposta" in coletivo
-    assert "Mostrar na leitura fácil" in coletivo
+    assert 'include "scouting/_collective_structure.html"' in coletivo
+    assert "Chaves e nossa resposta" in estrutura
+    assert "Mostrar na leitura fácil" in estrutura
 
 
 def test_perfil_coletivo_tem_avaliacao_de_zero_a_cinco():

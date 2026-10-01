@@ -1011,6 +1011,55 @@ def _jogadores_prioritarios_coletivo(adversario, jogador_ids: list[int] | None =
     return resultado[:4]
 
 
+def _caracteristicas_cinco_coletivo(jogadores) -> dict[int, list[str]]:
+    resultado = {}
+    for jogador in jogadores:
+        itens = [
+            relacao for relacao in (jogador.itens or [])
+            if relacao.item and relacao.item.ativo
+            and relacao.item.categoria == "caracteristica"
+            and (relacao.avaliacao or 0) > 0
+        ]
+        itens.sort(key=lambda relacao: (
+            not relacao.destaque,
+            -(relacao.avaliacao or 0),
+            relacao.ordem_destaque if relacao.ordem_destaque is not None else 10_000,
+        ))
+        resultado[jogador.id] = [relacao.item.nome for relacao in itens[:2]]
+    return resultado
+
+
+def _opcoes_defensivas_coletivas(opcoes) -> list[dict[str, str]]:
+    if not opcoes:
+        return []
+    campos = (
+        ("bloqueio_central", "Bloqueios diretos centrais"),
+        ("bloqueio_lateral", "Bloqueios diretos laterais"),
+        ("bloqueio_indireto", "Bloqueios indiretos"),
+        ("handoff", "Handoff"),
+        ("bola_interior", "Defesa da bola interior"),
+        ("alteracoes", "Alterações defensivas"),
+    )
+    return [
+        {"nome": nome, "notas": (getattr(opcoes, f"{campo}_notas", None) or "").strip()}
+        for campo, nome in campos
+        if getattr(opcoes, campo, False) and (getattr(opcoes, f"{campo}_notas", None) or "").strip()
+    ]
+
+
+def _blocos_coletivos_visiveis(blocos: dict[str, list], secoes: list[str]) -> dict[str, list]:
+    secao_por_tipo = {
+        "chave": "chaves", "perfil": "perfil", "resposta": "resposta",
+        "prioridade_ofensiva": "prioridades", "prioridade_defensiva": "prioridades",
+        "transicao": "situacoes", "ressalto": "situacoes",
+        "situacao_especial": "situacoes",
+    }
+    return {
+        tipo: entradas for tipo, entradas in blocos.items()
+        if entradas and secao_por_tipo.get(tipo) in secoes
+    }
+
+
 def _rotacoes_coletivas_por_posicao(adversario):
     cinco_previsto = [r for r in adversario.rotacao_prevista if r.papel == "titular"]
     rotacoes_previstas = [r for r in adversario.rotacao_prevista if r.papel != "titular"]
@@ -1055,22 +1104,21 @@ def _indicadores_coletivos(media: dict, selecionados: list[str]) -> list[dict]:
             continue
         indicadores.append({"nome": STAT_CODES[campo], "valor": f"{media[campo]:.1f}"})
         usados.add(campo)
-    return indicadores[:10]
+    return indicadores
 
 
 def _grupos_resposta_coletiva(blocos: dict[str, list]) -> list[dict]:
     grupos = [
-        ("Sem bola", ("resposta", "prioridade_defensiva")),
-        ("P&R", ("prioridade_ofensiva",)),
-        ("Transição", ("transicao",)),
-        ("Ressalto", ("ressalto",)),
+        ("Sem bola", "resposta", ("resposta",)),
+        ("Prioridades", "prioridades", ("prioridade_ofensiva", "prioridade_defensiva")),
+        ("Transição", "situacoes", ("transicao",)),
+        ("Ressalto", "situacoes", ("ressalto",)),
+        ("Situações especiais", "situacoes", ("situacao_especial",)),
     ]
     resultado = []
-    for nome, tipos in grupos:
+    for nome, secao, tipos in grupos:
         candidatos = [bloco for tipo in tipos for bloco in blocos.get(tipo, []) if bloco.destaque]
-        if nome == "P&R":
-            candidatos = [bloco for bloco in candidatos if "p&r" in (bloco.categoria or "").lower() or "bloqueio" in bloco.titulo.lower()]
-        resultado.append({"nome": nome, "blocos": candidatos[:2]})
+        resultado.append({"nome": nome, "secao": secao, "blocos": candidatos})
     return resultado
 
 
@@ -1134,12 +1182,20 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             adversario=alvo,
             jogo_referencia=jogos_referencia[0] if jogos_referencia else None,
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in alvo.jogadores},
+            caracteristicas_cinco=_caracteristicas_cinco_coletivo(
+                [entrada.jogador for entrada in cinco_previsto]
+            ),
+            opcoes_defensivas_facil=_opcoes_defensivas_coletivas(alvo.opcoes_defensivas),
             itens_coletivos=itens_coletivos,
+            jogadas_coletivas=[
+                entrada for entrada in (alvo.conceitos_ofensivos + alvo.momentos_playbook)
+                if entrada.setplay
+            ],
             jogadores_prioritarios=_jogadores_prioritarios_coletivo(alvo, jogadores_destaque_ids),
             media_exibida=media_exibida,
             indicadores_coletivos=_indicadores_coletivos(media_exibida, stat_fields),
-            perfil_ataque=[bloco for bloco in perfil_facil if "defesa" not in (bloco["categoria"] or "").lower()][:4],
-            perfil_defesa=[bloco for bloco in perfil_facil if "defesa" in (bloco["categoria"] or "").lower()][:4],
+            perfil_ataque=[bloco for bloco in perfil_facil if "defesa" not in (bloco["categoria"] or "").lower()],
+            perfil_defesa=[bloco for bloco in perfil_facil if "defesa" in (bloco["categoria"] or "").lower()],
             respostas_grupos=_grupos_resposta_coletiva(blocos_coletivos),
             stat_fields_com_dados=[
                 campo for campo in stat_fields
@@ -1152,7 +1208,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             principais_caracteristicas=(
                 itens_coletivos.get("ataque_forte", [])
                 + itens_coletivos.get("defesa_forte", [])
-            )[:6],
+            ),
             blocos_coletivos=blocos_coletivos,
             cinco_previsto=cinco_previsto,
             rotacoes_previstas=rotacoes_previstas,
@@ -1298,6 +1354,13 @@ def _gerar_relatorio(tipo: str, alvo_id: int, request: Request, dados, db: Sessi
         contexto.update(
             secoes_por_atleta=secoes_por_atleta,
             stat_fields_por_atleta=estatisticas_por_atleta,
+        )
+    if tipo == "scouting-coletivo":
+        contexto["respostas_grupos"] = [
+            grupo for grupo in contexto["respostas_grupos"] if grupo["secao"] in secoes
+        ]
+        contexto["blocos_coletivos_visiveis"] = _blocos_coletivos_visiveis(
+            contexto["blocos_coletivos"], secoes
         )
     contexto.update(
         formato=formato,

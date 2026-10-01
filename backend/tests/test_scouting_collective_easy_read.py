@@ -11,7 +11,14 @@ from weasyprint import HTML
 from formatacao import data_pt
 from models.scouting import STAT_FIELDS
 from paths import STATIC_DIR, TEMPLATES_DIR
-from routers.exportacoes import _grupos_resposta_coletiva, _indicadores_coletivos, _media_exibida_coletiva
+from routers.exportacoes import (
+    _blocos_coletivos_visiveis,
+    _caracteristicas_cinco_coletivo,
+    _grupos_resposta_coletiva,
+    _indicadores_coletivos,
+    _media_exibida_coletiva,
+    _opcoes_defensivas_coletivas,
+)
 from services.desenho_service import imagem_estatica_data_uri
 
 
@@ -37,6 +44,34 @@ def test_respostas_agrupadas_ignoram_blocos_nao_destacados():
     grupos = _grupos_resposta_coletiva(blocos)
     assert grupos[0]["blocos"][0].titulo == "Fechar linha"
     assert grupos[2]["blocos"] == []
+
+
+def test_relatorio_completo_filtra_blocos_pelas_secoes_escolhidas():
+    blocos = {"chave": [Item(titulo="Ritmo")], "perfil": [Item(titulo="P&R")],
+              "situacao_especial": [Item(titulo="Fundo")], "resposta": []}
+    assert list(_blocos_coletivos_visiveis(blocos, ["chaves", "situacoes"])) == [
+        "chave", "situacao_especial"
+    ]
+
+
+def test_titulares_recebem_caracteristicas_e_opcoes_ativas_sem_ruido():
+    relacao = lambda nome, nota, destaque=False: Item(
+        item=Item(nome=nome, ativo=True, categoria="caracteristica"),
+        avaliacao=nota, destaque=destaque, ordem_destaque=None,
+    )
+    jogador = Item(id=7, itens=[
+        relacao("Sem avaliação", 0), relacao("P&R central", 4),
+        relacao("Ressalto ofensivo", 5, True),
+    ])
+    assert _caracteristicas_cinco_coletivo([jogador]) == {
+        7: ["Ressalto ofensivo", "P&R central"]
+    }
+    opcoes = Item(bloqueio_central=True, bloqueio_central_notas="Push ou switch",
+                  bloqueio_lateral=True, bloqueio_lateral_notas=" ",
+                  handoff=False, handoff_notas="Não mostrar")
+    assert _opcoes_defensivas_coletivas(opcoes) == [
+        {"nome": "Bloqueios diretos centrais", "notas": "Push ou switch"}
+    ]
 
 
 def test_leitura_facil_coletiva_renderiza_uma_pagina():
@@ -67,8 +102,10 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
         "perfil_ataque": ataque, "perfil_defesa": defesa,
         "cinco_previsto": titulares, "rotacoes_previstas": [Item(jogador=jogador(6))],
         "rotacoes_por_posicao": {"Base": [Item(jogador=jogador(6))]},
-        "fotografias": {}, "jogadores_prioritarios": [{"jogador": jogador(numero), "caracteristica": "Lançamento exterior"} for numero in range(1, 5)], "indicadores_coletivos": [{"nome": nome, "valor": "85.0"} for nome in ("PTS", "2P%", "3P%", "LL%", "OREB", "DREB", "AST", "TOV", "STL", "EFF")],
+        "fotografias": {}, "caracteristicas_cinco": {1: ["P&R central", "Transição"]},
+        "jogadores_prioritarios": [{"jogador": jogador(numero), "caracteristica": "Lançamento exterior"} for numero in range(1, 5)], "indicadores_coletivos": [{"nome": nome, "valor": "85.0"} for nome in ("PTS", "2P%", "3P%", "LL%", "OREB", "DREB", "AST", "TOV", "STL", "EFF")],
         "principais_caracteristicas": [], "respostas_grupos": _grupos_resposta_coletiva(prioridades),
+        "jogadas_coletivas": jogadas,
         "passos_setplay": {numero: [Item(imagem=campo, observacao="Movimento e leitura de ajudas")] for numero in range(1, 4)},
     }
     html = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
@@ -81,3 +118,27 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
     assert "Números da equipa" in html
     assert "Perfil coletivo" in html
     assert "Plano de jogo" in html
+    assert "P&amp;R central" in html
+    assert "Forçar P&R lateral" not in html
+    assert "Defesa · regras e coberturas" not in html
+
+    contexto["secoes_set"].add("defesa")
+    contexto["opcoes_defensivas_facil"] = [{"nome": "Bloqueios diretos centrais", "notas": "Push ou switch"}]
+    com_defesa = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert "Defesa · regras e coberturas" in com_defesa
+    assert "Push ou switch" in com_defesa
+    texto_pdf = "\n".join(
+        pagina.extract_text() for pagina in PdfReader(BytesIO(HTML(string=com_defesa).write_pdf())).pages
+    )
+    assert "Push ou switch" in texto_pdf
+    contexto["opcoes_defensivas_facil"] = []
+    sem_dados = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert "Defesa · regras e coberturas" not in sem_dados
+
+    contexto["secoes_set"].add("ataque")
+    contexto["itens_coletivos"] = {
+        "ataque_forte": [Item(item=Item(nome="Pressão após cesto"), observacao="Ataca cedo", valor=None)]
+    }
+    com_ataque = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert "Ataque · comportamentos e conceitos" in com_ataque
+    assert "Pressão após cesto" in com_ataque

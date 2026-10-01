@@ -1,0 +1,63 @@
+<section id="estrutura-coletiva" class="scouting-section collective-structure" data-studio-region="collective-structure">
+  <header>
+    <div>
+      <p class="ds-kicker">Informação reutilizável</p>
+      <h2>Chaves e nossa resposta</h2>
+      <p class="scouting-subtext">Regista as mensagens da equipa. As avaliações 0–5 são editadas na secção Perfil coletivo.</p>
+    </div>
+  </header>
+  <div class="collective-structure-layout">
+    <form method="POST" action="/scouting/adversarios/{{ adversario.id }}/coletivo/blocos"
+      class="collective-structure-form" data-studio-async data-studio-refresh="collective-structure" data-studio-reset="true">
+      <h3>Novo apontamento</h3>
+      <label class="ds-label">Tipo
+        <select name="tipo" class="ds-input" required>
+          <option value="chave">Chave da equipa</option>
+          <option value="resposta">Nossa resposta</option>
+          <option value="prioridade_ofensiva">Prioridade ofensiva</option>
+          <option value="prioridade_defensiva">Prioridade defensiva</option>
+          <option value="transicao">Transição</option>
+          <option value="ressalto">Ressalto</option>
+          <option value="situacao_especial">Situação especial</option>
+        </select>
+      </label>
+      <label class="ds-label">Título curto
+        <input name="titulo" required maxlength="160" class="ds-input" placeholder="Ex.: Ritmo alto na transição">
+      </label>
+      <label class="ds-label">O que acontece ou o que fazer
+        <textarea name="descricao" rows="3" maxlength="500" class="ds-textarea" placeholder="Uma observação ou instrução objetiva"></textarea>
+      </label>
+      <details class="collective-structure-extra">
+        <summary>Categoria e prioridade <span>Opcional</span></summary>
+        <div>
+          <label class="ds-label">Categoria<input name="categoria" maxlength="64" class="ds-input" placeholder="Ex.: P&R, Defesa"></label>
+          <label class="ds-label">Prioridade
+            <select name="prioridade" class="ds-input"><option value="1">P1 · Essencial</option><option value="2" selected>P2 · Importante</option><option value="3">P3 · Contexto</option></select>
+          </label>
+          <label class="ds-label">Ordem<input type="number" name="ordem" min="0" value="0" class="ds-input"></label>
+        </div>
+      </details>
+      <label class="collective-structure-highlight"><input type="checkbox" name="destaque" value="true"><span><strong>Mostrar na leitura fácil</strong><small>Aparece apenas se esta opção estiver assinalada.</small></span></label>
+      <button class="ds-button-primary" type="submit">Adicionar apontamento</button>
+    </form>
+    <div class="collective-structure-saved">
+      <h3>Informação guardada</h3>
+      <div class="collective-structure-cards">
+        {% for bloco in adversario.blocos_coletivos %}
+        <article class="collective-structure-card">
+          <div class="collective-structure-card-head">
+            <span class="collective-structure-type">{{ bloco.tipo|replace('_',' ')|title }}</span>
+            {% if bloco.destaque %}<span class="collective-structure-visible">Leitura fácil</span>{% endif %}
+          </div>
+          <h4>{{ bloco.titulo }}</h4>
+          {% if bloco.descricao %}<p>{{ bloco.descricao }}</p>{% endif %}
+          {% if bloco.categoria or bloco.nivel %}<small>{{ bloco.categoria or '' }}{% if bloco.categoria and bloco.nivel %} · {% endif %}{{ bloco.nivel|title if bloco.nivel else '' }}</small>{% endif %}
+          <form method="POST" action="/scouting/coletivo/blocos/{{ bloco.id }}/eliminar" data-studio-async data-studio-refresh="collective-structure" onsubmit="return confirm('Eliminar este apontamento?')">
+            <button class="scouting-icon-danger" type="submit" aria-label="Eliminar {{ bloco.titulo }}">×</button>
+          </form>
+        </article>
+        {% else %}<p class="scouting-empty-inline">Ainda não há apontamentos guardados nesta secção.</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
