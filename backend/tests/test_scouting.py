@@ -604,6 +604,7 @@ def test_perfil_coletivo_tem_avaliacao_de_zero_a_cinco():
     modelo = (ROOT / "backend" / "models" / "scouting.py").read_text(encoding="utf-8")
     migracao = (ROOT / "backend" / "migrations" / "versions" / "0058_scouting_coletivo_avaliacao.py").read_text(encoding="utf-8")
     perfil = (TEMPLATES_DIR / "scouting" / "_collective_profile.html").read_text(encoding="utf-8")
+    pagina = (TEMPLATES_DIR / "scouting" / "coletivo.html").read_text(encoding="utf-8")
     router = (ROOT / "backend" / "routers" / "scouting.py").read_text(encoding="utf-8")
 
     assert "avaliacao >= 0 AND avaliacao <= 5" in modelo
@@ -611,6 +612,9 @@ def test_perfil_coletivo_tem_avaliacao_de_zero_a_cinco():
     assert "range(0, 6)" in perfil
     assert 'name="avaliacao"' in perfil
     assert "Perfil coletivo 0–5" in perfil
+    assert "scouting-intelligence.css" in pagina
+    assert 'name="categoria"' in perfil
+    assert "collective-profile-row" in perfil
     assert "0 <= avaliacao <= 5" in router
 
 

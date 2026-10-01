@@ -1,12 +1,83 @@
 {% macro escala(nome, valor) -%}
 <fieldset class="scout-rating-picker" aria-label="Avaliação de {{ nome }}">
-  {% for nivel in range(0, 6) %}<label class="{% if nivel == 0 %}is-na{% else %}rating-{{ nivel }}{% endif %}"><input type="radio" name="avaliacao" value="{{ nivel }}" {% if valor == nivel or (valor is none and nivel == 0) %}checked{% endif %}><span>{{ nivel }}</span></label>{% endfor %}
+  {% for nivel in range(0, 6) %}
+  <label class="{{ 'is-na' if nivel == 0 else 'rating-' ~ nivel }}">
+    <input type="radio" name="avaliacao" value="{{ nivel }}" {% if valor == nivel or (valor is none and nivel == 0) %}checked{% endif %}>
+    <span>{{ 'N/A' if nivel == 0 else nivel }}</span>
+  </label>
+  {% endfor %}
 </fieldset>
 {%- endmacro %}
-<section id="perfil-coletivo-avaliacao" class="scouting-section scouting-intelligence" data-studio-region="collective-profile-rating">
-  <header class="scout-intelligence-header"><div><p class="ds-kicker">Identidade da equipa</p><h2>Perfil coletivo 0–5</h2><p>Avalia como o adversário joga. Zero significa sem evidência; cinco identifica uma característica dominante.</p></div><div class="scout-intelligence-legend"><span class="weak">1–2 Fraco</span><span class="average">3 Médio</span><span class="strong">4–5 Forte</span><span class="na">0 Sem avaliação</span></div></header>
-  <div class="scout-rating-groups">{% for bloco in adversario.blocos_coletivos if bloco.tipo == 'perfil' %}<form method="POST" action="/scouting/adversarios/{{ adversario.id }}/coletivo/blocos" class="scout-profile-row tone-{{ 'weak' if bloco.avaliacao in [1,2] else ('average' if bloco.avaliacao == 3 else ('strong' if bloco.avaliacao in [4,5] else 'na')) }}" data-studio-async data-studio-refresh="collective-profile-rating"><input type="hidden" name="bloco_id" value="{{ bloco.id }}"><input type="hidden" name="tipo" value="perfil"><div class="scout-profile-main"><input name="titulo" value="{{ bloco.titulo }}" maxlength="160" required><span class="scout-rating-status">{{ bloco.avaliacao if bloco.avaliacao is not none else 0 }}/5</span></div>{{ escala(bloco.titulo, bloco.avaliacao) }}<input name="categoria" value="{{ bloco.categoria or '' }}" maxlength="64" placeholder="Ataque, Defesa, Transição…"><input name="descricao" value="{{ bloco.descricao or '' }}" maxlength="320" placeholder="Observação curta"><input type="hidden" name="prioridade" value="{{ bloco.prioridade or 2 }}"><input type="hidden" name="ordem" value="{{ bloco.ordem }}"><label class="scout-highlight-toggle"><input type="checkbox" name="destaque" value="true" {% if bloco.destaque %}checked{% endif %}><span>Leitura fácil</span></label><div class="scout-row-actions"><button class="save">Guardar</button><button type="submit" formaction="/scouting/coletivo/blocos/{{ bloco.id }}/eliminar" class="remove">×</button></div></form>{% else %}<p class="scouting-empty-inline">Ainda não existem características coletivas avaliadas.</p>{% endfor %}</div>
-  <details class="scouting-editor" open><summary>Adicionar característica coletiva</summary><form method="POST" action="/scouting/adversarios/{{ adversario.id }}/coletivo/blocos" class="scout-add-form" data-studio-async data-studio-refresh="collective-profile-rating" data-studio-reset="true"><input type="hidden" name="tipo" value="perfil"><label>Característica<input name="titulo" class="ds-input" list="caracteristicas-coletivas" maxlength="160" placeholder="Ex.: P&R central" required><datalist id="caracteristicas-coletivas">{% for item in biblioteca if item.categoria == 'caracteristica' %}<option value="{{ item.nome }}">{% endfor %}</datalist></label><label>Grupo<input name="categoria" class="ds-input" maxlength="64" placeholder="Ataque ou Defesa"></label><label>Observação<input name="descricao" class="ds-input" maxlength="320"></label><div><span class="scout-field-label">Avaliação</span>{{ escala('nova característica coletiva', 0) }}</div><label class="scout-highlight-toggle"><input type="checkbox" name="destaque" value="true" checked><span>Mostrar na leitura fácil</span></label><button class="ds-button-primary">Adicionar</button></form></details>
+
+{% macro grupo_selecao(valor) -%}
+<select name="categoria" aria-label="Grupo da característica" required>
+  {% if valor and valor not in ['Ataque', 'Defesa'] %}<option value="{{ valor }}" selected>{{ valor }}</option>{% endif %}
+  <option value="Ataque" {% if valor == 'Ataque' %}selected{% endif %}>Ataque</option>
+  <option value="Defesa" {% if valor == 'Defesa' %}selected{% endif %}>Defesa</option>
+</select>
+{%- endmacro %}
+
+<section id="perfil-coletivo-avaliacao" class="scouting-section scouting-intelligence collective-profile" data-studio-region="collective-profile-rating">
+  <header class="scout-intelligence-header">
+    <div>
+      <p class="ds-kicker">Identidade da equipa</p>
+      <h2>Perfil coletivo 0–5</h2>
+      <p>Avalia os comportamentos observados do adversário e escolhe o que aparece na leitura fácil.</p>
+    </div>
+    <div class="scout-intelligence-legend" aria-label="Legenda das avaliações">
+      <span class="na">N/A Sem avaliação</span>
+      <span class="weak">1–2 Fraco</span>
+      <span class="average">3 Médio</span>
+      <span class="strong">4–5 Forte</span>
+    </div>
+  </header>
+
+  <div class="scout-rating-groups collective-profile-list">
+    {% for bloco in adversario.blocos_coletivos if bloco.tipo == 'perfil' %}
+    {% set valor = bloco.avaliacao if bloco.avaliacao is not none else 0 %}
+    <form method="POST" action="/scouting/adversarios/{{ adversario.id }}/coletivo/blocos"
+      class="scout-profile-row collective-profile-row tone-{{ 'weak' if valor in [1, 2] else ('average' if valor == 3 else ('strong' if valor in [4, 5] else 'na')) }}"
+      data-studio-async data-studio-refresh="collective-profile-rating">
+      <input type="hidden" name="bloco_id" value="{{ bloco.id }}">
+      <input type="hidden" name="tipo" value="perfil">
+      <div class="scout-profile-main">
+        <label class="sr-only" for="perfil-titulo-{{ bloco.id }}">Característica</label>
+        <input id="perfil-titulo-{{ bloco.id }}" name="titulo" value="{{ bloco.titulo }}" maxlength="160" required>
+        <span class="scout-rating-status">{% if not valor %}N/A · Sem avaliação{% else %}{{ valor }}/5 · {{ 'Fraco' if valor <= 2 else ('Médio' if valor == 3 else ('Forte' if valor == 4 else 'Muito forte')) }}{% endif %}</span>
+      </div>
+      {{ escala(bloco.titulo, bloco.avaliacao) }}
+      <label class="collective-profile-field">
+        <span>Observação curta</span>
+        <input name="descricao" value="{{ bloco.descricao or '' }}" maxlength="320" placeholder="Contexto observado">
+      </label>
+      <label class="collective-profile-field">
+        <span>Grupo</span>
+        {{ grupo_selecao(bloco.categoria) }}
+      </label>
+      <input type="hidden" name="prioridade" value="{{ bloco.prioridade or 2 }}">
+      <input type="hidden" name="ordem" value="{{ bloco.ordem }}">
+      <label class="scout-highlight-toggle"><input type="checkbox" name="destaque" value="true" {% if bloco.destaque %}checked{% endif %}><span>Leitura fácil</span></label>
+      <div class="scout-row-actions">
+        <button class="save" type="submit">Guardar</button>
+        <button type="submit" formaction="/scouting/coletivo/blocos/{{ bloco.id }}/eliminar" formnovalidate class="remove" aria-label="Eliminar {{ bloco.titulo }}" onclick="return confirm('Eliminar esta característica?')">×</button>
+      </div>
+    </form>
+    {% else %}
+    <p class="scouting-empty-inline">Ainda não existem características coletivas avaliadas.</p>
+    {% endfor %}
+  </div>
+
+  <details class="scouting-editor collective-profile-editor" open>
+    <summary>Adicionar característica coletiva</summary>
+    <form method="POST" action="/scouting/adversarios/{{ adversario.id }}/coletivo/blocos"
+      class="scout-add-form collective-profile-add" data-studio-async data-studio-refresh="collective-profile-rating" data-studio-reset="true">
+      <input type="hidden" name="tipo" value="perfil">
+      <label>Característica<input name="titulo" class="ds-input" maxlength="160" placeholder="Ex.: P&R central" required></label>
+      <label>Grupo{{ grupo_selecao('Ataque') }}</label>
+      <label class="collective-profile-observation">Observação<input name="descricao" class="ds-input" maxlength="320" placeholder="Contexto curto (opcional)"></label>
+      <div class="collective-profile-rating"><span class="scout-field-label">Avaliação</span>{{ escala('nova característica coletiva', 0) }}</div>
+      <label class="scout-highlight-toggle"><input type="checkbox" name="destaque" value="true" checked><span>Mostrar na leitura fácil</span></label>
+      <button class="ds-button-primary" type="submit">Adicionar característica</button>
+    </form>
+  </details>
 </section>
-<datalist id="grupos-perfil-coletivo"><option value="Ataque"><option value="Defesa"></datalist>
-<script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('#perfil-coletivo-avaliacao [name="categoria"]').forEach(function(input){input.setAttribute('list','grupos-perfil-coletivo');input.setAttribute('required','required');input.placeholder='Ataque ou Defesa'})})</script>
