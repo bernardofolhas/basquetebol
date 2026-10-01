@@ -10,7 +10,7 @@ function studio(options = {}) {
   vm.runInNewContext(source.replace('  init();', `
     globalThis.api = { drawLine, cleanDrawnLine, normalizeScene, stateFor, continuationObjects,
       animatedObjects, previewAt, previewDuration, zigzagPoints, pointAlong, preparePreview,
-      togglePreview, pausePreview, seekPreview, previewTick, saveScene, saveNotes,
+      togglePreview, pausePreview, seekPreview, previewTick, saveScene, saveNotes, convertLegacyScene,
       times: { read: PREVIEW_READ_MS, move: PREVIEW_MOVE_MS },
       playback() { return { playing: previewPlaying, elapsed: previewElapsed }; },
       pending() { return { timers: saveTimers.size, queues: saveQueues.size, unsaved: Array.from(unsavedScenes) }; },
@@ -99,6 +99,40 @@ test('autosave keeps pending drawings from different scenes and snapshots the la
   assert.equal(env.requests.length, 2);
   assert.equal(env.requests.find(r => r.url.includes('/1/')).payload.estado.objectos[0].x, 10);
   assert.equal(api.pending().unsaved.length, 0);
+});
+
+test('training scenes save drawings and notes through exercise routes', async () => {
+  const env = environment();
+  Object.assign(env.options.document.querySelector('[data-playbook-studio]').dataset, { trainingExercise: 'true', setplayId: '42' });
+  const api = studio(env.options), field = scene(5, [marker('p', 10, 20)]);
+  api.setScenes([field]);
+  await api.saveScene(field, true);
+  await api.saveNotes(field, 'Passar e cortar', true);
+
+  assert.equal(env.requests[0].url, '/treino/exercicios/42/desenho');
+  assert.equal(env.requests[0].payload.numero, 5);
+  assert.equal(env.requests[0].payload.estado.campoTipo, 'meio');
+  assert.equal(env.requests[1].url, '/treino/exercicios/42/studio/cenas/5/observacao-json');
+  assert.equal(env.requests[1].payload.observacao, 'Passar e cortar');
+});
+
+test('a legacy exercise drawing is converted before the Studio saves it', async () => {
+  const env = environment();
+  env.options.window.TacticalLegacy = {
+    decomporImagem: () => [{ tipo: 'recorte', x: 4, y: 8 }],
+    aguardarRecortes: async () => {},
+    eRecorte: () => false
+  };
+  env.options.Image = class {
+    set src(value) { this.value = value; queueMicrotask(() => this.onload()); }
+  };
+  const api = studio(env.options);
+  const field = api.normalizeScene({ id: 1, desenho: 'data:image/png;base64,dGVzdA==', estado: { campoTipo: 'meio' } });
+  api.setScenes([field]);
+  await api.saveScene(field, true);
+
+  assert.equal(env.requests[0].payload.estado.objectos.length, 1);
+  assert.equal(field.converted, true);
 });
 
 test('notes retain their original scene and a drawing success cannot hide a failed save', async () => {

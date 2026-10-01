@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   {% set identidade = request.state.identidade_clube|default({}, true) %}
-  <title>{{ setplay.nome }} | Playbook Studio</title>
+  <title>{{ setplay.nome }} | {{ 'Studio de Treino' if modo_treino|default(false) else 'Playbook Studio' }}</title>
   <meta name="theme-color" content="#11100e">
   <meta name="csrf-token" content="{{ request.session.get('_csrf', '') }}">
   {% if identidade.logo_principal %}
@@ -18,20 +18,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/playbook-studio.css?v=20261001-1">
   <script defer src="/static/js/tactical-legacy.js?v=20260907-1"></script>
-  <script defer src="/static/js/playbook-studio.js?v=20261001-2"></script>
+  <script defer src="/static/js/playbook-studio.js?v=20261001-3"></script>
 </head>
 <body>
-  <div class="pbs-app" data-playbook-studio data-setplay-id="{{ setplay.id }}" data-equipa-id="{{ equipa.id }}" data-imported="{{ 'true' if setplay.origem == 'ebp' else 'false' }}">
+  <div class="pbs-app" data-playbook-studio data-setplay-id="{{ setplay.id }}" data-equipa-id="{{ equipa.id }}" data-imported="{{ 'true' if setplay.origem == 'ebp' else 'false' }}" data-training-exercise="{{ 'true' if modo_treino|default(false) else 'false' }}" data-initial-scene="{{ initial_scene|default('', true) }}">
     <header class="pbs-topbar">
       <div class="pbs-topbar-start">
-        <a class="pbs-icon-button pbs-back" href="{{ url_voltar|default('/playbook/equipas/' ~ equipa.id, true) }}" aria-label="Voltar ao Playbook" title="Voltar ao Playbook">
+        <a class="pbs-icon-button pbs-back" href="{{ url_voltar|default('/playbook/equipas/' ~ equipa.id, true) }}" aria-label="{{ 'Voltar ao plano de treino' if modo_treino|default(false) else 'Voltar ao Playbook' }}" title="Voltar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
         </a>
         {% if identidade.logo_principal %}<img class="pbs-club-mark" src="{{ identidade.logo_principal }}" alt="">{% endif %}
-        <button type="button" class="pbs-play-title" data-open-details>
+        {% if modo_treino|default(false) %}<div class="pbs-play-title">{% else %}<button type="button" class="pbs-play-title" data-open-details>{% endif %}
           <strong data-play-title>{{ setplay.nome }}</strong>
           <span>{{ setplay.categoria or 'Sem categoria' }}</span>
-        </button>
+        {% if modo_treino|default(false) %}</div>{% else %}</button>{% endif %}
       </div>
 
       {% if setplay.origem != 'ebp' %}
@@ -57,7 +57,7 @@
       <div class="pbs-topbar-actions">
         <span class="pbs-save-state" data-save-state role="status" aria-live="polite"><i></i>Guardado</span>
         <button type="button" class="pbs-button pbs-save-retry" data-retry-save>Voltar a guardar</button>
-        <a class="pbs-button pbs-button-quiet" href="/playbook/setplays/{{ setplay.id }}/pdf">Exportar PDF</a>
+        <a class="pbs-button pbs-button-quiet" href="{% if modo_treino|default(false) %}/treino/sessoes/{{ sessao_id }}/pdf{% else %}/playbook/setplays/{{ setplay.id }}/pdf{% endif %}">Exportar PDF</a>
         <button type="button" class="pbs-button pbs-button-dark" data-open-preview>Ver animação</button>
         <button type="button" class="pbs-icon-button" data-share title="Copiar ligação" aria-label="Copiar ligação">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.5-4.4M8.2 13.2l7.5 4.4"/></svg>
@@ -66,14 +66,14 @@
     </header>
 
     <div class="pbs-workspace">
-      <aside class="pbs-scenes-panel" aria-label="Cenas da jogada">
+      <aside class="pbs-scenes-panel" aria-label="{{ 'Cenas do exercício' if modo_treino|default(false) else 'Cenas da jogada' }}">
         <div class="pbs-panel-heading">
           <span>Cenas</span>
           <button type="button" class="pbs-round-add" data-add-scene aria-label="Adicionar cena" title="Adicionar cena">+</button>
         </div>
         <div class="pbs-scenes" data-scenes-list></div>
         <div class="pbs-scenes-empty" data-scenes-empty>
-          <span>Começa a jogada</span>
+          <span>{{ 'Começa o exercício' if modo_treino|default(false) else 'Começa a jogada' }}</span>
           <button type="button" data-add-scene>Adicionar primeira cena</button>
         </div>
       </aside>
@@ -157,7 +157,7 @@
       <button type="button" data-mobile-scenes>Cenas</button>
       {% if setplay.origem != 'ebp' %}<button type="button" data-mobile-tools>Ferramentas</button>{% endif %}
       <button type="button" data-mobile-inspector>Sequência</button>
-      <button type="button" data-open-preview>Ver jogada</button>
+      <button type="button" data-open-preview>{{ 'Ver exercício' if modo_treino|default(false) else 'Ver jogada' }}</button>
     </div>
   </div>
 
@@ -188,7 +188,7 @@
     </div>
   </dialog>
 
-  <dialog class="pbs-dialog pbs-details-dialog" data-details-dialog>
+  {% if not modo_treino|default(false) %}<dialog class="pbs-dialog pbs-details-dialog" data-details-dialog>
     <form method="dialog" class="pbs-details-form" data-details-form>
       <div class="pbs-dialog-title"><div><span>Informação da jogada</span><h2>Editar detalhes</h2></div><button value="cancel" aria-label="Fechar">×</button></div>
       <label>Título<input name="nome" required value="{{ setplay.nome }}"></label>
@@ -196,7 +196,7 @@
       <label>Descrição<textarea name="descricao" rows="4">{{ setplay.descricao or '' }}</textarea></label>
       <div class="pbs-dialog-actions"><button value="cancel">Cancelar</button><button type="submit" value="default">Guardar</button></div>
     </form>
-  </dialog>
+  </dialog>{% endif %}
 
   <div class="pbs-toast" role="status" aria-live="polite" data-toast></div>
 

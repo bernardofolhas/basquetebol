@@ -7,6 +7,7 @@
 
 from datetime import date, datetime
 import json
+from types import SimpleNamespace
 from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, Request, UploadFile, Depends
@@ -314,7 +315,7 @@ def _proximo_numero_campo(tipo: str, slots: list[int]) -> int:
     return numero
 
 
-def _mapa_desenhos(exercicio: ExercicioPlano) -> dict[str, str]:
+def _mapa_desenhos(exercicio: ExercicioPlano) -> dict:
     try:
         dados = json.loads(getattr(exercicio, "desenhos_campos", None) or "{}")
     except (TypeError, ValueError):
@@ -341,6 +342,46 @@ def _definir_desenho_campo(exercicio: ExercicioPlano, numero: int, desenho: str 
     exercicio.desenhos_campos = json.dumps(desenhos, ensure_ascii=False, separators=(",", ":"))
 
 
+def _metadados_cenas(exercicio: ExercicioPlano, chave: str) -> dict:
+    dados = _mapa_desenhos(exercicio).get(chave)
+    return dados if isinstance(dados, dict) else {}
+
+
+def _definir_metadado_cena(exercicio: ExercicioPlano, chave: str, numero: int, valor: str | None) -> None:
+    desenhos = _mapa_desenhos(exercicio)
+    metadados = dict(_metadados_cenas(exercicio, chave))
+    if valor is None:
+        metadados.pop(str(numero), None)
+    else:
+        metadados[str(numero)] = valor
+    if metadados:
+        desenhos[chave] = metadados
+    else:
+        desenhos.pop(chave, None)
+    exercicio.desenhos_campos = json.dumps(desenhos, ensure_ascii=False, separators=(",", ":"))
+
+
+def _tipo_campo_exercicio(exercicio: ExercicioPlano, numero: int, estado: dict | None = None) -> str:
+    for tipo in ((estado or {}).get("campoTipo"), _metadados_cenas(exercicio, "@tipos").get(str(numero))):
+        if tipo in IMAGENS_CAMPO:
+            return tipo
+    return _configuracao_campo(numero)[0]
+
+
+def _serializar_cena_exercicio(exercicio: ExercicioPlano, numero: int) -> dict:
+    desenho, estado = decompor_desenho_editavel(_obter_desenho_campo(exercicio, numero))
+    estado = dict(estado) if isinstance(estado, dict) else {}
+    estado.setdefault("campoTipo", _tipo_campo_exercicio(exercicio, numero, estado))
+    return {
+        "id": numero,
+        "ordem": _slots_ativos(exercicio).index(numero),
+        "observacao": _metadados_cenas(exercicio, "@notas").get(str(numero), ""),
+        "desenho": desenho,
+        "estado": estado,
+        "imagemCoach": None,
+    }
+
+
 def _slots_ativos(exercicio: ExercicioPlano) -> list[int]:
     valor = exercicio.campos_ativos
     if valor is None:
@@ -363,16 +404,21 @@ def _definir_slots_ativos(exercicio: ExercicioPlano, slots: list[int]) -> None:
 
 def _campos_exercicio(exercicio: ExercicioPlano) -> list[dict]:
     campos = []
+    contadores = {"meio": 0, "completo": 0}
     for numero in _slots_ativos(exercicio):
-        tipo, label, imagem = _configuracao_campo(numero)
         desenho, estado_desenho = decompor_desenho_editavel(_obter_desenho_campo(exercicio, numero))
+        tipo = _tipo_campo_exercicio(exercicio, numero, estado_desenho)
+        contadores[tipo] += 1
+        nome_tipo = "Campo meio" if tipo == "meio" else "Campo completo"
+        label = nome_tipo if contadores[tipo] == 1 else f"{nome_tipo} {contadores[tipo]}"
         campos.append({
             "numero": numero,
             "tipo": tipo,
             "label": label,
-            "imagem": imagem,
+            "imagem": IMAGENS_CAMPO[tipo],
             "desenho": desenho,
             "estado_desenho": estado_desenho,
+            "observacao": _metadados_cenas(exercicio, "@notas").get(str(numero), ""),
         })
     return campos
 
@@ -492,6 +538,11 @@ def _obter_equipa_id_por_exercicio(db: Session, exercicio_id: int) -> int | None
     if not exercicio:
         return None
     return _obter_equipa_id_por_plano(db, exercicio.plano_id)
+
+
+def _obter_exercicio_para_edicao(db: Session, exercicio_id: int) -> ExercicioPlano | None:
+    # Drawing, notes and scene order share one JSON field; serialize writes to avoid losing changes.
+    return db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).populate_existing().with_for_update().first()
 
 
 def _verificar_acesso_treino(utilizador, equipa_id: int | None, db: Session) -> None:
@@ -2483,6 +2534,115 @@ async def guardar_reflexao(
 
 
 # ─────────────────────────────────────────
+# PLAYBOOK STUDIO PARA OS QUADROS DE UM EXERCÍCIO
+# ─────────────────────────────────────────
+@router.get("/exercicios/{exercicio_id}/studio", response_class=HTMLResponse)
+def studio_exercicio(exercicio_id: int, request: Request, db: Session = Depends(get_db),
+                     utilizador=Depends(exigir_autenticacao)):
+    equipa_id = _obter_equipa_id_por_exercicio(db, exercicio_id)
+    _verificar_acesso_treino(utilizador, equipa_id, db)
+    exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
+    if not exercicio:
+        return RedirectResponse(url="/equipas", status_code=303)
+    equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
+    setplay = SimpleNamespace(
+        id=exercicio.id, nome=exercicio.nome or "Exercício sem título",
+        categoria=exercicio.categoria, descricao=exercicio.organizacao, origem="treino",
+    )
+    try:
+        cena_pedida = int(request.query_params.get("cena", ""))
+    except ValueError:
+        cena_pedida = None
+    slots = _slots_ativos(exercicio)
+    return templates.TemplateResponse(request, "playbook/detalhe.html", {
+        "utilizador": utilizador,
+        "equipa": equipa,
+        "setplay": setplay,
+        "categorias": CATEGORIAS_EXERCICIO,
+        "passos_studio": [_serializar_cena_exercicio(exercicio, numero) for numero in slots],
+        "initial_scene": cena_pedida if cena_pedida in slots else None,
+        "url_voltar": f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}",
+        "modo_treino": True,
+        "sessao_id": exercicio.plano.sessao_id,
+    })
+
+
+@router.post("/exercicios/{exercicio_id}/studio/cenas/novo")
+async def adicionar_cena_exercicio(exercicio_id: int, request: Request, db: Session = Depends(get_db),
+                                   utilizador=Depends(exigir_autenticacao)):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
+    exercicio = _obter_exercicio_para_edicao(db, exercicio_id)
+    if not exercicio:
+        return JSONResponse({"erro": "Exercício não encontrado."}, status_code=404)
+    dados = await request.json()
+    tipo = dados.get("tipo", "meio")
+    if tipo not in IMAGENS_CAMPO:
+        return JSONResponse({"erro": "Tipo de campo inválido."}, status_code=422)
+    slots = _slots_ativos(exercicio)
+    numero = max(slots, default=0) + 1
+    _definir_slots_ativos(exercicio, slots + [numero])
+    _definir_metadado_cena(exercicio, "@tipos", numero, tipo)
+    _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+    db.commit()
+    return JSONResponse({"sucesso": True, "passo": _serializar_cena_exercicio(exercicio, numero)})
+
+
+@router.post("/exercicios/{exercicio_id}/studio/cenas/{numero}/duplicar")
+def duplicar_cena_exercicio(exercicio_id: int, numero: int, db: Session = Depends(get_db),
+                           utilizador=Depends(exigir_autenticacao)):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
+    exercicio = _obter_exercicio_para_edicao(db, exercicio_id)
+    slots = _slots_ativos(exercicio) if exercicio else []
+    if numero not in slots:
+        return JSONResponse({"erro": "Cena não encontrada."}, status_code=404)
+    novo = max(slots) + 1
+    slots.insert(slots.index(numero) + 1, novo)
+    _definir_slots_ativos(exercicio, slots)
+    _definir_desenho_campo(exercicio, novo, _obter_desenho_campo(exercicio, numero))
+    _definir_metadado_cena(exercicio, "@tipos", novo, _tipo_campo_exercicio(exercicio, numero))
+    _definir_metadado_cena(exercicio, "@notas", novo, _metadados_cenas(exercicio, "@notas").get(str(numero)))
+    _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+    db.commit()
+    return JSONResponse({"sucesso": True, "passo": _serializar_cena_exercicio(exercicio, novo)})
+
+
+@router.post("/exercicios/{exercicio_id}/studio/cenas/reordenar")
+async def reordenar_cenas_exercicio(exercicio_id: int, request: Request, db: Session = Depends(get_db),
+                                   utilizador=Depends(exigir_autenticacao)):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
+    exercicio = _obter_exercicio_para_edicao(db, exercicio_id)
+    if not exercicio:
+        return JSONResponse({"erro": "Exercício não encontrado."}, status_code=404)
+    dados = await request.json()
+    try:
+        ordem = [int(numero) for numero in dados.get("passo_ids", [])]
+    except (TypeError, ValueError):
+        return JSONResponse({"erro": "Ordem inválida."}, status_code=422)
+    slots = _slots_ativos(exercicio)
+    if len(ordem) != len(slots) or set(ordem) != set(slots):
+        return JSONResponse({"erro": "A ordem tem de conter todas as cenas."}, status_code=422)
+    _definir_slots_ativos(exercicio, ordem)
+    _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+    db.commit()
+    return JSONResponse({"sucesso": True, "passo_ids": ordem})
+
+
+@router.post("/exercicios/{exercicio_id}/studio/cenas/{numero}/observacao-json")
+async def guardar_observacao_cena_exercicio(exercicio_id: int, numero: int, request: Request,
+                                           db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
+    exercicio = _obter_exercicio_para_edicao(db, exercicio_id)
+    if not exercicio or numero not in _slots_ativos(exercicio):
+        return JSONResponse({"erro": "Cena não encontrada."}, status_code=404)
+    dados = await request.json()
+    observacao = str(dados.get("observacao") or "").strip()[:3000]
+    _definir_metadado_cena(exercicio, "@notas", numero, observacao or None)
+    _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
+    db.commit()
+    return JSONResponse({"sucesso": True, "observacao": observacao})
+
+
+# ─────────────────────────────────────────
 # GUARDAR DESENHO DE UM EXERCÍCIO
 # URL: POST /treino/exercicios/{exercicio_id}/desenho
 # ─────────────────────────────────────────
@@ -2498,7 +2658,7 @@ async def guardar_desenho(exercicio_id: int, request: Request, db: Session = Dep
         numero = 0
     desenho_guardado = empacotar_desenho_editavel(dados.get("dados"), dados.get("estado"))
 
-    exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
+    exercicio = _obter_exercicio_para_edicao(db, exercicio_id)
 
     if not exercicio:
         return JSONResponse({"sucesso": False, "erro": "Exercício não encontrado"})
@@ -2510,6 +2670,9 @@ async def guardar_desenho(exercicio_id: int, request: Request, db: Session = Dep
         return JSONResponse({"sucesso": False, "erro": "O desenho enviado não é válido."}, status_code=400)
 
     _definir_desenho_campo(exercicio, numero, desenho_guardado)
+    estado = dados.get("estado")
+    if isinstance(estado, dict) and estado.get("campoTipo") in IMAGENS_CAMPO:
+        _definir_metadado_cena(exercicio, "@tipos", numero, estado["campoTipo"])
     slots = _slots_ativos(exercicio)
     if numero not in slots:
         slots.append(numero)
@@ -2530,7 +2693,7 @@ async def adicionar_campo_exercicio(
 ):
     resposta_json = "application/json" in request.headers.get("accept", "").lower()
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
-    exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
+    exercicio = _obter_exercicio_para_edicao(db, exercicio_id)
     if not exercicio:
         if resposta_json:
             return JSONResponse({"sucesso": False, "erro": "Exercício não encontrado."}, status_code=404)
@@ -2571,7 +2734,7 @@ async def apagar_campo_exercicio(
 ):
     resposta_json = "application/json" in request.headers.get("accept", "").lower()
     _verificar_acesso_treino(utilizador, _obter_equipa_id_por_exercicio(db, exercicio_id), db)
-    exercicio = db.query(ExercicioPlano).filter(ExercicioPlano.id == exercicio_id).first()
+    exercicio = _obter_exercicio_para_edicao(db, exercicio_id)
     if not exercicio or numero <= 0:
         if resposta_json:
             return JSONResponse({"sucesso": False, "erro": "Campo ou exercício inválido."}, status_code=404)
@@ -2583,6 +2746,8 @@ async def apagar_campo_exercicio(
         return RedirectResponse(url=f"/treino/sessoes/{exercicio.plano.sessao_id}#exercicio-{exercicio.id}", status_code=303)
     _definir_slots_ativos(exercicio, [slot for slot in _slots_ativos(exercicio) if slot != numero])
     _definir_desenho_campo(exercicio, numero, None)
+    _definir_metadado_cena(exercicio, "@tipos", numero, None)
+    _definir_metadado_cena(exercicio, "@notas", numero, None)
     _marcar_sessao_como_alterada_manual(exercicio.plano.sessao)
     db.commit()
     if resposta_json:

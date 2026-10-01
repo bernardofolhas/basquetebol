@@ -35,12 +35,12 @@
 {% endmacro %}
 
 {% macro campo_previsualizacao(ex_id, campo) %}
-<figure class="training-drawing-preview" data-drawing-preview-field="{{ campo.numero }}" role="button" tabindex="0" onclick="abrirEditorDesenho({{ ex_id }}, {{ campo.numero }})" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); abrirEditorDesenho({{ ex_id }}, {{ campo.numero }}); }" aria-label="Editar {{ campo.label }}" title="Editar {{ campo.label }}">
+<a class="training-drawing-preview" data-drawing-preview-field="{{ campo.numero }}" href="/treino/exercicios/{{ ex_id }}/studio?cena={{ campo.numero }}" aria-label="Editar {{ campo.label }} no Studio" title="Editar {{ campo.label }} no Studio">
     <div class="training-drawing-preview-stage" style="aspect-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %};">
         <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}" class="training-drawing-court">
         <img src="{{ campo.desenho|default('', true)|e }}" alt="Desenho de {{ campo.label }}" class="training-drawing-overlay" data-drawing-preview="{{ ex_id }}-{{ campo.numero }}" {% if not campo.desenho %}hidden{% endif %}>
     </div>
-</figure>
+</a>
 {% endmacro %}
 
 {% call equipa_contexto(
@@ -634,7 +634,7 @@
                                 <section class="training-exercise-visuals">
                                     <header>
                                         <h4>Quadros táticos</h4>
-                                        <button type="button" onclick="abrirEditorDesenho({{ ex.id }})" class="training-drawing-edit" aria-label="Acrescentar campo tático" title="Acrescentar campo tático">+</button>
+                                        <a href="/treino/exercicios/{{ ex.id }}/studio" class="training-drawing-edit" aria-label="Abrir editor tático no Studio" title="Abrir editor tático no Studio">+</a>
                                     </header>
                                     <div class="training-drawing-preview-grid">
                                         {% for campo in ex.campos_ui %}

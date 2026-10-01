@@ -9,6 +9,7 @@
     completo: { width: 697, height: 1222, src: "/static/campos/campo_completo.png?v=20260908-madeira-1" },
   };
   const imported = root.dataset.imported === "true";
+  const training = root.dataset.trainingExercise === "true";
   const setplayId = Number(root.dataset.setplayId);
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || "";
   const canvas = document.querySelector("#pbs-board");
@@ -29,7 +30,7 @@
   const pathMetrics = new WeakMap();
 
   let scenes = (data.passos || []).map(normalizeScene).sort((a, b) => a.ordem - b.ordem);
-  let activeId = scenes[0]?.id || null;
+  let activeId = Number(root.dataset.initialScene) || scenes[0]?.id || null;
   let tool = "selecionar";
   let selectedId = null;
   let gesture = null;
@@ -102,9 +103,10 @@
       imagemCoach: raw.imagemCoach || null,
       courtType,
       objects,
+      legacyBackground: saved.fundoLegado || null,
       undo: [],
       redo: [],
-      converted: Boolean(saved.objectos),
+      converted: Boolean(saved.objectos) && !saved.fundoLegado,
     };
   }
 
@@ -470,6 +472,8 @@
 
   async function saveScene(scene = activeScene(), immediate = false) {
     if (!scene || imported || !canvas) return;
+    try { await convertLegacyScene(scene); }
+    catch (error) { failedSaves.add(`drawing:${scene.id}`); refreshSaveStatus(); toast(error.message); if (immediate) throw error; return; }
     clearTimeout(saveTimers.get(scene.id));
     saveTimers.delete(scene.id);
     unsavedScenes.add(scene.id);
@@ -484,7 +488,8 @@
         const output = document.createElement("canvas"); output.width = court.width; output.height = court.height;
         render(output.getContext("2d"), savedScene.objects, false);
         const image = output.toDataURL("image/png");
-        await api(`/playbook/passos/${scene.id}/desenho`, { method: "POST", body: JSON.stringify({ dados: image, estado: stateFor(savedScene) }) });
+        const url = training ? `/treino/exercicios/${setplayId}/desenho` : `/playbook/passos/${scene.id}/desenho`;
+        await api(url, { method: "POST", body: JSON.stringify({ numero: scene.id, dados: image, estado: stateFor(savedScene) }) });
         if (scene.saveRevision === revision) { scene.desenho = image; unsavedScenes.delete(scene.id); }
         failedSaves.delete(`drawing:${scene.id}`); refreshSaveStatus(); renderScenes();
         return true;
@@ -503,15 +508,26 @@
   }
 
   async function convertLegacyScene(scene) {
-    if (!scene || scene.converted || scene.objects.length || !scene.desenho || !window.TacticalLegacy) return;
-    scene.converted = true;
-    const image = new Image();
-    image.onload = () => {
-      const court = dimensions(scene);
-      scene.objects = window.TacticalLegacy.decomporImagem(image, court.width, court.height).map((object) => ({ ...object, id: uid() }));
-      render(); renderScenes();
-    };
-    image.src = scene.desenho;
+    if (!scene || scene.converted || (!scene.legacyBackground && scene.objects.length) || !(scene.legacyBackground || scene.desenho)) return;
+    if (scene.conversionPromise) return scene.conversionPromise;
+    if (!window.TacticalLegacy) throw new Error("Não foi possível carregar o desenho antigo.");
+    scene.conversionPromise = new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        try {
+          const court = dimensions(scene);
+          const legacy = window.TacticalLegacy.decomporImagem(image, court.width, court.height).map((object) => ({ ...object, id: uid() }));
+          scene.objects = scene.legacyBackground ? [...legacy, ...scene.objects] : legacy;
+          scene.legacyBackground = null;
+          scene.converted = true;
+          if (activeId === scene.id) render();
+          renderScenes(); resolve();
+        } catch (error) { scene.conversionPromise = null; reject(error); }
+      };
+      image.onerror = () => { scene.conversionPromise = null; reject(new Error("Não foi possível carregar o desenho antigo.")); };
+      image.src = scene.legacyBackground || scene.desenho;
+    });
+    return scene.conversionPromise;
   }
 
   function renderThumbnail(scene, holder) {
@@ -561,7 +577,8 @@
 
   async function persistSceneOrder() {
     scenes.forEach((scene, index) => { scene.ordem = index; });
-    try { await api(`/playbook/setplays/${setplayId}/passos/reordenar`, { method: "POST", body: JSON.stringify({ passo_ids: scenes.map((scene) => scene.id) }) }); }
+    const url = training ? `/treino/exercicios/${setplayId}/studio/cenas/reordenar` : `/playbook/setplays/${setplayId}/passos/reordenar`;
+    try { await api(url, { method: "POST", body: JSON.stringify({ passo_ids: scenes.map((scene) => scene.id) }) }); }
     catch (error) { toast(error.message); }
   }
 
@@ -580,7 +597,8 @@
     try {
       const previous = activeScene();
       if (previous && !imported) await saveScene(previous, true);
-      const payload = await api(`/playbook/setplays/${setplayId}/passos/novo`, { method: "POST", body: "{}" });
+      const url = training ? `/treino/exercicios/${setplayId}/studio/cenas/novo` : `/playbook/setplays/${setplayId}/passos/novo`;
+      const payload = await api(url, { method: "POST", body: JSON.stringify({ tipo: previous?.courtType || "meio" }) });
       const scene = normalizeScene(payload.passo);
       if (previous && !imported) {
         scene.courtType = previous.courtType;
@@ -595,7 +613,8 @@
   async function duplicateScene(scene) {
     try {
       await saveScene(scene, true);
-      const payload = await api(`/playbook/passos/${scene.id}/duplicar`, { method: "POST", body: "{}" });
+      const url = training ? `/treino/exercicios/${setplayId}/studio/cenas/${scene.id}/duplicar` : `/playbook/passos/${scene.id}/duplicar`;
+      const payload = await api(url, { method: "POST", body: "{}" });
       const copy = normalizeScene(payload.passo); const index = scenes.indexOf(scene); scenes.splice(index + 1, 0, copy);
       activeId = copy.id; renderScenes(); activateScene(copy.id); toast("Cena duplicada.");
     } catch (error) { toast(error.message); }
@@ -607,7 +626,8 @@
       clearTimeout(saveTimers.get(scene.id)); saveTimers.delete(scene.id);
       clearTimeout(notesTimers.get(scene.id)); notesTimers.delete(scene.id);
       await Promise.all([saveQueues.get(scene.id), notesQueues.get(scene.id)]);
-      await api(`/playbook/passos/${scene.id}/eliminar`, { method: "POST", body: "{}" });
+      const url = training ? `/treino/exercicios/${setplayId}/campos/${scene.id}/apagar` : `/playbook/passos/${scene.id}/eliminar`;
+      await api(url, { method: "POST", body: "{}" });
       unsavedScenes.delete(scene.id); unsavedNotes.delete(scene.id);
       failedSaves.delete(`drawing:${scene.id}`); failedSaves.delete(`notes:${scene.id}`); refreshSaveStatus();
       const index = scenes.indexOf(scene); scenes.splice(index, 1);
@@ -626,7 +646,7 @@
       const image = document.querySelector("[data-imported-image]"); const empty = document.querySelector("[data-imported-empty]");
       const src = scene?.imagemCoach || scene?.desenho || ""; image.src = src; image.hidden = !src; empty.hidden = Boolean(src);
       setupImportedForms(scene);
-    } else { syncCourt(scene); render(); convertLegacyScene(scene); updatePlayerNumber(nextPlayerNumber(scene)); }
+    } else { syncCourt(scene); render(); convertLegacyScene(scene).catch((error) => toast(error.message)); updatePlayerNumber(nextPlayerNumber(scene)); }
     renderScenes(); renderTimeline();
   }
 
@@ -820,7 +840,8 @@
     unsavedNotes.add(scene.id); failedSaves.delete(`notes:${scene.id}`); refreshSaveStatus();
     const run = async () => {
       try {
-        await api(`/playbook/passos/${scene.id}/observacao-json`, { method: "POST", body: JSON.stringify({ observacao: value }) });
+        const url = training ? `/treino/exercicios/${setplayId}/studio/cenas/${scene.id}/observacao-json` : `/playbook/passos/${scene.id}/observacao-json`;
+        await api(url, { method: "POST", body: JSON.stringify({ observacao: value }) });
         if (scene.notesRevision === revision) unsavedNotes.delete(scene.id);
         failedSaves.delete(`notes:${scene.id}`); refreshSaveStatus();
       } catch (error) { failedSaves.add(`notes:${scene.id}`); refreshSaveStatus(); toast(error.message); }
@@ -1030,8 +1051,10 @@
     wrap.style.width = `${court.width * scale}px`; wrap.style.height = `${court.height * scale}px`;
   }
 
-  function openPreview() {
+  async function openPreview() {
     if (!scenes.length) { toast("Adiciona uma cena antes de pré-visualizar."); return; }
+    try { await Promise.all(scenes.map(convertLegacyScene)); }
+    catch (error) { toast(error.message); return; }
     pausePreview(); previewElapsed = 0; previewSceneId = null; preparePreview();
     document.querySelector("[data-preview-dialog]").showModal(); renderPreview(0); togglePreview();
   }
@@ -1099,7 +1122,7 @@
   async function init() {
     document.querySelectorAll('form[method="post"]').forEach((form) => { if (!form.querySelector('[name="csrf_token"]')) { const input = document.createElement("input"); input.type = "hidden"; input.name = "csrf_token"; input.value = csrf; form.prepend(input); } });
     bindEvents(); renderScenes();
-    if (!scenes.length && !imported) await addScene(); else activateScene(activeId);
+    if (!scenes.length && !imported && !training) await addScene(); else activateScene(activeId);
     setTool("selecionar");
     const stage = document.querySelector("[data-stage]");
     if (stage && window.ResizeObserver) {
