@@ -752,12 +752,12 @@ RELATORIOS_CONFIG = {
             _secao("estatisticas", "Estatísticas da equipa", "Apenas os indicadores selecionados.", ("completo", "facil")),
             _secao("perfil", "Perfil coletivo", "Como a equipa joga, com avaliação simples.", ("completo", "facil", "a3")),
             _secao("analise", "Análise técnico-tática", "Pontos fortes e fragilidades no ataque e na defesa.", ("completo",)),
-            _secao("regras_coberturas", "Regras e coberturas", "Opções defensivas usadas pelo adversário.", ("completo", "facil", "a3")),
-            _secao("jogadores_chave", "Jogadores-chave", "Lideres e prioridades individuais.", ("completo", "facil", "a3")),
+            _secao("regras_coberturas", "Regras defensivas mais utilizadas", "Opções defensivas usadas pelo adversário.", ("completo", "facil", "a3")),
+            _secao("jogadores_chave", "Jogadores mais influentes", "Lideres e prioridades individuais.", ("completo", "facil", "a3")),
             _secao("resposta", "Nossa resposta", "Instruções para contrariar o adversário.", ("completo", "facil", "a3")),
             _secao("prioridades", "Prioridades", "Prioridades ofensivas e defensivas.", ("completo", "facil", "a3")),
             _secao("situacoes", "Transição, ressalto e especiais", "Situações específicas destacadas.", ("completo", "facil")),
-            _secao("diagramas", "Ações principais / Playbook", "Jogadas selecionadas, apresentadas no final.", ("completo", "facil", "a3")),
+            _secao("diagramas", "Ações principais", "Conceitos ofensivos selecionados, apresentados no final.", ("completo", "facil", "a3")),
         ],
     },
     "plano-jogo": {
@@ -822,6 +822,12 @@ STAT_CODES = {
     "mais_menos": "+/-",
     "eficiencia": "EFF",
 }
+
+STAT_HIGHLIGHT_OPTIONS = [
+    (STAT_CODES[campo], f"{STAT_LABELS[campo]} ({STAT_CODES[campo]})")
+    for campo in STAT_FIELDS
+] + [(codigo, codigo) for codigo in ("FG%", "2P%", "3P%", "LL%")]
+STAT_HIGHLIGHT_CODES = {codigo for codigo, _ in STAT_HIGHLIGHT_OPTIONS}
 
 PERFIS_CONTACTOS = {"superadministrador", "administrador", "coordenador", "secretaria"}
 
@@ -1110,6 +1116,19 @@ def _indicadores_coletivos(media: dict, selecionados: list[str]) -> list[dict]:
     return indicadores
 
 
+def _destaque_estatistico_coletivo(codigo, tom, indicadores: list[dict]) -> dict | None:
+    codigo = str(codigo or "").strip()
+    tom = str(tom or "").strip().lower()
+    if codigo in STAT_HIGHLIGHT_CODES and tom in {"positivo", "negativo"}:
+        if any(indicador["nome"] == codigo for indicador in indicadores):
+            return {"codigo": codigo, "tom": tom}
+    return None
+
+
+def _acoes_principais_coletivas(adversario) -> list:
+    return [entrada for entrada in adversario.conceitos_ofensivos if entrada.setplay]
+
+
 def _grupos_resposta_coletiva(blocos: dict[str, list]) -> list[dict]:
     grupos = [
         ("Sem bola", "resposta", ("resposta",)),
@@ -1163,7 +1182,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
                     jogadores_destaque_ids.append(int(valor))
                 if len(jogadores_destaque_ids) == 4:
                     break
-        setplays = [r.setplay for r in alvo.conceitos_ofensivos] + [r.setplay for r in alvo.momentos_playbook]
+        setplays = [r.setplay for r in alvo.conceitos_ofensivos]
         itens_coletivos = _itens_por_categoria(alvo.itens_coletivos)
         media_exibida = _media_exibida_coletiva(alvo)
         blocos_coletivos = {}
@@ -1184,6 +1203,10 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         jogos_referencia = jogos_em_preparacao(
             [ligacao.jogo for ligacao in alvo.jogos if ligacao.jogo]
         )
+        indicadores_coletivos = _indicadores_coletivos(media_exibida, stat_fields)
+        destaque_estatistico = _destaque_estatistico_coletivo(
+            dados.get("estatistica_destaque"), dados.get("estatistica_destaque_tom"), indicadores_coletivos
+        )
         cinco_previsto, rotacoes_previstas, rotacoes_por_posicao = _rotacoes_coletivas_por_posicao(alvo)
         contexto.update(
             adversario=alvo,
@@ -1194,13 +1217,11 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             ),
             opcoes_defensivas_facil=_opcoes_defensivas_coletivas(alvo.opcoes_defensivas),
             itens_coletivos=itens_coletivos,
-            jogadas_coletivas=[
-                entrada for entrada in (alvo.conceitos_ofensivos + alvo.momentos_playbook)
-                if entrada.setplay
-            ],
+            jogadas_coletivas=_acoes_principais_coletivas(alvo),
             jogadores_prioritarios=_jogadores_prioritarios_coletivo(alvo, jogadores_destaque_ids),
             media_exibida=media_exibida,
-            indicadores_coletivos=_indicadores_coletivos(media_exibida, stat_fields),
+            indicadores_coletivos=indicadores_coletivos,
+            destaque_estatistico=destaque_estatistico,
             perfil_ataque=[bloco for bloco in perfil_facil if "defesa" not in (bloco["categoria"] or "").lower()],
             perfil_defesa=[bloco for bloco in perfil_facil if "defesa" in (bloco["categoria"] or "").lower()],
             respostas_grupos=_grupos_resposta_coletiva(blocos_coletivos),
@@ -1306,6 +1327,9 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
         "predefinicao": predefinicao,
         "selecionadas": selecionadas,
         "estatisticas_selecionadas": configuracao_guardada.get("estatisticas", []),
+        "estatisticas_destaque_opcoes": STAT_HIGHLIGHT_OPTIONS if tipo == "scouting-coletivo" else [],
+        "estatistica_destaque_selecionada": configuracao_guardada.get("estatistica_destaque", "") if configuracao_guardada.get("estatistica_destaque") in STAT_HIGHLIGHT_CODES else "",
+        "estatistica_destaque_tom": configuracao_guardada.get("estatistica_destaque_tom", "positivo") if configuracao_guardada.get("estatistica_destaque_tom") in {"positivo", "negativo"} else "positivo",
         "jogadores_destaque_selecionados": configuracao_guardada.get("jogadores_destaque", []),
         "padroes": {f: _secoes_padrao(tipo, f) for f in FORMATOS_RELATORIO},
         "estatisticas_disponiveis": [(campo, STAT_LABELS[campo]) for campo in STAT_FIELDS]
@@ -1439,6 +1463,8 @@ async def guardar_predefinicao_relatorio(tipo: str, alvo_id: int, request: Reque
     registo.secoes = json.dumps(secoes)
     registo.configuracao = json.dumps({
         "estatisticas": [campo for campo in dados.getlist("estatisticas") if campo in STAT_FIELDS],
+        "estatistica_destaque": str(dados.get("estatistica_destaque") or "").strip() if tipo == "scouting-coletivo" and str(dados.get("estatistica_destaque") or "").strip() in STAT_HIGHLIGHT_CODES else "",
+        "estatistica_destaque_tom": str(dados.get("estatistica_destaque_tom") or "").strip().lower() if tipo == "scouting-coletivo" and str(dados.get("estatistica_destaque_tom") or "").strip().lower() in {"positivo", "negativo"} else "positivo",
         "jogadores_destaque": [int(valor) for valor in dados.getlist("jogadores_destaque") if str(valor).isdigit()][:4],
     })
     db.commit()

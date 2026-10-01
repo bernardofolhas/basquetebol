@@ -1,9 +1,11 @@
+import base64
 from datetime import date
 from io import BytesIO
 import os
 from pathlib import Path
 from types import SimpleNamespace as Item
 
+from PIL import Image, ImageDraw
 from pypdf import PdfReader
 from starlette.templating import Jinja2Templates
 from weasyprint import HTML
@@ -12,7 +14,9 @@ from formatacao import data_pt
 from models.scouting import STAT_FIELDS
 from paths import STATIC_DIR, TEMPLATES_DIR
 from routers.exportacoes import (
+    _acoes_principais_coletivas,
     _caracteristicas_cinco_coletivo,
+    _destaque_estatistico_coletivo,
     _grupos_resposta_coletiva,
     _indicadores_coletivos,
     _media_exibida_coletiva,
@@ -20,6 +24,40 @@ from routers.exportacoes import (
     _opcoes_defensivas_coletivas,
 )
 from services.desenho_service import imagem_estatica_data_uri
+from services.pdf_service import preparar_contexto_pdf, simbolo_cabecalho_sem_fundo
+
+
+def test_simbolos_opacos_assumem_o_fundo_do_cabecalho(monkeypatch):
+    imagem = Image.new("RGB", (64, 64), "#080808")
+    ImageDraw.Draw(imagem).ellipse((12, 12, 52, 52), fill="#f4c542")
+    buffer = BytesIO()
+    imagem.save(buffer, format="PNG")
+    uri = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+
+    contexto = preparar_contexto_pdf(
+        Item(state=Item(identidade_clube=None)),
+        {"tipo_relatorio": "scouting-coletivo", "simbolo_adversario": uri},
+    )
+    resultado = Image.open(BytesIO(base64.b64decode(contexto["simbolo_adversario"].split(",", 1)[1])))
+    assert resultado.getpixel((0, 0))[3] == 0
+    assert resultado.getpixel((32, 32)) == (244, 197, 66, 255)
+
+    monkeypatch.setattr("services.pdf_service.caminho_ficheiro_logo", lambda _base, url: Path(__file__) if url else None)
+    monkeypatch.setattr("services.pdf_service.imagem_estatica_data_uri", lambda _caminho, _mime: uri)
+    contexto_clube = preparar_contexto_pdf(
+        Item(state=Item(identidade_clube=None)),
+        {"tipo_relatorio": "scouting-coletivo", "identidade": {"logo_principal": "/static/simbolo-clube.png"}},
+    )
+    clube = Image.open(BytesIO(base64.b64decode(contexto_clube["identidade"]["logo_principal"].split(",", 1)[1])))
+    assert clube.getpixel((0, 0))[3] == 0
+    assert clube.getpixel((32, 32)) == (244, 197, 66, 255)
+
+    imagem_transparente = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    ImageDraw.Draw(imagem_transparente).ellipse((12, 12, 52, 52), fill="#f4c542")
+    buffer = BytesIO()
+    imagem_transparente.save(buffer, format="PNG")
+    uri_transparente = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+    assert simbolo_cabecalho_sem_fundo(uri_transparente) == uri_transparente
 
 
 def test_medias_calculadas_e_percentagens_sem_media_manual():
@@ -34,6 +72,17 @@ def test_medias_calculadas_e_percentagens_sem_media_manual():
 
     assert media["pontos"] == 85
     assert indicadores == [{"nome": "PTS", "valor": "85.0"}, {"nome": "2P%", "valor": "50%"}]
+    assert _destaque_estatistico_coletivo("2P%", "positivo", indicadores) == {"codigo": "2P%", "tom": "positivo"}
+    assert _destaque_estatistico_coletivo("PTS", "negativo", indicadores) == {"codigo": "PTS", "tom": "negativo"}
+    assert _destaque_estatistico_coletivo("FG%", "positivo", indicadores) is None
+    assert _destaque_estatistico_coletivo("PTS", "neutro", indicadores) is None
+
+
+def test_acoes_principais_nao_incluem_momentos_reservados_ao_playbook():
+    conceito = Item(setplay=Item(nome="Horns"))
+    momento = Item(setplay=Item(nome="ATO"))
+    adversario = Item(conceitos_ofensivos=[conceito], momentos_playbook=[momento])
+    assert _acoes_principais_coletivas(adversario) == [conceito]
 
 
 def test_respostas_agrupadas_ignoram_blocos_nao_destacados():
@@ -94,7 +143,7 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
         "identidade": {"cor_principal": "#d60b18", "cor_principal_escura": "#a00812", "texto_sobre_principal": "#ffffff", "logo_principal": None},
         "alvo_nome": "Rivals BC", "simbolo_adversario": None, "nome_autor": "Treinador",
         "adversario": Item(observacoes="Equipa rápida e agressiva", momentos_playbook=jogadas),
-        "jogo_referencia": Item(competicao="Liga", data=date(2026, 10, 12)),
+        "jogo_referencia": Item(competicao="Liga", data=date(2026, 10, 12), hora="15:00", local="Pavilhão Municipal"),
         "secoes_set": {"identidade", "chaves", "cinco_rotacao", "jogadores_chave", "estatisticas", "perfil", "resposta", "diagramas"},
         "blocos_coletivos": {"chave": chaves, "resposta": [resposta]},
         "perfil_ataque": ataque, "perfil_defesa": defesa,
@@ -126,18 +175,39 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
     for texto in ("Gus Goerzen", "Lamine Banora", "Thomas Jervis", "Participação no ressalto ofensivo", "Criação de lançamento após bloqueio direto"):
         assert texto in texto_pdf
     assert "Cinco inicial" in html
-    assert "Números da equipa" in html
+    assert "<small>Dia</small>12/10/2026" in html
+    assert "<small>Hora</small>15:00" in html
+    assert "<small>Pavilhão</small>Pavilhão Municipal" in html
+    assert "<small>Treinador</small>" not in html
+    assert "Treinador" not in texto_pdf
+    assert "Estatística - Média de época" in html
+    assert "Jogadores mais influentes" in html
+    assert ".priority-player{display:flex;" in html
+    assert ".priority-copy{display:block;flex:1 1 0;min-width:0}" in html
+    assert "Ações principais" in html
+    assert "Ações principais / Playbook" not in html
+    assert 'class="stat is-positive"' not in html
     assert "Perfil coletivo" in html
     assert "Nossa resposta" in html
     assert "Chaves da equipa" in html
     assert "P&amp;R central" in html
     assert "Forçar P&R lateral" not in html
-    assert "Regras e coberturas" not in html
+    assert "Regras defensivas mais utilizadas" not in html
+
+    contexto["destaque_estatistico"] = {"codigo": "PTS", "tom": "positivo"}
+    positivo = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert '<div class="stat is-positive"><small>PTS</small>' in positivo
+    assert positivo.count('class="stat is-positive"') == 1
+    contexto["destaque_estatistico"] = {"codigo": "2P%", "tom": "negativo"}
+    negativo = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert '<div class="stat is-negative"><small>2P%</small>' in negativo
+    assert negativo.count('class="stat is-negative"') == 1
+    contexto["destaque_estatistico"] = None
 
     contexto["secoes_set"].add("regras_coberturas")
     contexto["opcoes_defensivas_facil"] = [{"nome": "Bloqueios diretos centrais", "notas": "Push ou switch"}]
     com_defesa = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
-    assert "Regras e coberturas" in com_defesa
+    assert "Regras defensivas mais utilizadas" in com_defesa
     assert "Push ou switch" in com_defesa
     texto_pdf = "\n".join(
         pagina.extract_text() for pagina in PdfReader(BytesIO(HTML(string=com_defesa).write_pdf())).pages
@@ -145,7 +215,7 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
     assert "Push ou switch" in texto_pdf
     contexto["opcoes_defensivas_facil"] = []
     sem_dados = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
-    assert "Regras e coberturas" not in sem_dados
+    assert "Regras defensivas mais utilizadas" not in sem_dados
 
     contexto["secoes_set"].add("analise")
     contexto["itens_coletivos"] = {
@@ -179,3 +249,8 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
     so_regras = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
     assert "Push ou switch" in so_regras
     assert "Pressão após cesto" not in so_regras
+
+    contexto["secoes_set"] = {"identidade"}
+    contexto["jogo_referencia"] = None
+    sem_jogo = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert sem_jogo.count("Por definir") == 3

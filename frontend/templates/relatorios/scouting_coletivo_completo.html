@@ -4,8 +4,8 @@
 {% if blocos %}<section class="scout-section"><h2 class="scout-section-title">{{ titulo }}</h2><table class="scout-table"><thead><tr><th>Mensagem</th><th>Detalhes</th></tr></thead><tbody>{% for bloco in blocos %}<tr><td><strong>{{ bloco.titulo }}</strong>{% if bloco.categoria %}<br><small>{{ bloco.categoria }}</small>{% endif %}</td><td>{% if bloco.descricao %}{{ bloco.descricao }}{% endif %}{% if bloco.avaliacao or bloco.nivel %}{% if bloco.descricao %} · {% endif %}{{ (bloco.avaliacao ~ '/5') if bloco.avaliacao else bloco.nivel|title }}{% endif %}</td></tr>{% endfor %}</tbody></table></section>{% endif %}
 {% endmacro %}
 <!doctype html><html lang="pt"><head><meta charset="utf-8"><title>Scouting coletivo · {{ alvo_nome }}</title>{{ estilo_pdf() }}
-<style>@page{size:A4 portrait;margin:8mm}.identity-table td{height:8mm}.leader-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.leader-grid .scout-player{grid-template-columns:18mm minmax(0,1fr)}.leader-grid .scout-photo,.leader-grid .scout-avatar{width:18mm;height:21mm}.option-on{color:#17623a;font-weight:900}.option-off{color:#94a3b8}.playbook-block{page-break-before:auto}</style>
-{% include "relatorios/_scouting_estilos.html" %}</head><body>
+<style>@page{size:A4 portrait;margin:8mm}.identity-table td{height:8mm}.leader-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.leader-grid .scout-player{grid-template-columns:18mm minmax(0,1fr)}.leader-grid .scout-photo,.leader-grid .scout-avatar{width:18mm;height:21mm}.option-on{color:#17623a;font-weight:900}.option-off{color:#94a3b8}</style>
+{% include "relatorios/_scouting_estilos.html" %}<style>body{font-size:9.5px;line-height:1.38}.defensive-rules-table td:first-child{font-size:10.5px;font-weight:800}.defensive-rules-table td:last-child{font-size:9.5px}</style></head><body>
 {{ cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes if 'identidade' in secoes_set else None) }}
 
 {% if 'identidade' in secoes_set %}<section class="scout-section keep"><h2 class="scout-section-title">Identificação do scouting</h2><table class="scout-table identity-table"><tbody><tr><td class="label">Adversário</td><td>{{ alvo_nome }}</td><td class="label">Competição</td><td>{{ jogo_referencia.competicao if jogo_referencia and jogo_referencia.competicao else '—' }}</td></tr><tr><td class="label">Jogo / Jornada</td><td>{{ equipa.nome }} vs {{ alvo_nome }}</td><td class="label">Data e hora</td><td>{% if jogo_referencia %}{{ jogo_referencia.data|data_pt }} · {{ jogo_referencia.hora or 'hora por definir' }}{% else %}—{% endif %}</td></tr><tr><td class="label">Local</td><td>{{ jogo_referencia.local if jogo_referencia and jogo_referencia.local else '—' }}</td><td class="label">Analista</td><td>{{ nome_autor }}</td></tr><tr><td class="label">Período analisado</td><td>{{ adversario.resultados|length }} resultado(s) registado(s)</td><td class="label">Última atualização</td><td>{{ adversario.atualizado_em|data_pt if adversario.atualizado_em else data_exportacao }}</td></tr></tbody></table></section>
@@ -22,7 +22,7 @@
 
 {{ secao_blocos('Perfil coletivo', perfil_preenchido) if 'perfil' in secoes_set else '' }}
 
-{% if 'jogadores_chave' in secoes_set and adversario.lideres %}<section class="scout-section"><h2 class="scout-section-title">Líderes estatísticos</h2><div class="scout-grid leader-grid">{% for l in adversario.lideres %}{% set j=l.jogador %}<article class="scout-card scout-player">{% if fotografias.get(j.id) %}<img class="scout-photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="scout-avatar">{{ j.nome[:2]|upper }}</div>{% endif %}<div><h3>#{{ j.numero or '—' }} · {{ j.nome }}</h3><div class="scout-meta"><span>{{ j.posicao_principal }}</span><span>{{ l.tipo }}</span></div>{% if l.observacao %}<p>{{ l.observacao }}</p>{% endif %}</div></article>{% endfor %}</div></section>{% endif %}
+{% if 'jogadores_chave' in secoes_set and adversario.lideres %}<section class="scout-section"><h2 class="scout-section-title">Jogadores mais influentes</h2><div class="scout-grid leader-grid">{% for l in adversario.lideres %}{% set j=l.jogador %}<article class="scout-card scout-player">{% if fotografias.get(j.id) %}<img class="scout-photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="scout-avatar">{{ j.nome[:2]|upper }}</div>{% endif %}<div><h3>#{{ j.numero or '—' }} · {{ j.nome }}</h3><div class="scout-meta"><span>{{ j.posicao_principal }}</span><span>{{ l.tipo }}</span></div>{% if l.observacao %}<p>{{ l.observacao }}</p>{% endif %}</div></article>{% endfor %}</div></section>{% endif %}
 
 {% set ataque_forte = itens_coletivos.get('ataque_forte', []) %}{% set ataque_fraco = itens_coletivos.get('ataque_fraco', []) %}
 {% set defesa_forte = itens_coletivos.get('defesa_forte', []) %}{% set defesa_fraco = itens_coletivos.get('defesa_fraco', []) %}
@@ -36,11 +36,11 @@
   </div>{% endif %}
 </section>{% endif %}
 
-{% if 'diagramas' in secoes_set and adversario.conceitos_ofensivos %}<section class="scout-section"><h2 class="scout-section-title">Principais conceitos ofensivos</h2><div class="scout-play-grid">{% for conceito in adversario.conceitos_ofensivos %}{% set setplay=conceito.setplay %}{% set passos=passos_setplay.get(setplay.id, []) %}<article class="scout-play"><header><h3>{{ setplay.nome }}</h3></header>{% if passos and passos[0].imagem %}<img src="{{ passos[0].imagem }}" alt="">{% endif %}<div class="scout-play-copy">{{ setplay.descricao or (passos[0].observacao if passos else '') or 'Sem observações.' }}</div></article>{% endfor %}</div></section>{% endif %}
+{% if 'diagramas' in secoes_set and adversario.conceitos_ofensivos %}<section class="scout-section"><h2 class="scout-section-title">Ações principais</h2><div class="scout-play-grid">{% for conceito in adversario.conceitos_ofensivos %}{% set setplay=conceito.setplay %}{% set passos=passos_setplay.get(setplay.id, []) %}<article class="scout-play"><header><h3>{{ setplay.nome }}</h3></header>{% if passos and passos[0].imagem %}<img src="{{ passos[0].imagem }}" alt="">{% endif %}<div class="scout-play-copy">{{ setplay.descricao or (passos[0].observacao if passos else '') or 'Sem observações.' }}</div></article>{% endfor %}</div></section>{% endif %}
 
 {% if 'regras_coberturas' in secoes_set and opcoes_defensivas_facil %}
-<section class="scout-section"><h2 class="scout-section-title">Regras e coberturas do adversário</h2>
-  <table class="scout-table"><thead><tr><th style="width:32%">Opção</th><th>Comportamentos / regras específicas</th></tr></thead>
+<section class="scout-section"><h2 class="scout-section-title">Regras defensivas mais utilizadas</h2>
+  <table class="scout-table defensive-rules-table"><thead><tr><th style="width:32%">Opção</th><th>Comportamentos / regras específicas</th></tr></thead>
     <tbody>{% for opcao in opcoes_defensivas_facil %}<tr><td><strong>{{ opcao.nome }}</strong></td><td>{{ opcao.notas or '—' }}</td></tr>{% endfor %}</tbody>
   </table>
 </section>
@@ -50,6 +50,5 @@
 {{ secao_blocos('Prioridades', blocos_coletivos.get('prioridade_ofensiva', []) + blocos_coletivos.get('prioridade_defensiva', [])) if 'prioridades' in secoes_set else '' }}
 {{ secao_blocos('Transição, ressalto e situações especiais', blocos_coletivos.get('transicao', []) + blocos_coletivos.get('ressalto', []) + blocos_coletivos.get('situacao_especial', [])) if 'situacoes' in secoes_set else '' }}
 
-{% if 'diagramas' in secoes_set and adversario.momentos_playbook %}<section class="scout-section playbook-block"><h2 class="scout-section-title">Playbook coletivo do adversário</h2>{% for momento in adversario.momentos_playbook %}{% set setplay=momento.setplay %}<h3 class="scout-subtitle">{{ setplay.nome }}</h3><div class="scout-play-grid">{% for passo in passos_setplay.get(setplay.id, []) %}<article class="scout-play"><header><h3>Momento {{ passo.ordem }}</h3></header>{% if passo.imagem %}<img src="{{ passo.imagem }}" alt="">{% endif %}<div class="scout-play-copy">{{ passo.observacao or setplay.descricao or 'Sem observações.' }}</div></article>{% endfor %}</div>{% endfor %}</section>{% endif %}
 {{ rodape_pdf(equipa.nome ~ ' · Scouting coletivo completo') }}
 </body></html>

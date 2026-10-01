@@ -175,13 +175,13 @@ def test_quatro_modelos_de_scouting_seguem_estrutura_de_exportacao_fornecida():
         "Perfil coletivo",
         "Nossa resposta",
         "Análise técnico-tática",
-        "Regras e coberturas do adversário",
+        "Regras defensivas mais utilizadas",
         "Últimos 5 resultados",
-        "Líderes estatísticos",
-        "Principais conceitos ofensivos",
-        "Playbook coletivo do adversário",
+        "Jogadores mais influentes",
+        "Ações principais",
     ):
         assert marcador in coletivo_completo
+    assert "Playbook coletivo do adversário" not in coletivo_completo
     assert "Últimos 3 resultados" in coletivo_facil
     assert "cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes)" in coletivo_facil
     assert "passos_setplay" in rota
@@ -323,13 +323,16 @@ def test_scouting_coletivo_modular_guarda_e_recarrega_configuracao():
         assert f'_secao("{chave}"' in rota
     assert 'data-preset-statistics' in formulario
     assert 'data-preset-highlight-players' in formulario
+    assert 'name="estatistica_destaque"' in formulario
+    assert 'name="estatistica_destaque_tom"' in formulario
     assert "presetStatistics.includes(input.value)" in javascript
     assert '"estatisticas": [campo for campo in dados.getlist("estatisticas")' in rota
+    assert '"estatistica_destaque":' in rota
     assert "blocos_coletivos.get('chave'" in facil
     assert "perfil_ataque" in facil
     assert "Nossa resposta" in facil
     assert "Análise técnico-tática" in completo
-    assert "Regras e coberturas do adversário" in completo
+    assert "Regras defensivas mais utilizadas" in completo
     assert 'class="rating-bar"' in facil
     assert "range(1,6)" in facil
     assert "{{ valor }}/5" in facil
