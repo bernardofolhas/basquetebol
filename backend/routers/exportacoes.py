@@ -1024,6 +1024,56 @@ def _rotacoes_coletivas_por_posicao(adversario):
     return cinco_previsto, rotacoes_previstas, rotacoes_por_posicao
 
 
+def _media_exibida_coletiva(adversario) -> dict[str, float | None]:
+    media = adversario.media_coletiva
+    if media and media.usar_manual:
+        return {campo: getattr(media, campo) for campo in STAT_FIELDS}
+    jogos = adversario.estatisticas_coletivas or []
+    resultado = {}
+    for campo in STAT_FIELDS:
+        valores = [getattr(jogo, campo) for jogo in jogos if getattr(jogo, campo) is not None]
+        resultado[campo] = round(sum(valores) / len(valores), 1) if valores else None
+    return resultado
+
+
+def _indicadores_coletivos(media: dict, selecionados: list[str]) -> list[dict]:
+    padrao = ["pontos", "dois_c", "dois_t", "tres_c", "tres_t", "ll_c", "ll_t", "ress_of", "ress_def", "assistencias", "turnovers", "roubos", "eficiencia"]
+    campos = selecionados or padrao
+    indicadores = []
+    pares = {"fg_c": ("fg_t", "FG%"), "dois_c": ("dois_t", "2P%"), "tres_c": ("tres_t", "3P%"), "ll_c": ("ll_t", "LL%")}
+    usados = set()
+    for campo in campos:
+        if campo in usados or media.get(campo) is None:
+            continue
+        if campo in pares:
+            tentativas, nome = pares[campo]
+            if tentativas in campos and media.get(tentativas):
+                indicadores.append({"nome": nome, "valor": f"{media[campo] / media[tentativas] * 100:.0f}%"})
+                usados.update((campo, tentativas))
+                continue
+        if any(campo == tentativas and convertidos in campos and media.get(convertidos) is not None for convertidos, (tentativas, _) in pares.items()):
+            continue
+        indicadores.append({"nome": STAT_CODES[campo], "valor": f"{media[campo]:.1f}"})
+        usados.add(campo)
+    return indicadores[:10]
+
+
+def _grupos_resposta_coletiva(blocos: dict[str, list]) -> list[dict]:
+    grupos = [
+        ("Sem bola", ("resposta", "prioridade_defensiva")),
+        ("P&R", ("prioridade_ofensiva",)),
+        ("Transição", ("transicao",)),
+        ("Ressalto", ("ressalto",)),
+    ]
+    resultado = []
+    for nome, tipos in grupos:
+        candidatos = [bloco for tipo in tipos for bloco in blocos.get(tipo, []) if bloco.destaque]
+        if nome == "P&R":
+            candidatos = [bloco for bloco in candidatos if "p&r" in (bloco.categoria or "").lower() or "bloqueio" in bloco.titulo.lower()]
+        resultado.append({"nome": nome, "blocos": candidatos[:2]})
+    return resultado
+
+
 def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> dict:
     contexto = {"tipo_relatorio": tipo, "equipa": equipa, "alvo": alvo}
     if tipo in {"scouting-individual", "scouting-coletivo"}:
@@ -1064,10 +1114,18 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
                     break
         setplays = [r.setplay for r in alvo.conceitos_ofensivos] + [r.setplay for r in alvo.momentos_playbook]
         itens_coletivos = _itens_por_categoria(alvo.itens_coletivos)
-        media = alvo.media_coletiva
+        media_exibida = _media_exibida_coletiva(alvo)
         blocos_coletivos = {}
         for bloco in alvo.blocos_coletivos:
             blocos_coletivos.setdefault(bloco.tipo, []).append(bloco)
+        perfil_facil = []
+        for bloco in blocos_coletivos.get("perfil", []):
+            avaliacao = bloco.avaliacao if bloco.avaliacao is not None else {"fraco": 2, "medio": 3, "forte": 4}.get(bloco.nivel)
+            if bloco.destaque and avaliacao not in (None, 0):
+                perfil_facil.append({
+                    "titulo": bloco.titulo, "descricao": bloco.descricao,
+                    "categoria": bloco.categoria, "avaliacao": avaliacao,
+                })
         jogos_referencia = jogos_em_preparacao(
             [ligacao.jogo for ligacao in alvo.jogos if ligacao.jogo]
         )
@@ -1078,9 +1136,14 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             fotografias={j.id: _fotografia_embebida(j.fotografia) for j in alvo.jogadores},
             itens_coletivos=itens_coletivos,
             jogadores_prioritarios=_jogadores_prioritarios_coletivo(alvo, jogadores_destaque_ids),
+            media_exibida=media_exibida,
+            indicadores_coletivos=_indicadores_coletivos(media_exibida, stat_fields),
+            perfil_ataque=[bloco for bloco in perfil_facil if "defesa" not in (bloco["categoria"] or "").lower()][:4],
+            perfil_defesa=[bloco for bloco in perfil_facil if "defesa" in (bloco["categoria"] or "").lower()][:4],
+            respostas_grupos=_grupos_resposta_coletiva(blocos_coletivos),
             stat_fields_com_dados=[
                 campo for campo in stat_fields
-                if media is not None and getattr(media, campo, None) is not None
+                if media_exibida.get(campo) is not None
             ],
             caracteristicas_estatisticas_com_dados=[
                 relacao for relacao in itens_coletivos.get("estatistica_coletiva", [])
@@ -1144,7 +1207,8 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
     alvo, equipa, alvo_nome = _alvo_relatorio(tipo, alvo_id, db, utilizador)
     predefinicoes = _predefinicoes_relatorio(db, utilizador, tipo, equipa.id)
     predefinicao = next((p for p in predefinicoes if p.id == predefinicao_id), None)
-    selecionadas = json.loads(predefinicao.secoes) if predefinicao else _secoes_padrao(tipo, "completo")
+    formato_inicial = "facil" if tipo == "scouting-coletivo" else "completo"
+    selecionadas = json.loads(predefinicao.secoes) if predefinicao else _secoes_padrao(tipo, formato_inicial)
     try:
         configuracao_guardada = json.loads(predefinicao.configuracao or "{}") if predefinicao else {}
     except (TypeError, ValueError):
@@ -1247,6 +1311,8 @@ def _gerar_relatorio(tipo: str, alvo_id: int, request: Request, dados, db: Sessi
         ordem_secoes={chave: indice for indice, chave in enumerate(secoes)},
     )
     template = f"relatorios/{tipo.replace('-', '_')}_{formato}.html"
+    if tipo == "scouting-coletivo" and formato == "facil":
+        template = "relatorios/scouting_coletivo_facil_v2.html"
     nome = f"{RELATORIOS_CONFIG[tipo]['nome']} - {alvo_nome} - {date.today().isoformat()}"
     if previsualizar:
         html = templates.get_template(template).render(preparar_contexto_pdf(request, contexto))

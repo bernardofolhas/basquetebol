@@ -187,6 +187,29 @@ def _eliminar_adversario_integracao(adversario_id, jogo_id, playbook_id=None):
         db.close()
 
 
+def test_coletivo_abre_e_exporta_leitura_facil(client_admin):
+    adversario_id, jogo_id, _, _, _ = _criar_adversario_integracao()
+    try:
+        pagina = client_admin.get(f"/scouting/adversarios/{adversario_id}/coletivo")
+        assert pagina.status_code == 200
+        assert "Prepara a leitura fácil" in pagina.text
+        assert "Perfil coletivo 0–5" in pagina.text
+
+        configurador = client_admin.get(f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}")
+        assert configurador.status_code == 200
+
+        dados = {"formato": "facil", "secoes": ["identidade", "chaves", "cinco_rotacao", "estatisticas", "perfil", "resposta", "diagramas"]}
+        previsualizacao = client_admin.post(f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}/previsualizar", data=dados)
+        assert previsualizacao.status_code == 200
+        assert "Scouting Coletivo" in previsualizacao.text
+
+        pdf = client_admin.post(f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}/pdf", data=dados)
+        assert pdf.status_code == 200
+        assert pdf.content.startswith(b"%PDF")
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_id)
+
+
 def test_scouting_escolhe_proximo_jogo_e_bloqueia_jogos_passados(client_admin):
     adversario_id, jogo_passado_id, equipa_id, clube_id, nome = _criar_adversario_integracao()
     jogos_extra_ids = []

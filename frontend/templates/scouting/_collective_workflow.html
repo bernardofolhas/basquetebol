@@ -1,0 +1,14 @@
+{% set chaves=adversario.blocos_coletivos|selectattr('tipo','equalto','chave')|selectattr('destaque')|list %}
+{% set perfis=adversario.blocos_coletivos|selectattr('tipo','equalto','perfil')|selectattr('destaque')|list %}
+{% set respostas=adversario.blocos_coletivos|selectattr('tipo','equalto','resposta')|selectattr('destaque')|list %}
+<section class="collective-workflow" aria-label="Preparação da leitura fácil">
+  <div class="collective-workflow-head"><div><p class="ds-kicker">Documento para jogadores</p><h2>Prepara a leitura fácil</h2><p>Preenche o essencial. O PDF reúne automaticamente os blocos destacados e omite os que estiverem vazios.</p></div><a class="ds-button-primary" href="/exportacoes/relatorios/scouting-coletivo/{{ adversario.id }}">Pré-visualizar / Exportar</a></div>
+  <div class="collective-workflow-grid">
+    <a href="#resumo-equipa"><b>01</b><strong>Mensagem e 3 chaves</strong><small>{{ chaves|length }} chaves · {{ 'resumo pronto' if adversario.observacoes else 'falta ideia-chave' }}</small></a>
+    <a href="#rotacao-prevista"><b>02</b><strong>Cinco e rotação</strong><small>{{ cinco_previsto|length }}/5 titulares · {{ rotacoes_previstas|length }} rotações</small></a>
+    <a href="#estatisticas-coletivas"><b>03</b><strong>Números</strong><small>{{ 'Média manual' if media_coletiva.usar_manual else estatisticas_coletivas|length ~ ' jogos registados' }}</small></a>
+    <a href="#perfil-coletivo-avaliacao"><b>04</b><strong>Perfil 0–5</strong><small>{{ perfis|length }} características destacadas</small></a>
+    <a href="#estrutura-coletiva"><b>05</b><strong>Plano de jogo</strong><small>{{ respostas|length }} respostas destacadas</small></a>
+    <a href="#playbook-coletivo"><b>06</b><strong>Ações / Playbook</strong><small>{{ momentos|length }} ações desenhadas</small></a>
+  </div>
+</section>
