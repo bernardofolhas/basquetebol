@@ -4,7 +4,8 @@ from datetime import date, datetime
 import unicodedata
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -1343,12 +1344,17 @@ def ficha_individual(jogador_id: int, request: Request, db: Session = Depends(ge
     ).all()
     itens_por_categoria = _itens_validos_jogador(db, jogador)
     db.refresh(jogador)
+    perfil_individual = construir_perfil_individual(jogador)
+    itens_cartao = [entrada["relacao"] for entrada in perfil_individual["avaliacoes"]]
+    itens_cartao += perfil_individual["tendencias"] + perfil_individual["game_plan"]
     return templates.TemplateResponse(request, "scouting/individual.html", _contexto_departamento(
         request, utilizador, jogador.adversario, separador="individual", jogador=jogador, biblioteca=biblioteca,
         jogos=jogos, stat_fields=STAT_FIELDS, ficha=ficha, media_epoca=media_epoca,
         estatisticas=estatisticas, zonas=zonas, itens_por_categoria=itens_por_categoria,
         grupos_avaliacao=grupos_avaliacao,
-        perfil_individual=construir_perfil_individual(jogador),
+        perfil_individual=perfil_individual,
+        todos_itens_cartao=bool(itens_cartao) and all(item.destaque for item in itens_cartao),
+        total_itens_cartao=len(itens_cartao),
     ))
 
 
@@ -1589,6 +1595,51 @@ async def guardar_observacao_item(associacao_id: int, request: Request, db: Sess
     db.commit()
     set_flash(request, "Informação atualizada.")
     return RedirectResponse(url=f"/scouting/jogadores/{jogador.id}#perfil", status_code=303)
+
+
+@router.post("/itens-associados/{associacao_id}/destaque")
+async def guardar_destaque_item(associacao_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    associacao = db.query(ScoutingJogadorItem).filter(ScoutingJogadorItem.id == associacao_id).first()
+    jogador = _jogador_acessivel(db, associacao.jogador_id, utilizador) if associacao else None
+    if not jogador:
+        return JSONResponse({"erro": "Informação indisponível."}, status_code=404)
+    dados = await request.form()
+    associacao.destaque = dados.get("destaque") == "true"
+    if associacao.destaque and associacao.ordem_destaque is None:
+        maior_ordem = db.query(func.max(ScoutingJogadorItem.ordem_destaque)).filter(
+            ScoutingJogadorItem.jogador_id == jogador.id,
+        ).scalar() or 0
+        associacao.ordem_destaque = maior_ordem + 1
+    if not associacao.destaque:
+        associacao.ordem_destaque = None
+    db.commit()
+    return JSONResponse({"ok": True, "destaque": associacao.destaque})
+
+
+@router.post("/jogadores/{jogador_id}/destaques")
+async def guardar_destaques_jogador(jogador_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
+    jogador = _jogador_acessivel(db, jogador_id, utilizador)
+    if not jogador:
+        return JSONResponse({"erro": "Jogador indisponível."}, status_code=404)
+    dados = await request.form()
+    destacar = dados.get("destaque") == "true"
+    itens = db.query(ScoutingJogadorItem).join(ScoutingItemBiblioteca).filter(
+        ScoutingJogadorItem.jogador_id == jogador.id,
+        ScoutingItemBiblioteca.categoria.in_(("caracteristica", "tendencia", "movimento", "game_plan", "estrategia")),
+        ScoutingItemBiblioteca.ativo.is_(True),
+    ).order_by(ScoutingJogadorItem.ordem, ScoutingJogadorItem.id).all()
+    maior_ordem = db.query(func.max(ScoutingJogadorItem.ordem_destaque)).filter(
+        ScoutingJogadorItem.jogador_id == jogador.id,
+    ).scalar() or 0
+    for associacao in itens:
+        associacao.destaque = destacar
+        if destacar and associacao.ordem_destaque is None:
+            maior_ordem += 1
+            associacao.ordem_destaque = maior_ordem
+        elif not destacar:
+            associacao.ordem_destaque = None
+    db.commit()
+    return JSONResponse({"ok": True, "destaque": destacar, "total": len(itens)})
 
 
 @router.post("/jogadores/{jogador_id}/grupos-avaliacao")

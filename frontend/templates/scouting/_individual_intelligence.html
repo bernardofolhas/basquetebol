@@ -10,6 +10,8 @@
 
   <div class="scout-concept-strip"><span><b>1</b><strong>Avaliação</strong><small>O quão bom é?</small></span><i>→</i><span><b>2</b><strong>Tendência</strong><small>O que costuma fazer?</small></span><i>→</i><span><b>3</b><strong>Game Plan</strong><small>O que fazemos contra ele?</small></span></div>
 
+  <div class="scout-highlight-toolbar"><label><input type="checkbox" data-scout-highlight-all data-highlight-url="/scouting/jogadores/{{ jogador.id }}/destaques" {% if todos_itens_cartao %}checked{% endif %} {% if not total_itens_cartao %}disabled{% endif %}><strong>Mostrar todos no cartão</strong></label><small>Esta escolha e cada caixa abaixo são guardadas automaticamente.</small></div>
+
   <div class="scout-profile-toolbar">
     <div><strong>Grupos de avaliação</strong><small>Configuração reutilizável em todo o clube</small></div>
     <form method="POST" action="/scouting/jogadores/{{ jogador.id }}/grupos-avaliacao" data-studio-async data-studio-refresh="individual-profile" data-studio-reset="true"><input name="nome" class="ds-input" maxlength="120" placeholder="Novo grupo, ex.: Shooting" required><button class="ds-button-secondary">Criar grupo</button></form>

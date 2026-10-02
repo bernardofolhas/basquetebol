@@ -1084,9 +1084,11 @@ def _rotacoes_coletivas_por_posicao(adversario):
     return cinco_previsto, rotacoes_previstas, rotacoes_por_posicao
 
 
-def _substituicoes_coletivas_por_titular(adversario):
+def _substituicoes_coletivas_por_titular(adversario, titulares_ids=None):
     resultado = {}
     for entrada in adversario.substituicoes_previstas:
+        if titulares_ids is not None and entrada.titular_id not in titulares_ids:
+            continue
         resultado.setdefault(entrada.titular_id, {})[entrada.ordem] = entrada
     return resultado
 
@@ -1217,8 +1219,14 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             dados.get("estatistica_destaque"), dados.get("estatistica_destaque_tom"), indicadores_coletivos
         )
         cinco_previsto, rotacoes_previstas, rotacoes_por_posicao = _rotacoes_coletivas_por_posicao(alvo)
-        substituicoes_por_titular = _substituicoes_coletivas_por_titular(alvo)
-        ids_substitutos = {entrada.jogador_id for entrada in alvo.substituicoes_previstas}
+        substituicoes_por_titular = _substituicoes_coletivas_por_titular(
+            alvo, {entrada.jogador_id for entrada in cinco_previsto}
+        )
+        ids_substitutos = {
+            entrada.jogador_id
+            for entradas in substituicoes_por_titular.values()
+            for entrada in entradas.values()
+        }
         rotacoes_sem_titular = {
             posicao: [entrada for entrada in entradas if entrada.jogador_id not in ids_substitutos]
             for posicao, entradas in rotacoes_por_posicao.items()

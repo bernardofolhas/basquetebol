@@ -841,6 +841,8 @@ def test_rotacoes_previstas_ligam_duas_entradas_a_cada_titular(client_admin):
             texto = " ".join(pagina.extract_text() for pagina in PdfReader(BytesIO(pdf.content)).pages)
             assert "Jogador 6" in texto
             assert "Jogador 7" in texto
+            if formato == "facil":
+                assert "1.ª" in texto and "2.ª" in texto
 
         client_admin.post(
             f"/scouting/adversarios/{adversario_id}/coletivo/rotacao-prevista",
@@ -855,6 +857,90 @@ def test_rotacoes_previstas_ligam_duas_entradas_a_cada_titular(client_admin):
             db.close()
     finally:
         _eliminar_adversario_integracao(adversario_id, jogo_id)
+
+
+def test_destaques_individuais_gravam_ao_clicar_e_em_lote(client_admin):
+    adversario_id, jogo_id, _, clube_id, _ = _criar_adversario_integracao()
+    item_ids = []
+    try:
+        db = SessionLocal()
+        try:
+            jogador = ScoutingJogador(
+                clube_id=clube_id, adversario_id=adversario_id,
+                nome="Atleta dos destaques", posicao_principal="Base",
+            )
+            db.add(jogador)
+            db.flush()
+            jogador_id = jogador.id
+            associacoes = []
+            for ordem, categoria in enumerate(("caracteristica", "tendencia", "game_plan")):
+                nome = f"Destaque teste {categoria} {uuid4().hex[:8]}"
+                item = ScoutingItemBiblioteca(
+                    clube_id=clube_id, categoria=categoria, nome=nome,
+                    nome_normalizado=nome.lower(), ativo=True,
+                )
+                db.add(item)
+                db.flush()
+                item_ids.append(item.id)
+                associacao = ScoutingJogadorItem(
+                    clube_id=clube_id, jogador_id=jogador_id, item_id=item.id,
+                    observacao="Não perder esta nota", avaliacao=4 if ordem == 0 else None,
+                    ordem=ordem, destaque=False,
+                )
+                db.add(associacao)
+                db.flush()
+                associacoes.append(associacao.id)
+            db.commit()
+        finally:
+            db.close()
+
+        pagina = client_admin.get(f"/scouting/jogadores/{jogador_id}")
+        assert pagina.status_code == 200
+        assert "Mostrar todos no cartão" in pagina.text
+
+        resposta = client_admin.post(
+            f"/scouting/itens-associados/{associacoes[0]}/destaque",
+            data={"destaque": "true"},
+        )
+        assert resposta.status_code == 200 and resposta.json()["destaque"] is True
+        db = SessionLocal()
+        try:
+            associacao = db.get(ScoutingJogadorItem, associacoes[0])
+            assert associacao.destaque is True
+            assert associacao.avaliacao == 4
+            assert associacao.observacao == "Não perder esta nota"
+        finally:
+            db.close()
+
+        resposta = client_admin.post(
+            f"/scouting/jogadores/{jogador_id}/destaques", data={"destaque": "true"},
+        )
+        assert resposta.status_code == 200 and resposta.json()["total"] == 3
+        db = SessionLocal()
+        try:
+            assert all(db.get(ScoutingJogadorItem, item_id).destaque for item_id in associacoes)
+        finally:
+            db.close()
+
+        pagina = client_admin.get(f"/scouting/jogadores/{jogador_id}")
+        assert 'data-scout-highlight-all' in pagina.text
+        assert 'data-highlight-url="/scouting/jogadores/' in pagina.text
+
+        resposta = client_admin.post(f"/scouting/jogadores/{jogador_id}/destaques", data={"destaque": "false"})
+        assert resposta.status_code == 200
+        db = SessionLocal()
+        try:
+            assert all(not db.get(ScoutingJogadorItem, item_id).destaque for item_id in associacoes)
+        finally:
+            db.close()
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_id)
+        db = SessionLocal()
+        try:
+            db.query(ScoutingItemBiblioteca).filter(ScoutingItemBiblioteca.id.in_(item_ids)).delete(synchronize_session=False)
+            db.commit()
+        finally:
+            db.close()
 
 
 def test_scouting_coletivo_guarda_ideia_chave_sem_refresh_e_exporta_no_cabecalho():

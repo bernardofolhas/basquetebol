@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}{{ jogador.nome }} · Scouting individual{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260929-zones-1"><link rel="stylesheet" href="/static/css/scouting-intelligence.css?v=20260928-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260929-zones-1"><link rel="stylesheet" href="/static/css/scouting-intelligence.css?v=20261002-highlight-1">{% endblock %}
 {% block conteudo %}
 <div data-customizable-dashboard data-dashboard-key="scouting-individual-{{ jogador.id }}">
 <header class="scouting-profile-head"><a href="/scouting/adversarios/{{ adversario.id }}/individual">← Scouting individual</a><div>{% if jogador.fotografia %}<img src="{{ jogador.fotografia }}" alt="Fotografia de {{ jogador.nome }}">{% else %}<span>{{ jogador.nome[:2]|upper }}</span>{% endif %}<div><p class="ds-kicker">{{ adversario.nome }} · #{{ jogador.numero or '—' }}</p><h1>{{ jogador.nome }}</h1><p>{{ jogador.posicao_principal }}{% if jogador.posicao_alternativa %} / {{ jogador.posicao_alternativa }}{% endif %} · {{ jogador.estado|capitalize }}{% if jogador.altura_cm %} · {{ jogador.altura_cm|round|int }} cm{% endif %}</p></div></div><aside class="scouting-page-customizer" data-dashboard-customizer-anchor></aside></header>

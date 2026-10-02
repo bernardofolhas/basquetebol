@@ -128,6 +128,61 @@
       });
     }
 
+    function highlightInputs() {
+      return Array.from(root.querySelectorAll('[data-studio-region="individual-profile"] form[action*="/itens-associados/"] .scout-highlight-toggle input[name="destaque"]'));
+    }
+
+    function syncHighlightAll() {
+      var master = root.querySelector("[data-scout-highlight-all]");
+      if (!master) return;
+      var inputs = highlightInputs();
+      var selected = inputs.filter(function (input) { return input.checked; }).length;
+      master.checked = inputs.length > 0 && selected === inputs.length;
+      master.indeterminate = selected > 0 && selected < inputs.length;
+    }
+
+    async function postHighlight(url, checked) {
+      var body = new FormData();
+      body.append("destaque", checked ? "true" : "false");
+      var response = await fetch(url, {
+        method: "POST", body: body, credentials: "same-origin",
+        headers: {"Accept": "application/json", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content || ""}
+      });
+      if (!response.ok || !(response.headers.get("content-type") || "").includes("application/json")) {
+        throw new Error("Não foi possível guardar a seleção.");
+      }
+      var result = await response.json();
+      if (!result.ok) throw new Error(result.erro || "Não foi possível guardar a seleção.");
+    }
+
+    syncHighlightAll();
+    root.addEventListener("change", async function (event) {
+      var toggle = event.target.closest('[data-scout-highlight-all], .scout-highlight-toggle input[name="destaque"]');
+      if (!toggle || !toggle.closest('[data-studio-region="individual-profile"]')) return;
+      var master = toggle.matches("[data-scout-highlight-all]");
+      var form = toggle.closest("form");
+      if (!master && (!form || !/\/itens-associados\/\d+\/guardar$/.test(form.action))) return;
+      var inputs = highlightInputs();
+      var previous = inputs.map(function (input) { return input.checked; });
+      if (master) inputs.forEach(function (input) { input.checked = toggle.checked; });
+      else syncHighlightAll();
+      var url = master ? toggle.dataset.highlightUrl : form.action.replace(/\/guardar$/, "/destaque");
+      var saving = master ? [toggle].concat(inputs) : [toggle];
+      saving.forEach(function (input) { input.disabled = true; });
+      try {
+        await postHighlight(url, toggle.checked);
+        notify(master ? "Visibilidade de todos os itens guardada." : "Visibilidade no cartão guardada.", "success");
+      } catch (error) {
+        if (master) inputs.forEach(function (input, index) { input.checked = previous[index]; });
+        else toggle.checked = !toggle.checked;
+        notify(error.message || "Não foi possível guardar a seleção.", "error");
+      } finally {
+        saving.forEach(function (input) { if (input.isConnected) input.disabled = false; });
+        syncHighlightAll();
+        update();
+      }
+    });
+
     root.addEventListener("input", update);
     root.addEventListener("change", function (event) {
       var picker = event.target.closest("[data-stat-game-picker]");
@@ -210,6 +265,7 @@
             enhance(current);
           });
         });
+        syncHighlightAll();
         var dialog = form.closest("dialog");
         if (form.dataset.studioReset === "true" && form.isConnected) form.reset();
         if (form.dataset.studioClose === "true" && dialog && dialog.isConnected && dialog.open) dialog.close();
