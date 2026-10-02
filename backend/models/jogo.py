@@ -88,6 +88,9 @@ class PlanoJogo(Base):
     titular_4 = Column(Integer, ForeignKey("jogadores.id", ondelete="SET NULL"), nullable=True)
     titular_5 = Column(Integer, ForeignKey("jogadores.id", ondelete="SET NULL"), nullable=True)
     rotacoes = Column(Text, nullable=True)
+    rotacao_1_minuto = Column(Integer, nullable=True)
+    rotacao_2_minuto = Column(Integer, nullable=True)
+    rotacao_3_minuto = Column(Integer, nullable=True)
 
     # Chaves
     chaves_ataque = Column(Text, nullable=True)

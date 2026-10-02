@@ -604,6 +604,13 @@ async def guardar_plano_jogo(
             titulares_usados.add(jogador_id)
         setattr(plano, f"titular_{i}", jogador_id)
 
+    for grupo in range(1, 4):
+        campo = f"rotacao_{grupo}_minuto"
+        if campo in dados:
+            bruto = str(dados.get(campo) or "").strip()
+            minuto = int(bruto) if bruto.isdigit() else None
+            setattr(plano, campo, minuto if minuto is not None and 1 <= minuto <= 60 else None)
+
     if any(f"rotacao_{grupo}_{ordem}" in dados for grupo in range(1, 4) for ordem in range(1, 6)):
         db.flush()
         db.query(PlanoJogoRotacao).filter(PlanoJogoRotacao.plano_jogo_id == plano.id).delete()
@@ -751,6 +758,35 @@ async def eliminar_item_plano(jogo_id: int, relacao_id: int, request: Request, d
     return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
 
 
+@router.post("/{jogo_id}/plano/itens/eliminar-selecao")
+async def eliminar_chaves_selecionadas(jogo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
+    jogo = _obter_jogo(db, jogo_id)
+    dados = await request.form()
+    if not jogo:
+        return RedirectResponse(url="/equipas", status_code=303)
+    _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
+    categoria = str(dados.get("categoria") or "")
+    if categoria not in {"chave_ataque", "chave_defesa"}:
+        return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+    ids = {int(valor) for valor in dados.getlist("relacao_ids") if str(valor).isdigit()}
+    if ids:
+        plano = db.query(PlanoJogo).filter(PlanoJogo.jogo_id == jogo.id).first()
+        if plano:
+            selecionadas = [
+                relacao for relacao in plano.itens
+                if relacao.id in ids and relacao.item.categoria == categoria
+            ]
+            for relacao in selecionadas:
+                db.delete(relacao)
+            db.flush()
+            db.expire(plano, ["itens"])
+            for ordem, relacao in enumerate(itens_por_categoria(plano)[categoria]):
+                relacao.ordem = ordem
+            sincronizar_campos_legados(plano)
+            db.commit()
+    return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
+
+
 @router.post("/{jogo_id}/plano/jogadas")
 async def adicionar_jogada_plano(jogo_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_autenticacao)):
     jogo = _obter_jogo(db, jogo_id)
@@ -758,12 +794,26 @@ async def adicionar_jogada_plano(jogo_id: int, request: Request, db: Session = D
     if not jogo:
         return RedirectResponse(url="/equipas", status_code=303)
     _verificar_acesso_plano_jogo(utilizador, jogo, db, permitir_consulta_staff=False)
-    setplay_id = int(dados.get("setplay_id")) if str(dados.get("setplay_id") or "").isdigit() else None
-    setplay = db.query(SetPlay).join(Playbook).filter(SetPlay.id == setplay_id, Playbook.equipa_id == jogo.equipa_id).first()
+    pedidos = list(dict.fromkeys(
+        int(valor) for valor in [*dados.getlist("setplay_ids"), dados.get("setplay_id")]
+        if str(valor or "").isdigit()
+    ))
+    jogadas = db.query(SetPlay).join(Playbook).filter(
+        SetPlay.id.in_(pedidos), Playbook.equipa_id == jogo.equipa_id,
+    ).all() if pedidos else []
+    disponiveis = {jogada.id: jogada for jogada in jogadas}
     plano = _obter_ou_criar_plano_jogo(db, jogo)
     db.flush()
-    if setplay and not db.query(PlanoJogoJogada).filter_by(plano_jogo_id=plano.id, setplay_id=setplay.id).first():
-        db.add(PlanoJogoJogada(clube_id=jogo.clube_id, plano_jogo_id=plano.id, setplay_id=setplay.id, ordem=len(plano.jogadas)))
+    existentes = {relacao.setplay_id for relacao in plano.jogadas}
+    ordem = max((relacao.ordem for relacao in plano.jogadas), default=-1) + 1
+    adicionados = 0
+    for setplay_id in pedidos:
+        if setplay_id in disponiveis and setplay_id not in existentes:
+            db.add(PlanoJogoJogada(clube_id=jogo.clube_id, plano_jogo_id=plano.id, setplay_id=setplay_id, ordem=ordem))
+            existentes.add(setplay_id)
+            ordem += 1
+            adicionados += 1
+    if adicionados:
         db.commit()
     return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
 

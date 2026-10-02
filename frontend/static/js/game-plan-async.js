@@ -41,7 +41,9 @@
     var detailsState = Array.from(region.querySelectorAll("details")).map(function (item) {
       return item.open;
     });
-    var scrollTop = window.scrollY;
+    var scrollRoot = document.scrollingElement || document.documentElement;
+    var scrollTop = scrollRoot.scrollTop;
+    var previousOverflowAnchor = scrollRoot.style.overflowAnchor;
 
     try {
       var body = new FormData(form);
@@ -66,15 +68,19 @@
       }
       if (!incoming) throw new Error("Não foi possível atualizar o plano de jogo.");
 
+      scrollRoot.style.overflowAnchor = "none";
       region.innerHTML = incoming.innerHTML;
       Array.from(region.querySelectorAll("details")).forEach(function (item, index) {
         if (index < detailsState.length) item.open = detailsState[index];
       });
       notify(flash ? flash.textContent.replace("×", "").trim() : "Alteração guardada.", false);
+      scrollRoot.scrollTop = scrollTop;
       window.requestAnimationFrame(function () {
-        window.scrollTo({ top: scrollTop, behavior: "auto" });
+        scrollRoot.scrollTop = scrollTop;
+        window.requestAnimationFrame(function () { scrollRoot.style.overflowAnchor = previousOverflowAnchor; });
       });
     } catch (error) {
+      scrollRoot.style.overflowAnchor = previousOverflowAnchor;
       notify(error.message || "Não foi possível concluir a operação.", true);
     } finally {
       form.dataset.busy = "false";

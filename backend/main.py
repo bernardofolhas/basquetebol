@@ -56,6 +56,7 @@ from database import (
     actualizar_estrutura_scouting_individual,
     actualizar_estrutura_scouting_coletivo,
     actualizar_estrutura_ficha_jogo,
+    actualizar_estrutura_minutos_rotacao,
     actualizar_estrutura_equipas_treino,
     actualizar_estrutura_staff,
     actualizar_estrutura_jogadores,
@@ -150,6 +151,7 @@ try:
     actualizar_estrutura_convocacoes_assiduidade()
     actualizar_estrutura_jogadores()
     actualizar_estrutura_ficha_jogo()
+    actualizar_estrutura_minutos_rotacao()
     actualizar_estrutura_estatisticas()
     actualizar_estrutura_scouting_individual()
     actualizar_estrutura_scouting_coletivo()

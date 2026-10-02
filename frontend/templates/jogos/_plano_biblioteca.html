@@ -20,7 +20,7 @@
                 <ol class="game-plan-priority-list">
                     {% for relacao in itens_plano[categoria] %}
                     <li>
-                        <span>{{ loop.index }}</span>
+                        {% if categoria in ('chave_ataque', 'chave_defesa') %}<label class="game-plan-bulk-choice" title="Selecionar chave para retirar"><input type="checkbox" name="relacao_ids" value="{{ relacao.id }}" form="eliminar-chaves-{{ categoria }}"><span>{{ loop.index }}</span></label>{% else %}<span>{{ loop.index }}</span>{% endif %}
                         <p>{{ relacao.item.texto }}</p>
                         <div class="game-plan-order-actions">
                             <form method="POST" action="/jogos/{{ jogo.id }}/plano/itens/{{ relacao.id }}/mover/cima" {% if plano_async %}data-studio-async data-studio-refresh="game-plan"{% else %}data-game-plan-async{% endif %}>
@@ -41,6 +41,14 @@
                     <li class="is-empty">Ainda sem itens selecionados neste plano.</li>
                     {% endfor %}
                 </ol>
+
+                {% if categoria in ('chave_ataque', 'chave_defesa') and itens_plano[categoria] %}
+                <form id="eliminar-chaves-{{ categoria }}" class="game-plan-bulk-remove" method="POST" action="/jogos/{{ jogo.id }}/plano/itens/eliminar-selecao" {% if plano_async %}data-studio-async data-studio-refresh="game-plan"{% else %}data-game-plan-async{% endif %}>
+                    <input type="hidden" name="voltar" value="{{ voltar }}">
+                    <input type="hidden" name="categoria" value="{{ categoria }}">
+                    <button type="submit" class="ds-button-secondary">Retirar chaves selecionadas</button>
+                </form>
+                {% endif %}
 
                 <div class="game-plan-adders">
                     <form method="POST" action="/jogos/{{ jogo.id }}/plano/itens" {% if plano_async %}data-studio-async data-studio-refresh="game-plan"{% else %}data-game-plan-async{% endif %}>
@@ -93,15 +101,14 @@
             <h2>Jogadas para este plano</h2>
             <p>Os diagramas seguem esta ordem no PDF, da esquerda para a direita e de cima para baixo.</p>
         </div>
-        <form method="POST" action="/jogos/{{ jogo.id }}/plano/jogadas" {% if plano_async %}data-studio-async data-studio-refresh="game-plan"{% else %}data-game-plan-async{% endif %}>
+        <form class="game-plan-play-import" method="POST" action="/jogos/{{ jogo.id }}/plano/jogadas" {% if plano_async %}data-studio-async data-studio-refresh="game-plan"{% else %}data-game-plan-async{% endif %}>
             <input type="hidden" name="voltar" value="{{ voltar }}">
-            <select name="setplay_id" class="ds-input" required>
-                <option value="">Selecionar jogada da equipa</option>
-                {% for jogada in jogadas_disponiveis %}
-                <option value="{{ jogada.id }}">{{ jogada.categoria or 'Sem categoria' }} · {{ jogada.nome }}</option>
-                {% endfor %}
-            </select>
-            <button class="ds-button-primary">Importar jogada</button>
+            {% set ids_jogadas_plano=jogadas_plano|map(attribute='setplay_id')|list %}
+            <details class="game-plan-play-picker">
+                <summary>Selecionar jogadas do Playbook <b>{{ jogadas_disponiveis|length }}</b></summary>
+                <div class="game-plan-play-options">{% for jogada in jogadas_disponiveis %}<label><input type="checkbox" name="setplay_ids" value="{{ jogada.id }}" {% if jogada.id in ids_jogadas_plano %}disabled{% endif %}><span><small>{{ jogada.categoria or 'Sem categoria' }}</small><strong>{{ jogada.nome }}</strong>{% if jogada.id in ids_jogadas_plano %}<em>Já no plano</em>{% endif %}</span></label>{% else %}<p>Cria jogadas no Playbook desta equipa para as importar.</p>{% endfor %}</div>
+            </details>
+            <button class="ds-button-primary">Importar selecionadas</button>
         </form>
     </header>
     <div class="game-plan-play-grid">

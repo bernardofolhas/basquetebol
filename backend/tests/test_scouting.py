@@ -8,7 +8,8 @@ from pypdf import PdfReader
 
 from database import SessionLocal
 from models.equipa import Equipa
-from models.jogo import ItemPlanoJogoBiblioteca, Jogo, PlanoJogoItem
+from models.jogador import Jogador
+from models.jogo import Convocado, ItemPlanoJogoBiblioteca, Jogo, PlanoJogo, PlanoJogoItem, PlanoJogoJogada
 from models.playbook import PassoSetPlay, Playbook, SetPlay
 from models.scouting import (
     ScoutingAdversario,
@@ -886,8 +887,102 @@ def test_plano_de_jogo_vive_no_dossier_e_importa_scouting_sem_substituir():
     assert "importar_scouting_para_plano" in router
     assert 'voltar.startswith("/scouting/")' in jogos
     assert 'name="rotacao_{{ grupo }}_{{ posicao }}"' in plano
-    assert "Selecionar jogada da equipa" in biblioteca
+    assert "Selecionar jogadas do Playbook" in biblioteca
     assert "Criar e guardar uma nova opção" in biblioteca
+
+
+def test_plano_jogo_importa_multiplas_jogadas_remove_chaves_e_guarda_minutos(client_admin):
+    adversario_id, jogo_id, equipa_id, clube_id, _ = _criar_adversario_integracao()
+    playbook_id = jogador_id = None
+    try:
+        db = SessionLocal()
+        try:
+            playbook = Playbook(clube_id=clube_id, equipa_id=equipa_id, nome="Jogadas de integração")
+            jogador = Jogador(clube_id=clube_id, equipa_id=equipa_id, nome="Titular de integração")
+            db.add_all((playbook, jogador))
+            db.flush()
+            playbook_id, jogador_id = playbook.id, jogador.id
+            db.add(Convocado(clube_id=clube_id, jogo_id=jogo_id, jogador_id=jogador.id))
+            jogadas = [
+                SetPlay(clube_id=clube_id, playbook_id=playbook.id, nome=f"Ação {indice}", categoria="Ataque", ordem=indice)
+                for indice in range(1, 4)
+            ]
+            db.add_all(jogadas)
+            db.commit()
+            jogadas_ids = [jogada.id for jogada in jogadas]
+        finally:
+            db.close()
+
+        pagina = client_admin.get(f"/scouting/adversarios/{adversario_id}/plano-jogo?jogo_id={jogo_id}")
+        assert pagina.status_code == 200
+        assert 'name="setplay_ids"' in pagina.text
+        assert "Selecionar jogadas do Playbook" in pagina.text
+
+        resposta = client_admin.post(
+            f"/jogos/{jogo_id}/plano/jogadas",
+            data={"setplay_ids": [str(jogadas_ids[1]), str(jogadas_ids[0]), str(jogadas_ids[1]), "99999999"]},
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        db = SessionLocal()
+        try:
+            relacoes = db.query(PlanoJogoJogada).join(PlanoJogo).filter(PlanoJogo.jogo_id == jogo_id).order_by(PlanoJogoJogada.ordem).all()
+            assert [relacao.setplay_id for relacao in relacoes] == jogadas_ids[:2][::-1]
+        finally:
+            db.close()
+
+        client_admin.post(f"/jogos/{jogo_id}/plano/jogadas", data={"setplay_id": str(jogadas_ids[2])}, follow_redirects=False)
+        client_admin.post(
+            f"/jogos/{jogo_id}/plano",
+            data={"titular_1": str(jogador_id), "rotacao_1_1": str(jogador_id), "rotacao_1_minuto": "8", "rotacao_2_minuto": "18"},
+            follow_redirects=False,
+        )
+        for texto in ("Chave A", "Chave B"):
+            client_admin.post(
+                f"/jogos/{jogo_id}/plano/itens",
+                data={"categoria": "chave_ataque", "novo_texto": texto},
+                follow_redirects=False,
+            )
+        db = SessionLocal()
+        try:
+            plano = db.query(PlanoJogo).filter_by(jogo_id=jogo_id).one()
+            assert (plano.rotacao_1_minuto, plano.rotacao_2_minuto) == (8, 18)
+            assert [rel.setplay_id for rel in plano.jogadas] == [*jogadas_ids[:2][::-1], jogadas_ids[2]]
+            chaves = [rel for rel in plano.itens if rel.item.categoria == "chave_ataque"]
+            assert len(chaves) == 2
+            apagar_id, manter_id = chaves[0].id, chaves[1].id
+            biblioteca_id = chaves[0].item_id
+        finally:
+            db.close()
+
+        resposta = client_admin.post(
+            f"/jogos/{jogo_id}/plano/itens/eliminar-selecao",
+            data={"categoria": "chave_ataque", "relacao_ids": [str(apagar_id), "99999999"]},
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        db = SessionLocal()
+        try:
+            plano = db.query(PlanoJogo).filter_by(jogo_id=jogo_id).one()
+            assert [rel.id for rel in plano.itens if rel.item.categoria == "chave_ataque"] == [manter_id]
+            assert db.query(ItemPlanoJogoBiblioteca).filter_by(id=biblioteca_id).one().ativo is True
+        finally:
+            db.close()
+
+        impresso = client_admin.get(f"/jogos/{jogo_id}/plano/print")
+        assert impresso.status_code == 200
+        assert "min 8" in impresso.text
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_id, playbook_id)
+        if jogador_id:
+            db = SessionLocal()
+            try:
+                jogador = db.get(Jogador, jogador_id)
+                if jogador:
+                    db.delete(jogador)
+                    db.commit()
+            finally:
+                db.close()
 
 
 def test_scouting_atualiza_acoes_locais_sem_refresh_da_pagina():

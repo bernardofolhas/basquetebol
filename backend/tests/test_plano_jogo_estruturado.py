@@ -1,8 +1,12 @@
+import base64
 from datetime import date, timedelta
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 
-from services.plano_jogo_service import jogo_em_preparacao, jogos_em_preparacao
+from PIL import Image
+
+from services.plano_jogo_service import jogo_em_preparacao, jogos_em_preparacao, preview_jogada
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -60,6 +64,25 @@ def test_plano_jogo_tem_biblioteca_ordenada_e_jogadas_da_equipa():
     assert 'include "jogos/_plano_biblioteca.html"' in template
     assert '/plano/itens/{{ relacao.id }}/mover/cima' in biblioteca
     assert '/plano/jogadas/{{ relacao.id }}/mover/baixo' in biblioteca
+
+
+def test_previsualizacao_jogada_compoe_desenho_transparente_sobre_campo():
+    desenho = Image.new("RGBA", (120, 100), (0, 0, 0, 0))
+    desenho.putpixel((60, 50), (255, 0, 0, 255))
+    buffer = BytesIO()
+    desenho.save(buffer, format="PNG")
+    data_uri = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+    jogada = SimpleNamespace(passos=[SimpleNamespace(desenho=data_uri, imagem_coach=None)])
+
+    preview = preview_jogada(jogada)
+
+    assert preview and preview.startswith("data:image/png;base64,")
+    with Image.open(BytesIO(base64.b64decode(preview.split(",", 1)[1]))) as imagem:
+        assert imagem.width > desenho.width
+        assert imagem.getpixel((0, 0))[3] == 255
+
+    jogada.passos[0].imagem_coach = data_uri
+    assert preview_jogada(jogada) == data_uri
 
 
 def test_biblioteca_e_usada_nos_dois_acessos_e_mantem_memoria():

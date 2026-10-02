@@ -141,7 +141,7 @@
     <h2>Rotações planeadas</h2>
     <div class="grid-3">
     {% for grupo, entradas in rotacoes_equipa.items() %}
-        <article class="rotacao-card"><h3>Cinco {{ grupo }}</h3>
+        <article class="rotacao-card"><h3>Cinco {{ grupo }}{% set minuto=plano|attr('rotacao_' ~ grupo ~ '_minuto') if plano else none %}{% if minuto is not none %} · min {{ minuto }}{% endif %}</h3>
         {% for entrada in entradas %}<div class="jogador-row"><span class="num-pos">{{ loop.index }}</span><span>{{ entrada.jogador.nome }}</span></div>{% else %}<p class="texto">—</p>{% endfor %}
         </article>
     {% endfor %}

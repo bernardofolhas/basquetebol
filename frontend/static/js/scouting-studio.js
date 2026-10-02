@@ -170,7 +170,8 @@
         submitter.disabled = true;
         if (!submitter.classList.contains("scouting-icon-danger")) submitter.textContent = "A guardar...";
       }
-      var scrollTop = window.scrollY;
+      var scrollRoot = document.scrollingElement || document.documentElement;
+      var scrollTop = scrollRoot.scrollTop;
       var detailsState = {};
       var refreshKeys = (form.dataset.studioRefresh || "").split(/\s+/).filter(Boolean);
       refreshKeys.forEach(function (key) {
@@ -196,6 +197,8 @@
         if (!parsedRoot) throw new Error("A sessão deixou de ser válida. Atualiza a página e volta a tentar.");
         if (flash && flash.classList.contains("ds-flash-error")) throw new Error(flash.textContent.replace("×", "").trim());
         if (!refreshKeys.length) throw new Error("Esta ação ainda não suporta atualização local.");
+        var previousOverflowAnchor = scrollRoot.style.overflowAnchor;
+        scrollRoot.style.overflowAnchor = "none";
         refreshKeys.forEach(function (key) {
           var currentRegions = studioRegions(root, key);
           var incomingRegions = studioRegions(parsedRoot, key);
@@ -212,8 +215,13 @@
         if (form.dataset.studioClose === "true" && dialog && dialog.isConnected && dialog.open) dialog.close();
         notify(flash ? flash.textContent.replace("×", "").trim() : "Alteração guardada.", "success");
         update();
-        window.requestAnimationFrame(function () { window.scrollTo({ top: scrollTop, behavior: "auto" }); });
+        scrollRoot.scrollTop = scrollTop;
+        window.requestAnimationFrame(function () {
+          scrollRoot.scrollTop = scrollTop;
+          window.requestAnimationFrame(function () { scrollRoot.style.overflowAnchor = previousOverflowAnchor; });
+        });
       } catch (error) {
+        scrollRoot.style.overflowAnchor = previousOverflowAnchor || "";
         notify(error.message || "Não foi possível concluir a operação.", "error");
       } finally {
         form.dataset.studioBusy = "false";

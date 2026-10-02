@@ -142,7 +142,9 @@ def sincronizar_rotacoes_legadas(plano) -> None:
     for grupo, entradas in rotacoes_por_grupo(plano).items():
         nomes = [entrada.jogador.nome for entrada in entradas if entrada.jogador]
         if nomes:
-            linhas.append(f"Cinco {grupo}: " + " · ".join(nomes))
+            minuto = getattr(plano, f"rotacao_{grupo}_minuto", None)
+            etiqueta = f"Cinco {grupo} (min {minuto})" if minuto is not None else f"Cinco {grupo}"
+            linhas.append(etiqueta + ": " + " · ".join(nomes))
     plano.rotacoes = "\n".join(linhas) or None
 
 
@@ -156,7 +158,13 @@ def preview_jogada(setplay) -> str | None:
     passo = next(iter(setplay.passos), None)
     if not passo:
         return None
-    return passo.imagem_coach or decompor_desenho_editavel(passo.desenho)[0]
+    if passo.imagem_coach:
+        return normalizar_data_uri(passo.imagem_coach)
+    desenho = decompor_desenho_editavel(passo.desenho)[0] if passo.desenho else None
+    campo = Path(STATIC_DIR) / "campos" / "campo_meio.png"
+    if desenho and campo.is_file():
+        return compor_desenho_sobre_campo(campo, desenho)
+    return desenho
 
 
 def graficos_plano(plano) -> list[dict]:

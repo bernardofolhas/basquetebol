@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Plano de Jogo — {{ jogo.adversario }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20260923-game-plan-2">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/scouting-department.css?v=20261002-game-plan-3">{% endblock %}
 {% block conteudo %}
 
 {{ equipa_contexto(
@@ -37,7 +37,7 @@
                 </div>
                 {% endfor %}
                 {% for grupo in range(1, 4) %}
-                <h3 class="text-xs font-bold text-gray-600 uppercase tracking-wide mt-4 mb-2">Rotação {{ grupo }}</h3>
+                <div class="game-plan-five-heading mt-4 mb-2"><h3 class="text-xs font-bold text-gray-600 uppercase tracking-wide">Rotação {{ grupo }}</h3><label class="game-plan-rotation-minute">Minuto previsto <input type="number" name="rotacao_{{ grupo }}_minuto" min="1" max="60" value="{{ plano|attr('rotacao_' ~ grupo ~ '_minuto') if plano and plano|attr('rotacao_' ~ grupo ~ '_minuto') is not none else '' }}" aria-label="Minuto previsto da rotação {{ grupo }}"></label></div>
                 {% for posicao in range(1, 6) %}
                 {% set atual = rotacoes_equipa[grupo]|selectattr('ordem', 'equalto', posicao)|first %}
                 <div class="flex items-center gap-2 mb-2">
@@ -75,4 +75,4 @@
 </div>
 </div>
 {% endblock %}
-{% block scripts_extra %}<script src="/static/js/game-plan-async.js?v=20260923-1"></script>{% endblock %}
+{% block scripts_extra %}<script src="/static/js/game-plan-async.js?v=20261002-2"></script>{% endblock %}

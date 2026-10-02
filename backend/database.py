@@ -1070,6 +1070,20 @@ def actualizar_estrutura_ficha_jogo() -> None:
         logger.info("Campos da ficha de jogo atualizados em %s.", tabela)
 
 
+def actualizar_estrutura_minutos_rotacao() -> None:
+    """Acrescenta os minutos previstos a planos criados antes desta versão."""
+    inspector = inspect(engine)
+    if not inspector.has_table("planos_jogo"):
+        return
+    existentes = {coluna["name"] for coluna in inspector.get_columns("planos_jogo")}
+    with engine.begin() as ligacao:
+        for grupo in range(1, 4):
+            coluna = f"rotacao_{grupo}_minuto"
+            if coluna not in existentes:
+                opcao = "IF NOT EXISTS " if engine.dialect.name == "postgresql" else ""
+                ligacao.execute(text(f"ALTER TABLE planos_jogo ADD COLUMN {opcao}{coluna} INTEGER NULL"))
+
+
 def actualizar_estrutura_estatisticas() -> None:
     """Atualiza instalações existentes para o registo e importação estatística."""
     inspector = inspect(engine)
