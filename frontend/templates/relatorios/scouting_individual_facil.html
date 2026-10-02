@@ -12,9 +12,10 @@
 </style>{% include "relatorios/_scouting_estilos.html" %}
 <style>
 @page{size:A4 portrait;margin:7mm}
-.player-sheet{min-height:137mm;gap:1.8mm;margin-bottom:2mm;padding:0 4mm 2mm;page-break-after:auto;break-inside:avoid;page-break-inside:avoid}
+.player-sheet{display:block;min-height:137mm;margin-bottom:2mm;padding:0 4mm 2mm;page-break-after:auto;break-inside:avoid;page-break-inside:avoid}
 .player-sheet:last-child{margin-bottom:0}
-.player-sheet>.scouting-report-header{grid-template-columns:12mm minmax(0,1fr) 12mm;gap:2mm;min-height:15mm;margin:0 -4mm;padding:1mm 3mm}
+.player-sheet>.scouting-report-header{grid-template-columns:12mm minmax(0,1fr) 12mm;gap:2mm;min-height:15mm;margin:0 -4mm 1.8mm;padding:1mm 3mm}
+.player-sheet>section{margin-bottom:1.8mm}
 .player-sheet .scouting-report-header h1{font-size:10.5px}
 .player-sheet .scouting-report-logo,.player-sheet .scouting-report-logo img{width:11mm;height:11mm}
 .player-head,.player-head.has-hotzone{gap:2mm}

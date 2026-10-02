@@ -73,3 +73,26 @@ def test_dois_cartoes_individuais_completos_cabem_num_a4():
     assert "Ana Martins" in paginas[0].extract_text()
     assert "Beatriz Silva" in paginas[0].extract_text()
     assert "Clara Lopes" in paginas[1].extract_text()
+
+    # Sem estatisticas, o perfil continua a pertencer ao mesmo cartao/pagina.
+    contexto["atletas"] = atletas
+    contexto["secoes_set"] = contexto["secoes_set"] - {"estatisticas"}
+    sem_estatisticas = templates.get_template("relatorios/scouting_individual_facil.html").render(contexto)
+    paginas = PdfReader(BytesIO(HTML(string=sem_estatisticas).write_pdf())).pages
+    assert len(paginas) == 1
+    texto = " ".join(paginas[0].extract_text().split())
+    for valor in ("Ana Martins", "Beatriz Silva", "Característica 5", "Tendência 3", "Instrução 3"):
+        assert valor in texto
+
+    atletas[0].ficha.resumo = "\n".join(
+        f"Observação {numero}: muda de ritmo no ataque e procura a melhor opção depois do bloqueio."
+        for numero in range(1, 19)
+    )
+    contexto["secoes_set"].add("estatisticas")
+    paginas = PdfReader(BytesIO(HTML(string=templates.get_template("relatorios/scouting_individual_facil.html").render(contexto)).write_pdf())).pages
+    assert len(paginas) == 2
+    assert "Ana Martins" in paginas[0].extract_text()
+    assert "Beatriz Silva" not in paginas[0].extract_text()
+    assert "Característica 5" in paginas[0].extract_text()
+    assert "Beatriz Silva" in paginas[1].extract_text()
+    assert "Característica 5" in paginas[1].extract_text()
