@@ -9,7 +9,32 @@
 .player-head{grid-template-columns:26mm minmax(0,1fr);gap:3mm}.player-head.no-photo{grid-template-columns:minmax(0,1fr)}.player-head.has-hotzone{grid-template-columns:26mm minmax(0,1fr) 38mm}.player-head.no-photo.has-hotzone{grid-template-columns:minmax(0,1fr) 38mm}.player-head .scout-photo,.player-head .scout-avatar{width:26mm;height:32mm}.player-name{font-size:16px}.player-hotzone .scout-court{width:35mm;height:28mm}
 .player-banner{display:grid;grid-template-columns:12mm minmax(0,1fr) 12mm;align-items:center;gap:3mm}.player-banner-logo{width:11mm;height:11mm;object-fit:contain;border-radius:0;background:transparent;padding:0}.player-banner-title{margin:0;color:var(--pdf-on-primary);font-size:14px;line-height:1.1;text-align:center}.player-summary{display:grid;width:100%;max-width:none;gap:1mm;margin:3mm 0 0;padding:0;list-style:none}.player-summary li{display:flex;min-height:7mm;align-items:center;overflow:hidden;border:1px solid #e7ebf0;border-left:1mm solid var(--pdf-primary);border-radius:0 2mm 2mm 0;background:var(--pdf-surface);padding:1.5mm 2.2mm;color:var(--pdf-ink);font-size:7px;line-height:1.3;break-inside:avoid}.stat-percentage{display:block;margin-top:.4mm;color:var(--pdf-primary-dark);font-size:5.5px;font-weight:900}
 .player-profile{display:flex;align-items:stretch;gap:3mm;min-height:44mm}.intel-card{flex:1;min-width:0;min-height:44mm;overflow:visible;break-inside:avoid;page-break-inside:avoid}.intel-card h2{margin-bottom:2mm}.rating-list,.intel-list{gap:1.5mm}.rating-item{display:block;min-height:11mm;overflow:hidden;border:1px solid var(--pdf-line);border-left:1mm solid var(--pdf-primary);border-radius:2mm;background:#fff;padding:1.5mm 2mm}.rating-item>div:first-child{min-width:0}.rating-item>div:last-child{display:flex;align-items:center;justify-content:space-between;gap:2mm;margin-top:1.2mm}.rating-item strong{display:block;line-height:1.2}.rating-item small{margin-top:.7mm;line-height:1.2}.rating-value{min-width:22mm;line-height:1.15;white-space:nowrap}.intel-list li{min-height:10mm;overflow:hidden;border:1px solid var(--pdf-line);border-left:1mm solid var(--pdf-primary);border-radius:2mm;background:#fff;padding:2mm 2.2mm}.game-plan-card .intel-list li{border:1px solid var(--pdf-primary-border);border-left:1.2mm solid var(--pdf-primary);background:#fff}
-</style>{% include "relatorios/_scouting_estilos.html" %}</head><body>
+</style>{% include "relatorios/_scouting_estilos.html" %}
+<style>
+@page{size:A4 portrait;margin:7mm}
+.player-sheet{min-height:137mm;gap:1.8mm;margin-bottom:2mm;padding:0 4mm 2mm;page-break-after:auto;break-inside:avoid;page-break-inside:avoid}
+.player-sheet:last-child{margin-bottom:0}
+.player-sheet>.scouting-report-header{grid-template-columns:12mm minmax(0,1fr) 12mm;gap:2mm;min-height:15mm;margin:0 -4mm;padding:1mm 3mm}
+.player-sheet .scouting-report-header h1{font-size:10.5px}
+.player-sheet .scouting-report-logo,.player-sheet .scouting-report-logo img{width:11mm;height:11mm}
+.player-head,.player-head.has-hotzone{gap:2mm}
+.player-head{grid-template-columns:21mm minmax(0,1fr)}
+.player-head.has-hotzone{grid-template-columns:21mm minmax(0,1fr) 33mm}
+.player-head.no-photo.has-hotzone{grid-template-columns:minmax(0,1fr) 33mm}
+.player-head .scout-photo,.player-head .scout-avatar{width:21mm;height:26mm}
+.player-name{margin-bottom:1mm;font-size:12px;line-height:1.1}
+.player-facts{gap:.6mm}.player-facts span{padding:.5mm 1mm;font-size:6.5px}
+.player-hotzone{padding:.8mm}.player-hotzone>b{margin-bottom:.3mm;font-size:5.5px}.player-hotzone .scout-court{width:30mm;height:24mm}
+.player-hotzone .scout-zone-dot{width:6mm;height:6mm;min-width:6mm;min-height:6mm}
+.player-summary{gap:.35mm;margin:1mm 0 0}.player-summary li{min-height:0;overflow:visible;padding:.6mm 1mm;font-size:6.5px;line-height:1.15}
+.player-stats-title{margin-bottom:.6mm}.player-stats-title h2{font-size:9px}
+.player-sheet .scout-stat-table th,.player-sheet .scout-stat-table td{padding:.7mm .5mm;font-size:6.5px}.player-sheet .stat-percentage{margin-top:0;font-size:5.5px}
+.player-profile{gap:1.5mm;min-height:0}.intel-card{min-height:0;padding:1.5mm;overflow:visible}.intel-card h2{margin-bottom:1mm;font-size:8.5px}
+.rating-list,.intel-list{gap:.6mm}.rating-item{min-height:8.6mm;overflow:visible;padding:1mm}.rating-item strong,.intel-list strong{font-size:7px}.rating-item small{margin-top:.35mm;font-size:5.8px}
+.rating-item>div:last-child{gap:.5mm;margin-top:.9mm}.rating-scale i{width:2.6mm;height:1.5mm}.rating-value{min-width:0;font-size:5.3px}
+.intel-list li{min-height:8.6mm;overflow:visible;padding:1mm;font-size:7px;line-height:1.18}.intel-list span{font-size:6px}
+.player-footer{padding-top:.7mm;font-size:5.5px}
+</style></head><body>
 {% for j in atletas %}{% set perfil=destaques_atletas[j.id] %}{% set ultimo=ultimo_jogo.get(j.id) %}{% set secoes_jogador=(secoes_por_atleta|default({})).get(j.id, secoes_set) %}{% set stats_jogador=(stat_fields_por_atleta|default({})).get(j.id, stat_fields) %}{% set pares_lancamento={'fg_c':'fg_t','dois_c':'dois_t','tres_c':'tres_t','ll_c':'ll_t'} %}
 <main class="player-sheet">
   {{ cabecalho_scouting('Individual', alvo_nome, identidade, simbolo_adversario) }}

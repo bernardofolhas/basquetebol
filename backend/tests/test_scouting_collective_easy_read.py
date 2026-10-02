@@ -148,6 +148,11 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
         "blocos_coletivos": {"chave": chaves, "resposta": [resposta]},
         "perfil_ataque": ataque, "perfil_defesa": defesa,
         "cinco_previsto": titulares, "rotacoes_previstas": [Item(jogador=jogador(6))],
+        "substituicoes_por_titular": {1: {
+            1: Item(jogador=Item(nome="Reserva Um")),
+            2: Item(jogador=Item(nome="Reserva Dois")),
+        }},
+        "rotacoes_sem_titular": {}, "ha_rotacoes_sem_titular": False,
         "rotacoes_por_posicao": {"Base": [Item(jogador=jogador(6))]},
         "fotografias": {}, "caracteristicas_cinco": {1: ["P&R central", "Transição"]},
         "jogadores_prioritarios": [
@@ -172,7 +177,7 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
     paginas = PdfReader(BytesIO(pdf)).pages
     assert len(paginas) == 1
     texto_pdf = " ".join(paginas[0].extract_text().split())
-    for texto in ("Gus Goerzen", "Lamine Banora", "Thomas Jervis", "Participação no ressalto ofensivo", "Criação de lançamento após bloqueio direto"):
+    for texto in ("Gus Goerzen", "Lamine Banora", "Thomas Jervis", "Reserva Um", "Reserva Dois", "Participação no ressalto ofensivo", "Criação de lançamento após bloqueio direto"):
         assert texto in texto_pdf
     assert "Cinco inicial" in html
     assert "<small>Dia</small>12/10/2026" in html

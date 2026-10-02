@@ -67,6 +67,7 @@ from models.scouting import (
     ScoutingLiderEstatistico,
     ScoutingMomentoPlaybook,
     ScoutingRotacaoPrevista,
+    ScoutingSubstituicaoPrevista,
     STAT_FIELDS,
 )
 from models.treinador import Treinador, treinador_equipa
@@ -952,6 +953,7 @@ def _alvo_relatorio(tipo: str, alvo_id: int, db: Session, utilizador):
             consulta = consulta.options(
                 selectinload(ScoutingAdversario.blocos_coletivos),
                 selectinload(ScoutingAdversario.rotacao_prevista).joinedload(ScoutingRotacaoPrevista.jogador),
+                selectinload(ScoutingAdversario.substituicoes_previstas).joinedload(ScoutingSubstituicaoPrevista.jogador),
                 selectinload(ScoutingAdversario.itens_coletivos)
                 .joinedload(ScoutingAdversarioItem.item),
                 selectinload(ScoutingAdversario.lideres).joinedload(ScoutingLiderEstatistico.jogador),
@@ -1082,6 +1084,13 @@ def _rotacoes_coletivas_por_posicao(adversario):
     return cinco_previsto, rotacoes_previstas, rotacoes_por_posicao
 
 
+def _substituicoes_coletivas_por_titular(adversario):
+    resultado = {}
+    for entrada in adversario.substituicoes_previstas:
+        resultado.setdefault(entrada.titular_id, {})[entrada.ordem] = entrada
+    return resultado
+
+
 def _media_exibida_coletiva(adversario) -> dict[str, float | None]:
     media = adversario.media_coletiva
     if media and media.usar_manual:
@@ -1208,6 +1217,12 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             dados.get("estatistica_destaque"), dados.get("estatistica_destaque_tom"), indicadores_coletivos
         )
         cinco_previsto, rotacoes_previstas, rotacoes_por_posicao = _rotacoes_coletivas_por_posicao(alvo)
+        substituicoes_por_titular = _substituicoes_coletivas_por_titular(alvo)
+        ids_substitutos = {entrada.jogador_id for entrada in alvo.substituicoes_previstas}
+        rotacoes_sem_titular = {
+            posicao: [entrada for entrada in entradas if entrada.jogador_id not in ids_substitutos]
+            for posicao, entradas in rotacoes_por_posicao.items()
+        }
         contexto.update(
             adversario=alvo,
             jogo_referencia=jogos_referencia[0] if jogos_referencia else None,
@@ -1242,6 +1257,10 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             cinco_previsto=cinco_previsto,
             rotacoes_previstas=rotacoes_previstas,
             rotacoes_por_posicao=rotacoes_por_posicao,
+            rotacoes_sem_titular=rotacoes_sem_titular,
+            rotacoes_sem_titular_lista=[entrada for entradas in rotacoes_sem_titular.values() for entrada in entradas],
+            ha_rotacoes_sem_titular=any(rotacoes_sem_titular.values()),
+            substituicoes_por_titular=substituicoes_por_titular,
             passos_setplay={setplay.id: _passos_setplay_pdf(setplay) for setplay in setplays},
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,

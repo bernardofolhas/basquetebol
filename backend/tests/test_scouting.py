@@ -1,8 +1,10 @@
 from datetime import date, timedelta
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from pypdf import PdfReader
 
 from database import SessionLocal
 from models.equipa import Equipa
@@ -19,6 +21,8 @@ from models.scouting import (
     ScoutingJogadorItem,
     ScoutingMediaColetiva,
     ScoutingOpcoesDefensivas,
+    ScoutingRotacaoPrevista,
+    ScoutingSubstituicaoPrevista,
 )
 from models.utilizador import Utilizador
 from paths import TEMPLATES_DIR
@@ -776,7 +780,80 @@ def test_scouting_coletivo_guarda_cinco_inicial_e_rotacoes_previstas():
     assert "Cinco inicial e principais rotações" in coletivo
     assert 'name="titular_{{ indice + 1 }}"' in coletivo
     assert 'name="rotacoes"' in coletivo
+    assert 'data-studio-region="collective-rotation-form"' in coletivo
+    assert 'data-studio-refresh="collective-rotation collective-rotation-form"' in coletivo
     assert "guardar_rotacao_prevista" in router
+
+
+def test_rotacoes_previstas_ligam_duas_entradas_a_cada_titular(client_admin):
+    adversario_id, jogo_id, _, clube_id, _ = _criar_adversario_integracao()
+    try:
+        db = SessionLocal()
+        try:
+            jogadores = [
+                ScoutingJogador(
+                    clube_id=clube_id, adversario_id=adversario_id,
+                    nome=f"Jogador {indice}", numero=str(indice), posicao_principal="Base",
+                )
+                for indice in range(1, 8)
+            ]
+            db.add_all(jogadores)
+            db.commit()
+            ids = [jogador.id for jogador in jogadores]
+        finally:
+            db.close()
+
+        resposta = client_admin.post(
+            f"/scouting/adversarios/{adversario_id}/coletivo/rotacao-prevista",
+            data={
+                "titular_1": str(ids[0]), "titular_2": str(ids[1]),
+                "substituicao_1_1": str(ids[5]), "substituicao_1_2": str(ids[6]),
+                "substituicao_2_1": str(ids[6]), "substituicao_2_2": str(ids[1]),
+            },
+            follow_redirects=False,
+        )
+        assert resposta.status_code == 303
+        db = SessionLocal()
+        try:
+            entradas = db.query(ScoutingSubstituicaoPrevista).filter_by(adversario_id=adversario_id).order_by(
+                ScoutingSubstituicaoPrevista.titular_id, ScoutingSubstituicaoPrevista.ordem
+            ).all()
+            assert [(e.titular_id, e.jogador_id, e.ordem) for e in entradas] == [
+                (ids[0], ids[5], 1), (ids[0], ids[6], 2), (ids[1], ids[6], 1),
+            ]
+            rotacoes = db.query(ScoutingRotacaoPrevista).filter_by(adversario_id=adversario_id, papel="rotacao").all()
+            assert {entrada.jogador_id for entrada in rotacoes} == {ids[5], ids[6]}
+        finally:
+            db.close()
+
+        pagina = client_admin.get(f"/scouting/adversarios/{adversario_id}/coletivo")
+        assert pagina.status_code == 200
+        assert "1.ª entrada" in pagina.text
+        assert "2.ª entrada" in pagina.text
+
+        for formato in ("facil", "completo"):
+            pdf = client_admin.post(
+                f"/exportacoes/relatorios/scouting-coletivo/{adversario_id}/pdf",
+                data={"formato": formato, "secoes": ["identidade", "cinco_rotacao"]},
+            )
+            assert pdf.status_code == 200
+            texto = " ".join(pagina.extract_text() for pagina in PdfReader(BytesIO(pdf.content)).pages)
+            assert "Jogador 6" in texto
+            assert "Jogador 7" in texto
+
+        client_admin.post(
+            f"/scouting/adversarios/{adversario_id}/coletivo/rotacao-prevista",
+            data={"titular_1": str(ids[0]), "substituicao_1_2": str(ids[5])},
+            follow_redirects=False,
+        )
+        db = SessionLocal()
+        try:
+            entradas = db.query(ScoutingSubstituicaoPrevista).filter_by(adversario_id=adversario_id).all()
+            assert [(e.titular_id, e.jogador_id, e.ordem) for e in entradas] == [(ids[0], ids[5], 1)]
+        finally:
+            db.close()
+    finally:
+        _eliminar_adversario_integracao(adversario_id, jogo_id)
 
 
 def test_scouting_coletivo_guarda_ideia_chave_sem_refresh_e_exporta_no_cabecalho():

@@ -137,7 +137,7 @@ def test_configurador_individual_transporta_avaliacoes_tendencias_e_game_plan():
 def test_scouting_individual_facil_tem_cartoes_fotografia_e_texto_curto():
     html = (TEMPLATES / "relatorios" / "scouting_individual_facil.html").read_text(encoding="utf-8")
     assert 'class="player-sheet"' in html
-    assert "page-break-after:always" in html
+    assert "page-break-after:auto" in html
     assert "fotografias.get(j.id)" in html
     assert "stat_fields" in html
     assert "Média da época" in html

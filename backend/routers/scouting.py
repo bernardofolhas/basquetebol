@@ -41,6 +41,7 @@ from models.scouting import (
     ScoutingOpcoesDefensivas,
     ScoutingResultadoColetivo,
     ScoutingRotacaoPrevista,
+    ScoutingSubstituicaoPrevista,
     ScoutingZonaAcao,
 )
 from paths import TEMPLATES_DIR
@@ -611,6 +612,10 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             intel_individual=intel_individual,
             cinco_previsto=[item for item in adversario.rotacao_prevista if item.papel == "titular"],
             rotacoes_previstas=[item for item in adversario.rotacao_prevista if item.papel == "rotacao"],
+            substituicoes_por_titular={
+                titular.id: {entrada.ordem: entrada for entrada in adversario.substituicoes_previstas if entrada.titular_id == titular.id}
+                for titular in adversario.jogadores
+            },
         ))
     if separador == "coletivo":
         _sincronizar_resultados_coletivos(db, adversario)
@@ -691,6 +696,10 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             conceitos=conceitos, momentos=momentos,
             cinco_previsto=[item for item in rotacoes if item.papel == "titular"],
             rotacoes_previstas=[item for item in rotacoes if item.papel == "rotacao"],
+            substituicoes_por_titular={
+                titular.id: {entrada.ordem: entrada for entrada in adversario.substituicoes_previstas if entrada.titular_id == titular.id}
+                for titular in adversario.jogadores
+            },
         ))
     if separador == "relatorios":
         equipas_relatorio = list({jogo.equipa.id: jogo.equipa for jogo in jogos_futuros}.values())
@@ -739,16 +748,30 @@ async def guardar_rotacao_prevista(adversario_id: int, request: Request, db: Ses
     if not adversario:
         return RedirectResponse(url="/scouting", status_code=303)
     dados = await request.form()
+    ids_validos = {jogador.id for jogador in adversario.jogadores}
     titulares = []
+    titulares_por_lugar = []
     for indice in range(1, 6):
         jogador_id = _int(dados.get(f"titular_{indice}"))
-        if jogador_id and jogador_id not in titulares:
+        if jogador_id in ids_validos and jogador_id not in titulares:
             titulares.append(jogador_id)
-    rotacoes = [_int(valor) for valor in dados.getlist("rotacoes")]
-    rotacoes = [jogador_id for jogador_id in rotacoes if jogador_id and jogador_id not in titulares]
-    ids_validos = {jogador.id for jogador in adversario.jogadores}
-    titulares = [jogador_id for jogador_id in titulares if jogador_id in ids_validos][:5]
-    rotacoes = [jogador_id for jogador_id in rotacoes if jogador_id in ids_validos]
+            titulares_por_lugar.append((indice, jogador_id))
+    rotacoes = []
+    for valor in dados.getlist("rotacoes"):
+        jogador_id = _int(valor)
+        if jogador_id in ids_validos and jogador_id not in titulares and jogador_id not in rotacoes:
+            rotacoes.append(jogador_id)
+    substituicoes = []
+    for lugar, titular_id in titulares_por_lugar:
+        entradas = []
+        for ordem in (1, 2):
+            jogador_id = _int(dados.get(f"substituicao_{lugar}_{ordem}"))
+            if jogador_id in ids_validos and jogador_id not in titulares and jogador_id not in entradas:
+                entradas.append(jogador_id)
+                if jogador_id not in rotacoes:
+                    rotacoes.append(jogador_id)
+        substituicoes.extend((titular_id, jogador_id, ordem) for ordem, jogador_id in enumerate(entradas, 1))
+    db.query(ScoutingSubstituicaoPrevista).filter(ScoutingSubstituicaoPrevista.adversario_id == adversario.id).delete(synchronize_session=False)
     db.query(ScoutingRotacaoPrevista).filter(ScoutingRotacaoPrevista.adversario_id == adversario.id).delete(synchronize_session=False)
     for papel, jogadores_ids in (("titular", titulares), ("rotacao", rotacoes)):
         for ordem, jogador_id in enumerate(jogadores_ids):
@@ -756,6 +779,11 @@ async def guardar_rotacao_prevista(adversario_id: int, request: Request, db: Ses
                 clube_id=adversario.clube_id, adversario_id=adversario.id,
                 jogador_id=jogador_id, papel=papel, ordem=ordem,
             ))
+    for titular_id, jogador_id, ordem in substituicoes:
+        db.add(ScoutingSubstituicaoPrevista(
+            clube_id=adversario.clube_id, adversario_id=adversario.id,
+            titular_id=titular_id, jogador_id=jogador_id, ordem=ordem,
+        ))
     db.commit()
     set_flash(request, "Cinco inicial e rotações previstas atualizados.")
     return _voltar_coletivo(adversario.id, "#rotacao-prevista")
