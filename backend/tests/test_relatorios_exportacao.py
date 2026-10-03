@@ -410,7 +410,7 @@ def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
     marcadores = {
         "roster_facil.html": ("easy-roster", "fotografias.get(j.id)", "Referência rápida"),
         "scouting_coletivo_facil.html": ("Quando defendemos", "Quando atacamos", "Jogadores prioritários"),
-        "plano_jogo_facil.html": ("briefing da equipa", "O nosso cinco", "Convocados"),
+        "plano_jogo_facil.html": ("cabecalho_relatorio('Plano de jogo'", "O nosso cinco", "Convocados"),
     }
     for ficheiro, esperados in marcadores.items():
         html = (TEMPLATES / "relatorios" / ficheiro).read_text(encoding="utf-8")

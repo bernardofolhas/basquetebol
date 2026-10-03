@@ -89,8 +89,11 @@ def preparar_contexto_pdf(request, contexto: dict | None = None, identidade: dic
     identidade_pedido = getattr(getattr(request, "state", None), "identidade_clube", None)
     identidade_origem = resultado.get("identidade") or identidade or identidade_pedido or dict(CORES_PADRAO)
     scouting = resultado.get("tipo_relatorio") in {"scouting-individual", "scouting-coletivo"}
-    resultado["identidade"] = _identidade_para_pdf(identidade_origem, scouting=scouting)
-    if scouting and resultado.get("simbolo_adversario"):
+    cabecalho_com_simbolos = scouting or (
+        resultado.get("formato") == "facil" and resultado.get("tipo_relatorio") in {"roster", "plano-jogo"}
+    )
+    resultado["identidade"] = _identidade_para_pdf(identidade_origem, scouting=cabecalho_com_simbolos)
+    if cabecalho_com_simbolos and resultado.get("simbolo_adversario"):
         resultado["simbolo_adversario"] = simbolo_cabecalho_sem_fundo(resultado["simbolo_adversario"])
     resultado.setdefault("hoje", date.today())
     resultado.setdefault("data_exportacao", date.today())

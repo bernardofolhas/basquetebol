@@ -1157,7 +1157,7 @@ def _grupos_resposta_coletiva(blocos: dict[str, list]) -> list[dict]:
 
 def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> dict:
     contexto = {"tipo_relatorio": tipo, "equipa": equipa, "alvo": alvo}
-    if tipo in {"scouting-individual", "scouting-coletivo"}:
+    if tipo in {"roster", "scouting-individual", "scouting-coletivo"}:
         contexto["simbolo_adversario"] = _fotografia_embebida(alvo.simbolo)
     ids = {int(v) for v in dados.getlist("entidades") if str(v).isdigit()}
     stat_fields = [campo for campo in dados.getlist("estatisticas") if campo in STAT_FIELDS]
@@ -1294,6 +1294,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
                 for j in {c.jogador for c in alvo.convocados} | set(titulares_ordenados)
             },
             adversario=adversario,
+            simbolo_adversario=_fotografia_embebida(adversario.simbolo) if adversario else None,
             fotografias_adversario={
                 j.id: _fotografia_embebida(j.fotografia)
                 for j in (adversario.jogadores if adversario else [])
