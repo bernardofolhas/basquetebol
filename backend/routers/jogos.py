@@ -21,10 +21,13 @@ from models.jogo import (
     PlanoJogoRotacao,
 )
 from models.playbook import Playbook, SetPlay
+from models.scouting import ScoutingAdversarioJogo
 from models.treinador import Treinador
 from paths import TEMPLATES_DIR
 from services.notificacoes_service import criar_notificacoes_para_equipa
-from services.pdf_service import content_disposition_pdf, renderizar_pdf
+from services.desenho_service import imagem_estatica_data_uri
+from services.logo_service import caminho_logo_guardado
+from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
 from services.pdf_filtros_service import filtrar_jogos, obter_filtros_pdf
 from services.jogos_service import (
     formatar_confronto,
@@ -854,6 +857,25 @@ async def eliminar_jogada_plano(jogo_id: int, relacao_id: int, request: Request,
     return RedirectResponse(url=_destino_plano(dados, jogo_id), status_code=303)
 
 
+def _contexto_convocatoria(request: Request, db: Session, jogo: Jogo, utilizador) -> dict:
+    ligacao = db.query(ScoutingAdversarioJogo).filter(ScoutingAdversarioJogo.jogo_id == jogo.id).first()
+    simbolo = ligacao.adversario.simbolo if ligacao and ligacao.adversario else None
+    caminho = caminho_logo_guardado(simbolo)
+    simbolo_embebido = None
+    if caminho and caminho.is_file():
+        mime = "image/png" if caminho.suffix.lower() == ".png" else "image/jpeg"
+        simbolo_embebido = imagem_estatica_data_uri(caminho, mime)
+    return {
+        "utilizador": utilizador,
+        "jogo": jogo,
+        "jogadores_convocados": [convocado.jogador for convocado in jogo.convocados],
+        "nome_clube": _nome_clube_pedido(request, jogo.equipa),
+        "simbolo_adversario": simbolo_embebido,
+        "tipo_relatorio": "convocatoria",
+        "formato": "facil",
+    }
+
+
 @router.get("/{jogo_id}/convocatoria/print", response_class=HTMLResponse)
 def imprimir_convocatoria(
     jogo_id: int,
@@ -866,13 +888,8 @@ def imprimir_convocatoria(
         return RedirectResponse(url="/equipas")
     verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
 
-    return templates.TemplateResponse(request, "jogos/convocatoria_print.html", {
-        "utilizador": utilizador,
-        "jogo": jogo,
-        "jogadores_convocados": [c.jogador for c in jogo.convocados],
-        "identidade": getattr(request.state, "identidade_clube", {}),
-        "nome_clube": _nome_clube_pedido(request, jogo.equipa),
-    })
+    contexto = preparar_contexto_pdf(request, _contexto_convocatoria(request, db, jogo, utilizador))
+    return templates.TemplateResponse(request, "jogos/convocatoria_print.html", contexto)
 
 
 @router.get("/{jogo_id}/convocatoria/pdf")
@@ -886,13 +903,9 @@ def exportar_pdf_convocatoria(
     if not jogo:
         return RedirectResponse(url="/equipas")
     verificar_ou_negar_equipa(utilizador, jogo.equipa_id, db)
-    pdf_bytes = renderizar_pdf(request, "jogos/convocatoria_print.html", {
-        "utilizador": utilizador,
-        "jogo": jogo,
-        "jogadores_convocados": [c.jogador for c in jogo.convocados],
-        "modo_pdf": True,
-        "nome_clube": _nome_clube_pedido(request, jogo.equipa),
-    })
+    contexto = _contexto_convocatoria(request, db, jogo, utilizador)
+    contexto["modo_pdf"] = True
+    pdf_bytes = renderizar_pdf(request, "jogos/convocatoria_print.html", contexto)
     nome = f"convocatoria_{jogo.equipa.nome}_{jogo.data}.pdf".replace(" ", "_")
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nome}"})
 

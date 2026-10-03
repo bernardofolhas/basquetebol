@@ -90,7 +90,7 @@ def preparar_contexto_pdf(request, contexto: dict | None = None, identidade: dic
     identidade_origem = resultado.get("identidade") or identidade or identidade_pedido or dict(CORES_PADRAO)
     scouting = resultado.get("tipo_relatorio") in {"scouting-individual", "scouting-coletivo"}
     cabecalho_com_simbolos = scouting or (
-        resultado.get("formato") == "facil" and resultado.get("tipo_relatorio") in {"roster", "plano-jogo"}
+        resultado.get("formato") == "facil" and resultado.get("tipo_relatorio") in {"roster", "plano-jogo", "convocatoria"}
     )
     resultado["identidade"] = _identidade_para_pdf(identidade_origem, scouting=cabecalho_com_simbolos)
     if cabecalho_com_simbolos and resultado.get("simbolo_adversario"):

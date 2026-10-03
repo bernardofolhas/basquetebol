@@ -42,13 +42,13 @@ def test_contexto_pdf_abrevia_nome_do_treinador_no_rodape():
     assert pdf_service.nome_curto_pessoa("Bernardo") == "Bernardo"
 
 
-def test_roster_e_plano_faceis_tratam_fundo_dos_simbolos(monkeypatch):
+def test_relatorios_faceis_tratam_fundo_dos_simbolos(monkeypatch):
     monkeypatch.setattr(
         pdf_service, "_identidade_para_pdf",
         lambda identidade, scouting=False: {"logo_principal": "sem-fundo" if scouting else "opaco"},
     )
     monkeypatch.setattr(pdf_service, "simbolo_cabecalho_sem_fundo", lambda uri: f"sem-fundo:{uri}")
-    for tipo in ("roster", "plano-jogo"):
+    for tipo in ("roster", "plano-jogo", "convocatoria"):
         contexto = pdf_service.preparar_contexto_pdf(
             _request(pdf_service.CORES_PADRAO),
             {"tipo_relatorio": tipo, "formato": "facil", "simbolo_adversario": "adversario"},

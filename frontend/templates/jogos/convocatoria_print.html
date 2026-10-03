@@ -1,4 +1,5 @@
-{% from "partials/pdf_branding.html" import estilo_pdf, cabecalho_pdf, rodape_pdf with context %}
+{% from "partials/pdf_branding.html" import estilo_pdf, rodape_pdf with context %}
+{% from "relatorios/_scouting_cabecalho.html" import cabecalho_relatorio with context %}
 <!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -8,25 +9,19 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         @page { size: A4 portrait; margin: 12mm; }
         body { font-family: Arial, sans-serif; font-size: 12px; color: #000; padding: 8px; }
-        .pdf-brand-header { margin-bottom: 5px; padding-bottom: 5px; }
-        .pdf-brand-logo { width: 30px; height: 30px; }
-        .pdf-brand-name { font-size: 9px; }
-        .pdf-brand-title { font-size: 13px; }
-        .pdf-brand-subtitle, .pdf-brand-meta { font-size: 7px; }
         .toolbar { text-align: center; padding: 10px; background: #f5f5f5; border-bottom: 1px solid #ddd; margin-bottom: 20px; }
-        .btn-print { background: #e25a1c; color: white; border: none; padding: 10px 20px; font-size: 14px; cursor: pointer; border-radius: 6px; }
-        h1 { font-size: 20px; text-align: center; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .btn-print { background: var(--pdf-primary); color: white; border: none; padding: 10px 20px; font-size: 14px; cursor: pointer; border-radius: 6px; }
         .info-jogo { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; }
         .info-jogo table { width: 100%; border-collapse: collapse; }
         .info-jogo td { padding: 5px 8px; border: 1px solid #eee; }
         .info-jogo td:first-child { font-weight: bold; width: 30%; background: #f5f5f5; font-size: 10px; text-transform: uppercase; }
-        .encontro { border: 2px solid #e25a1c; padding: 10px; margin-bottom: 15px; text-align: center; }
-        .encontro h2 { color: #e25a1c; font-size: 13px; margin-bottom: 8px; }
+        .encontro { border: 2px solid var(--pdf-primary); padding: 10px; margin-bottom: 15px; text-align: center; }
+        .encontro h2 { color: var(--pdf-primary-dark); font-size: 13px; margin-bottom: 8px; }
         .encontro p { font-size: 13px; font-weight: bold; }
         .jogadores h2 { font-size: 13px; text-transform: uppercase; margin-bottom: 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
         .jogador { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-bottom: 1px solid #eee; }
         .jogador:nth-child(even) { background: #f9f9f9; }
-        .numero { background: #e25a1c; color: white; font-weight: bold; font-size: 11px; padding: 2px 6px; border-radius: 3px; min-width: 28px; text-align: center; }
+        .numero { background: var(--pdf-primary); color: var(--pdf-on-primary); font-weight: bold; font-size: 11px; padding: 2px 6px; border-radius: 3px; min-width: 28px; text-align: center; }
         .obs { border: 1px solid #ccc; padding: 8px; margin-top: 15px; min-height: 50px; }
         .obs h2 { font-size: 11px; text-transform: uppercase; color: #666; margin-bottom: 6px; }
         .rodape { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -36,6 +31,7 @@
         .modo-pdf .toolbar { display: none; }
     </style>
     {{ estilo_pdf() }}
+    {% include 'relatorios/_cabecalho_relatorio_estilos.html' %}
 </head>
 <body class="{% if modo_pdf %}modo-pdf{% endif %}">
 
@@ -44,7 +40,7 @@
     <a href="/jogos/{{ jogo.id }}" style="margin-left: 15px; color: #666; font-size: 12px;">← Voltar</a>
 </div>
 
-{{ cabecalho_pdf('Convocatória', nome_clube ~ ' · vs ' ~ jogo.adversario ~ ' · ' ~ (jogo.data|data_pt), 'Jogo · ' ~ data_exportacao) }}
+{{ cabecalho_relatorio('Convocatória', jogo.adversario, identidade, simbolo_adversario) }}
 
 <div class="info-jogo">
     <table>
