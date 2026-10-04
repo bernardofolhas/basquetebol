@@ -77,6 +77,7 @@ from paths import STATIC_DIR, TEMPLATES_DIR
 from services.auditoria_service import registar_auditoria
 from services.fotografia_jogador_service import caminho_fotografia
 from services.identidade_clube_service import caminho_ficheiro_logo
+from services.logo_service import caminho_logo_guardado
 from services.desenho_service import (
     compor_desenho_sobre_campo,
     decompor_desenho_editavel,
@@ -84,7 +85,13 @@ from services.desenho_service import (
     normalizar_data_uri,
 )
 from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
-from services.plano_jogo_service import graficos_plano, jogo_em_preparacao, jogos_em_preparacao, rotacoes_por_grupo
+from services.plano_jogo_service import (
+    conteudo_plano_por_categoria,
+    graficos_plano,
+    jogo_em_preparacao,
+    jogos_em_preparacao,
+    rotacoes_por_grupo,
+)
 from services.scouting_individual_service import construir_perfil_individual
 
 router = APIRouter(prefix="/exportacoes", tags=["exportacoes"])
@@ -765,10 +772,10 @@ RELATORIOS_CONFIG = {
         "nome": "Plano de jogo",
         "secoes": [
             _secao("dados_jogo", "Dados do jogo", "Data, hora, local, competicao e adversario.", ("completo", "facil", "a3")),
-            _secao("convocatoria", "Convocatoria", "Atletas convocados e informacao de encontro.", ("completo", "facil")),
+            _secao("convocatoria", "Convocatoria", "Atletas convocados e informacao de encontro.", ("completo",)),
             _secao("cinco_previsto", "Cinco e rotacoes", "Cinco inicial da equipa e previsao do adversario.", ("completo", "facil", "a3")),
-            _secao("plano_ofensivo", "Plano ofensivo", "Chaves e movimentos prioritarios.", ("completo", "facil", "a3")),
-            _secao("plano_defensivo", "Plano defensivo", "Coberturas e respostas por acao.", ("completo", "facil", "a3")),
+            _secao("plano_ofensivo", "Plano ofensivo", "Chaves do jogo no ataque e movimentos prioritários.", ("completo", "facil", "a3")),
+            _secao("plano_defensivo", "Plano defensivo", "Chaves do jogo na defesa e estratégias por situação.", ("completo", "facil", "a3")),
             _secao("situacoes_especiais", "Situacoes especiais", "Decisoes para momentos especificos.", ("completo", "facil")),
             _secao("scouting", "Sintese do scouting", "Informacao coletiva importada do adversario.", ("completo", "facil")),
             _secao("mensagem", "Mensagem final", "Rotações, prioridades e mensagem curta para a equipa.", ("completo", "facil", "a3")),
@@ -900,6 +907,14 @@ def _configuracao_individual_por_atleta(dados, atletas, secoes_globais: list[str
 
 def _fotografia_embebida(url: str | None) -> str | None:
     caminho = caminho_fotografia(url)
+    if not caminho or not caminho.is_file():
+        return None
+    mime = "image/png" if caminho.suffix.lower() == ".png" else "image/jpeg"
+    return imagem_estatica_data_uri(caminho, mime)
+
+
+def _simbolo_embebido(url: str | None) -> str | None:
+    caminho = caminho_logo_guardado(url)
     if not caminho or not caminho.is_file():
         return None
     mime = "image/png" if caminho.suffix.lower() == ".png" else "image/jpeg"
@@ -1158,7 +1173,7 @@ def _grupos_resposta_coletiva(blocos: dict[str, list]) -> list[dict]:
 def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> dict:
     contexto = {"tipo_relatorio": tipo, "equipa": equipa, "alvo": alvo}
     if tipo in {"roster", "scouting-individual", "scouting-coletivo"}:
-        contexto["simbolo_adversario"] = _fotografia_embebida(alvo.simbolo)
+        contexto["simbolo_adversario"] = _simbolo_embebido(alvo.simbolo)
     ids = {int(v) for v in dados.getlist("entidades") if str(v).isdigit()}
     stat_fields = [campo for campo in dados.getlist("estatisticas") if campo in STAT_FIELDS]
     if tipo == "roster":
@@ -1285,6 +1300,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         contexto.update(
             jogo=alvo,
             plano=plano,
+            conteudo_plano=conteudo_plano_por_categoria(plano),
             convocados=alvo.convocados,
             titulares=titulares_ordenados,
             rotacoes_equipa=rotacoes_por_grupo(plano),
@@ -1294,7 +1310,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
                 for j in {c.jogador for c in alvo.convocados} | set(titulares_ordenados)
             },
             adversario=adversario,
-            simbolo_adversario=_fotografia_embebida(adversario.simbolo) if adversario else None,
+            simbolo_adversario=_simbolo_embebido(adversario.simbolo) if adversario else None,
             fotografias_adversario={
                 j.id: _fotografia_embebida(j.fotografia)
                 for j in (adversario.jogadores if adversario else [])

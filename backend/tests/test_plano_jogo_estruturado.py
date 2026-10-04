@@ -6,10 +6,30 @@ from types import SimpleNamespace
 
 from PIL import Image
 
-from services.plano_jogo_service import jogo_em_preparacao, jogos_em_preparacao, preview_jogada
+from services.plano_jogo_service import (
+    conteudo_plano_por_categoria,
+    jogo_em_preparacao,
+    jogos_em_preparacao,
+    preview_jogada,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_conteudo_do_relatorio_prioriza_escolhas_e_recupera_planos_antigos():
+    plano = SimpleNamespace(
+        itens=[SimpleNamespace(item=SimpleNamespace(categoria="chave_ataque", texto="  Atacar cedo  "))],
+        chaves_ataque="Texto antigo",
+        bloqueio_direto_lateral="Forçar para a linha\nTrocar no segundo bloqueio",
+    )
+
+    conteudo = conteudo_plano_por_categoria(plano)
+
+    assert conteudo["chave_ataque"] == ["Atacar cedo"]
+    assert conteudo["bloqueio_direto_lateral"] == ["Forçar para a linha", "Trocar no segundo bloqueio"]
+    assert conteudo["bloqueio_direto_central"] == []
+    assert not any(conteudo_plano_por_categoria(None).values())
 
 
 def test_jogos_em_preparacao_excluem_passados_e_escolhem_o_mais_proximo():

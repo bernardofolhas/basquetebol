@@ -11,7 +11,7 @@ from starlette.templating import Jinja2Templates
 from weasyprint import HTML
 
 from paths import TEMPLATES_DIR
-from routers.exportacoes import _contexto_relatorio
+from routers.exportacoes import _contexto_relatorio, _simbolo_embebido
 
 
 TEMPLATES = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -90,6 +90,59 @@ def test_plano_de_jogo_facil_usa_o_simbolo_do_adversario_e_titulo_curto():
     assert "Plano de jogo - Rivals BC" in paginas[0].extract_text()
 
 
+def test_plano_facil_destaca_chaves_e_defesas_sem_convocados():
+    contexto = _base()
+    jogadores = [
+        Item(id=indice, nome=f"Atleta {indice}", numero_camisola=indice, posicao="Base")
+        for indice in range(1, 6)
+    ]
+    contexto.update(
+        jogo=Item(adversario="Rivals BC", data="04/10/2026", hora="15:00", local="Pavilhão", competicao="Liga"),
+        secoes_set={"dados_jogo", "convocatoria", "plano_ofensivo", "plano_defensivo", "cinco_previsto"},
+        plano=Item(reflexao=None), titulares=jogadores,
+        convocados=[Item(jogador=Item(nome="Convocado não selecionado"))],
+        cinco_adversario=[], rotacoes_equipa={}, graficos_plano=[], fotografias_adversario={},
+        fotografias_equipa={j.id: _simbolo("#d10b14", str(j.id)) for j in jogadores[:4]},
+        conteudo_plano={
+            "chave_ataque": ["Explorar vantagem no primeiro passe"],
+            "chave_defesa": ["Fechar a linha central"],
+            "bloqueio_direto_lateral": ["Forçar para a linha lateral"],
+            "bloqueio_direto_central": ["Mostrar cobertura alta"],
+            "handoff": ["Trocar com comunicação"],
+            "indiretos_entrada": ["Perseguir e recuperar"],
+            "indiretos_saida": ["Negar receção"],
+            "bola_dentro": ["Ajudar do lado fraco"],
+        },
+    )
+    html, paginas = _pdf("relatorios/plano_jogo_facil.html", contexto)
+    texto = " ".join(pagina.extract_text() for pagina in paginas)
+
+    for valor in ("Chaves do jogo", "Explorar vantagem no primeiro passe", "Fechar a linha central",
+                  "Estratégias defensivas por situação", "Bloqueio direto lateral", "Forçar para a linha lateral",
+                  "Handoff", "Trocar com comunicação", "Bloqueio direto central", "Mostrar cobertura alta",
+                  "Indiretos de entrada", "Perseguir e recuperar", "Indiretos de saída", "Negar receção",
+                  "Bola dentro", "Ajudar do lado fraco"):
+        assert valor in texto
+    assert "Convocado não selecionado" not in html
+    assert "object-fit:contain" in html
+    assert 'class="easy-avatar"' in html
+
+
+def test_plano_facil_omite_defesas_nao_preenchidas_ou_deselecionadas():
+    contexto = _base()
+    contexto.update(
+        jogo=Item(adversario="Rivals BC", data="04/10/2026", hora=None, local=None, competicao=None),
+        secoes_set={"plano_ofensivo"}, plano=None, titulares=[], cinco_adversario=[],
+        rotacoes_equipa={}, graficos_plano=[], fotografias_equipa={}, fotografias_adversario={},
+        conteudo_plano={"chave_ataque": ["Atacar o lado fraco"], "handoff": ["Trocar"]},
+    )
+    html = TEMPLATES.get_template("relatorios/plano_jogo_facil.html").render(contexto)
+
+    assert "Atacar o lado fraco" in html
+    assert "Estratégias defensivas por situação" not in html
+    assert "Trocar" not in html
+
+
 def test_roster_longo_nao_divide_a_identificacao_e_as_notas_do_jogador():
     contexto = _base()
     contexto.update(
@@ -113,7 +166,7 @@ def test_roster_longo_nao_divide_a_identificacao_e_as_notas_do_jogador():
 
 
 def test_contexto_de_exportacao_prepara_o_simbolo_nos_dois_relatorios(monkeypatch):
-    monkeypatch.setattr("routers.exportacoes._fotografia_embebida", lambda url: f"embebido:{url}" if url else None)
+    monkeypatch.setattr("routers.exportacoes._simbolo_embebido", lambda url: f"embebido:{url}" if url else None)
     dados = Item(getlist=lambda chave: [])
     adversario = Item(simbolo="rivals.png", jogadores=[], rotacao_prevista=[], itens_coletivos=[])
     equipa = Item(nome="CBQueluz")
@@ -131,3 +184,11 @@ def test_contexto_de_exportacao_prepara_o_simbolo_nos_dois_relatorios(monkeypatc
     db = Item(query=lambda modelo: Consulta())
     plano = _contexto_relatorio("plano-jogo", jogo, equipa, dados, db)
     assert plano["simbolo_adversario"] == "embebido:rivals.png"
+
+
+def test_simbolo_de_adversario_aceita_pasta_de_branding(monkeypatch, tmp_path):
+    imagem = tmp_path / "rivals.png"
+    imagem.write_bytes(b"simbolo")
+    monkeypatch.setattr("routers.exportacoes.caminho_logo_guardado", lambda url: imagem)
+
+    assert _simbolo_embebido("/static/uploads/branding/rivals.png") == "data:image/png;base64,c2ltYm9sbw=="

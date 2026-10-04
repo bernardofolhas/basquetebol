@@ -83,6 +83,23 @@ def itens_por_categoria(plano) -> dict[str, list]:
     return resultado
 
 
+def conteudo_plano_por_categoria(plano) -> dict[str, list[str]]:
+    """Prioriza as escolhas atuais e mantém legíveis os planos antigos."""
+    grupos = itens_por_categoria(plano)
+    resultado = {}
+    for categoria, _, campo in CATEGORIAS_PLANO:
+        escolhidos = [
+            relacao.item.texto.strip()
+            for relacao in grupos[categoria]
+            if relacao.item and (relacao.item.texto or "").strip()
+        ]
+        legado = getattr(plano, campo, None) if plano else None
+        resultado[categoria] = escolhidos or [
+            linha.strip() for linha in (legado or "").splitlines() if linha.strip()
+        ]
+    return resultado
+
+
 def biblioteca_por_categoria(db: Session, equipa_id: int) -> dict[str, list]:
     resultado = {categoria: [] for categoria, _, _ in CATEGORIAS_PLANO}
     itens = db.query(ItemPlanoJogoBiblioteca).filter(

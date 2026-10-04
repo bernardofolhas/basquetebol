@@ -279,7 +279,7 @@ def test_dossier_permite_guardar_simbolo_do_adversario_para_os_relatorios():
     assert 'enctype="multipart/form-data"' in resumo
     assert 'name="simbolo"' in resumo
     assert '@router.post("/adversarios/{adversario_id}/simbolo")' in rota_scouting
-    assert 'contexto["simbolo_adversario"] = _fotografia_embebida(alvo.simbolo)' in rota_exportacao
+    assert 'contexto["simbolo_adversario"] = _simbolo_embebido(alvo.simbolo)' in rota_exportacao
 
 
 def test_coletivo_facil_resume_jogadores_estatisticas_e_diagramas():
@@ -410,7 +410,7 @@ def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
     marcadores = {
         "roster_facil.html": ("easy-roster", "fotografias.get(j.id)", "Referência rápida"),
         "scouting_coletivo_facil.html": ("Quando defendemos", "Quando atacamos", "Jogadores prioritários"),
-        "plano_jogo_facil.html": ("cabecalho_relatorio('Plano de jogo'", "O nosso cinco", "Convocados"),
+        "plano_jogo_facil.html": ("cabecalho_relatorio('Plano de jogo'", "O nosso cinco", "Chaves do jogo", "Estratégias defensivas por situação"),
     }
     for ficheiro, esperados in marcadores.items():
         html = (TEMPLATES / "relatorios" / ficheiro).read_text(encoding="utf-8")
