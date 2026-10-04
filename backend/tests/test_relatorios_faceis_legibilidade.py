@@ -92,6 +92,7 @@ def test_plano_de_jogo_facil_usa_o_simbolo_do_adversario_e_titulo_curto():
 
 def test_plano_facil_destaca_chaves_e_defesas_sem_convocados():
     contexto = _base()
+    contexto["identidade"]["cor_secundaria"] = "#ffffff"
     jogadores = [
         Item(id=indice, nome=f"Atleta {indice}", numero_camisola=indice, posicao="Base")
         for indice in range(1, 6)
@@ -126,6 +127,42 @@ def test_plano_facil_destaca_chaves_e_defesas_sem_convocados():
     assert "Convocado não selecionado" not in html
     assert "object-fit:contain" in html
     assert 'class="easy-avatar"' in html
+
+
+def test_plano_facil_reserva_as_ultimas_paginas_para_jogadas():
+    contexto = _base()
+    contexto.update(
+        jogo=Item(adversario="Rivals BC", data="04/10/2026", hora=None, local=None, competicao=None),
+        secoes_set={"dados_jogo", "plano_ofensivo"}, plano=None,
+        titulares=[], cinco_adversario=[], rotacoes_equipa={},
+        fotografias_equipa={}, fotografias_adversario={},
+        conteudo_plano={"chave_ataque": ["Chave prioritária antes do Playbook"]},
+        graficos_plano=[
+            Item(imagem=_simbolo("#d10b14", str(indice)), titulo=f"Jogada {indice:02d}", passo=1, observacao=None)
+            for indice in range(1, 17)
+        ],
+    )
+
+    _, paginas = _pdf("relatorios/plano_jogo_facil.html", contexto)
+    textos = [pagina.extract_text() for pagina in paginas]
+
+    assert len(paginas) >= 3
+    assert "Chave prioritária antes do Playbook" in textos[0]
+    assert "Jogadas do plano" not in textos[0]
+    assert "Jogadas do plano" in textos[1]
+    assert "Jogada 01" in textos[1]
+    assert "Jogadas do plano" in textos[-1]
+    assert "continuação" in textos[-1]
+    assert "Jogada 16" in textos[-1]
+    assert all("Chave prioritária antes do Playbook" not in texto for texto in textos[1:])
+
+    contexto["orientacao"] = "paisagem"
+    _, paginas_paisagem = _pdf("relatorios/plano_jogo_facil.html", contexto)
+    textos_paisagem = [pagina.extract_text() for pagina in paginas_paisagem]
+    assert len(paginas_paisagem) >= 4
+    assert "Jogadas do plano" not in textos_paisagem[0]
+    assert all("Jogadas do plano" in texto for texto in textos_paisagem[1:])
+    assert "Jogada 16" in textos_paisagem[-1]
 
 
 def test_plano_facil_omite_defesas_nao_preenchidas_ou_deselecionadas():

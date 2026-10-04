@@ -1,26 +1,22 @@
 <style>
-.easy-section>h2{display:block;white-space:nowrap}
-.easy-section>h2::before{display:inline-flex;vertical-align:middle;margin-right:7px}
+.easy-section>h2{display:block;white-space:nowrap;background:var(--pdf-primary);color:var(--pdf-on-primary)}
+.easy-section>h2::before{display:inline-flex;vertical-align:middle;margin-right:7px;background:var(--pdf-on-primary);color:var(--pdf-primary)}
 .plan-lineup .easy-card{min-width:0;padding:5px;text-align:center}
 .plan-lineup .easy-photo,.plan-lineup .easy-avatar{display:flex;align-items:center;justify-content:center;width:100%;height:27mm;max-width:100%;object-fit:contain;object-position:center;border:0;border-radius:5px;background:var(--pdf-surface);box-shadow:none}
 .plan-lineup .easy-avatar{background:var(--pdf-primary);color:var(--pdf-on-primary)}
 .plan-lineup strong{margin-top:3px;font-size:9px;line-height:1.2;overflow-wrap:anywhere}
 .plan-lineup small{font-size:8px}
-.plan-keys>h2{background:var(--pdf-primary);color:var(--pdf-on-primary)}
-.plan-keys>h2::before{background:var(--pdf-on-primary);color:var(--pdf-primary)}
 .plan-key-grid,.plan-defense-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .plan-key-grid.is-single{grid-template-columns:1fr}
 .plan-key-card{min-width:0;padding:9px 10px;border:2px solid var(--pdf-primary);border-radius:8px;background:var(--pdf-primary-light);page-break-inside:avoid}
-.plan-key-card.is-defense{border-color:var(--pdf-secondary);background:var(--pdf-surface)}
-.plan-key-card h3{margin:0 0 6px;color:var(--pdf-primary-dark);font-size:11px;text-transform:uppercase}
-.plan-key-card.is-defense h3{color:var(--pdf-secondary)}
+.plan-key-card.is-defense{border-color:var(--pdf-night);background:var(--pdf-surface)}
+.plan-key-card h3{margin:0 0 6px;color:var(--pdf-ink);font-size:11px;text-transform:uppercase}
 .plan-key-card ol,.plan-defense-card ol{margin:0;padding-left:16px}
 .plan-key-card li{margin:0 0 5px;font-size:11px;font-weight:750;line-height:1.3;white-space:pre-line}
 .plan-key-card li:last-child,.plan-defense-card li:last-child{margin-bottom:0}
-.plan-defense>h2{background:var(--pdf-secondary);color:var(--pdf-on-secondary)}
-.plan-defense>h2::before{background:var(--pdf-on-secondary);color:var(--pdf-secondary)}
-.plan-defense-card{min-width:0;padding:8px 9px;border:1px solid var(--pdf-line);border-left:4px solid var(--pdf-secondary);border-radius:6px;background:#fff;page-break-inside:avoid}
-.plan-defense-card h3{margin:0 0 5px;color:var(--pdf-secondary);font-size:11px;line-height:1.2}
+.plan-defense-card{min-width:0;padding:8px 9px;border:1px solid var(--pdf-line);border-left:4px solid var(--pdf-night);border-radius:6px;background:#fff;page-break-inside:avoid}
+.plan-defense-card h3{margin:0 0 5px;color:var(--pdf-ink);font-size:11px;line-height:1.2}
 .plan-defense-card li{margin-bottom:4px;font-size:10px;line-height:1.3;white-space:pre-line}
 .plan-offense-card{border-left:4px solid var(--pdf-primary)}
+.plan-playbook{break-before:page;page-break-before:always;break-inside:auto;page-break-inside:auto}
 </style>
