@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from PIL import Image
 
 from services.plano_jogo_service import (
+    agrupar_graficos_plano,
     conteudo_plano_por_categoria,
     jogo_em_preparacao,
     jogos_em_preparacao,
@@ -130,5 +131,16 @@ def test_pdfs_colocam_rotacoes_e_graficos_no_final():
 
     for documento in (direto, completo, facil, poster):
         assert "rotacoes_equipa" in documento
-        assert "graficos_plano" in documento
-        assert documento.index("rotacoes_equipa") < documento.index("graficos_plano")
+        assert "jogadas_pdf" in documento
+        assert documento.index("rotacoes_equipa") < documento.index("jogadas_pdf")
+
+
+def test_passos_da_mesma_jogada_ficam_no_mesmo_cartao_apesar_de_nomes_iguais():
+    graficos = [
+        {"jogada_id": 1, "titulo": "Horns", "passo": 1},
+        {"jogada_id": 1, "titulo": "Horns", "passo": 2},
+        {"jogada_id": 2, "titulo": "Horns", "passo": 1},
+    ]
+    jogadas = agrupar_graficos_plano(graficos)
+    assert [len(jogada["passos"]) for jogada in jogadas] == [2, 1]
+    assert [passo["passo"] for passo in jogadas[0]["passos"]] == [1, 2]

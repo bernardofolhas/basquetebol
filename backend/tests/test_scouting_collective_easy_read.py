@@ -170,6 +170,9 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
         "passos_setplay": {numero: [Item(imagem=campo, observacao="Movimento e leitura de ajudas")] for numero in range(1, 4)},
     }
     html = templates.get_template("relatorios/scouting_coletivo_facil_v2.html").render(contexto)
+    assert html.count('class="play-card"') == 3
+    assert html.count("<header><h3>Ação") == 3
+    assert "background:#cf0000" in html
     assert html.count('class="lineup-rotation-slot"') == 5
     assert "1.ª →" in html and "2.ª →" in html
     pdf = HTML(string=html).write_pdf()

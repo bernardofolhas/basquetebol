@@ -12,6 +12,7 @@ from weasyprint import HTML
 
 from paths import TEMPLATES_DIR
 from routers.exportacoes import _contexto_relatorio, _simbolo_embebido
+from routers.exportacoes import templates as export_templates
 
 
 TEMPLATES = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -137,13 +138,16 @@ def test_plano_facil_reserva_as_ultimas_paginas_para_jogadas():
         titulares=[], cinco_adversario=[], rotacoes_equipa={},
         fotografias_equipa={}, fotografias_adversario={},
         conteudo_plano={"chave_ataque": ["Chave prioritária antes do Playbook"]},
-        graficos_plano=[
-            Item(imagem=_simbolo("#d10b14", str(indice)), titulo=f"Jogada {indice:02d}", passo=1, observacao=None)
+        jogadas_pdf=[
+            Item(titulo=f"Jogada {indice:02d}", passos=[Item(imagem=_simbolo("#d10b14", str(indice)), passo=1, observacao=None)])
             for indice in range(1, 17)
         ],
     )
 
-    _, paginas = _pdf("relatorios/plano_jogo_facil.html", contexto)
+    html, paginas = _pdf("relatorios/plano_jogo_facil.html", contexto)
+    assert html.count('class="pdf-play-card"') == 16
+    assert html.count('class="pdf-play-card-header"') == 16
+    assert "background:#cf0000" in html
     textos = [pagina.extract_text() for pagina in paginas]
 
     assert len(paginas) >= 3
@@ -163,6 +167,44 @@ def test_plano_facil_reserva_as_ultimas_paginas_para_jogadas():
     assert "Jogadas do plano" not in textos_paisagem[0]
     assert all("Jogadas do plano" in texto for texto in textos_paisagem[1:])
     assert "Jogada 16" in textos_paisagem[-1]
+
+
+def test_plano_facil_reune_passos_da_mesma_jogada_no_cartao():
+    contexto = _base()
+    contexto.update(
+        jogo=Item(adversario="Rivals BC", data="04/10/2026", hora=None, local=None, competicao=None),
+        secoes_set={"dados_jogo"}, plano=None, titulares=[], cinco_adversario=[],
+        rotacoes_equipa={}, fotografias_equipa={}, fotografias_adversario={}, conteudo_plano={},
+        jogadas_pdf=[Item(titulo="Horns", passos=[
+            Item(imagem=_simbolo("#d10b14", "1"), passo=1, observacao="Entrada"),
+            Item(imagem=_simbolo("#d10b14", "2"), passo=2, observacao="Finalização"),
+        ])],
+    )
+    html, paginas = _pdf("relatorios/plano_jogo_facil.html", contexto)
+    assert html.count('class="pdf-play-card"') == 1
+    assert html.count('class="pdf-play-step"') == 2
+    assert "Horns" in paginas[-1].extract_text()
+    assert "Finalização" in paginas[-1].extract_text()
+
+
+def test_poster_a3_distribui_jogadas_por_quadros_e_paginas():
+    equipa = Item(nome="CBQueluz")
+    contexto = _base()
+    contexto.update(
+        tipo_relatorio="plano-jogo", equipa=equipa, nome_autor="Treinador",
+        jogo=Item(equipa=equipa, adversario="Rivals BC", data="04/10/2026", hora="15:00",
+                  local="Pavilhão", competicao="Liga"),
+        secoes_set=set(), plano=None, titulares=[], rotacoes_equipa={},
+        jogadas_pdf=[Item(titulo=f"Jogada {indice:02d}", passos=[
+            Item(imagem=_simbolo("#d10b14", str(indice)), passo=1, observacao=None),
+        ]) for indice in range(1, 14)],
+    )
+    html = export_templates.get_template("relatorios/plano_jogo_a3.html").render(contexto)
+    assert html.count('class="pdf-play-card"') == 13
+    paginas = PdfReader(BytesIO(HTML(string=html).write_pdf())).pages
+    assert len(paginas) == 4
+    assert "Jogada 01" in paginas[1].extract_text()
+    assert "Jogada 13" in paginas[-1].extract_text()
 
 
 def test_plano_facil_omite_defesas_nao_preenchidas_ou_deselecionadas():

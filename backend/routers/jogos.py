@@ -40,6 +40,7 @@ from services.plano_jogo_service import (
     CATEGORIAS_PLANO,
     biblioteca_por_categoria,
     convocados_plano,
+    agrupar_graficos_plano,
     graficos_plano,
     itens_por_categoria,
     jogo_em_preparacao,
@@ -1000,13 +1001,15 @@ def imprimir_plano_jogo(
     jogadores = convocados_plano(jogo)
     jogadores_dict = {j.id: j for j in jogadores}
 
+    graficos = graficos_plano(jogo.plano)
     return templates.TemplateResponse(request, "jogos/plano_jogo_print.html", {
         "utilizador": utilizador,
         "jogo": jogo,
         "plano": jogo.plano,
         "jogadores_dict": jogadores_dict,
         "rotacoes_equipa": rotacoes_por_grupo(jogo.plano),
-        "graficos_plano": graficos_plano(jogo.plano),
+        "graficos_plano": graficos,
+        "jogadas_pdf": agrupar_graficos_plano(graficos),
         "identidade": getattr(request.state, "identidade_clube", {}),
     })
 
@@ -1024,13 +1027,15 @@ def exportar_pdf_plano_jogo(
     _verificar_acesso_plano_jogo(utilizador, jogo, db)
     jogadores = convocados_plano(jogo)
     jogadores_dict = {j.id: j for j in jogadores}
+    graficos = graficos_plano(jogo.plano)
     pdf_bytes = renderizar_pdf(request, "jogos/plano_jogo_print.html", {
         "utilizador": utilizador,
         "jogo": jogo,
         "plano": jogo.plano,
         "jogadores_dict": jogadores_dict,
         "rotacoes_equipa": rotacoes_por_grupo(jogo.plano),
-        "graficos_plano": graficos_plano(jogo.plano),
+        "graficos_plano": graficos,
+        "jogadas_pdf": agrupar_graficos_plano(graficos),
         "modo_pdf": True,
     })
     nome = f"plano_jogo_{jogo.equipa.nome}_{jogo.adversario}_{jogo.data}.pdf".replace(" ", "_")

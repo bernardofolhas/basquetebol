@@ -1,0 +1,30 @@
+{% macro estilos_playbook() %}
+<style>
+.pdf-play-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:3mm}
+.report-section.playbook-section{break-inside:auto;page-break-inside:auto}
+.pdf-play-card{min-width:0;overflow:hidden;border:1px solid #cbd5df;border-radius:2mm;background:#fff;color:#10253a;break-inside:avoid;page-break-inside:avoid}
+.pdf-play-card-header{background:#cf0000;padding:2mm 3mm;color:#fff}
+.pdf-play-card-header h3{margin:0;color:#fff;font-size:11px;font-weight:900;line-height:1.2;overflow-wrap:anywhere}
+.pdf-play-steps{display:flex;flex-wrap:wrap;gap:1mm;padding:2mm}
+.pdf-play-step{box-sizing:border-box;flex:1 1 calc(50% - 1mm);min-width:0;border:1px solid #e0e6ec;border-radius:1mm;overflow:hidden;background:#fff}
+.pdf-play-step:only-child{flex-basis:100%}
+.pdf-play-step img{display:block;width:100%;height:40mm;padding:1mm;background:#f5f7f9;object-fit:contain}
+.pdf-play-step-copy{padding:1.5mm 2mm;border-top:1px solid #e0e6ec;font-size:8px;line-height:1.25}
+.pdf-play-step-copy strong{display:block;color:#10253a}
+.pdf-play-step-copy p{margin:1mm 0 0;color:#40556c;white-space:pre-line}
+</style>
+{% endmacro %}
+
+{% macro cartao_jogada(jogada) %}
+<article class="pdf-play-card">
+  <header class="pdf-play-card-header"><h3>{{ jogada.titulo }}</h3></header>
+  <div class="pdf-play-steps">
+  {% for passo in jogada.passos %}
+    <div class="pdf-play-step">
+      {% if passo.imagem %}<img src="{{ passo.imagem }}" alt="Diagrama: {{ jogada.titulo }}, passo {{ passo.passo }}">{% endif %}
+      {% if passo.passo or passo.observacao %}<div class="pdf-play-step-copy">{% if passo.passo %}<strong>Passo {{ passo.passo }}</strong>{% endif %}{% if passo.observacao %}<p>{{ passo.observacao }}</p>{% endif %}</div>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+</article>
+{% endmacro %}

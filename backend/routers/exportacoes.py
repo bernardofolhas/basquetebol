@@ -86,6 +86,7 @@ from services.desenho_service import (
 )
 from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
 from services.plano_jogo_service import (
+    agrupar_graficos_plano,
     conteudo_plano_por_categoria,
     graficos_plano,
     jogo_em_preparacao,
@@ -1297,6 +1298,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         titulares_ordenados = [titulares_map[i] for i in titulares_ids if i in titulares_map]
         ligacao = db.query(ScoutingAdversarioJogo).filter(ScoutingAdversarioJogo.jogo_id == alvo.id).first()
         adversario = ligacao.adversario if ligacao else None
+        graficos = graficos_plano(plano)
         contexto.update(
             jogo=alvo,
             plano=plano,
@@ -1304,7 +1306,8 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             convocados=alvo.convocados,
             titulares=titulares_ordenados,
             rotacoes_equipa=rotacoes_por_grupo(plano),
-            graficos_plano=graficos_plano(plano),
+            graficos_plano=graficos,
+            jogadas_pdf=agrupar_graficos_plano(graficos),
             fotografias_equipa={
                 j.id: _fotografia_embebida(j.fotografia)
                 for j in {c.jogador for c in alvo.convocados} | set(titulares_ordenados)

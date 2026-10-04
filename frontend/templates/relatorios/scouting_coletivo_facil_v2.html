@@ -25,6 +25,10 @@ body{font-size:8.5px;line-height:1.25}
 .lineup-player strong,.plan-card h3,.play-card h3{font-size:8px}.lineup-player small,.lineup-traits span,.priority-position,.priority-copy small,.plan-card li,.profile-entry b{font-size:6.5px}
 .rotation-track{font-size:6.2px}.stat strong{font-size:9.5px}.detail-card strong{font-size:7.5px}.detail-card p{font-size:6.8px}
 .detail-card.rule-card strong{font-size:8.5px;line-height:1.2}.detail-card.rule-card p{font-size:6.8px;line-height:1.25}
+.play-grid .play-card{overflow:hidden;padding:0;margin-bottom:2mm;border-color:#cbd5df}
+.play-card header{background:#cf0000;padding:1.4mm 2mm;color:#fff}
+.play-card header h3{margin:0;color:#fff;white-space:normal;overflow-wrap:anywhere;line-height:1.15}
+.play-card img{padding:1mm}.play-card p{padding:0 1.5mm 1mm}
 </style></head><body>
 {% if 'identidade' in secoes_set %}{{ cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes) }}<div class="report-meta"><span><small>Dia</small>{{ jogo_referencia.data|data_pt if jogo_referencia and jogo_referencia.data else 'Por definir' }}</span><span><small>Hora</small>{{ jogo_referencia.hora if jogo_referencia and jogo_referencia.hora else 'Por definir' }}</span><span><small>Pavilhão</small>{{ jogo_referencia.local if jogo_referencia and jogo_referencia.local else 'Por definir' }}</span></div>{% endif %}
 {% set chaves_facil=blocos_coletivos.get('chave', [])|selectattr('destaque')|list %}
@@ -87,5 +91,5 @@ body{font-size:8.5px;line-height:1.25}
   {% set grupos_visiveis = respostas_grupos|selectattr('secao', 'equalto', chave)|selectattr('blocos')|list %}
   {% if chave in secoes_set and grupos_visiveis %}<section class="report-section"><h2 class="report-title">{{ titulo }}</h2><div class="plan-grid">{% for grupo in grupos_visiveis %}<article class="plan-card"><h3>{{ grupo.nome }}</h3><ul>{% for bloco in grupo.blocos %}<li>{{ bloco.titulo }}{% if bloco.descricao %}: {{ bloco.descricao|truncate(85) }}{% endif %}</li>{% endfor %}</ul></article>{% endfor %}</div></section>{% endif %}
 {% endfor %}
-{% if 'diagramas' in secoes_set and jogadas_coletivas|default([]) %}<section class="report-section playbook-section"><h2 class="report-title">Ações principais</h2><div class="play-grid">{% for momento in jogadas_coletivas|default([]) %}{% set setplay=momento.setplay %}{% set passos=passos_setplay.get(setplay.id, []) %}<article class="play-card"><h3>{{ loop.index }} · {{ setplay.nome }}</h3>{% if passos and passos[0].imagem %}<img src="{{ passos[0].imagem }}" alt="Diagrama de {{ setplay.nome }}">{% endif %}{% if setplay.descricao or (passos and passos[0].observacao) %}<p>{{ (setplay.descricao or passos[0].observacao)|truncate(110) }}</p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+{% if 'diagramas' in secoes_set and jogadas_coletivas|default([]) %}<section class="report-section playbook-section"><h2 class="report-title">Ações principais</h2><div class="play-grid">{% for momento in jogadas_coletivas|default([]) %}{% set setplay=momento.setplay %}{% set passos=passos_setplay.get(setplay.id, []) %}<article class="play-card"><header><h3>{{ setplay.nome }}</h3></header>{% if passos and passos[0].imagem %}<img src="{{ passos[0].imagem }}" alt="Diagrama de {{ setplay.nome }}">{% endif %}{% if setplay.descricao or (passos and passos[0].observacao) %}<p>{{ (setplay.descricao or passos[0].observacao)|truncate(110) }}</p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
 </body></html>

@@ -294,7 +294,8 @@ def test_coletivo_facil_resume_jogadores_estatisticas_e_diagramas():
     assert "caracteristicas_estatisticas_com_dados" in html
     assert "Principais características" in html
     assert 'class="tactical-board"' in html
-    assert 'class="tactical-board playbook-board"' in html
+    assert 'class="pdf-play-card"' in html
+    assert 'class="pdf-play-card-header"' in html
     assert "adversario.momentos_playbook" in html
     assert 'name="jogadores_destaque"' in formulario
     assert "data-highlight-player" in formulario

@@ -194,9 +194,23 @@ def graficos_plano(plano) -> list[dict]:
             if desenho and campo.is_file():
                 imagem = compor_desenho_sobre_campo(campo, desenho)
             graficos.append({
+                "jogada_id": getattr(relacao, "id", None) or id(relacao),
                 "titulo": relacao.setplay.nome,
                 "passo": indice,
                 "observacao": (passo.observacao or relacao.setplay.descricao or "").strip(),
                 "imagem": imagem,
             })
     return graficos
+
+
+def agrupar_graficos_plano(graficos: list[dict]) -> list[dict]:
+    """Keep every step of a play in the same PDF card, even with duplicate names."""
+    jogadas = []
+    por_id = {}
+    for indice, grafico in enumerate(graficos):
+        chave = grafico.get("jogada_id", indice)
+        if chave not in por_id:
+            por_id[chave] = {"titulo": grafico["titulo"], "passos": []}
+            jogadas.append(por_id[chave])
+        por_id[chave]["passos"].append(grafico)
+    return jogadas

@@ -1,3 +1,5 @@
+{% from "relatorios/_playbook_pdf.html" import estilos_playbook %}
+{{ estilos_playbook() }}
 <style>
 .easy-section>h2{display:block;white-space:nowrap;background:var(--pdf-primary);color:var(--pdf-on-primary)}
 .easy-section>h2::before{display:inline-flex;vertical-align:middle;margin-right:7px;background:var(--pdf-on-primary);color:var(--pdf-primary)}
@@ -19,4 +21,5 @@
 .plan-defense-card li{margin-bottom:4px;font-size:10px;line-height:1.3;white-space:pre-line}
 .plan-offense-card{border-left:4px solid var(--pdf-primary)}
 .plan-playbook{break-before:page;page-break-before:always;break-inside:auto;page-break-inside:auto}
+.plan-playbook .pdf-play-list{grid-template-columns:repeat(2,minmax(0,1fr))}
 </style>

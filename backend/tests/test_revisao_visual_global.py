@@ -84,7 +84,10 @@ def test_cartao_individual_inovador_preserva_uma_pagina_por_atleta():
 
 def test_exportacoes_reais_usam_a_identidade_pdf_partilhada():
     documentos = set(TEMPLATES.rglob("*pdf*.html")) | set(TEMPLATES.rglob("*print*.html"))
-    documentos = {ficheiro for ficheiro in documentos if "partials" not in ficheiro.parts}
+    documentos = {
+        ficheiro for ficheiro in documentos
+        if "partials" not in ficheiro.parts and not ficheiro.name.startswith("_")
+    }
 
     sem_identidade = []
     for ficheiro in documentos:
