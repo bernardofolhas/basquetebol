@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   const teamSelect=root.querySelector("[data-fiba-team]");
   const mappingsRoot=root.querySelector("[data-fiba-mappings]");
   const optionsTemplate=root.querySelector("[data-local-player-options]");
+  const normalizeName=value=>(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
   let currentSource="file";
   let currentForm=null;
   let previewData=null;
@@ -32,6 +33,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     const team=teamSelect.value;
     const players=(previewData?.jogadores||[]).filter(item=>item.equipa_numero===team);
     mappingsRoot.innerHTML="";
+    if(!team){mappingsRoot.innerHTML='<p class="fiba-empty">Seleciona primeiro a equipa do clube no jogo importado.</p>';updateMappedCount();return;}
     if(!players.length){mappingsRoot.innerHTML='<p class="fiba-empty">O ficheiro não apresenta o plantel desta equipa. As ações serão importadas e poderão ficar sem atleta associado.</p>';updateMappedCount();return;}
     players.forEach(player=>{
       const row=document.createElement("label");
@@ -58,9 +60,10 @@ document.addEventListener("DOMContentLoaded",()=>{
     root.querySelector("[data-fiba-ignored]").textContent=data.eventos_ignorados;
     root.querySelector("[data-fiba-format]").textContent=data.formato.toUpperCase();
     teamSelect.innerHTML="";
+    appendOption(teamSelect,"","Seleciona a equipa do clube");
     (data.equipas||[]).forEach(item=>appendOption(teamSelect,item.numero,item.nome));
-    const teamByName=(data.equipas||[]).find(item=>item.nome.toLowerCase().includes("benfica"));
-    if(teamByName)teamSelect.value=teamByName.numero;
+    const matches=(data.equipas||[]).filter(item=>normalizeName(item.nome)===normalizeName(root.dataset.clubName));
+    if(matches.length===1)teamSelect.value=matches[0].numero;
     renderMappings();
     const sample=root.querySelector("[data-fiba-sample]");
     sample.innerHTML="";
@@ -96,6 +99,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   root.querySelector("[data-fiba-confirm]").addEventListener("click",async event=>{
     if(!currentForm||!previewData)return;
+    if(!teamSelect.value){showFeedback("Seleciona qual é a equipa do clube antes de importar.","error");teamSelect.focus();return;}
     const button=event.currentTarget;
     const mapping={};
     mappingsRoot.querySelectorAll("select[data-external-id]").forEach(select=>{if(select.value)mapping[select.dataset.externalId]=Number(select.value);});

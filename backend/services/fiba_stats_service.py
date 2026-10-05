@@ -482,8 +482,12 @@ async def obter_estatistica_link(url_estatistica: str) -> tuple[bytes, str, str]
     async with httpx.AsyncClient(timeout=25, follow_redirects=False, verify=_contexto_ssl_sistema()) as cliente:
         resposta = await _descarregar_url_estatistica(cliente, url)
         content_type = resposta.headers.get("content-type", "").lower()
-        nome = urlparse(str(resposta.url)).path.rsplit("/", 1)[-1] or "estatistica.json"
-        if any(tipo in content_type for tipo in ("json", "javascript", "xml")) or nome.lower().endswith((".json", ".xml")):
+        nome_origem = urlparse(str(resposta.url)).path.rsplit("/", 1)[-1]
+        nome = nome_origem or "estatistica.json"
+        if "html" not in content_type and (
+            any(tipo in content_type for tipo in ("json", "javascript", "xml"))
+            or nome_origem.lower().endswith((".json", ".xml"))
+        ):
             return resposta.content, nome, content_type
 
         html = resposta.content.decode("utf-8", errors="replace")

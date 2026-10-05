@@ -1,6 +1,9 @@
+import asyncio
 import json
 from datetime import date
 from pathlib import Path
+
+import httpx
 
 from database import SessionLocal
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
@@ -11,6 +14,7 @@ from models.utilizador import Utilizador
 from routers import estatisticas as estatisticas_router
 from services.estatistica_service import box_score_eventos, segundos_jogados_eventos
 from services.fiba_stats_service import ErroImportacaoFiba, interpretar_fiba
+from services import fiba_stats_service
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -307,6 +311,13 @@ def test_recursos_offline_e_atalhos_estao_configurados():
     assert "localStorage.removeItem(storageKey)" in script
 
 
+def test_importacao_fiba_exige_identificar_a_equipa_do_clube():
+    script = (ROOT / "frontend" / "static" / "js" / "fiba-import.js").read_text(encoding="utf-8")
+    assert 'appendOption(teamSelect,"","Seleciona a equipa do clube")' in script
+    assert 'if(!teamSelect.value)' in script
+    assert 'includes("benfica")' not in script
+
+
 def _ficheiro_fiba_json(nome_atleta="Atleta Estatística"):
     return json.dumps({
         "type": "playbyplay",
@@ -369,6 +380,40 @@ def test_normalizador_fiba_interpreta_data_json_e_associa_coordenadas():
     assert (resultado["eventos"][0]["posicao_x"], resultado["eventos"][0]["posicao_y"]) == (24.5, 61.0)
 
 
+def test_link_livestats_com_barra_final_resolve_data_json(monkeypatch):
+    origem = "https://fibalivestats.dcd.shared.geniussports.com/u/FPDB/2922983/"
+    dados_url = "https://fibalivestats.dcd.shared.geniussports.com/data/2922983/data.json"
+    visitados = []
+
+    class ClienteFalso:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            return False
+
+    async def descarregar(_, url):
+        visitados.append(url)
+        if url == origem:
+            return httpx.Response(
+                200, request=httpx.Request("GET", url), headers={"content-type": "text/html"},
+                text='<input type="hidden" id="datapath" value="/data/2922983/">',
+            )
+        assert url == dados_url
+        return httpx.Response(
+            200, request=httpx.Request("GET", url), headers={"content-type": "application/javascript"},
+            content=_ficheiro_fiba_json(),
+        )
+
+    monkeypatch.setattr(fiba_stats_service.httpx, "AsyncClient", lambda **_: ClienteFalso())
+    monkeypatch.setattr(fiba_stats_service, "_descarregar_url_estatistica", descarregar)
+    conteudo, nome, tipo = asyncio.run(fiba_stats_service.obter_estatistica_link(origem))
+
+    assert visitados == [origem, dados_url]
+    assert nome == "fiba-livestats-data.json"
+    assert interpretar_fiba(conteudo, nome, tipo)["eventos"][0]["tipo"] == "dois_c"
+
+
 def test_normalizador_fiba_rejeita_xml_perigoso():
     xml = b"<!DOCTYPE game [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><game><action actionType='2pt'>&xxe;</action></game>"
     try:
@@ -388,6 +433,7 @@ def test_importacao_fiba_previsualiza_associa_e_nao_duplica(client_admin):
         assert "Importar estatística oficial" in pagina.text
         assert "Link da estatística do jogo" in pagina.text
         assert "Ficheiro FIBA LiveStats" in pagina.text
+        assert 'data-club-name="Equipa Teste Estatísticas"' in pagina.text
 
         preview = client_admin.post(
             f"/estatisticas/jogos/{jogo_id}/fiba/previsualizar-ficheiro",
@@ -444,5 +490,46 @@ def test_importacao_por_link_publico_previsualiza_json(client_admin, monkeypatch
         )
         assert resposta.status_code == 200
         assert resposta.json()["eventos_suportados"] == 3
+    finally:
+        _limpar(db, equipa_id)
+
+
+def test_importacao_link_associa_equipa_visitante_sem_inverter_marcador(client_admin, monkeypatch):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    url = "https://fibalivestats.dcd.shared.geniussports.com/u/FPDB/2922983/"
+    conteudo = json.dumps({
+        "tm": {
+            "1": {"name": "Adversário Estatística", "pl": {}, "shot": []},
+            "2": {"name": "Equipa Teste Estatísticas", "pl": {
+                "7": {"firstName": "Atleta", "familyName": "Estatística", "shirtNumber": "7"},
+            }, "shot": []},
+        },
+        "pbp": [
+            {"actionNumber": 101, "tno": 1, "period": 1, "clock": "09:00:00", "actionType": "3pt", "success": 1},
+            {"actionNumber": 102, "tno": 2, "pno": 7, "period": 1, "clock": "08:45:00", "actionType": "2pt", "success": 1},
+        ],
+    }).encode()
+
+    async def obter_link_teste(recebido):
+        assert recebido == url
+        return conteudo, "fiba-livestats-data.json", "application/javascript"
+
+    monkeypatch.setattr(estatisticas_router, "obter_estatistica_link", obter_link_teste)
+    try:
+        preview = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/previsualizar-link",
+            data={"url_estatistica": url},
+        )
+        assert preview.status_code == 200
+        assert preview.json()["eventos_suportados"] == 2
+        assert preview.json()["jogadores"][0]["jogador_id_sugerido"] == jogador_id
+
+        dados = {"url_estatistica": url, "equipa_ficheiro": "2", "mapeamentos": json.dumps({"7": jogador_id})}
+        resposta = client_admin.post(f"/estatisticas/jogos/{jogo_id}/fiba/importar-link", data=dados)
+        assert resposta.status_code == 200
+        assert resposta.json()["marcador"] == {"equipa": 2, "adversario": 3}
+        repetida = client_admin.post(f"/estatisticas/jogos/{jogo_id}/fiba/importar-link", data=dados)
+        assert repetida.json()["criadas"] == 0
+        assert repetida.json()["atualizadas"] == 2
     finally:
         _limpar(db, equipa_id)

@@ -7,7 +7,7 @@
   <a href="/estatisticas/jogos/{{ jogo.id }}?offline={{ utilizador.id }}" class="ds-button ds-button-secondary">Mesa estatística</a>
 {% endcall %}
 
-<main class="fiba-import" data-fiba-import data-game-id="{{ jogo.id }}">
+<main class="fiba-import" data-fiba-import data-game-id="{{ jogo.id }}" data-club-name="{{ equipa.nome }}">
   <section class="fiba-import-intro">
     <div>
       <p class="ds-kicker">{{ jogo.data|data_pt }} · {{ jogo.hora or 'Hora por definir' }}</p>
@@ -21,7 +21,7 @@
     <form class="fiba-source-card is-active" data-fiba-source="link">
       <span class="fiba-source-number">1</span>
       <div><p class="ds-kicker">Mais rápido</p><h3>Link da estatística do jogo</h3><p>Cola a página pública da FPB ou FIBA LiveStats. O JSON do jogo é localizado automaticamente.</p></div>
-      <label>Ligação pública<input type="url" name="url_estatistica" placeholder="https://www.fpb.pt/ficha-de-jogo/?internalID=..." inputmode="url" required></label>
+      <label>Ligação pública<input type="url" name="url_estatistica" placeholder="https://fibalivestats.dcd.shared.geniussports.com/u/FPDB/1234567/" inputmode="url" required></label>
       <button type="submit" class="ds-button ds-button-primary">Consultar link</button>
     </form>
     <form class="fiba-source-card" data-fiba-source="file">
