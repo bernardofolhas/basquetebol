@@ -18,7 +18,8 @@ router = APIRouter(prefix="/treinadores")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 FUNCOES_EQUIPE_TECNICA = (
-    "Treinador", "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
+    "Treinador Principal", "Treinador", "Adjunto", "Team manager",
+    "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
     "Secretaria", "Presidente", "Vice-Presidente",
 )
 
@@ -34,7 +35,7 @@ def _voltar_seguro(voltar: str | None, padrao: str) -> str:
 def _perfil_login_para_funcao(funcao: str) -> PerfilEnum:
     if funcao == "Fisioterapeuta":
         return PerfilEnum.fisioterapeuta
-    if funcao == "Treinador":
+    if funcao in {"Treinador", "Treinador Principal", "Adjunto"}:
         return PerfilEnum.treinador
     if funcao == "Secretaria":
         return PerfilEnum.secretaria

@@ -26,6 +26,7 @@ from models.treinador import Treinador
 from paths import TEMPLATES_DIR
 from services.notificacoes_service import criar_notificacoes_para_equipa
 from services.desenho_service import imagem_estatica_data_uri
+from services.fotografia_jogador_service import caminho_fotografia
 from services.logo_service import caminho_logo_guardado
 from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
 from services.pdf_filtros_service import filtrar_jogos, obter_filtros_pdf
@@ -191,8 +192,30 @@ def _elementos_equipa_ficha(db: Session, equipa_id: int):
     equipa = db.query(Equipa).filter(Equipa.id == equipa_id).first()
     return sorted(
         list(equipa.treinadores if equipa else []),
-        key=lambda elemento: ((elemento.funcao or "Treinador"), (elemento.nome or "").lower()),
+        key=_ordem_staff_ficha,
     )
+
+
+def _ordem_staff_ficha(elemento):
+    funcao = " ".join((elemento.funcao or "Treinador").strip().casefold().replace("-", " ").split())
+    prioridade = {
+        "treinador principal": (0, 0),
+        "treinador": (0, 1),
+        "treinador adjunto": (1, 0),
+        "adjunto": (1, 0),
+        "team manager": (2, 0),
+    }
+    return (*prioridade.get(funcao, (3, 0)), funcao, (elemento.nome or "").casefold())
+
+
+def _fotografias_ficha(jogadores):
+    fotografias = {}
+    for jogador in jogadores:
+        caminho = caminho_fotografia(jogador.fotografia)
+        if caminho and caminho.is_file():
+            mime = "image/png" if caminho.suffix.lower() == ".png" else "image/jpeg"
+            fotografias[jogador.id] = imagem_estatica_data_uri(caminho, mime)
+    return fotografias
 
 
 @router.get("/equipas/{equipa_id}", response_class=HTMLResponse)
@@ -975,6 +998,7 @@ async def exportar_ficha_jogo(
         "utilizador": utilizador,
         "jogo": jogo,
         "jogadores": _jogadores_ficha(jogadores),
+        "fotografias": _fotografias_ficha(jogadores),
         "elementos_tecnicos": elementos,
         "capitao_id": capitao_id,
         "cor_equipamento": cor_equipamento,

@@ -55,7 +55,8 @@ def _ordenar_treinadores(treinadores):
 
 
 FUNCOES_EQUIPE_TECNICA = (
-    "Treinador", "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
+    "Treinador Principal", "Treinador", "Adjunto", "Team manager",
+    "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
     "Secretaria", "Presidente", "Vice-Presidente",
 )
 
