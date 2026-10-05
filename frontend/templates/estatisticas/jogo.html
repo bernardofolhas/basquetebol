@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block titulo %}Estatísticas - {{ jogo.adversario }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20260907-fields-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20261005-2">{% endblock %}
 {% block conteudo %}
 <main class="statboard" data-statboard data-game-id="{{ jogo.id }}" data-user-id="{{ utilizador.id }}" data-can-edit="{{ 'true' if pode_registar else 'false' }}">
   <script type="application/json" data-stats-events>{{ eventos|tojson }}</script>
-  <script type="application/json" data-stats-players>[{% for jogador in jogadores %}{"id":{{ jogador.id }},"name":{{ jogador.nome|tojson }},"number":{{ (jogador.numero_camisola or jogador.nome[:1])|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+  <script type="application/json" data-stats-players>[{% for jogador in jogadores %}{"id":{{ jogador.id }},"name":{{ jogador.nome|tojson }},"number":{{ (jogador.numero_camisola if jogador.numero_camisola is not none else jogador.nome[:1])|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
   <header class="statboard-head">
     <div><p class="ds-kicker">Mesa estatística</p><h1>{{ nome_clube }} <span>vs</span> {{ jogo.adversario }}</h1><p>{{ jogo.data|data_pt }}{% if jogo.hora %} · {{ jogo.hora }}{% endif %}{% if jogo.competicao %} · {{ jogo.competicao }}{% endif %}</p></div>
     <div class="statboard-head-actions">
@@ -13,6 +13,8 @@
       {% if pode_registar %}<button type="button" class="stat-reset-button" data-stat-reset>Recomeçar estatística</button>{% endif %}
     </div>
   </header>
+
+  {% if avisos_importacao %}<section class="stat-import-warning" role="status"><strong>Importação FIBA a rever</strong>{% for aviso in avisos_importacao %}<p>{{ aviso }}</p>{% endfor %}{% if pode_registar %}<a href="/estatisticas/jogos/{{ jogo.id }}/importar">Reimportar e confirmar atletas</a>{% endif %}</section>{% endif %}
 
   <section class="stat-scorebar">
     <div class="stat-score-team"><span>{{ nome_clube }}</span><strong data-score="equipa">0</strong></div>
@@ -44,7 +46,7 @@
     <aside class="stat-roster-panel">
       <header><span>1</span><div><h2>Selecionar atleta</h2><p data-selected-player>Nenhum selecionado</p></div></header>
       <div class="stat-player-grid">
-      {% for jogador in jogadores %}<button type="button" class="stat-player" data-player-id="{{ jogador.id }}" data-player-name="{{ jogador.nome }}"><strong>{{ jogador.numero_camisola or jogador.nome[:1] }}</strong><span>{{ jogador.nome }}</span><small data-player-points="{{ jogador.id }}">0 pts</small></button>{% endfor %}
+      {% for jogador in jogadores %}<button type="button" class="stat-player" data-player-id="{{ jogador.id }}" data-player-name="{{ jogador.nome }}"><strong>{{ jogador.numero_camisola if jogador.numero_camisola is not none else jogador.nome[:1] }}</strong><span>{{ jogador.nome }}</span><small data-player-points="{{ jogador.id }}">0 pts</small></button>{% endfor %}
       </div>
     </aside>
 
@@ -67,7 +69,7 @@
     <form method="dialog" class="stat-lineup-modal">
       <header><div><p class="ds-kicker">Substituições</p><h2 id="stat-lineup-title">Escolher cinco em campo</h2><p>Seleciona exatamente cinco atletas. As alterações ficam registadas no momento atual do jogo.</p></div><button type="button" data-lineup-cancel aria-label="Fechar">×</button></header>
       <div class="stat-lineup-options">
-        {% for jogador in jogadores %}<button type="button" data-lineup-option="{{ jogador.id }}"><strong>{{ jogador.numero_camisola or jogador.nome[:1] }}</strong><span>{{ jogador.nome }}</span><small>Banco</small></button>{% endfor %}
+        {% for jogador in jogadores %}<button type="button" data-lineup-option="{{ jogador.id }}"><strong>{{ jogador.numero_camisola if jogador.numero_camisola is not none else jogador.nome[:1] }}</strong><span>{{ jogador.nome }}</span><small>Banco</small></button>{% endfor %}
       </div>
       <footer><p data-lineup-dialog-hint>Seleciona cinco atletas.</p><button type="button" class="ds-button ds-button-secondary" data-lineup-cancel>Cancelar</button><button type="button" class="ds-button ds-button-primary" data-lineup-save disabled>Aplicar cinco</button></footer>
     </form>
@@ -126,7 +128,7 @@
     <div class="stat-analysis-panel" role="tabpanel" data-analysis-panel="boxscore" hidden>
       <article class="stat-boxscore-card stat-analysis-card">
         <header><div><p class="ds-kicker">Detalhe individual</p><h2>Box score</h2></div><small>Atualização automática</small></header>
-        <div class="stat-table-wrap"><table class="stat-boxscore"><thead><tr><th>Atleta</th><th>MIN</th><th>PTS</th><th>LL</th><th>2P</th><th>3P</th><th>RO</th><th>RD</th><th>RT</th><th>AST</th><th>RB</th><th>TO</th><th>DL</th><th>FP</th><th>EFF</th></tr></thead><tbody data-boxscore-body>{% for jogador in jogadores %}<tr data-boxscore-player="{{ jogador.id }}"><td><strong>#{{ jogador.numero_camisola or '–' }}</strong> {{ jogador.nome }}</td>{% for campo in range(14) %}<td>0</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+        <div class="stat-table-wrap"><table class="stat-boxscore"><thead><tr><th>Atleta</th><th>MIN</th><th>PTS</th><th>LL</th><th>2P</th><th>3P</th><th>RO</th><th>RD</th><th>RT</th><th>AST</th><th>RB</th><th>TO</th><th>DL</th><th>FP</th><th>EFF</th></tr></thead><tbody data-boxscore-body>{% for jogador in jogadores %}<tr data-boxscore-player="{{ jogador.id }}"><td><strong>#{{ jogador.numero_camisola if jogador.numero_camisola is not none else '–' }}</strong> {{ jogador.nome }}</td>{% for campo in range(14) %}<td>0</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
       </article>
     </div>
 
@@ -167,5 +169,5 @@
     </div>
   </section>
 </main>
-<script src="/static/js/basket-stats.js?v=20261005-1"></script>
+<script src="/static/js/basket-stats.js?v=20261005-2"></script>
 {% endblock %}

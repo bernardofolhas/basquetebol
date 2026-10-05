@@ -203,7 +203,7 @@ def construir_analise_global_equipa(db: Session, equipa, jogadores: list) -> dic
             "jogadores": estatisticas_jogadores,
             "jogos": jogos,
             "jogos_com_dados": len(jogos_com_estatisticas),
-            "eventos": len(eventos),
+            "eventos": sum(evento.tipo != "minutos_oficiais" for evento in eventos),
             "totais": dict(totais_box),
             "vitorias": vitorias,
             "derrotas": len(jogos_concluidos) - vitorias,

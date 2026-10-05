@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
 {% block titulo %}Importar estatística FIBA - {{ equipa.nome }}{% endblock %}
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20261005-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/basket-stats.css?v=20261005-2">{% endblock %}
 {% block conteudo %}
 {% call equipa_contexto(equipa, "Importar estatística oficial", "Pré-visualiza, associa os atletas e confirma sem alterar o registo manual.", "acao", "/estatisticas/jogos/" ~ jogo.id, "Voltar à mesa") %}
   <a href="/estatisticas/jogos/{{ jogo.id }}?offline={{ utilizador.id }}" class="ds-button ds-button-secondary">Mesa estatística</a>
@@ -56,7 +56,7 @@
     </div>
 
     <div class="fiba-mapping-shell">
-      <div class="fiba-section-heading"><div><h3>Associação de atletas</h3><p>As sugestões são automáticas por associação guardada, nome ou número.</p></div><span data-fiba-mapped-count>0 associados</span></div>
+      <div class="fiba-section-heading"><div><h3>Associação de atletas</h3><p>Confirma especialmente quem tem minutos oficiais. As sugestões usam associações verificadas neste jogo, nome ou camisola.</p></div><span data-fiba-mapped-count>0 associados</span></div>
       <div class="fiba-mapping-list" data-fiba-mappings></div>
       <label class="fiba-unmapped-warning" data-fiba-unmapped-warning hidden><input type="checkbox" data-fiba-allow-unmapped><span data-fiba-unmapped-text></span></label>
     </div>
@@ -74,8 +74,8 @@
 
   <template data-local-player-options>
     <option value="">Sem associação</option>
-    {% for jogador in jogadores %}<option value="{{ jogador.id }}">{% if jogador.numero_camisola %}#{{ jogador.numero_camisola }} · {% endif %}{{ jogador.nome }}</option>{% endfor %}
+    {% for jogador in jogadores %}<option value="{{ jogador.id }}">{% if jogador.numero_camisola is not none %}#{{ jogador.numero_camisola }} · {% endif %}{{ jogador.nome }}</option>{% endfor %}
   </template>
 </main>
-<script src="/static/js/fiba-import.js?v=20261005-1"></script>
+<script src="/static/js/fiba-import.js?v=20261005-2"></script>
 {% endblock %}

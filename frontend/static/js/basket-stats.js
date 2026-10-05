@@ -24,7 +24,7 @@
   const players = new Map(playerData.map(player => [Number(player.id), {
     id: Number(player.id),
     name: player.name,
-    number: String(player.number || "–"),
+    number: String(player.number ?? "–"),
   }]));
   const requiredLineupSize = Math.min(5, players.size);
 
@@ -631,7 +631,7 @@
   }
 
   function renderFeed() {
-    const all = [...active()].filter(item => !lineupTypes.has(item.tipo)).reverse();
+    const all = [...active()].filter(item => !lineupTypes.has(item.tipo) && item.tipo !== "minutos_oficiais").reverse();
     const renderInto = (target, list) => {
       if (!target) return;
       target.innerHTML = "";

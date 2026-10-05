@@ -347,20 +347,33 @@ def interpretar_fiba(conteudo: bytes, nome_ficheiro: str = "estatistica.json", c
     }
 
 
-def sugerir_mapeamentos(jogadores_externos: list[dict[str, str]], jogadores_locais, existentes: dict[str, int] | None = None) -> list[dict[str, Any]]:
+def sugerir_mapeamentos(jogadores_externos: list[dict[str, Any]], jogadores_locais, existentes: dict[str, int] | None = None) -> list[dict[str, Any]]:
     existentes = existentes or {}
+    locais_por_id = {item.id: item for item in jogadores_locais}
     resultado = []
     for externo in jogadores_externos:
         identificador = externo["identificador"]
+        nome_externo = _normalizar_nome(externo.get("nome", ""))
+        numero_externo = externo.get("numero", "")
         sugestao = existentes.get(identificador)
-        motivo = "associação guardada" if sugestao else ""
+        local_guardado = locais_por_id.get(sugestao)
+        mesmo_nome = bool(local_guardado and nome_externo and _normalizar_nome(local_guardado.nome) == nome_externo)
+        mesma_camisola = bool(
+            local_guardado and numero_externo and local_guardado.numero_camisola is not None
+            and str(local_guardado.numero_camisola) == numero_externo
+        )
+        if not (mesmo_nome or mesma_camisola):
+            sugestao = None
+        motivo = "associação confirmada neste jogo" if sugestao else ""
         if not sugestao:
-            nome_externo = _normalizar_nome(externo.get("nome", ""))
             candidatos_nome = [item for item in jogadores_locais if _normalizar_nome(item.nome) == nome_externo and nome_externo]
             if len(candidatos_nome) == 1:
                 sugestao, motivo = candidatos_nome[0].id, "nome igual"
-        if not sugestao and externo.get("numero"):
-            candidatos_numero = [item for item in jogadores_locais if str(item.numero_camisola or "") == externo["numero"]]
+        if not sugestao and numero_externo:
+            candidatos_numero = [
+                item for item in jogadores_locais
+                if item.numero_camisola is not None and str(item.numero_camisola) == numero_externo
+            ]
             if len(candidatos_numero) == 1:
                 sugestao, motivo = candidatos_numero[0].id, "número igual"
         if not sugestao and externo.get("nome"):

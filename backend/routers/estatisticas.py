@@ -80,7 +80,7 @@ def _jogadores_equipa(db: Session, equipa_id: int) -> list[Jogador]:
 
 def _mapeamentos_equipa(db: Session, equipa_id: int, jogo_id: int) -> dict[str, int]:
     prefixo = f"{jogo_id}:"
-    return {
+    mapeamentos = {
         item.identificador_externo[len(prefixo):]: item.jogador_id
         for item in db.query(MapeamentoJogadorEstatistica).filter(
             MapeamentoJogadorEstatistica.equipa_id == equipa_id,
@@ -88,6 +88,22 @@ def _mapeamentos_equipa(db: Session, equipa_id: int, jogo_id: int) -> dict[str, 
             MapeamentoJogadorEstatistica.identificador_externo.like(f"{prefixo}%"),
         ).all()
     }
+    historico: dict[str, set[int]] = {}
+    for identificador, jogador_id in db.query(
+        EventoEstatistica.jogador_externo, EventoEstatistica.jogador_id
+    ).filter(
+        EventoEstatistica.jogo_id == jogo_id,
+        EventoEstatistica.equipa_id == equipa_id,
+        EventoEstatistica.lado == "equipa",
+        EventoEstatistica.origem.in_(("fiba_link", "fiba_ficheiro", "fiba_api")),
+        EventoEstatistica.jogador_externo.isnot(None),
+        EventoEstatistica.jogador_id.isnot(None),
+    ).all():
+        historico.setdefault(identificador, set()).add(jogador_id)
+    for identificador, ids in historico.items():
+        if identificador not in mapeamentos and len(ids) == 1:
+            mapeamentos[identificador] = next(iter(ids))
+    return mapeamentos
 
 
 def _resumo_previsualizacao(db: Session, jogo: Jogo, dados: dict) -> dict:
@@ -121,6 +137,23 @@ def _resumo_previsualizacao(db: Session, jogo: Jogo, dados: dict) -> dict:
     }
 
 
+def _falhas_associacao(dados: dict, equipa_ficheiro: str, mapeamentos: dict[str, int]) -> tuple[int, int, int]:
+    acoes = sum(
+        1 for evento in dados["eventos"]
+        if evento["equipa_numero"] == equipa_ficheiro
+        and evento["jogador_externo"] not in ("", "0")
+        and evento["jogador_externo"] not in mapeamentos
+        and not evento["anulado"]
+    )
+    sem_atleta = [
+        jogador for jogador in dados["jogadores"]
+        if jogador["equipa_numero"] == equipa_ficheiro
+        and jogador["identificador"] not in mapeamentos
+        and (jogador.get("segundos_jogados_oficiais") or 0) > 0
+    ]
+    return acoes, sum(jogador["segundos_jogados_oficiais"] for jogador in sem_atleta), len(sem_atleta)
+
+
 def _guardar_importacao(
     db: Session,
     jogo: Jogo,
@@ -131,6 +164,7 @@ def _guardar_importacao(
     conteudo: bytes,
     utilizador,
     request: Request,
+    permitir_importacao_parcial: bool = False,
 ) -> dict:
     try:
         mapeamentos_recebidos = json.loads(mapeamentos_json or "{}")
@@ -152,6 +186,13 @@ def _guardar_importacao(
         for item in dados["jogadores"]
         if item["equipa_numero"] == equipa_ficheiro
     }
+    acoes_sem_mapeamento, minutos_sem_mapeamento, atletas_sem_mapeamento = _falhas_associacao(
+        dados, equipa_ficheiro, mapeamentos_recebidos
+    )
+    if (acoes_sem_mapeamento or minutos_sem_mapeamento) and not permitir_importacao_parcial:
+        raise ErroImportacaoFiba(
+            "Há ações ou minutos oficiais sem atleta associado. Completa as associações ou confirma a importação parcial."
+        )
     for identificador, jogador_id in mapeamentos_recebidos.items():
         externo = jogadores_externos.get(identificador, {})
         if not externo:
@@ -179,9 +220,18 @@ def _guardar_importacao(
     for evento in dados["eventos"]:
         base = f"{jogo.id}:{evento['identificador_externo']}"
         chaves.append("fiba-" + hashlib.sha256(base.encode()).hexdigest()[:64])
+    chaves_tempo = {
+        jogador["identificador"]: "fiba-tempo-" + hashlib.sha256(
+            f"{jogo.id}:tempo:{jogador['identificador']}".encode()
+        ).hexdigest()[:64]
+        for jogador in jogadores_externos.values()
+        if jogador.get("segundos_jogados_oficiais") is not None
+    }
     existentes = {
         item.client_uid: item
-        for item in db.query(EventoEstatistica).filter(EventoEstatistica.client_uid.in_(chaves)).all()
+        for item in db.query(EventoEstatistica).filter(
+            EventoEstatistica.client_uid.in_([*chaves, *chaves_tempo.values()])
+        ).all()
     }
     criados = atualizados = sem_mapeamento = 0
     for evento, client_uid in zip(dados["eventos"], chaves):
@@ -222,6 +272,36 @@ def _guardar_importacao(
         registo.segundos_jogados_oficiais = evento.get("segundos_jogados_oficiais")
         registo.anulado = evento["anulado"]
 
+    for identificador, client_uid in chaves_tempo.items():
+        atleta = jogadores_externos[identificador]
+        registo = existentes.get(client_uid)
+        if registo and registo.jogo_id != jogo.id:
+            raise ErroImportacaoFiba("Foi detetado um identificador externo associado a outro jogo.")
+        if not registo:
+            registo = EventoEstatistica(
+                client_uid=client_uid,
+                clube_id=jogo.clube_id,
+                equipa_id=jogo.equipa_id,
+                jogo_id=jogo.id,
+                registado_por_id=utilizador.id,
+            )
+            db.add(registo)
+        registo.jogador_id = mapeamentos_recebidos.get(identificador)
+        registo.lado = "equipa"
+        registo.tipo = "minutos_oficiais"
+        registo.periodo = 1
+        registo.segundos_restantes = None
+        registo.posicao_x = None
+        registo.posicao_y = None
+        registo.origem = origem
+        registo.identificador_externo = f"tempo:{identificador}"
+        registo.jogador_externo = identificador
+        registo.subtipo = None
+        registo.qualificadores = "[]"
+        registo.importacao_uid = importacao_uid
+        registo.segundos_jogados_oficiais = atleta["segundos_jogados_oficiais"]
+        registo.anulado = False
+
     db.flush()
     eventos = _eventos_jogo(db, jogo.id)
     jogo.pontos_nos = pontos_eventos(eventos, "equipa")
@@ -241,6 +321,8 @@ def _guardar_importacao(
         "criadas": criados,
         "atualizadas": atualizados,
         "sem_mapeamento": sem_mapeamento,
+        "minutos_sem_mapeamento": minutos_sem_mapeamento,
+        "atletas_sem_mapeamento": atletas_sem_mapeamento,
         "ignoradas": dados["eventos_ignorados"],
         "marcador": {"equipa": jogo.pontos_nos, "adversario": jogo.pontos_adversario},
         "destino": f"/estatisticas/jogos/{jogo.id}?offline={utilizador.id}",
@@ -255,7 +337,9 @@ def dashboard_equipa(equipa_id: int, request: Request, db: Session = Depends(get
         return RedirectResponse("/equipas", status_code=303)
     jogos = db.query(Jogo).filter(Jogo.equipa_id == equipa_id).order_by(Jogo.data.desc(), Jogo.hora.desc()).all()
     eventos = db.query(EventoEstatistica).filter(EventoEstatistica.equipa_id == equipa_id, EventoEstatistica.anulado.is_(False)).all()
-    eventos_estatisticos = [evento for evento in eventos if evento.tipo not in TIPOS_ALINHAMENTO]
+    eventos_estatisticos = [
+        evento for evento in eventos if evento.tipo not in TIPOS_ALINHAMENTO | {"minutos_oficiais"}
+    ]
     jogos_concluidos = [jogo for jogo in jogos if jogo.pontos_nos is not None and jogo.pontos_adversario is not None]
     resumo = {
         "jogos": len(jogos_concluidos),
@@ -283,16 +367,37 @@ def registo_jogo(jogo_id: int, request: Request, db: Session = Depends(get_db), 
     if not jogo:
         return RedirectResponse("/equipas", status_code=303)
     convocados_ids = [linha[0] for linha in db.query(Convocado.jogador_id).filter(Convocado.jogo_id == jogo.id).all()]
-    jogadores_query = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id, Jogador.ativo.is_(True))
-    if convocados_ids:
-        jogadores_query = jogadores_query.filter(Jogador.id.in_(convocados_ids))
-    jogadores = jogadores_query.order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome).all()
     eventos = _eventos_jogo(db, jogo.id)
+    eventos_fiba = [
+        item for item in eventos
+        if item.origem in {"fiba_link", "fiba_ficheiro", "fiba_api"} and not item.anulado
+    ]
+    importados_ids = {item.jogador_id for item in eventos_fiba if item.jogador_id}
+    jogadores_query = db.query(Jogador).filter(Jogador.equipa_id == jogo.equipa_id)
+    selecionados_ids = set(convocados_ids) | importados_ids
+    if selecionados_ids:
+        jogadores_query = jogadores_query.filter(Jogador.id.in_(selecionados_ids))
+    else:
+        jogadores_query = jogadores_query.filter(Jogador.ativo.is_(True))
+    jogadores = jogadores_query.order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome).all()
+    avisos_importacao = []
+    sem_atleta = {
+        item.jogador_externo for item in eventos_fiba
+        if item.lado == "equipa" and item.jogador_externo not in (None, "", "0") and not item.jogador_id
+    }
+    if sem_atleta:
+        avisos_importacao.append(f"{len(sem_atleta)} atleta(s) FIBA ainda sem associação ao plantel.")
+    if any(
+        item.lado == "equipa" and item.jogador_id and item.segundos_jogados_oficiais is None
+        for item in eventos_fiba
+    ):
+        avisos_importacao.append("Há atletas importados sem minutos oficiais guardados. Repete a importação pelo mesmo link.")
     identidade = getattr(request.state, "identidade_clube", {}) or {}
     return templates.TemplateResponse(request, "estatisticas/jogo.html", {
         "utilizador": utilizador, "equipa": jogo.equipa, "jogo": jogo,
         "jogadores": jogadores, "eventos": [serializar_evento(item) for item in eventos],
         "box_score": box_score_eventos(eventos), "pode_registar": _pode_registar(utilizador),
+        "avisos_importacao": avisos_importacao,
         "nome_clube": identidade.get("nome_curto") or identidade.get("nome_oficial") or jogo.equipa.nome,
     })
 
@@ -350,6 +455,7 @@ async def importar_fiba_ficheiro(
     ficheiro: UploadFile = File(...),
     equipa_ficheiro: str = Form(...),
     mapeamentos: str = Form("{}"),
+    permitir_importacao_parcial: bool = Form(False),
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_operacao_desportiva),
 ):
@@ -359,7 +465,7 @@ async def importar_fiba_ficheiro(
     try:
         conteudo, nome, content_type = await _ler_upload(ficheiro)
         dados = interpretar_fiba(conteudo, nome, content_type)
-        return _guardar_importacao(db, jogo, dados, equipa_ficheiro, mapeamentos, "fiba_ficheiro", conteudo, utilizador, request)
+        return _guardar_importacao(db, jogo, dados, equipa_ficheiro, mapeamentos, "fiba_ficheiro", conteudo, utilizador, request, permitir_importacao_parcial)
     except ErroImportacaoFiba as exc:
         db.rollback()
         return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
@@ -390,6 +496,7 @@ async def importar_fiba_link(
     url_estatistica: str = Form(...),
     equipa_ficheiro: str = Form(...),
     mapeamentos: str = Form("{}"),
+    permitir_importacao_parcial: bool = Form(False),
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_operacao_desportiva),
 ):
@@ -399,7 +506,7 @@ async def importar_fiba_link(
     try:
         conteudo, nome, content_type = await obter_estatistica_link(url_estatistica)
         dados = interpretar_fiba(conteudo, nome, content_type)
-        return _guardar_importacao(db, jogo, dados, equipa_ficheiro, mapeamentos, "fiba_link", conteudo, utilizador, request)
+        return _guardar_importacao(db, jogo, dados, equipa_ficheiro, mapeamentos, "fiba_link", conteudo, utilizador, request, permitir_importacao_parcial)
     except ErroImportacaoFiba as exc:
         db.rollback()
         return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
@@ -430,6 +537,7 @@ async def importar_fiba_api(
     identificador_jogo: str = Form(...),
     equipa_ficheiro: str = Form(...),
     mapeamentos: str = Form("{}"),
+    permitir_importacao_parcial: bool = Form(False),
     db: Session = Depends(get_db),
     utilizador=Depends(exigir_operacao_desportiva),
 ):
@@ -439,7 +547,7 @@ async def importar_fiba_api(
     try:
         conteudo, nome, content_type = await obter_estatistica_api(identificador_jogo)
         dados = interpretar_fiba(conteudo, nome, content_type)
-        return _guardar_importacao(db, jogo, dados, equipa_ficheiro, mapeamentos, "fiba_api", conteudo, utilizador, request)
+        return _guardar_importacao(db, jogo, dados, equipa_ficheiro, mapeamentos, "fiba_api", conteudo, utilizador, request, permitir_importacao_parcial)
     except ErroImportacaoFiba as exc:
         db.rollback()
         return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)

@@ -2,6 +2,7 @@ import asyncio
 import json
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 
@@ -9,11 +10,11 @@ from database import SessionLocal
 from models.equipa import Equipa, EscalaoEnum, GeneroEnum
 from models.estatistica import EventoEstatistica, MapeamentoJogadorEstatistica
 from models.jogador import Jogador
-from models.jogo import Jogo
+from models.jogo import Convocado, Jogo
 from models.utilizador import Utilizador
 from routers import estatisticas as estatisticas_router
 from services.estatistica_service import box_score_eventos, segundos_jogados_eventos
-from services.fiba_stats_service import ErroImportacaoFiba, interpretar_fiba
+from services.fiba_stats_service import ErroImportacaoFiba, interpretar_fiba, sugerir_mapeamentos
 from services import fiba_stats_service
 
 
@@ -185,6 +186,44 @@ def test_cinco_em_campo_sincroniza_e_calcula_minutos(client_admin):
         assert dashboard.status_code == 200
         assert "2 ações" not in dashboard.text
     finally:
+        _limpar(db, equipa_id)
+
+
+def test_minutos_oficiais_somam_entre_jogos_sem_duplicar_acoes():
+    eventos = [
+        SimpleNamespace(
+            id=indice, jogo_id=jogo_id, jogador_id=7, lado="equipa", tipo="minutos_oficiais",
+            periodo=1, segundos_restantes=None, segundos_jogados_oficiais=segundos, anulado=False,
+        )
+        for indice, (jogo_id, segundos) in enumerate(((1, 986), (2, 1270)), 1)
+    ]
+    assert segundos_jogados_eventos(eventos) == {7: 2256}
+    assert box_score_eventos(eventos)[7]["segundos_jogados"] == 2256
+
+
+def test_folha_mostra_atleta_importado_fora_da_convocatoria_e_avisos(client_admin):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    clube_id = db.query(Equipa.clube_id).filter(Equipa.id == equipa_id).scalar()
+    convocado = Jogador(clube_id=clube_id, equipa_id=equipa_id, nome="Atleta Convocado", numero_camisola=8)
+    db.add(convocado)
+    db.flush()
+    db.add(Convocado(clube_id=clube_id, jogo_id=jogo_id, jogador_id=convocado.id))
+    db.add(EventoEstatistica(
+        client_uid="fiba-historical-missing-minutes", clube_id=clube_id, equipa_id=equipa_id,
+        jogo_id=jogo_id, jogador_id=jogador_id, jogador_externo="3", origem="fiba_link",
+        lado="equipa", tipo="dois_c", periodo=1, anulado=False,
+    ))
+    db.commit()
+    try:
+        resposta = client_admin.get(f"/estatisticas/jogos/{jogo_id}")
+        assert resposta.status_code == 200
+        atletas = json.loads(resposta.text.split('data-stats-players>')[1].split('</script>')[0])
+        assert {item["id"] for item in atletas} == {jogador_id, convocado.id}
+        assert "Há atletas importados sem minutos oficiais guardados" in resposta.text
+        assert "Reimportar e confirmar atletas" in resposta.text
+    finally:
+        db.query(Convocado).filter(Convocado.jogo_id == jogo_id).delete(synchronize_session=False)
+        db.expunge_all()
         _limpar(db, equipa_id)
 
 
@@ -394,6 +433,14 @@ def test_livestats_prefere_nome_completo_e_minutos_oficiais():
     assert dados["jogadores"][0]["nome"] == "Krassimir Pereira"
     assert dados["jogadores"][0]["segundos_jogados_oficiais"] == 986
     assert dados["eventos"][0]["segundos_jogados_oficiais"] == 986
+
+
+def test_associacao_aceita_camisola_zero_e_rejeita_historico_incompativel():
+    locais = [SimpleNamespace(id=42, nome="Krassimir Pereira", numero_camisola=0)]
+    externo = [{"identificador": "3", "nome": "K. Pereira", "numero": "0"}]
+    assert sugerir_mapeamentos(externo, locais)[0]["jogador_id_sugerido"] == 42
+    diferente = [{"identificador": "3", "nome": "Outro Atleta", "numero": "12"}]
+    assert sugerir_mapeamentos(diferente, locais, {"3": 42})[0]["jogador_id_sugerido"] is None
 
 
 def test_previsualizacao_assinala_acoes_de_atletas_ausentes_do_plantel():
@@ -636,5 +683,126 @@ def test_importacao_rejeita_dois_atletas_externos_para_o_mesmo_local(client_admi
         assert resposta.status_code == 400
         assert "só pode ser associado" in resposta.json()["message"]
         assert db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).count() == 0
+    finally:
+        _limpar(db, equipa_id)
+
+
+def test_importacao_guarda_minutos_mesmo_sem_acoes_do_atleta(client_admin):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    payload = {
+        "tm": {
+            "1": {"name": "Equipa Teste Estatísticas", "pl": {
+                "7": {"firstName": "Atleta", "familyName": "Estatística", "shirtNumber": "7", "sMinutes": "08:15"},
+            }, "shot": []},
+            "2": {"name": "Adversário Estatística", "pl": {}, "shot": []},
+        },
+        "pbp": [{"actionNumber": 1, "tno": 2, "period": 1, "actionType": "2pt", "success": 1}],
+    }
+    conteudo = json.dumps(payload).encode()
+    try:
+        dados = {"equipa_ficheiro": "1", "mapeamentos": json.dumps({"7": jogador_id})}
+        primeira = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/importar-ficheiro",
+            data=dados,
+            files={"ficheiro": ("data.json", conteudo, "application/json")},
+        )
+        assert primeira.status_code == 200
+        assert primeira.json()["criadas"] == 1
+        assert primeira.json()["marcador"] == {"equipa": 0, "adversario": 2}
+        db.expire_all()
+        eventos = db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).all()
+        assert len(eventos) == 2
+        assert box_score_eventos(eventos)[jogador_id]["segundos_jogados"] == 495
+        assert next(item for item in eventos if item.tipo == "minutos_oficiais").jogador_id == jogador_id
+
+        repetida = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/importar-ficheiro",
+            data=dados,
+            files={"ficheiro": ("data.json", conteudo, "application/json")},
+        )
+        assert repetida.status_code == 200
+        assert db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).count() == 2
+    finally:
+        _limpar(db, equipa_id)
+
+
+def test_link_livestats_importa_minutos_do_jogador_zero(client_admin, monkeypatch):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    local = db.query(Jogador).filter(Jogador.id == jogador_id).one()
+    local.numero_camisola = 0
+    db.commit()
+    payload = {
+        "tm": {
+            "1": {"name": "Adversário", "pl": {}, "shot": []},
+            "2": {"name": "Clube Basket Queluz", "pl": {
+                "3": {"name": "A. Estatística", "firstName": "Atleta", "familyName": "Estatística", "shirtNumber": "0", "sMinutes": "16:26"},
+            }, "shot": []},
+        },
+        "pbp": [{"actionNumber": 10, "tno": 2, "pno": 3, "period": 1, "clock": "08:30:00", "actionType": "2pt", "success": 1}],
+    }
+
+    async def obter_link_teste(_):
+        return json.dumps(payload).encode(), "data.json", "application/javascript"
+
+    monkeypatch.setattr(estatisticas_router, "obter_estatistica_link", obter_link_teste)
+    try:
+        preview = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/previsualizar-link",
+            data={"url_estatistica": "https://fibalivestats.dcd.shared.geniussports.com/u/FPDB/2922983/"},
+        )
+        assert preview.status_code == 200
+        jogador_fiba = next(item for item in preview.json()["jogadores"] if item["equipa_numero"] == "2")
+        assert jogador_fiba["jogador_id_sugerido"] == jogador_id
+        assert jogador_fiba["segundos_jogados_oficiais"] == 986
+
+        resposta = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/importar-link",
+            data={
+                "url_estatistica": "https://fibalivestats.dcd.shared.geniussports.com/u/FPDB/2922983/",
+                "equipa_ficheiro": "2",
+                "mapeamentos": json.dumps({"3": jogador_id}),
+            },
+        )
+        assert resposta.status_code == 200
+        assert resposta.json()["marcador"] == {"equipa": 2, "adversario": 0}
+        db.expire_all()
+        eventos = db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).all()
+        assert box_score_eventos(eventos)[jogador_id]["segundos_jogados"] == 986
+    finally:
+        db.expunge_all()
+        _limpar(db, equipa_id)
+
+
+def test_importacao_parcial_exige_confirmacao_para_minutos_sem_atleta(client_admin):
+    db, equipa_id, _, jogo_id = _criar_contexto()
+    payload = {
+        "tm": {
+            "1": {"name": "Equipa Teste Estatísticas", "pl": {
+                "7": {"firstName": "Atleta", "familyName": "Estatística", "shirtNumber": "7", "sMinutes": "08:15"},
+            }, "shot": []},
+            "2": {"name": "Adversário Estatística", "pl": {}, "shot": []},
+        },
+        "pbp": [{"actionNumber": 1, "tno": 2, "period": 1, "actionType": "2pt", "success": 1}],
+    }
+    conteudo = json.dumps(payload).encode()
+    try:
+        dados = {"equipa_ficheiro": "1", "mapeamentos": "{}"}
+        rejeitada = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/importar-ficheiro",
+            data=dados,
+            files={"ficheiro": ("data.json", conteudo, "application/json")},
+        )
+        assert rejeitada.status_code == 400
+        assert "minutos oficiais sem atleta" in rejeitada.json()["message"]
+        assert db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).count() == 0
+
+        confirmada = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/importar-ficheiro",
+            data={**dados, "permitir_importacao_parcial": "true"},
+            files={"ficheiro": ("data.json", conteudo, "application/json")},
+        )
+        assert confirmada.status_code == 200
+        assert confirmada.json()["minutos_sem_mapeamento"] == 495
+        assert confirmada.json()["atletas_sem_mapeamento"] == 1
     finally:
         _limpar(db, equipa_id)

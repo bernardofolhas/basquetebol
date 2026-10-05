@@ -27,7 +27,7 @@ def segundos_jogados_eventos(
     segundos_restantes: int | None = None,
 ) -> dict[int, int]:
     """Calcula o tempo a partir das entradas e saídas registadas no relógio decrescente."""
-    por_periodo: dict[int, list[EventoEstatistica]] = defaultdict(list)
+    por_periodo: dict[tuple[int, int], list[EventoEstatistica]] = defaultdict(list)
     for evento in eventos:
         if (
             not evento.anulado
@@ -35,10 +35,10 @@ def segundos_jogados_eventos(
             and evento.jogador_id
             and evento.tipo in TIPOS_ALINHAMENTO
         ):
-            por_periodo[evento.periodo].append(evento)
+            por_periodo[(getattr(evento, "jogo_id", 0) or 0, evento.periodo)].append(evento)
 
-    totais: dict[int, int] = defaultdict(int)
-    for periodo, registos in por_periodo.items():
+    totais_por_jogo: dict[tuple[int, int], int] = defaultdict(int)
+    for (jogo_id, periodo), registos in por_periodo.items():
         entradas: dict[int, int] = {}
         registos.sort(key=lambda item: (-(item.segundos_restantes or 0), item.id or 0))
         for evento in registos:
@@ -46,21 +46,24 @@ def segundos_jogados_eventos(
             if evento.tipo == "entrada_campo":
                 entradas.setdefault(evento.jogador_id, relogio)
             elif evento.jogador_id in entradas:
-                totais[evento.jogador_id] += max(0, entradas.pop(evento.jogador_id) - relogio)
+                totais_por_jogo[jogo_id, evento.jogador_id] += max(0, entradas.pop(evento.jogador_id) - relogio)
         for jogador_id, entrada in entradas.items():
             if periodo_atual is not None and periodo < periodo_atual:
-                totais[jogador_id] += entrada
+                totais_por_jogo[jogo_id, jogador_id] += entrada
             elif periodo_atual == periodo and segundos_restantes is not None:
-                totais[jogador_id] += max(0, entrada - segundos_restantes)
+                totais_por_jogo[jogo_id, jogador_id] += max(0, entrada - segundos_restantes)
     oficiais = {
-        evento.jogador_id: evento.segundos_jogados_oficiais
+        (getattr(evento, "jogo_id", 0) or 0, evento.jogador_id): evento.segundos_jogados_oficiais
         for evento in eventos
         if not evento.anulado
         and evento.lado == "equipa"
         and evento.jogador_id
         and getattr(evento, "segundos_jogados_oficiais", None) is not None
     }
-    totais.update(oficiais)
+    totais_por_jogo.update(oficiais)
+    totais: dict[int, int] = defaultdict(int)
+    for (_, jogador_id), segundos in totais_por_jogo.items():
+        totais[jogador_id] += segundos
     return dict(totais)
 
 

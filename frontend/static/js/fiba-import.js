@@ -23,11 +23,14 @@ document.addEventListener("DOMContentLoaded",()=>{
   const clock=value=>value===null||value===undefined?"–":`${String(Math.floor(value/60)).padStart(2,"0")}:${String(value%60).padStart(2,"0")}`;
   const updateMappedCount=()=>{
     const selects=[...mappingsRoot.querySelectorAll("select")];
-    root.querySelector("[data-fiba-mapped-count]").textContent=`${selects.filter(item=>item.value).length}/${selects.length} associados`;
+    const totalMinutes=selects.reduce((total,item)=>total+Number(item.dataset.minutes||0),0);
+    const mappedMinutes=selects.reduce((total,item)=>total+(item.value?Number(item.dataset.minutes||0):0),0);
+    root.querySelector("[data-fiba-mapped-count]").textContent=`${selects.filter(item=>item.value).length}/${selects.length} associados · ${clock(mappedMinutes)}/${clock(totalMinutes)} min`;
     const missingActions=selects.reduce((total,item)=>total+(item.value?0:Number(item.dataset.actions||0)),0)+Number(previewData?.acoes_sem_plantel?.[teamSelect.value]||0);
-    unmappedWarning.hidden=missingActions===0;
-    if(missingActions){
-      root.querySelector("[data-fiba-unmapped-text]").textContent=`${missingActions} ações ficariam sem atleta associado. Confirma esta importação parcial apenas se esses atletas não existem no teu roster.`;
+    const missingMinutes=totalMinutes-mappedMinutes;
+    unmappedWarning.hidden=missingActions===0&&missingMinutes===0;
+    if(!unmappedWarning.hidden){
+      root.querySelector("[data-fiba-unmapped-text]").textContent=`${missingActions} ações e ${clock(missingMinutes)} minutos oficiais ficariam sem atleta associado. Confirma a importação parcial apenas se esses atletas não existem no teu roster.`;
     }else allowUnmapped.checked=false;
   };
   const appendOption=(select,value,label)=>{
@@ -49,11 +52,12 @@ document.addEventListener("DOMContentLoaded",()=>{
       const name=document.createElement("strong");
       name.textContent=`${player.numero?`#${player.numero} · `:""}${player.nome}`;
       const reason=document.createElement("small");
-      reason.textContent=`${player.acoes||0} ações · ${player.motivo||`ID externo: ${player.identificador}`}`;
+      reason.textContent=`${player.acoes||0} ações · ${clock(player.segundos_jogados_oficiais||0)} min · ${player.motivo||`ID externo: ${player.identificador}`}`;
       external.append(name,reason);
       const select=document.createElement("select");
       select.dataset.externalId=player.identificador;
       select.dataset.actions=player.acoes||0;
+      select.dataset.minutes=player.segundos_jogados_oficiais||0;
       select.innerHTML=optionsTemplate.innerHTML;
       if(player.jogador_id_sugerido)select.value=String(player.jogador_id_sugerido);
       select.addEventListener("change",()=>{allowUnmapped.checked=false;updateMappedCount();});
@@ -115,12 +119,13 @@ document.addEventListener("DOMContentLoaded",()=>{
     const body=new FormData(currentForm);
     body.append("equipa_ficheiro",teamSelect.value);
     body.append("mapeamentos",JSON.stringify(mapping));
+    if(allowUnmapped.checked)body.append("permitir_importacao_parcial","true");
     button.disabled=true;button.textContent="A importar…";
     try{
       const response=await fetch(`/estatisticas/jogos/${gameId}/fiba/importar-${currentSource}`,{method:"POST",headers:{"X-CSRF-Token":csrf,"X-Requested-With":"XMLHttpRequest"},body});
       const data=await response.json();
       if(!response.ok||!data.ok)throw new Error(data.message||"Não foi possível concluir a importação.");
-      const unmapped=data.sem_mapeamento?` ${data.sem_mapeamento} ações ficaram sem atleta associado.`:"";
+      const unmapped=data.sem_mapeamento||data.minutos_sem_mapeamento?` ${data.sem_mapeamento} ações e ${clock(data.minutos_sem_mapeamento||0)} minutos ficaram sem atleta associado.`:"";
       showFeedback(`Importação concluída: ${data.criadas} ações adicionadas e ${data.atualizadas} atualizadas.${unmapped}`,"success");
       button.textContent="Importação concluída";
       root.querySelectorAll("[data-fiba-result-link]").forEach(item=>item.remove());
