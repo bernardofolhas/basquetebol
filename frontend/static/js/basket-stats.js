@@ -223,6 +223,11 @@
   }
 
   function playingSeconds(playerId) {
+    const official = active().find(item =>
+      item.lado === "equipa" && Number(item.jogador_id) === playerId &&
+      Number.isFinite(item.segundos_jogados_oficiais)
+    );
+    if (official) return official.segundos_jogados_oficiais;
     let total = 0;
     for (let period = 1; period <= Number(clock.period); period += 1) {
       let enteredAt = null;

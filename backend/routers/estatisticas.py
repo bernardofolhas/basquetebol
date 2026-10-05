@@ -78,28 +78,42 @@ def _jogadores_equipa(db: Session, equipa_id: int) -> list[Jogador]:
     ).order_by(Jogador.numero_camisola.asc().nullslast(), Jogador.nome).all()
 
 
-def _mapeamentos_equipa(db: Session, equipa_id: int) -> dict[str, int]:
+def _mapeamentos_equipa(db: Session, equipa_id: int, jogo_id: int) -> dict[str, int]:
+    prefixo = f"{jogo_id}:"
     return {
-        item.identificador_externo: item.jogador_id
+        item.identificador_externo[len(prefixo):]: item.jogador_id
         for item in db.query(MapeamentoJogadorEstatistica).filter(
             MapeamentoJogadorEstatistica.equipa_id == equipa_id,
             MapeamentoJogadorEstatistica.fornecedor == "fiba",
+            MapeamentoJogadorEstatistica.identificador_externo.like(f"{prefixo}%"),
         ).all()
     }
 
 
 def _resumo_previsualizacao(db: Session, jogo: Jogo, dados: dict) -> dict:
     locais = _jogadores_equipa(db, jogo.equipa_id)
-    mapeamentos = _mapeamentos_equipa(db, jogo.equipa_id)
+    mapeamentos = _mapeamentos_equipa(db, jogo.equipa_id, jogo.id)
     jogadores = sugerir_mapeamentos(dados["jogadores"], locais, mapeamentos)
     contagens: dict[str, int] = {}
+    acoes_por_atleta: dict[tuple[str, str], int] = {}
     for evento in dados["eventos"]:
         contagens[evento["tipo"]] = contagens.get(evento["tipo"], 0) + 1
+        chave = (evento["equipa_numero"], evento["jogador_externo"])
+        if chave[1] and chave[1] != "0" and not evento["anulado"]:
+            acoes_por_atleta[chave] = acoes_por_atleta.get(chave, 0) + 1
+    for jogador in jogadores:
+        jogador["acoes"] = acoes_por_atleta.get((jogador["equipa_numero"], jogador["identificador"]), 0)
+    atletas_listados = {(item["equipa_numero"], item["identificador"]) for item in jogadores}
+    acoes_sem_plantel: dict[str, int] = {}
+    for (equipa_numero, identificador), total in acoes_por_atleta.items():
+        if (equipa_numero, identificador) not in atletas_listados:
+            acoes_sem_plantel[equipa_numero] = acoes_sem_plantel.get(equipa_numero, 0) + total
     return {
         "ok": True,
         "formato": dados["formato"],
         "equipas": dados["equipas"],
         "jogadores": jogadores,
+        "acoes_sem_plantel": acoes_sem_plantel,
         "eventos_suportados": len(dados["eventos"]),
         "eventos_ignorados": dados["eventos_ignorados"],
         "contagens": contagens,
@@ -127,6 +141,8 @@ def _guardar_importacao(
     jogadores_locais = {item.id: item for item in _jogadores_equipa(db, jogo.equipa_id)}
     if any(jogador_id not in jogadores_locais for jogador_id in mapeamentos_recebidos.values()):
         raise ErroImportacaoFiba("Foi selecionado um atleta que não pertence a esta equipa.")
+    if len(set(mapeamentos_recebidos.values())) != len(mapeamentos_recebidos):
+        raise ErroImportacaoFiba("Cada atleta local só pode ser associado a um atleta FIBA neste jogo.")
     equipas_validas = {item["numero"] for item in dados["equipas"]}
     if equipas_validas and equipa_ficheiro not in equipas_validas:
         raise ErroImportacaoFiba("Seleciona qual é a equipa do clube no ficheiro.")
@@ -138,17 +154,20 @@ def _guardar_importacao(
     }
     for identificador, jogador_id in mapeamentos_recebidos.items():
         externo = jogadores_externos.get(identificador, {})
+        if not externo:
+            raise ErroImportacaoFiba("A associação inclui um atleta que não pertence à equipa selecionada no ficheiro.")
+        chave_mapeamento = f"{jogo.id}:{identificador}"
         mapeamento = db.query(MapeamentoJogadorEstatistica).filter(
             MapeamentoJogadorEstatistica.equipa_id == jogo.equipa_id,
             MapeamentoJogadorEstatistica.fornecedor == "fiba",
-            MapeamentoJogadorEstatistica.identificador_externo == identificador,
+            MapeamentoJogadorEstatistica.identificador_externo == chave_mapeamento,
         ).first()
         if not mapeamento:
             mapeamento = MapeamentoJogadorEstatistica(
                 clube_id=jogo.clube_id,
                 equipa_id=jogo.equipa_id,
                 fornecedor="fiba",
-                identificador_externo=identificador,
+                identificador_externo=chave_mapeamento,
             )
             db.add(mapeamento)
         mapeamento.jogador_id = jogador_id
@@ -168,9 +187,9 @@ def _guardar_importacao(
     for evento, client_uid in zip(dados["eventos"], chaves):
         lado = "equipa" if evento["equipa_numero"] == equipa_ficheiro else "adversario"
         jogador_id = None
-        if lado == "equipa" and evento["jogador_externo"]:
+        if lado == "equipa" and evento["jogador_externo"] and evento["jogador_externo"] != "0":
             jogador_id = mapeamentos_recebidos.get(evento["jogador_externo"])
-            if not jogador_id:
+            if not jogador_id and not evento["anulado"]:
                 sem_mapeamento += 1
         registo = existentes.get(client_uid)
         if registo and registo.jogo_id != jogo.id:
@@ -200,6 +219,7 @@ def _guardar_importacao(
         registo.subtipo = evento["subtipo"]
         registo.qualificadores = json.dumps(evento["qualificadores"], ensure_ascii=False)
         registo.importacao_uid = importacao_uid
+        registo.segundos_jogados_oficiais = evento.get("segundos_jogados_oficiais")
         registo.anulado = evento["anulado"]
 
     db.flush()

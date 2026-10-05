@@ -52,6 +52,15 @@ def segundos_jogados_eventos(
                 totais[jogador_id] += entrada
             elif periodo_atual == periodo and segundos_restantes is not None:
                 totais[jogador_id] += max(0, entrada - segundos_restantes)
+    oficiais = {
+        evento.jogador_id: evento.segundos_jogados_oficiais
+        for evento in eventos
+        if not evento.anulado
+        and evento.lado == "equipa"
+        and evento.jogador_id
+        and getattr(evento, "segundos_jogados_oficiais", None) is not None
+    }
+    totais.update(oficiais)
     return dict(totais)
 
 
@@ -113,4 +122,5 @@ def serializar_evento(evento: EventoEstatistica) -> dict:
         "qualificadores": json.loads(evento.qualificadores or "[]"),
         "anulado": evento.anulado,
         "sincronizado": True,
+        "segundos_jogados_oficiais": evento.segundos_jogados_oficiais,
     }

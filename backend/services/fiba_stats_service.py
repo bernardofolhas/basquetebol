@@ -223,9 +223,9 @@ def _extrair_xml(raiz) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     return acoes, equipas
 
 
-def _jogadores_equipas(equipas_brutas: list[dict[str, Any]]) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+def _jogadores_equipas(equipas_brutas: list[dict[str, Any]]) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
     equipas: list[dict[str, str]] = []
-    jogadores: list[dict[str, str]] = []
+    jogadores: list[dict[str, Any]] = []
     vistos_equipas: set[str] = set()
     vistos_jogadores: set[tuple[str, str]] = set()
     for indice, equipa in enumerate(equipas_brutas, 1):
@@ -250,12 +250,15 @@ def _jogadores_equipas(equipas_brutas: list[dict[str, Any]]) -> tuple[list[dict[
                 continue
             primeiro = _texto(_pick(atleta, "firstName", "givenName"))
             ultimo = _texto(_pick(atleta, "familyName", "lastName", "surname"))
-            nome_atleta = _texto(_pick(atleta, "name", "fullName", "displayName")) or " ".join(filter(None, (primeiro, ultimo)))
+            nome_atleta = " ".join(filter(None, (primeiro, ultimo))) or _texto(
+                _pick(atleta, "fullName", "displayName", "name")
+            )
             jogadores.append({
                 "equipa_numero": numero,
                 "identificador": externo,
                 "nome": nome_atleta or f"Atleta {externo}",
                 "numero": _texto(_pick(atleta, "shirtNumber", "jerseyNumber", "number", "pno")),
+                "segundos_jogados_oficiais": _segundos_relogio(_pick(atleta, "sMinutes")),
             })
             vistos_jogadores.add(chave)
     return equipas, jogadores
@@ -307,6 +310,7 @@ def interpretar_fiba(conteudo: bytes, nome_ficheiro: str = "estatistica.json", c
             "jogador_externo": jogador_externo,
             "jogador_nome": atleta.get("nome", ""),
             "jogador_numero": atleta.get("numero", ""),
+            "segundos_jogados_oficiais": atleta.get("segundos_jogados_oficiais"),
             "tipo": tipo,
             "periodo": _inteiro_limitado(_pick(acao, "period", "periodo", "quarter"), 1, 20, 1),
             "segundos_restantes": _segundos_relogio(_pick(acao, "clock", "time", "timeRemaining", "segundos_restantes")),

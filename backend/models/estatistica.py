@@ -30,6 +30,7 @@ class EventoEstatistica(Base):
     subtipo = Column(String(60), nullable=True)
     qualificadores = Column(Text, nullable=True)
     importacao_uid = Column(String(80), nullable=True, index=True)
+    segundos_jogados_oficiais = Column(Integer, nullable=True)
     anulado = Column(Boolean, nullable=False, default=False, server_default="false")
     criado_em = Column(DateTime, nullable=False, default=datetime.now)
     atualizado_em = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)

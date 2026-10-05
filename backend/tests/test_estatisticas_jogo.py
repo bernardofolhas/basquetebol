@@ -380,6 +380,40 @@ def test_normalizador_fiba_interpreta_data_json_e_associa_coordenadas():
     assert (resultado["eventos"][0]["posicao_x"], resultado["eventos"][0]["posicao_y"]) == (24.5, 61.0)
 
 
+def test_livestats_prefere_nome_completo_e_minutos_oficiais():
+    payload = {
+        "tm": {
+            "1": {"name": "Equipa", "pl": {
+                "3": {"name": "K. Pereira", "firstName": "Krassimir", "familyName": "Pereira", "shirtNumber": "0", "sMinutes": "16:26"},
+            }, "shot": []},
+        },
+        "pbp": [{"actionNumber": 10, "tno": 1, "pno": 3, "period": 1, "actionType": "assist"}],
+    }
+    dados = interpretar_fiba(json.dumps(payload).encode(), "data.json")
+
+    assert dados["jogadores"][0]["nome"] == "Krassimir Pereira"
+    assert dados["jogadores"][0]["segundos_jogados_oficiais"] == 986
+    assert dados["eventos"][0]["segundos_jogados_oficiais"] == 986
+
+
+def test_previsualizacao_assinala_acoes_de_atletas_ausentes_do_plantel():
+    db, equipa_id, _, jogo_id = _criar_contexto()
+    payload = {
+        "tm": {"1": {"name": "Equipa Teste Estatísticas", "pl": {
+            "7": {"name": "Atleta Estatística", "shirtNumber": "7"},
+        }, "shot": []}},
+        "pbp": [{"actionNumber": 1, "tno": 1, "pno": 77, "actionType": "assist"}],
+    }
+    try:
+        dados = interpretar_fiba(json.dumps(payload).encode(), "data.json")
+        jogo = db.query(Jogo).filter(Jogo.id == jogo_id).one()
+        resumo = estatisticas_router._resumo_previsualizacao(db, jogo, dados)
+        assert resumo["acoes_sem_plantel"] == {"1": 1}
+    finally:
+        db.expunge_all()
+        _limpar(db, equipa_id)
+
+
 def test_link_livestats_com_barra_final_resolve_data_json(monkeypatch):
     origem = "https://fibalivestats.dcd.shared.geniussports.com/u/FPDB/2922983/"
     dados_url = "https://fibalivestats.dcd.shared.geniussports.com/data/2922983/data.json"
@@ -443,6 +477,7 @@ def test_importacao_fiba_previsualiza_associa_e_nao_duplica(client_admin):
         assert preview.json()["eventos_suportados"] == 3
         assert preview.json()["eventos_ignorados"] == 1
         assert preview.json()["jogadores"][0]["jogador_id_sugerido"] == jogador_id
+        assert preview.json()["jogadores"][0]["acoes"] == 2
 
         dados = {"equipa_ficheiro": "1", "mapeamentos": json.dumps({"7": jogador_id})}
         primeira = client_admin.post(
@@ -531,5 +566,75 @@ def test_importacao_link_associa_equipa_visitante_sem_inverter_marcador(client_a
         repetida = client_admin.post(f"/estatisticas/jogos/{jogo_id}/fiba/importar-link", data=dados)
         assert repetida.json()["criadas"] == 0
         assert repetida.json()["atualizadas"] == 2
+    finally:
+        _limpar(db, equipa_id)
+
+
+def test_importacao_preserva_minutos_oficiais_e_isola_mapeamento_por_jogo(client_admin):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    outro = Jogo(
+        clube_id=db.query(Equipa.clube_id).filter(Equipa.id == equipa_id).scalar(),
+        equipa_id=equipa_id,
+        data=date(2042, 2, 9),
+        hora="18:00",
+        adversario="Outro adversário",
+        em_casa=False,
+    )
+    db.add(outro)
+    db.commit()
+    payload = {
+        "tm": {
+            "1": {"name": "Equipa Teste Estatísticas", "pl": {
+                "7": {"name": "A. Estatística", "firstName": "Atleta", "familyName": "Estatística", "shirtNumber": "7", "sMinutes": "21:10"},
+            }, "shot": []},
+            "2": {"name": "Adversário Estatística", "pl": {}, "shot": []},
+        },
+        "pbp": [{"actionNumber": 11, "tno": 1, "pno": 7, "period": 1, "clock": "09:00:00", "actionType": "2pt", "success": 1}],
+    }
+    conteudo = json.dumps(payload).encode()
+    try:
+        resposta = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/importar-ficheiro",
+            data={"equipa_ficheiro": "1", "mapeamentos": json.dumps({"7": jogador_id})},
+            files={"ficheiro": ("data.json", conteudo, "application/json")},
+        )
+        assert resposta.status_code == 200
+        db.expire_all()
+        eventos = db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).all()
+        assert box_score_eventos(eventos)[jogador_id]["segundos_jogados"] == 1270
+        assert eventos[0].segundos_jogados_oficiais == 1270
+        assert db.query(MapeamentoJogadorEstatistica).filter(
+            MapeamentoJogadorEstatistica.equipa_id == equipa_id
+        ).one().identificador_externo == f"{jogo_id}:7"
+
+        payload["tm"]["1"]["pl"]["7"].update({"name": "Outra Pessoa", "firstName": "Outra", "familyName": "Pessoa", "shirtNumber": "15"})
+        outro_preview = client_admin.post(
+            f"/estatisticas/jogos/{outro.id}/fiba/previsualizar-ficheiro",
+            files={"ficheiro": ("outro.json", json.dumps(payload).encode(), "application/json")},
+        )
+        assert outro_preview.status_code == 200
+        assert outro_preview.json()["jogadores"][0]["jogador_id_sugerido"] is None
+    finally:
+        _limpar(db, equipa_id)
+
+
+def test_importacao_rejeita_dois_atletas_externos_para_o_mesmo_local(client_admin):
+    db, equipa_id, jogador_id, jogo_id = _criar_contexto()
+    payload = {
+        "tm": {"1": {"name": "Equipa", "pl": {
+            "1": {"name": "A", "shirtNumber": "1"},
+            "2": {"name": "B", "shirtNumber": "2"},
+        }, "shot": []}},
+        "pbp": [{"actionNumber": 1, "tno": 1, "pno": 1, "actionType": "assist"}],
+    }
+    try:
+        resposta = client_admin.post(
+            f"/estatisticas/jogos/{jogo_id}/fiba/importar-ficheiro",
+            data={"equipa_ficheiro": "1", "mapeamentos": json.dumps({"1": jogador_id, "2": jogador_id})},
+            files={"ficheiro": ("data.json", json.dumps(payload).encode(), "application/json")},
+        )
+        assert resposta.status_code == 400
+        assert "só pode ser associado" in resposta.json()["message"]
+        assert db.query(EventoEstatistica).filter(EventoEstatistica.jogo_id == jogo_id).count() == 0
     finally:
         _limpar(db, equipa_id)

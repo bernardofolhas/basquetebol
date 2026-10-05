@@ -8,6 +8,8 @@ document.addEventListener("DOMContentLoaded",()=>{
   const teamSelect=root.querySelector("[data-fiba-team]");
   const mappingsRoot=root.querySelector("[data-fiba-mappings]");
   const optionsTemplate=root.querySelector("[data-local-player-options]");
+  const unmappedWarning=root.querySelector("[data-fiba-unmapped-warning]");
+  const allowUnmapped=root.querySelector("[data-fiba-allow-unmapped]");
   const normalizeName=value=>(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
   let currentSource="file";
   let currentForm=null;
@@ -22,6 +24,11 @@ document.addEventListener("DOMContentLoaded",()=>{
   const updateMappedCount=()=>{
     const selects=[...mappingsRoot.querySelectorAll("select")];
     root.querySelector("[data-fiba-mapped-count]").textContent=`${selects.filter(item=>item.value).length}/${selects.length} associados`;
+    const missingActions=selects.reduce((total,item)=>total+(item.value?0:Number(item.dataset.actions||0)),0)+Number(previewData?.acoes_sem_plantel?.[teamSelect.value]||0);
+    unmappedWarning.hidden=missingActions===0;
+    if(missingActions){
+      root.querySelector("[data-fiba-unmapped-text]").textContent=`${missingActions} ações ficariam sem atleta associado. Confirma esta importação parcial apenas se esses atletas não existem no teu roster.`;
+    }else allowUnmapped.checked=false;
   };
   const appendOption=(select,value,label)=>{
     const option=document.createElement("option");
@@ -42,13 +49,14 @@ document.addEventListener("DOMContentLoaded",()=>{
       const name=document.createElement("strong");
       name.textContent=`${player.numero?`#${player.numero} · `:""}${player.nome}`;
       const reason=document.createElement("small");
-      reason.textContent=player.motivo||`ID externo: ${player.identificador}`;
+      reason.textContent=`${player.acoes||0} ações · ${player.motivo||`ID externo: ${player.identificador}`}`;
       external.append(name,reason);
       const select=document.createElement("select");
       select.dataset.externalId=player.identificador;
+      select.dataset.actions=player.acoes||0;
       select.innerHTML=optionsTemplate.innerHTML;
       if(player.jogador_id_sugerido)select.value=String(player.jogador_id_sugerido);
-      select.addEventListener("change",updateMappedCount);
+      select.addEventListener("change",()=>{allowUnmapped.checked=false;updateMappedCount();});
       row.append(external,select);
       mappingsRoot.append(row);
     });
@@ -77,7 +85,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     preview.hidden=false;
     preview.scrollIntoView({behavior:"smooth",block:"start"});
   };
-  teamSelect.addEventListener("change",renderMappings);
+  teamSelect.addEventListener("change",()=>{allowUnmapped.checked=false;renderMappings();});
 
   root.querySelectorAll("[data-fiba-source]").forEach(form=>form.addEventListener("submit",async event=>{
     event.preventDefault();
@@ -100,6 +108,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   root.querySelector("[data-fiba-confirm]").addEventListener("click",async event=>{
     if(!currentForm||!previewData)return;
     if(!teamSelect.value){showFeedback("Seleciona qual é a equipa do clube antes de importar.","error");teamSelect.focus();return;}
+    if(!unmappedWarning.hidden&&!allowUnmapped.checked){showFeedback("Associa os atletas em falta ou confirma explicitamente a importação parcial.","error");allowUnmapped.focus();return;}
     const button=event.currentTarget;
     const mapping={};
     mappingsRoot.querySelectorAll("select[data-external-id]").forEach(select=>{if(select.value)mapping[select.dataset.externalId]=Number(select.value);});

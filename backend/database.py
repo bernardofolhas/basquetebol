@@ -1099,6 +1099,7 @@ def actualizar_estrutura_estatisticas() -> None:
         "subtipo": "VARCHAR(60) NULL",
         "qualificadores": "TEXT NULL",
         "importacao_uid": "VARCHAR(80) NULL",
+        "segundos_jogados_oficiais": "INTEGER NULL",
     }
     em_falta = [nome for nome in definicoes if nome not in colunas]
     if not em_falta:
