@@ -18,7 +18,7 @@ router = APIRouter(prefix="/treinadores")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 FUNCOES_EQUIPE_TECNICA = (
-    "Treinador Principal", "Treinador", "Adjunto", "Team manager",
+    "Treinador Principal", "Adjunto", "Team manager", "Treinador",
     "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
     "Secretaria", "Presidente", "Vice-Presidente",
 )

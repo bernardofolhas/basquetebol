@@ -55,7 +55,7 @@ def _ordenar_treinadores(treinadores):
 
 
 FUNCOES_EQUIPE_TECNICA = (
-    "Treinador Principal", "Treinador", "Adjunto", "Team manager",
+    "Treinador Principal", "Adjunto", "Team manager", "Treinador",
     "Fisioterapeuta", "Médico", "Seccionista", "Roupeiro",
     "Secretaria", "Presidente", "Vice-Presidente",
 )
@@ -64,9 +64,31 @@ FUNCOES_EQUIPE_TECNICA = (
 def _agrupar_equipa_tecnica(elementos):
     grupos = {}
     for elemento in elementos:
-        funcao = elemento.funcao or "Treinador"
+        funcao = (elemento.funcao or "Treinador").strip() or "Treinador"
+        if funcao.casefold() in {"treinador", "treinador principal"}:
+            funcao = "Treinador Principal"
+        elif funcao.casefold() in {"adjunto", "treinador adjunto"}:
+            funcao = "Adjunto"
+        elif funcao.casefold() == "team manager":
+            funcao = "Team manager"
         grupos.setdefault(funcao, []).append(elemento)
-    return [(funcao, _ordenar_treinadores(grupos[funcao])) for funcao in FUNCOES_EQUIPE_TECNICA if grupos.get(funcao)]
+    prioritarias = ("Treinador Principal", "Adjunto", "Team manager")
+    restantes = sorted((funcao for funcao in grupos if funcao not in prioritarias), key=str.casefold)
+    titulos = {
+        "Treinador Principal": "Treinador principal",
+        "Adjunto": "Treinadores adjuntos",
+        "Team manager": "Team managers",
+        "Fisioterapeuta": "Fisioterapeutas",
+        "Médico": "Médicos",
+        "Seccionista": "Seccionistas",
+        "Roupeiro": "Roupeiros",
+        "Presidente": "Presidentes",
+        "Vice-Presidente": "Vice-presidentes",
+    }
+    return [
+        (titulos.get(funcao, funcao), _ordenar_treinadores(grupos[funcao]))
+        for funcao in (*prioritarias, *restantes) if funcao in grupos
+    ]
 
 
 def _pode_gerir_equipa(utilizador) -> bool:

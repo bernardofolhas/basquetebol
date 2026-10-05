@@ -28,8 +28,29 @@ def test_equipa_tecnica_agrupa_apenas_funcoes_com_elementos():
 
     grupos = _agrupar_equipa_tecnica(elementos)
 
-    assert [funcao for funcao, _ in grupos] == ["Treinador", "Fisioterapeuta"]
-    assert all(funcao in FUNCOES_EQUIPE_TECNICA for funcao, _ in grupos)
+    assert [titulo for titulo, _ in grupos] == ["Treinador principal", "Fisioterapeutas"]
+    assert [elemento.id for _, elementos_grupo in grupos for elemento in elementos_grupo] == [1, 2]
+
+
+def test_equipa_tecnica_mostra_todos_os_cargos_na_ordem_pedida():
+    funcoes = (
+        "Médico", "Team Manager", "Treinador Adjunto", "Treinador", "Scout",
+        "Adjunto", "Treinador Principal", "Fisioterapeuta",
+    )
+    elementos = [SimpleNamespace(id=numero, nome=f"Pessoa {numero}", funcao=funcao) for numero, funcao in enumerate(funcoes, 1)]
+
+    grupos = _agrupar_equipa_tecnica(elementos)
+
+    assert [titulo for titulo, _ in grupos] == [
+        "Treinador principal", "Treinadores adjuntos", "Team managers",
+        "Fisioterapeutas", "Médicos", "Scout",
+    ]
+    assert [[item.funcao for item in grupo] for _, grupo in grupos[:3]] == [
+        ["Treinador", "Treinador Principal"],
+        ["Treinador Adjunto", "Adjunto"],
+        ["Team Manager"],
+    ]
+    assert sum(len(grupo) for _, grupo in grupos) == len(elementos)
 
 
 def test_perfis_tecnicos_usam_funcoes_da_equipa_sem_criar_novos_logins():
