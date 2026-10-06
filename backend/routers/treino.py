@@ -86,6 +86,10 @@ IMAGENS_CAMPO = {
 }
 
 
+def _campos_iniciais_exercicio(biblioteca: BibliotecoExercicio | None = None) -> str:
+    return "1,2" if biblioteca and biblioteca.desenho_campo_completo else "1"
+
+
 def _configuracao_campo(numero: int) -> tuple[str, str, str]:
     tipo = "meio" if numero % 2 else "completo"
     indice_tipo = (numero + 1) // 2 if tipo == "meio" else numero // 2
@@ -936,7 +940,7 @@ def _aplicar_importacao_automaticamente(
             rpe=rpe,
             organizacao=str(item.get("organizacao") or "").strip() or None,
             coaching_points=str(item.get("coaching_points") or "").strip() or None,
-            campos_ativos="",
+            campos_ativos=_campos_iniciais_exercicio(),
         ))
     db.add_all(novos)
     db.flush()
@@ -1592,7 +1596,7 @@ async def aplicar_importacao_plano(
                 rpe=rpe,
                 organizacao=valor(organizacoes) or None,
                 coaching_points=valor(coaching) or None,
-                campos_ativos="",
+                campos_ativos=_campos_iniciais_exercicio(),
             ))
     except (TypeError, ValueError) as erro:
         set_flash(request, f"Corrige os exercícios: {erro}", "error")
@@ -2204,7 +2208,8 @@ async def adicionar_exercicio(
         minutos=minutos_exercicio,
         rpe=rpe_exercicio,
         organizacao=organizacao or None,
-        coaching_points=coaching_points or None
+        coaching_points=coaching_points or None,
+        campos_ativos=_campos_iniciais_exercicio(biblioteca),
     )
     if biblioteca and biblioteca.desenho:
         exercicio.desenho_1 = biblioteca.desenho
@@ -2323,6 +2328,7 @@ async def adicionar_exercicio_da_biblioteca(
         categoria=biblioteca.categoria,
         desenho_1=biblioteca.desenho,
         desenho_2=biblioteca.desenho_campo_completo,
+        campos_ativos=_campos_iniciais_exercicio(biblioteca),
         organizacao=biblioteca.organizacao,
         coaching_points=biblioteca.coaching_points,
     )

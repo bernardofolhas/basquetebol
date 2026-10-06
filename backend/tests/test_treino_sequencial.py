@@ -748,7 +748,7 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         for texto in (
             "Finalização em vantagem", "Hora", "18:15", "Duração", "20 min",
             "Tipo", "TIO", "RPE", "Organização", "Três filas na linha final.",
-            "Coaching points", "Atacar o cesto sem hesitar.", "Acrescentar campo tático",
+            "Coaching points", "Atacar o cesto sem hesitar.", "Abrir editor tático no Studio",
         ):
             assert texto in pagina.text
         assert 'class="training-exercise-card"' in pagina.text
@@ -776,6 +776,9 @@ def test_cartao_do_exercicio_mostra_dados_da_ficha(client_admin):
         assert "Editar dados do exercício" not in pagina.text
 
         exercicio = db.query(ExercicioPlano).filter_by(plano_id=plano.id).one()
+        assert exercicio.campos_ativos == "1"
+        assert pagina.text.count('data-drawing-preview-field="1"') == 1
+        assert 'data-drawing-preview-field="2"' not in pagina.text
         novo_campo = client_admin.post(
             f"/treino/exercicios/{exercicio.id}/campos",
             data={"tipo": "meio"},

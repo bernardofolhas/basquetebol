@@ -143,7 +143,7 @@ class ExercicioPlano(Base):
     # neste mapa extensível, sem impor um limite ao número de quadros.
     desenhos_campos = Column(Text, nullable=False, default="{}", server_default="{}")
     # Lista ordenada das posições visíveis. Permite um exercício sem campos.
-    campos_ativos = Column(String, nullable=False, default="1,2", server_default="1,2")
+    campos_ativos = Column(String, nullable=False, default="1", server_default="1")
 
     # Organização do exercício
     organizacao = Column(Text, nullable=True)

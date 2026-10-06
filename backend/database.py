@@ -410,18 +410,19 @@ def actualizar_estrutura_campos_desenho() -> None:
     inspector = inspect(engine)
     dialecto = engine.dialect.name
     if inspector.has_table("exercicios_plano"):
-        colunas = {coluna["name"] for coluna in inspector.get_columns("exercicios_plano")}
+        detalhes_colunas = {coluna["name"]: coluna for coluna in inspector.get_columns("exercicios_plano")}
+        colunas = set(detalhes_colunas)
         if "campos_ativos" not in colunas:
             with engine.begin() as ligacao:
                 if dialecto == "postgresql":
                     ligacao.execute(text(
                         "ALTER TABLE exercicios_plano ADD COLUMN IF NOT EXISTS "
-                        "campos_ativos VARCHAR NOT NULL DEFAULT '1,2'"
+                        "campos_ativos VARCHAR NOT NULL DEFAULT '1'"
                     ))
                 else:
                     ligacao.execute(text(
                         "ALTER TABLE exercicios_plano ADD COLUMN "
-                        "campos_ativos VARCHAR NOT NULL DEFAULT '1,2'"
+                        "campos_ativos VARCHAR NOT NULL DEFAULT '1'"
                     ))
                 ligacao.execute(text(
                     "UPDATE exercicios_plano SET campos_ativos = CASE "
@@ -430,6 +431,10 @@ def actualizar_estrutura_campos_desenho() -> None:
                     "WHEN desenho_4 IS NOT NULL THEN '1,2,4' ELSE '1,2' END"
                 ))
             logger.info("Campos táticos ativos adicionados aos exercícios.")
+        elif dialecto == "postgresql" and "'1'" not in str(detalhes_colunas["campos_ativos"].get("default") or ""):
+            with engine.begin() as ligacao:
+                ligacao.execute(text("ALTER TABLE exercicios_plano ALTER COLUMN campos_ativos SET DEFAULT '1'"))
+            logger.info("Novo padrão dos exercícios: um meio campo.")
         if "desenhos_campos" not in colunas:
             with engine.begin() as ligacao:
                 if dialecto == "postgresql":

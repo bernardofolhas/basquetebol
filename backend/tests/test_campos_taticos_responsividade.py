@@ -18,6 +18,7 @@ from models.treinador import Treinador
 from models.treino import ExercicioPlano
 from models.utilizador import PerfilEnum, Utilizador
 from routers.treino import (
+    _campos_iniciais_exercicio,
     _campos_exercicio,
     _contexto_impressao_plano,
     _definir_desenho_campo,
@@ -29,6 +30,23 @@ from services.planeamento_integrado_service import _item_evento
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_exercicio_novo_comeca_com_um_meio_campo_e_pode_acrescentar_quadros():
+    coluna = ExercicioPlano.__table__.c.campos_ativos
+    assert coluna.default.arg == "1"
+    assert coluna.server_default.arg == "1"
+    assert _campos_iniciais_exercicio() == "1"
+
+    exercicio = ExercicioPlano(campos_ativos=_campos_iniciais_exercicio())
+    assert [campo["tipo"] for campo in _campos_exercicio(exercicio)] == ["meio"]
+    assert _proximo_numero_campo("completo", _slots_ativos(exercicio)) == 2
+    assert _proximo_numero_campo("meio", _slots_ativos(exercicio)) == 3
+
+
+def test_biblioteca_preserva_campo_completo_quando_ja_tem_desenho():
+    assert _campos_iniciais_exercicio(SimpleNamespace(desenho_campo_completo=None)) == "1"
+    assert _campos_iniciais_exercicio(SimpleNamespace(desenho_campo_completo="desenho")) == "1,2"
 
 
 def test_exercicio_pode_ficar_sem_campos_e_recuperar_um_campo():
