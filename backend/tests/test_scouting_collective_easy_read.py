@@ -156,7 +156,9 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
         "rotacoes_por_posicao": {"Base": [Item(jogador=jogador(6))]},
         "fotografias": {}, "caracteristicas_cinco": {1: ["P&R central", "Transição"]},
         "jogadores_prioritarios": [
-            {"jogador": Item(id=numero, nome=nome, posicao_principal=posicao), "caracteristica": caracteristica}
+            {"jogador": Item(id=numero, nome=nome, posicao_principal=posicao),
+             "caracteristica": caracteristica,
+             "liderancas": ["Melhor marcador", "Melhor assistente"] if numero == 1 else []}
             for numero, nome, posicao, caracteristica in (
                 (1, "Gus Goerzen", "Extremo", "Lançador Catch and Shoot"),
                 (2, "Lamine Banora", "Poste", "Participação no ressalto ofensivo"),
@@ -182,7 +184,7 @@ def test_leitura_facil_coletiva_renderiza_uma_pagina():
     paginas = PdfReader(BytesIO(pdf)).pages
     assert len(paginas) == 1
     texto_pdf = " ".join(paginas[0].extract_text().split())
-    for texto in ("Gus Goerzen", "Lamine Banora", "Thomas Jervis", "Reserva Um", "Reserva Dois", "Participação no ressalto ofensivo", "Criação de lançamento após bloqueio direto"):
+    for texto in ("Gus Goerzen", "Lamine Banora", "Thomas Jervis", "Reserva Um", "Reserva Dois", "Participação no ressalto ofensivo", "Criação de lançamento após bloqueio direto", "Melhor marcador", "Melhor assistente"):
         assert texto in texto_pdf
     assert "Cinco inicial" in html
     assert "<small>Dia</small>12/10/2026" in html

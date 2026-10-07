@@ -389,7 +389,11 @@ def test_jogadores_prioritarios_usam_a_caracteristica_com_maior_avaliacao():
 
     resultado = _jogadores_prioritarios_coletivo(adversario)
 
-    assert resultado == [{"jogador": jogador, "caracteristica": "Jogo interior"}]
+    assert resultado == [{
+        "jogador": jogador,
+        "liderancas": ["Melhor marcador", "Mais ressaltos"],
+        "caracteristica": "Jogo interior",
+    }]
 
 
 def test_jogadores_prioritarios_respeitam_a_selecao_e_ordem_do_treinador():
@@ -399,12 +403,19 @@ def test_jogadores_prioritarios_respeitam_a_selecao_e_ordem_do_treinador():
         id=22,
         itens=[SimpleNamespace(item=caracteristica, avaliacao=4, destaque=False, ordem_destaque=None)],
     )
-    adversario = SimpleNamespace(jogadores=[jogador_um, jogador_dois], lideres=[])
+    adversario = SimpleNamespace(jogadores=[jogador_um, jogador_dois], lideres=[
+        SimpleNamespace(jogador=jogador_um, tipo="Melhor marcador"),
+        SimpleNamespace(jogador=jogador_um, tipo="Melhor assistente"),
+        SimpleNamespace(jogador=jogador_um, tipo="Melhor marcador"),
+    ])
 
     resultado = _jogadores_prioritarios_coletivo(adversario, [22, 11])
 
     assert [entrada["jogador"].id for entrada in resultado] == [22, 11]
     assert resultado[0]["caracteristica"] == "Defesa do bloqueio"
+    assert resultado[0]["liderancas"] == []
+    assert resultado[1]["liderancas"] == ["Melhor marcador", "Melhor assistente"]
+    assert resultado[1]["caracteristica"] is None
 
 
 def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():

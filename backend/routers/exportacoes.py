@@ -1013,20 +1013,29 @@ def _jogadores_prioritarios_coletivo(adversario, jogador_ids: list[int] | None =
     """Resume os jogadores escolhidos para os mini-cartoes do relatorio."""
     resultado = []
     vistos = set()
+    liderancas_por_jogador: dict[int, list[str]] = {}
+    for lider in adversario.lideres or []:
+        if not lider.jogador:
+            continue
+        tipo = (lider.tipo or "").strip()
+        liderancas = liderancas_por_jogador.setdefault(lider.jogador.id, [])
+        if tipo and tipo not in liderancas:
+            liderancas.append(tipo)
     if jogador_ids is None:
         candidatos = [
-            (lider.jogador, lider.tipo)
+            lider.jogador
             for lider in (adversario.lideres or [])
             if lider.jogador
         ]
     else:
         jogadores = {jogador.id: jogador for jogador in (adversario.jogadores or [])}
-        candidatos = [(jogadores.get(jogador_id), None) for jogador_id in jogador_ids]
+        candidatos = [jogadores.get(jogador_id) for jogador_id in jogador_ids]
 
-    for jogador, caracteristica_padrao in candidatos:
+    for jogador in candidatos:
         if not jogador or jogador.id in vistos:
             continue
         vistos.add(jogador.id)
+        liderancas = liderancas_por_jogador.get(jogador.id, [])
         caracteristicas = [
             relacao for relacao in (jogador.itens or [])
             if relacao.item
@@ -1042,10 +1051,11 @@ def _jogadores_prioritarios_coletivo(adversario, jogador_ids: list[int] | None =
         ))
         resultado.append({
             "jogador": jogador,
+            "liderancas": liderancas,
             "caracteristica": (
                 caracteristicas[0].item.nome
                 if caracteristicas
-                else (caracteristica_padrao or "Sem caracteristica avaliada")
+                else (None if liderancas else "Sem caracteristica avaliada")
             ),
         })
     return resultado[:4]
