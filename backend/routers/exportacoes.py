@@ -759,6 +759,7 @@ RELATORIOS_CONFIG = {
             _secao("chaves", "Chaves da equipa", "Mensagens-chave selecionadas pelo treinador.", ("completo", "facil", "a3")),
             _secao("cinco_rotacao", "Cinco e rotações", "Cinco inicial previsto e principais rotações.", ("completo", "facil", "a3")),
             _secao("estatisticas", "Estatísticas da equipa", "Apenas os indicadores selecionados.", ("completo", "facil")),
+            _secao("resultados", "Últimos resultados", "Escolhe os jogos recentes que entram no relatório.", ("completo", "facil")),
             _secao("perfil", "Perfil coletivo", "Como a equipa joga, com avaliação simples.", ("completo", "facil", "a3")),
             _secao("analise", "Análise técnico-tática", "Pontos fortes e fragilidades no ataque e na defesa.", ("completo",)),
             _secao("regras_coberturas", "Regras defensivas mais utilizadas", "Opções defensivas usadas pelo adversário.", ("completo", "facil", "a3")),
@@ -767,6 +768,7 @@ RELATORIOS_CONFIG = {
             _secao("prioridades", "Prioridades", "Prioridades ofensivas e defensivas.", ("completo", "facil", "a3")),
             _secao("situacoes", "Transição, ressalto e especiais", "Situações específicas destacadas.", ("completo", "facil")),
             _secao("diagramas", "Ações principais", "Conceitos ofensivos selecionados, apresentados no final.", ("completo", "facil", "a3")),
+            _secao("playbook", "Playbook do adversário", "Cada jogada com as suas cenas e observações, no fim do documento.", ("completo", "facil")),
         ],
     },
     "plano-jogo": {
@@ -846,7 +848,10 @@ def _perfil(utilizador) -> str:
 
 
 def _secoes_padrao(tipo: str, formato: str) -> list[str]:
-    return [s["chave"] for s in RELATORIOS_CONFIG[tipo]["secoes"] if formato in s["formatos"]]
+    return [
+        s["chave"] for s in RELATORIOS_CONFIG[tipo]["secoes"]
+        if formato in s["formatos"] and not (tipo == "scouting-coletivo" and s["chave"] == "playbook")
+    ]
 
 
 def _normalizar_secoes_coletivas(secoes: list[str]) -> list[str]:
@@ -924,10 +929,18 @@ def _simbolo_embebido(url: str | None) -> str | None:
 
 def _passos_setplay_pdf(setplay) -> list[dict]:
     """Prepara imagens autónomas do Playbook para o HTML/PDF."""
-    campo = STATIC_DIR / "campos" / "campo_meio.png"
     passos = []
     for passo in getattr(setplay, "passos", []) or []:
-        desenho = decompor_desenho_editavel(passo.desenho)[0] if passo.desenho else None
+        desenho, estado = decompor_desenho_editavel(passo.desenho) if passo.desenho else (None, None)
+        tipo = estado.get("campoTipo") if isinstance(estado, dict) else None
+        if tipo not in {"meio", "completo"} and isinstance(estado, dict):
+            try:
+                largura = float(estado.get("largura") or 0)
+                altura = float(estado.get("altura") or 0)
+            except (TypeError, ValueError):
+                largura = altura = 0
+            tipo = "completo" if largura and altura > largura else "meio"
+        campo = STATIC_DIR / "campos" / ("campo_completo.png" if tipo == "completo" else "campo_meio.png")
         imagem_coach = normalizar_data_uri(passo.imagem_coach) if passo.imagem_coach else None
         if desenho and campo.is_file():
             imagem = compor_desenho_sobre_campo(campo, desenho)
@@ -1166,6 +1179,39 @@ def _acoes_principais_coletivas(adversario) -> list:
     return [entrada for entrada in adversario.conceitos_ofensivos if entrada.setplay]
 
 
+def _resultados_recentes_coletivos(adversario, selecionados: list[int] | None = None) -> list:
+    resultados = sorted(
+        (
+            resultado for resultado in adversario.resultados
+            if resultado.data and resultado.pontos_marcados is not None
+            and resultado.pontos_sofridos is not None
+        ),
+        key=lambda resultado: (resultado.data, resultado.id),
+        reverse=True,
+    )[:5]
+    return resultados if selecionados is None else [r for r in resultados if r.id in selecionados]
+
+
+def _playbook_coletivo(adversario, passos_setplay: dict[int, list[dict]]) -> list[dict]:
+    jogadas = []
+    for momento in adversario.momentos_playbook:
+        setplay = momento.setplay
+        if not setplay or not any(
+            passo.desenho or passo.imagem_coach or (passo.observacao or "").strip()
+            for passo in setplay.passos
+        ):
+            continue
+        jogadas.append({
+            "titulo": setplay.nome,
+            "descricao": setplay.descricao,
+            "passos": [
+                {"passo": passo["ordem"], "imagem": passo["imagem"], "observacao": passo["observacao"]}
+                for passo in passos_setplay.get(setplay.id, [])
+            ],
+        })
+    return jogadas
+
+
 def _grupos_resposta_coletiva(blocos: dict[str, list]) -> list[dict]:
     grupos = [
         ("Sem bola", "resposta", ("resposta",)),
@@ -1219,7 +1265,13 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
                     jogadores_destaque_ids.append(int(valor))
                 if len(jogadores_destaque_ids) == 4:
                     break
-        setplays = [r.setplay for r in alvo.conceitos_ofensivos]
+        mostrar_playbook = "playbook" in dados.getlist("secoes")
+        momentos_para_pdf = alvo.momentos_playbook if mostrar_playbook else []
+        setplays = list({r.setplay.id: r.setplay for r in [*alvo.conceitos_ofensivos, *momentos_para_pdf] if r.setplay}.values())
+        passos_setplay = {setplay.id: _passos_setplay_pdf(setplay) for setplay in setplays}
+        ids_resultados = None
+        if dados.get("configuracao_resultados") == "1":
+            ids_resultados = [int(valor) for valor in dados.getlist("resultados") if str(valor).isdigit()]
         itens_coletivos = _itens_por_categoria(alvo.itens_coletivos)
         media_exibida = _media_exibida_coletiva(alvo)
         blocos_coletivos = {}
@@ -1267,6 +1319,8 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             opcoes_defensivas_facil=_opcoes_defensivas_coletivas(alvo.opcoes_defensivas),
             itens_coletivos=itens_coletivos,
             jogadas_coletivas=_acoes_principais_coletivas(alvo),
+            playbook_coletivo=_playbook_coletivo(alvo, passos_setplay) if mostrar_playbook else [],
+            resultados_recentes=_resultados_recentes_coletivos(alvo, ids_resultados),
             jogadores_prioritarios=_jogadores_prioritarios_coletivo(alvo, jogadores_destaque_ids),
             media_exibida=media_exibida,
             indicadores_coletivos=indicadores_coletivos,
@@ -1295,7 +1349,7 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             rotacoes_sem_titular_lista=[entrada for entradas in rotacoes_sem_titular.values() for entrada in entradas],
             ha_rotacoes_sem_titular=any(rotacoes_sem_titular.values()),
             substituicoes_por_titular=substituicoes_por_titular,
-            passos_setplay={setplay.id: _passos_setplay_pdf(setplay) for setplay in setplays},
+            passos_setplay=passos_setplay,
             stat_fields=stat_fields,
             stat_labels=STAT_LABELS,
             stat_codes=STAT_CODES,
@@ -1364,11 +1418,19 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
         entidades = alvo.jogadores
     jogadores_mini_cartoes = []
     jogadores_mini_cartoes_preselecionados = []
+    resultados_disponiveis = []
+    resultados_selecionados = []
     if tipo == "scouting-coletivo":
         jogadores_mini_cartoes = sorted(alvo.jogadores, key=lambda jogador: jogador.nome.casefold())
         jogadores_mini_cartoes_preselecionados = [
             entrada["jogador"].id for entrada in _jogadores_prioritarios_coletivo(alvo)
         ]
+        resultados_disponiveis = _resultados_recentes_coletivos(alvo)
+        resultados_selecionados = (
+            configuracao_guardada["resultados"]
+            if "resultados" in configuracao_guardada
+            else [resultado.id for resultado in resultados_disponiveis]
+        )
     return {
         "utilizador": utilizador,
         "tipo": tipo,
@@ -1388,6 +1450,8 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
         "estatistica_destaque_selecionada": configuracao_guardada.get("estatistica_destaque", "") if configuracao_guardada.get("estatistica_destaque") in STAT_HIGHLIGHT_CODES else "",
         "estatistica_destaque_tom": configuracao_guardada.get("estatistica_destaque_tom", "positivo") if configuracao_guardada.get("estatistica_destaque_tom") in {"positivo", "negativo"} else "positivo",
         "jogadores_destaque_selecionados": configuracao_guardada.get("jogadores_destaque", []),
+        "resultados_disponiveis": resultados_disponiveis,
+        "resultados_selecionados": resultados_selecionados,
         "padroes": {f: _secoes_padrao(tipo, f) for f in FORMATOS_RELATORIO},
         "estatisticas_disponiveis": [(campo, STAT_LABELS[campo]) for campo in STAT_FIELDS]
         if any(secao["chave"] == "estatisticas" for secao in RELATORIOS_CONFIG[tipo]["secoes"])
@@ -1523,6 +1587,8 @@ async def guardar_predefinicao_relatorio(tipo: str, alvo_id: int, request: Reque
         "estatistica_destaque": str(dados.get("estatistica_destaque") or "").strip() if tipo == "scouting-coletivo" and str(dados.get("estatistica_destaque") or "").strip() in STAT_HIGHLIGHT_CODES else "",
         "estatistica_destaque_tom": str(dados.get("estatistica_destaque_tom") or "").strip().lower() if tipo == "scouting-coletivo" and str(dados.get("estatistica_destaque_tom") or "").strip().lower() in {"positivo", "negativo"} else "positivo",
         "jogadores_destaque": [int(valor) for valor in dados.getlist("jogadores_destaque") if str(valor).isdigit()][:4],
+        "resultados": [int(valor) for valor in dados.getlist("resultados") if str(valor).isdigit()][:5]
+        if tipo == "scouting-coletivo" else [],
     })
     db.commit()
     return RedirectResponse(f"/exportacoes/relatorios/{tipo}/{alvo_id}?predefinicao_id={registo.id}", status_code=303)

@@ -109,6 +109,24 @@ def test_configurador_tem_selecao_arrastar_previsualizacao_e_predefinicoes():
         assert marcador in html
 
 
+def test_coletivo_configura_resultados_e_playbook_em_secoes_independentes():
+    secoes = {secao['chave'] for secao in RELATORIOS_CONFIG['scouting-coletivo']['secoes']}
+    assert {'resultados', 'playbook', 'diagramas'}.issubset(secoes)
+    padrao_facil = _secoes_padrao('scouting-coletivo', 'facil')
+    assert 'resultados' in padrao_facil and 'playbook' not in padrao_facil
+    formulario = (TEMPLATES / 'exportacoes' / '_relatorio_formulario.html').read_text(encoding='utf-8')
+    assert 'name="resultados"' in formulario
+    assert 'name="configuracao_resultados"' in formulario
+    assert 'Introduzir ou corrigir resultados' in formulario
+    dados = FormData([
+        ('formato', 'facil'), ('secoes_configuradas', '1'),
+        ('secoes', 'playbook'), ('secoes', 'resultados'),
+        ('ordem', 'resultados,playbook'),
+    ])
+    _, _, escolhidas = _configuracao_relatorio('scouting-coletivo', dados, UtilizadorFalso(PerfilEnum.treinador))
+    assert escolhidas == ['resultados', 'playbook']
+
+
 def test_estatisticas_sao_escolhidas_individualmente_antes_da_exportacao():
     formulario = (TEMPLATES / "exportacoes" / "_relatorio_formulario.html").read_text(encoding="utf-8")
     rota = (ROOT / "backend" / "routers" / "exportacoes.py").read_text(encoding="utf-8")
@@ -176,12 +194,12 @@ def test_quatro_modelos_de_scouting_seguem_estrutura_de_exportacao_fornecida():
         "Nossa resposta",
         "Análise técnico-tática",
         "Regras defensivas mais utilizadas",
-        "Últimos 5 resultados",
+        "Últimos resultados",
         "Jogadores mais influentes",
         "Ações principais",
     ):
         assert marcador in coletivo_completo
-    assert "Playbook coletivo do adversário" not in coletivo_completo
+    assert "Playbook do adversário" in coletivo_completo
     assert "Últimos 3 resultados" in coletivo_facil
     assert "cabecalho_scouting('Coletivo', alvo_nome, identidade, simbolo_adversario, adversario.observacoes)" in coletivo_facil
     assert "passos_setplay" in rota

@@ -22,8 +22,11 @@ from routers.exportacoes import (
     _media_exibida_coletiva,
     _normalizar_secoes_coletivas,
     _opcoes_defensivas_coletivas,
+    _passos_setplay_pdf,
+    _playbook_coletivo,
+    _resultados_recentes_coletivos,
 )
-from services.desenho_service import imagem_estatica_data_uri
+from services.desenho_service import empacotar_desenho_editavel, imagem_estatica_data_uri
 from services.pdf_service import preparar_contexto_pdf, simbolo_cabecalho_sem_fundo
 
 
@@ -83,6 +86,123 @@ def test_acoes_principais_nao_incluem_momentos_reservados_ao_playbook():
     momento = Item(setplay=Item(nome="ATO"))
     adversario = Item(conceitos_ofensivos=[conceito], momentos_playbook=[momento])
     assert _acoes_principais_coletivas(adversario) == [conceito]
+
+
+def test_resultados_recentes_so_incluem_jogos_com_marcador_e_respeitam_a_selecao():
+    resultados = [
+        Item(id=numero, data=date(2026, 10, numero), pontos_marcados=70 + numero,
+             pontos_sofridos=65, oponente=f'Equipa {numero}')
+        for numero in range(1, 7)
+    ]
+    resultados.append(Item(id=7, data=date(2026, 10, 7), pontos_marcados=None,
+                           pontos_sofridos=65, oponente='Sem marcador'))
+    adversario = Item(resultados=resultados)
+
+    assert [r.id for r in _resultados_recentes_coletivos(adversario)] == [6, 5, 4, 3, 2]
+    assert [r.id for r in _resultados_recentes_coletivos(adversario, [3, 6, 1])] == [6, 3]
+    assert _resultados_recentes_coletivos(adversario, []) == []
+
+
+def test_playbook_coletivo_mantem_jogadas_separadas_e_observacoes_por_cena():
+    primeiro = Item(id=11, nome='Horns', descricao='Entrada central', passos=[
+        Item(desenho='{}', imagem_coach=None, observacao='Bloquear à esquerda'),
+        Item(desenho='{}', imagem_coach=None, observacao='Abrir para o canto'),
+    ])
+    segundo = Item(id=12, nome='Stagger', descricao=None, passos=[
+        Item(desenho='{}', imagem_coach=None, observacao='Libertar o lançador'),
+    ])
+    vazio = Item(id=13, nome='Por desenhar', descricao=None, passos=[
+        Item(desenho=None, imagem_coach=None, observacao=''),
+    ])
+    adversario = Item(momentos_playbook=[Item(setplay=primeiro), Item(setplay=segundo), Item(setplay=vazio)])
+    passos = {
+        11: [{'ordem': 1, 'imagem': 'cena-1', 'observacao': 'Bloquear à esquerda'},
+             {'ordem': 2, 'imagem': 'cena-2', 'observacao': 'Abrir para o canto'}],
+        12: [{'ordem': 1, 'imagem': 'cena-3', 'observacao': 'Libertar o lançador'}],
+    }
+
+    jogadas = _playbook_coletivo(adversario, passos)
+    assert [jogada['titulo'] for jogada in jogadas] == ['Horns', 'Stagger']
+    assert [passo['observacao'] for passo in jogadas[0]['passos']] == [
+        'Bloquear à esquerda', 'Abrir para o canto'
+    ]
+
+
+def test_cena_de_campo_inteiro_mantem_o_campo_inteiro_no_pdf():
+    imagem = imagem_estatica_data_uri(STATIC_DIR / 'campos' / 'campo_completo.png')
+    desenho = empacotar_desenho_editavel(imagem, {
+        'campoTipo': 'completo', 'largura': 697, 'altura': 1222, 'objectos': [],
+    })
+    setplay = Item(passos=[Item(ordem=0, desenho=desenho, imagem_coach=None, observacao='Campo inteiro')])
+
+    passo = _passos_setplay_pdf(setplay)[0]
+    imagem_pdf = Image.open(BytesIO(base64.b64decode(passo['imagem'].split(',', 1)[1])))
+    assert imagem_pdf.size == (697, 1222)
+    assert passo['observacao'] == 'Campo inteiro'
+
+
+def test_resultados_e_playbook_ficam_em_blocos_independentes_no_fim_da_leitura_facil():
+    templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    templates.env.filters['data_pt'] = data_pt
+    campo = imagem_estatica_data_uri(STATIC_DIR / 'campos' / 'campo_meio.png')
+    contexto = {
+        'secoes_set': {'resultados', 'playbook'}, 'blocos_coletivos': {},
+        'respostas_grupos': [], 'alvo_nome': 'Rivals BC',
+        'identidade': {'cor_principal': '#d60b18', 'cor_principal_escura': '#a00812',
+                       'texto_sobre_principal': '#ffffff', 'logo_principal': None},
+        'resultados_recentes': [Item(id=1, data=date(2026, 10, 2), oponente='Queluz',
+                                     em_casa=True, competicao='Liga', pontos_marcados=80, pontos_sofridos=72)],
+        'playbook_coletivo': [
+            {'titulo': 'Horns', 'passos': [
+                {'passo': 1, 'imagem': campo, 'observacao': 'Bloqueio no topo'},
+                {'passo': 2, 'imagem': campo, 'observacao': 'Passe para o canto'},
+            ]},
+            {'titulo': 'Stagger', 'passos': [
+                {'passo': 1, 'imagem': campo, 'observacao': 'Saída do lançador'},
+            ]},
+        ],
+    }
+    template = templates.get_template('relatorios/scouting_coletivo_facil_v2.html')
+    html = template.render(contexto)
+    assert html.index('Últimos resultados') < html.index('Playbook do adversário')
+    assert html.count('class="pdf-play-card"') == 2
+    assert html.count('class="pdf-play-step"') == 3
+    assert html.index('Bloqueio no topo') < html.index('Passe para o canto') < html.index('Stagger')
+    assert 'Queluz' in html and '80–72' in html
+    pdf = HTML(string=html).write_pdf()
+    if destino := os.getenv('SCOUTING_PLAYBOOK_QA_PDF'):
+        Path(destino).write_bytes(pdf)
+    texto_pdf = ' '.join(pagina.extract_text() for pagina in PdfReader(BytesIO(pdf)).pages)
+    for texto in ('Queluz', 'Horns', 'Stagger', 'Bloqueio no topo', 'Passe para o canto', 'Saída do lançador'):
+        assert texto in texto_pdf
+
+    contexto['secoes_set'] = {'resultados'}
+    assert 'Playbook do adversário</h2>' not in template.render(contexto)
+    contexto['secoes_set'] = {'playbook'}
+    assert 'Últimos resultados</h2>' not in template.render(contexto)
+    contexto['playbook_coletivo'] = []
+    assert 'Playbook do adversário</h2>' not in template.render(contexto)
+
+
+def test_relatorio_completo_apresenta_o_playbook_depois_das_outras_secoes():
+    templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    templates.env.filters['data_pt'] = data_pt
+    contexto = {
+        'identidade': {'cor_principal': '#d60b18', 'cor_principal_escura': '#a00812',
+                       'texto_sobre_principal': '#ffffff', 'logo_principal': None},
+        'secoes_set': {'resultados', 'playbook'}, 'alvo_nome': 'Rivals BC',
+        'simbolo_adversario': None, 'adversario': Item(observacoes=None),
+        'equipa': Item(nome='Nossa equipa'), 'itens_coletivos': {},
+        'resultados_recentes': [Item(data=date(2026, 10, 2), oponente='Queluz',
+                                     em_casa=True, competicao='Liga', pontos_marcados=80, pontos_sofridos=72)],
+        'playbook_coletivo': [{'titulo': 'Horns', 'passos': [
+            {'passo': 1, 'imagem': None, 'observacao': 'Entrada central'},
+        ]}],
+    }
+    html = templates.get_template('relatorios/scouting_coletivo_completo.html').render(contexto)
+    assert html.index('Últimos resultados') < html.index('Playbook do adversário')
+    assert html.count('class="pdf-play-card"') == 1
+    assert 'Entrada central' in html
 
 
 def test_respostas_agrupadas_ignoram_blocos_nao_destacados():
