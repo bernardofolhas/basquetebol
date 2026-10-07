@@ -283,7 +283,7 @@ def test_studio_gera_e_reordena_cenas_sem_recarregar(client_admin):
 
         ordem = [terceiro_id, primeiro.id, segundo_id]
         resposta = client_admin.post(f"/playbook/setplays/{setplay.id}/passos/reordenar", json={"passo_ids": ordem})
-        assert resposta.json() == {"sucesso": True}
+        assert resposta.json() == {"sucesso": True, "passo_ids": ordem}
         db.expire_all()
         guardados = db.query(PassoSetPlay).filter(PassoSetPlay.setplay_id == setplay.id).order_by(PassoSetPlay.ordem).all()
         assert [passo.id for passo in guardados] == ordem

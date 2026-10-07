@@ -116,7 +116,9 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline:3px solid 
 .pbs-scene-actions { position: absolute; top: 8px; right: 8px; display: none; gap: 3px; }
 .pbs-scene:hover .pbs-scene-actions, .pbs-scene:focus-within .pbs-scene-actions { display: flex; }
 .pbs-scene-actions button { width: 25px; height: 25px; display: grid; place-items: center; border: 0; border-radius: 7px; background: rgba(255,255,255,.94); box-shadow: 0 1px 6px #0002; cursor: pointer; }
+.pbs-scene-actions button:disabled { opacity: .4; cursor: not-allowed; }
 .pbs-scene-actions button:last-child { color: var(--pbs-red-dark); }
+@media (hover: none) { .pbs-scene-actions { display: flex; } }
 .pbs-scenes-empty { margin: auto 15px; color: var(--pbs-muted); text-align: center; font-size: 12px; }
 .pbs-scenes-empty span { display: block; margin-bottom: 8px; }
 .pbs-scenes-empty button { border: 0; color: var(--pbs-red-dark); background: none; font-weight: 700; cursor: pointer; }
@@ -252,7 +254,7 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline:3px solid 
   .pbs-workspace { grid-template-columns: 1fr; }
   .pbs-scenes-panel { position: fixed; z-index: 40; inset: 58px auto 54px 0; width: min(78vw, 230px); transform: translateX(-102%); transition: transform .2s ease; box-shadow: 12px 0 35px #0002; }
   .pbs-scenes-panel.is-mobile-open { transform: translateX(0); }
-  .pbs-scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .pbs-scenes { display: grid; grid-template-columns: 1fr; gap: 7px; }
   .pbs-scene { margin: 0; }
   .pbs-stage-options label { display:flex; }
   .pbs-court-switch { margin-right: 2px; }

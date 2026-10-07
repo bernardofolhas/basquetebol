@@ -703,7 +703,7 @@ async def reordenar_passos_setplay(
     for ordem, passo_id in enumerate(ids):
         mapa[passo_id].ordem = ordem
     db.commit()
-    return JSONResponse({"sucesso": True})
+    return JSONResponse({"sucesso": True, "passo_ids": ids})
 
 
 # ── ELIMINAR PASSO ─────────────────────────────────────────────────────────────

@@ -8,13 +8,15 @@ function studio(options = {}) {
   const source = fs.readFileSync(path.join(__dirname, '../static/js/playbook-studio.js'), 'utf8');
   const sandbox = { document: { querySelector: selector => selector === '[data-playbook-studio]' ? { dataset: {} } : null }, window: {}, ...options };
   vm.runInNewContext(source.replace('  init();', `
-    globalThis.api = { drawLine, cleanDrawnLine, normalizeScene, stateFor, continuationObjects,
+    globalThis.api = { drawLine, cleanDrawnLine, normalizeScene, stateFor, continuationObjects, moveScene,
       animatedObjects, previewAt, previewDuration, zigzagPoints, pointAlong, preparePreview,
       togglePreview, pausePreview, seekPreview, previewTick, saveScene, saveNotes, convertLegacyScene,
       times: { read: PREVIEW_READ_MS, move: PREVIEW_MOVE_MS },
       playback() { return { playing: previewPlaying, elapsed: previewElapsed }; },
       pending() { return { timers: saveTimers.size, queues: saveQueues.size, unsaved: Array.from(unsavedScenes) }; },
-      setScenes(value) { scenes = value; previewPlan = null; activeId = value[0]?.id; } };
+      orderPending() { return orderSaveQueue; },
+      sceneIds() { return scenes.map(scene => scene.id); },
+      setScenes(value) { scenes = value; previewPlan = null; activeId = value[0]?.id; confirmedSceneIds = value.map(scene => scene.id); } };
   `), sandbox);
   return sandbox.api;
 }
@@ -43,7 +45,7 @@ function environment() {
   function node() {
     const classes = new Set();
     const el = { dataset: {}, style: {}, clientWidth: 800, clientHeight: 500, width: 702, height: 622,
-      value: '1', lastChild: {}, append() {}, setAttribute() {}, toggleAttribute() {}, addEventListener() {},
+      value: '1', lastChild: {}, append() {}, setAttribute() {}, toggleAttribute() {}, addEventListener() {}, querySelectorAll: () => [],
       toDataURL: () => 'data:image/png;base64,test',
       classList: { toggle(c, active) { active ? classes.add(c) : classes.delete(c); }, contains: c => classes.has(c), add: c => classes.add(c), remove: c => classes.delete(c) }
     };
@@ -62,17 +64,98 @@ function environment() {
   const options = { document, window: {}, FormData: class {}, Image: class {},
     setTimeout(fn) { const id = ++serial; timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id),
     requestAnimationFrame(fn) { const id = ++serial; frames.set(id, fn); return id; }, cancelAnimationFrame: id => frames.delete(id),
-    async fetch(url, options) { requests.push({ url, payload: JSON.parse(options.body) }); return { ok: true, json: async () => ({}) }; }
+    async fetch(url, options) {
+      const payload = JSON.parse(options.body);
+      requests.push({ url, payload });
+      return { ok: true, json: async () => url.endsWith('/reordenar')
+        ? { sucesso: true, passo_ids: payload.passo_ids } : {} };
+    }
   };
+  document.querySelector('[data-playbook-studio]').dataset.setplayId = '1';
   return { options, nodes, frames, requests,
     async flush() { const pending = [...timers.values()]; timers.clear(); await Promise.all(pending.map(fn => fn())); },
     frame(time) { const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(time)); }
   };
 }
 
+test('reordering scenes persists the new order and updates the active scene number', async () => {
+  const env = environment(), api = studio(env.options);
+  api.setScenes([scene(1, []), scene(2, []), scene(3, [])]);
+
+  api.moveScene(1, 3, false);
+  await api.orderPending();
+
+  assert.deepEqual(api.sceneIds(), [2, 3, 1]);
+  assert.equal(env.requests.length, 1);
+  assert.equal(env.requests[0].url, '/playbook/setplays/1/passos/reordenar');
+  assert.deepEqual(Array.from(env.requests[0].payload.passo_ids), [2, 3, 1]);
+  assert.equal(env.nodes.get('[data-scene-label]').textContent, 'Cena 3');
+  assert.equal(env.nodes.get('[data-save-state]').lastChild.textContent, 'Guardado');
+});
+
+test('rapid scene reorders reach the server in revision order', async () => {
+  const env = environment();
+  const originalFetch = env.options.fetch;
+  let unblockFirst;
+  const firstBlocked = new Promise(resolve => { unblockFirst = resolve; });
+  let firstStarted;
+  const firstRequest = new Promise(resolve => { firstStarted = resolve; });
+  env.options.fetch = async (url, options) => {
+    if (url.endsWith('/reordenar') && !env.requests.length) {
+      firstStarted();
+      await firstBlocked;
+    }
+    return originalFetch(url, options);
+  };
+  const api = studio(env.options);
+  api.setScenes([scene(1, []), scene(2, []), scene(3, [])]);
+
+  api.moveScene(1, 3, false);
+  await firstRequest;
+  api.moveScene(2, 1, false);
+  assert.equal(env.requests.length, 0);
+  unblockFirst();
+  await api.orderPending();
+
+  assert.deepEqual(api.sceneIds(), [3, 1, 2]);
+  assert.deepEqual(env.requests.map(request => Array.from(request.payload.passo_ids)), [[2, 3, 1], [3, 1, 2]]);
+  assert.equal(env.nodes.get('[data-save-state]').lastChild.textContent, 'Guardado');
+});
+
+test('a rejected scene order restores the last confirmed order', async () => {
+  const env = environment();
+  env.options.fetch = async () => ({ ok: false, json: async () => ({ erro: 'Falha de rede' }) });
+  const api = studio(env.options);
+  api.setScenes([scene(1, []), scene(2, []), scene(3, [])]);
+
+  api.moveScene(1, 3, false);
+  await api.orderPending();
+
+  assert.deepEqual(api.sceneIds(), [1, 2, 3]);
+  assert.equal(env.nodes.get('[data-scene-label]').textContent, 'Cena 1');
+  assert.equal(env.nodes.get('[data-save-state]').lastChild.textContent, 'Não guardado');
+  assert.match(env.nodes.get('[data-toast]').textContent, /Falha de rede/);
+});
+
+test('training exercise scenes use the training reorder endpoint', async () => {
+  const env = environment();
+  env.nodes.get('[data-playbook-studio]').dataset = { trainingExercise: 'true', setplayId: '42' };
+  const api = studio(env.options);
+  api.setScenes([scene(1, []), scene(2, [])]);
+
+  api.moveScene(2, 1, true);
+  await api.orderPending();
+
+  assert.equal(env.requests[0].url, '/treino/exercicios/42/studio/cenas/reordenar');
+  assert.deepEqual(api.sceneIds(), [2, 1]);
+});
+
 test('playback changes speed without jumping, resumes without wall-clock drift and schedules one frame', () => {
   const env = environment(), api = studio(env.options);
-  api.setScenes([scene(1, [marker('p', 0, 0), action('a', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }])])]);
+  api.setScenes([
+    scene(1, [marker('p', 0, 0), action('a', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }])]),
+    scene(2, [marker('p', 200, 0)])
+  ]);
   api.preparePreview(); api.togglePreview();
   env.frame(0); env.frame(1000);
   assert.equal(api.playback().elapsed, 1000);
@@ -275,12 +358,12 @@ test('preview reads each scene then moves all its players together before advanc
   assert.ok(movement.objects.filter(o => o.pontos).every(o => o.hidden));
   assert.equal(movement.objects.find(o => o.id === 'p').x, 100);
   assert.equal(movement.objects.find(o => o.id === 'other').x, 300);
-  assert.equal(api.previewDuration(), 2 * (api.times.read + api.times.move));
+  assert.equal(api.previewDuration(), 2 * api.times.read + api.times.move);
   assert.equal(at(1550).scene.id, 2);
   assert.equal(at(1550).reading, true);
   assert.ok(at(1550).objects.every(o => !o.hidden));
-  assert.equal(at(2675).objects.find(o => o.id === 'q').x, 450);
-  assert.equal(api.previewAt(1).objects.find(o => o.id === 'q').x, 500);
+  assert.equal(at(1900).objects.find(o => o.id === 'q').x, 400);
+  assert.equal(api.previewAt(1).objects.find(o => o.id === 'q').x, 400);
   assert.equal(JSON.stringify([first, second]), original);
 });
 
@@ -289,8 +372,9 @@ test('compiled playback is repeatable when seeking backwards and leaves saved sc
   const initial = scene(1, [marker('p', 0, 0), marker('other', 200, 0),
     action('a', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }]),
     action('b', 'seta_zigzag', [{ x: 200, y: 0 }, { x: 300, y: 100 }, { x: 400, y: 0 }])]);
-  const original = JSON.stringify(initial);
-  api.setScenes([initial]); api.preparePreview();
+  const final = scene(2, [marker('p', 200, 0), marker('other', 400, 0)]);
+  const original = JSON.stringify([initial, final]);
+  api.setScenes([initial, final]); api.preparePreview();
   const at = ms => api.previewAt(ms / api.previewDuration());
   assert.equal(at(1125).objects.find(o => o.id === 'p').x, 100);
   assert.equal(at(1125).objects.find(o => o.id === 'other').x, 300);
@@ -301,7 +385,7 @@ test('compiled playback is repeatable when seeking backwards and leaves saved sc
   assert.equal(at(1125).objects.find(o => o.id === 'other').y, 100);
   assert.ok(at(1125).objects.filter(o => o.pontos).every(o => o.hidden));
   assert.equal(at(100).reading, true);
-  assert.equal(JSON.stringify(initial), original);
+  assert.equal(JSON.stringify([initial, final]), original);
 });
 
 test('short trajectory segments interpolate continuously', () => {
@@ -317,9 +401,12 @@ test('movements start together even with different legacy groups and static scen
   const output = api.animatedObjects(scene(1, [marker('p1', 0, 0), marker('p2', 150, 0), a, b]), 0, .5);
   assert.equal(output.find(o => o.id === 'p1').x, 75);
   assert.equal(output.find(o => o.id === 'p2').x, 225);
-  api.setScenes([scene(1, [marker('p1', 0, 0), marker('p2', 150, 0), a, b])]);
+  api.setScenes([
+    scene(1, [marker('p1', 0, 0), marker('p2', 150, 0), a, b]),
+    scene(2, [marker('p1', 150, 0), marker('p2', 300, 0)])
+  ]);
   api.preparePreview();
-  assert.equal(api.previewDuration(), api.times.read + api.times.move);
+  assert.equal(api.previewDuration(), 2 * api.times.read + api.times.move);
   assert.equal(api.previewAt(1125 / api.previewDuration()).objects.find(o => o.id === 'p2').x, 225);
   api.setScenes([scene(1, [marker('p', 10, 20)])]);
   assert.equal(api.previewAt(1).reading, true);
@@ -327,15 +414,37 @@ test('movements start together even with different legacy groups and static scen
 
 test('a player movement and a pass share the same playback interval', () => {
   const api = studio();
-  api.setScenes([scene(1, [
-    marker('player', 0, 0), marker('ball', 300, 0, 'bola'),
-    action('run', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }]),
-    action('pass', 'seta_tracejada', [{ x: 300, y: 0 }, { x: 500, y: 0 }])
-  ])]);
+  api.setScenes([
+    scene(1, [
+      marker('player', 0, 0), marker('ball', 300, 0, 'bola'),
+      action('run', 'seta', [{ x: 0, y: 0 }, { x: 200, y: 0 }]),
+      action('pass', 'seta_tracejada', [{ x: 300, y: 0 }, { x: 500, y: 0 }])
+    ]),
+    scene(2, [marker('player', 200, 0), marker('ball', 500, 0, 'bola')])
+  ]);
   api.preparePreview();
   const halfway = api.previewAt(1125 / api.previewDuration()).objects;
   assert.equal(halfway.find(o => o.id === 'player').x, 100);
   assert.equal(halfway.find(o => o.id === 'ball').x, 400);
+});
+
+test('the last scene keeps its drawn positions even when it contains arrows', () => {
+  const api = studio();
+  const last = scene(1, [marker('player', 20, 30), marker('ball', 25, 35, 'bola'),
+    action('run', 'seta', [{ x: 20, y: 30 }, { x: 200, y: 30 }]),
+    action('shot', 'lancamento', [{ x: 25, y: 35 }, { x: 300, y: 50 }])]);
+  const original = JSON.stringify(last);
+  api.setScenes([last]);
+
+  assert.equal(api.previewDuration(), api.times.read);
+  for (const progress of [0, .5, 1]) {
+    const frame = api.previewAt(progress);
+    assert.equal(frame.reading, true);
+    assert.deepEqual(coordinates(frame.objects.find(o => o.id === 'player')), { x: 20, y: 30 });
+    assert.deepEqual(coordinates(frame.objects.find(o => o.id === 'ball')), { x: 25, y: 35 });
+    assert.ok(frame.objects.filter(o => o.pontos).every(o => !o.hidden));
+  }
+  assert.equal(JSON.stringify(last), original);
 });
 
 test('the next scene fixes the destination even when the drawn path ends elsewhere', () => {

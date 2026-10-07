@@ -48,6 +48,10 @@
   let previewPlan = null;
   let previewSceneId = null;
   let previewPlaying = false;
+  let confirmedSceneIds = scenes.map(scene => scene.id);
+  let orderSaveQueue = Promise.resolve();
+  let orderRevision = 0;
+  let unsavedOrder = false;
   let pencilTap = { time: 0, x: 0, y: 0 };
 
   function clone(value) {
@@ -140,7 +144,7 @@
 
   function refreshSaveStatus() {
     if (failedSaves.size) setStatus("Não guardado", "error");
-    else if (unsavedScenes.size || unsavedNotes.size) setStatus("A guardar…", "saving");
+    else if (unsavedScenes.size || unsavedNotes.size || unsavedOrder) setStatus("A guardar…", "saving");
     else setStatus("Guardado");
   }
 
@@ -533,12 +537,12 @@
   function renderThumbnail(scene, holder) {
     if (imported) {
       const image = document.createElement("img");
-      image.alt = ""; image.src = scene.imagemCoach || scene.desenho || "";
+      image.alt = ""; image.draggable = false; image.src = scene.imagemCoach || scene.desenho || "";
       holder.append(image); return;
     }
     const court = dimensions(scene);
     holder.style.aspectRatio = `${court.width} / ${court.height}`;
-    const base = document.createElement("img"); base.alt = ""; base.src = court.src; holder.append(base);
+    const base = document.createElement("img"); base.alt = ""; base.draggable = false; base.src = court.src; holder.append(base);
     const thumb = document.createElement("canvas"); thumb.width = court.width; thumb.height = court.height; holder.append(thumb);
     const thumbCtx = thumb.getContext("2d");
     if (scene.objects.length) render(thumbCtx, scene.objects, false);
@@ -557,11 +561,20 @@
       const number = document.createElement("span"); number.className = "pbs-scene-number"; number.textContent = index + 1;
       const preview = document.createElement("div"); preview.className = "pbs-scene-preview"; renderThumbnail(scene, preview);
       const actions = document.createElement("span"); actions.className = "pbs-scene-actions";
+      const up = document.createElement("button"); up.type = "button"; up.title = "Subir cena"; up.ariaLabel = "Subir cena"; up.textContent = "↑"; up.disabled = index === 0;
+      const down = document.createElement("button"); down.type = "button"; down.title = "Descer cena"; down.ariaLabel = "Descer cena"; down.textContent = "↓"; down.disabled = index === scenes.length - 1;
       const duplicate = document.createElement("button"); duplicate.type = "button"; duplicate.title = "Duplicar cena"; duplicate.ariaLabel = "Duplicar cena"; duplicate.textContent = "⧉";
       const remove = document.createElement("button"); remove.type = "button"; remove.title = "Eliminar cena"; remove.ariaLabel = "Eliminar cena"; remove.textContent = "×";
-      actions.append(duplicate, remove); item.append(number, preview, actions); scenesList.append(item);
+      actions.append(up, down, duplicate, remove); item.append(number, preview, actions); scenesList.append(item);
       item.addEventListener("click", (event) => { if (!event.target.closest("button")) activateScene(scene.id); });
-      item.addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) activateScene(scene.id); });
+      item.addEventListener("keydown", (event) => {
+        if (event.target.closest("button")) return;
+        if (event.altKey && event.key === "ArrowUp" && index > 0) { event.preventDefault(); moveScene(scene.id, scenes[index - 1].id, true); }
+        else if (event.altKey && event.key === "ArrowDown" && index < scenes.length - 1) { event.preventDefault(); moveScene(scene.id, scenes[index + 1].id, false); }
+        else if (["Enter", " "].includes(event.key)) activateScene(scene.id);
+      });
+      up.addEventListener("click", () => moveScene(scene.id, scenes[index - 1]?.id, true));
+      down.addEventListener("click", () => moveScene(scene.id, scenes[index + 1]?.id, false));
       duplicate.addEventListener("click", () => duplicateScene(scene));
       remove.addEventListener("click", () => deleteScene(scene));
       item.addEventListener("dragstart", (event) => { draggedSceneId = scene.id; item.classList.add("is-dragging"); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(scene.id)); });
@@ -576,25 +589,58 @@
   }
 
   async function persistSceneOrder() {
-    scenes.forEach((scene, index) => { scene.ordem = index; });
+    const ids = scenes.map(scene => scene.id);
+    const revision = ++orderRevision;
+    unsavedOrder = true;
+    failedSaves.delete("order");
+    refreshSaveStatus();
     const url = training ? `/treino/exercicios/${setplayId}/studio/cenas/reordenar` : `/playbook/setplays/${setplayId}/passos/reordenar`;
-    try { await api(url, { method: "POST", body: JSON.stringify({ passo_ids: scenes.map((scene) => scene.id) }) }); }
-    catch (error) { toast(error.message); }
+    const save = async () => {
+      try {
+        const response = await api(url, { method: "POST", body: JSON.stringify({ passo_ids: ids }) });
+        if (!Array.isArray(response.passo_ids) || response.passo_ids.some((id, index) => id !== ids[index]) || response.passo_ids.length !== ids.length) {
+          throw new Error("O servidor não confirmou a nova ordem.");
+        }
+        confirmedSceneIds = ids;
+        if (revision === orderRevision) { unsavedOrder = false; refreshSaveStatus(); toast("Ordem das cenas guardada."); }
+      } catch (error) {
+        if (revision !== orderRevision) return;
+        unsavedOrder = false;
+        failedSaves.add("order");
+        const positions = new Map(confirmedSceneIds.map((id, index) => [id, index]));
+        scenes.sort((a, b) => (positions.get(a.id) ?? scenes.length) - (positions.get(b.id) ?? scenes.length));
+        scenes.forEach((scene, index) => { scene.ordem = index; });
+        previewPlan = null;
+        renderScenes();
+        document.querySelector("[data-scene-label]").textContent = `Cena ${scenes.findIndex(scene => scene.id === activeId) + 1}`;
+        refreshSaveStatus();
+        toast(`Ordem não guardada: ${error.message}`);
+      }
+    };
+    orderSaveQueue = orderSaveQueue.then(save, save);
+    return orderSaveQueue;
   }
 
   function moveScene(sourceId, targetId, before) {
     if (!sourceId || sourceId === targetId) return;
+    const previousOrder = scenes.map(scene => scene.id);
     const sourceIndex = scenes.findIndex((scene) => scene.id === sourceId);
     let targetIndex = scenes.findIndex((scene) => scene.id === targetId);
     if (sourceIndex < 0 || targetIndex < 0) return;
     const [scene] = scenes.splice(sourceIndex, 1);
     targetIndex = scenes.findIndex((candidate) => candidate.id === targetId);
     scenes.splice(targetIndex + (before ? 0 : 1), 0, scene);
-    renderScenes(); persistSceneOrder();
+    if (scenes.every((item, index) => item.id === previousOrder[index])) { clearDropMarks(); return; }
+    scenes.forEach((item, index) => { item.ordem = index; });
+    previewPlan = null;
+    renderScenes();
+    document.querySelector("[data-scene-label]").textContent = `Cena ${scenes.findIndex(item => item.id === activeId) + 1}`;
+    persistSceneOrder();
   }
 
   async function addScene() {
     try {
+      await orderSaveQueue;
       const previous = activeScene();
       if (previous && !imported) await saveScene(previous, true);
       const url = training ? `/treino/exercicios/${setplayId}/studio/cenas/novo` : `/playbook/setplays/${setplayId}/passos/novo`;
@@ -604,7 +650,7 @@
         scene.courtType = previous.courtType;
         scene.objects = continuationObjects(previous);
       }
-      scenes.push(scene); activeId = scene.id; renderScenes(); activateScene(scene.id);
+      scenes.push(scene); confirmedSceneIds = scenes.map(item => item.id); activeId = scene.id; renderScenes(); activateScene(scene.id);
       if (scene.objects.length) await saveScene(scene, true);
       toast(previous && !imported ? "Nova cena criada a partir da posição final." : "Nova cena adicionada.");
     } catch (error) { toast(error.message); }
@@ -612,10 +658,12 @@
 
   async function duplicateScene(scene) {
     try {
+      await orderSaveQueue;
       await saveScene(scene, true);
       const url = training ? `/treino/exercicios/${setplayId}/studio/cenas/${scene.id}/duplicar` : `/playbook/passos/${scene.id}/duplicar`;
       const payload = await api(url, { method: "POST", body: "{}" });
       const copy = normalizeScene(payload.passo); const index = scenes.indexOf(scene); scenes.splice(index + 1, 0, copy);
+      confirmedSceneIds = scenes.map(item => item.id);
       activeId = copy.id; renderScenes(); activateScene(copy.id); toast("Cena duplicada.");
     } catch (error) { toast(error.message); }
   }
@@ -623,6 +671,7 @@
   async function deleteScene(scene) {
     if (!window.confirm("Eliminar esta cena?")) return;
     try {
+      await orderSaveQueue;
       clearTimeout(saveTimers.get(scene.id)); saveTimers.delete(scene.id);
       clearTimeout(notesTimers.get(scene.id)); notesTimers.delete(scene.id);
       await Promise.all([saveQueues.get(scene.id), notesQueues.get(scene.id)]);
@@ -630,7 +679,7 @@
       await api(url, { method: "POST", body: "{}" });
       unsavedScenes.delete(scene.id); unsavedNotes.delete(scene.id);
       failedSaves.delete(`drawing:${scene.id}`); failedSaves.delete(`notes:${scene.id}`); refreshSaveStatus();
-      const index = scenes.indexOf(scene); scenes.splice(index, 1);
+      const index = scenes.indexOf(scene); scenes.splice(index, 1); confirmedSceneIds = scenes.map(item => item.id);
       if (activeId === scene.id) activeId = scenes[Math.min(index, scenes.length - 1)]?.id || null;
       renderScenes(); activateScene(activeId); toast("Cena eliminada.");
     } catch (error) { if (unsavedScenes.has(scene.id)) saveScene(scene); if (unsavedNotes.has(scene.id)) saveNotes(scene, scene.observacao); toast(error.message); }
@@ -943,6 +992,7 @@
   }
 
   function previewTransition(scene, nextScene) {
+    if (!nextScene) return { actions: new Map(), targets: new Map(), moving: false };
     const markers = scene.objects.filter(object => markerTypes.has(object.tipo));
     const actions = new Map();
     (actionPlan(scene)[0]?.actions || []).forEach(action => {
