@@ -933,53 +933,124 @@
     return objects;
   }
 
-  function scenePreviewDuration(scene) {
-    return PREVIEW_READ_MS + (imported ? 0 : actionPlan(scene).length * PREVIEW_MOVE_MS);
+  function previewActor(action, objects) {
+    const start = action.pontos[0];
+    if (["seta_tracejada", "lancamento"].includes(action.tipo)) {
+      return nearestMarker(objects, start, object => object.tipo === "bola");
+    }
+    return playerMovementTypes.has(action.tipo)
+      ? nearestMarker(objects, start, object => object.tipo?.startsWith("jogador_")) : null;
+  }
+
+  function previewTransition(scene, nextScene) {
+    const markers = scene.objects.filter(object => markerTypes.has(object.tipo));
+    const actions = new Map();
+    (actionPlan(scene)[0]?.actions || []).forEach(action => {
+      const actor = previewActor(action, markers);
+      if (actor && !actions.has(actor.id)) actions.set(actor.id, action);
+    });
+    const targets = new Map();
+    const scaleX = dimensions(scene).width / dimensions(nextScene || scene).width;
+    const scaleY = dimensions(scene).height / dimensions(nextScene || scene).height;
+    const available = (nextScene?.objects || []).filter(object => markerTypes.has(object.tipo))
+      .map(object => ({ ...object, x: object.x * scaleX, y: object.y * scaleY }));
+    const used = new Set();
+    const assign = (marker, candidates) => {
+      const expected = actions.get(marker.id)?.pontos.at(-1) || marker;
+      const target = candidates.filter(candidate => !used.has(candidate))
+        .sort((a, b) => Math.hypot(a.x - expected.x, a.y - expected.y) - Math.hypot(b.x - expected.x, b.y - expected.y))[0];
+      if (target) { used.add(target); targets.set(marker.id, target); }
+    };
+    markers.forEach(marker => assign(marker, available.filter(candidate => candidate.tipo === marker.tipo && candidate.id === marker.id)));
+    markers.forEach(marker => {
+      if (targets.has(marker.id) || marker.numero == null) return;
+      assign(marker, available.filter(candidate => candidate.tipo === marker.tipo && candidate.numero != null && String(candidate.numero) === String(marker.numero)));
+    });
+    while (true) {
+      let closest = null;
+      markers.filter(marker => !targets.has(marker.id)).forEach(marker => {
+        const expected = actions.get(marker.id)?.pontos.at(-1) || marker;
+        available.filter(candidate => !used.has(candidate) && candidate.tipo === marker.tipo
+          && (marker.numero == null || candidate.numero == null)).forEach(candidate => {
+          const distance = Math.hypot(candidate.x - expected.x, candidate.y - expected.y);
+          if (!closest || distance < closest.distance) closest = { marker, candidate, distance };
+        });
+      });
+      if (!closest) break;
+      assign(closest.marker, [closest.candidate]);
+    }
+    const moved = markers.some(marker => {
+      const target = targets.get(marker.id);
+      return target && Math.hypot(target.x - marker.x, target.y - marker.y) > .01;
+    });
+    return { actions, targets, moving: actions.size > 0 || moved };
+  }
+
+  function animatedTransitionObjects(scene, transition, progress) {
+    const objects = clone(scene.objects);
+    objects.forEach(object => {
+      if (movementTypes.has(object.tipo) || object.tipo === "caneta") object.hidden = true;
+      if (!markerTypes.has(object.tipo)) return;
+      const start = { x: object.x, y: object.y };
+      const action = transition.actions.get(object.id);
+      const target = transition.targets.get(object.id);
+      if (action) {
+        const pathStart = action.pontos[0], pathEnd = action.pontos.at(-1);
+        const destination = target || pathEnd;
+        const point = pointAlong(action.pontos, progress);
+        object.x = point.x + (start.x - pathStart.x) * (1 - progress) + (destination.x - pathEnd.x) * progress;
+        object.y = point.y + (start.y - pathStart.y) * (1 - progress) + (destination.y - pathEnd.y) * progress;
+      } else if (target) {
+        object.x = start.x + (target.x - start.x) * progress;
+        object.y = start.y + (target.y - start.y) * progress;
+      }
+    });
+    objects.filter(object => object.tipo === "bola" && !transition.actions.has(object.id)).forEach(ball => {
+      const start = scene.objects.find(candidate => candidate.id === ball.id);
+      const dribbler = scene.objects.find(candidate => transition.actions.get(candidate.id)?.tipo === "seta_zigzag"
+        && Math.hypot(candidate.x - start.x, candidate.y - start.y) < 45);
+      if (!dribbler) return;
+      const movingPlayer = objects.find(candidate => candidate.id === dribbler.id);
+      const finalPlayer = transition.targets.get(dribbler.id) || transition.actions.get(dribbler.id).pontos.at(-1);
+      const target = transition.targets.get(ball.id);
+      const offset = { x: start.x - dribbler.x, y: start.y - dribbler.y };
+      ball.x = movingPlayer.x + offset.x + (target ? target.x - finalPlayer.x - offset.x : 0) * progress;
+      ball.y = movingPlayer.y + offset.y + (target ? target.y - finalPlayer.y - offset.y : 0) * progress;
+    });
+    return objects;
+  }
+
+  function scenePreviewDuration(transition) {
+    return PREVIEW_READ_MS + (imported || !transition.moving ? 0 : PREVIEW_MOVE_MS);
   }
 
   function previewDuration() {
-    return previewPlan ? previewPlan.reduce((sum, item) => sum + item.duration, 0) : scenes.reduce((total, scene) => total + scenePreviewDuration(scene), 0);
+    if (!previewPlan) preparePreview();
+    return previewPlan.reduce((sum, item) => sum + item.duration, 0);
   }
 
   function preparePreview() {
-    previewPlan = scenes.map(scene => {
-      const groups = actionPlan(scene).map(group => clone(group));
-      let positions = clone(scene.objects);
-      const steps = groups.map(group => {
-        group.actions.forEach(action => {
-          const lengths = action.pontos.slice(1).map((point, i) => Math.hypot(point.x - action.pontos[i].x, point.y - action.pontos[i].y));
-          pathMetrics.set(action.pontos, { lengths, total: lengths.reduce((a, b) => a + b, 0) });
-        });
-        const start = clone(positions);
-        const output = clone(start);
-        output.forEach(object => { if (movementTypes.has(object.tipo) || object.tipo === "caneta") object.hidden = true; });
-        applyMovementGroup(positions, group, 1);
-        return { group, start, output };
+    previewPlan = scenes.map((scene, index) => {
+      const transition = previewTransition(scene, scenes[index + 1]);
+      transition.actions.forEach(action => {
+        const lengths = action.pontos.slice(1).map((point, i) => Math.hypot(point.x - action.pontos[i].x, point.y - action.pontos[i].y));
+        pathMetrics.set(action.pontos, { lengths, total: lengths.reduce((a, b) => a + b, 0) });
       });
-      return { scene, steps, duration: scenePreviewDuration(scene) };
+      return { scene, transition, duration: scenePreviewDuration(transition) };
     });
   }
 
   function previewAt(progress) {
+    if (!previewPlan) preparePreview();
     let remaining = Math.max(0, Math.min(1, progress)) * previewDuration();
     for (let index = 0; index < scenes.length; index += 1) {
       const scene = scenes[index];
-      const duration = previewPlan?.[index]?.duration ?? scenePreviewDuration(scene);
+      const { duration, transition } = previewPlan[index];
       if (remaining < duration || index === scenes.length - 1) {
-        const count = previewPlan?.[index]?.steps.length ?? actionPlan(scene).length;
-        const reading = imported || remaining < PREVIEW_READ_MS || count === 0;
+        const reading = imported || remaining < PREVIEW_READ_MS || !transition.moving;
         const elapsed = Math.max(0, remaining - PREVIEW_READ_MS);
-        const groupIndex = Math.min(count - 1, Math.floor(elapsed / PREVIEW_MOVE_MS));
-        const local = Math.min(1, (elapsed - groupIndex * PREVIEW_MOVE_MS) / PREVIEW_MOVE_MS);
-        let objects = scene.objects;
-        if (!reading) {
-          const step = previewPlan?.[index]?.steps[groupIndex];
-          if (step) {
-            step.output.forEach((object, i) => { if (markerTypes.has(object.tipo)) { object.x = step.start[i].x; object.y = step.start[i].y; } });
-            applyMovementGroup(step.output, step.group, local * local * (3 - 2 * local));
-            objects = step.output;
-          } else objects = animatedObjects(scene, groupIndex, local);
-        }
+        const local = Math.min(1, elapsed / PREVIEW_MOVE_MS);
+        const objects = reading ? scene.objects : animatedTransitionObjects(scene, transition, local * local * (3 - 2 * local));
         return { scene, index, reading, objects };
       }
       remaining -= duration;

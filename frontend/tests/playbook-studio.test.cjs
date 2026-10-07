@@ -337,3 +337,70 @@ test('a player movement and a pass share the same playback interval', () => {
   assert.equal(halfway.find(o => o.id === 'player').x, 100);
   assert.equal(halfway.find(o => o.id === 'ball').x, 400);
 });
+
+test('the next scene fixes the destination even when the drawn path ends elsewhere', () => {
+  const api = studio();
+  const firstPlayer = { ...marker('first-player', 10, 20), numero: 1 };
+  const nextPlayer = { ...marker('next-player', 150, 40), numero: 1 };
+  const first = scene(1, [firstPlayer,
+    action('run', 'seta_curva', [{ x: 12, y: 20 }, { x: 60, y: 80 }, { x: 100, y: 20 }])]);
+  const second = scene(2, [nextPlayer]);
+  const original = JSON.stringify([first, second]);
+  api.setScenes([first, second]);
+  const at = ms => api.previewAt(ms / api.previewDuration());
+
+  assert.equal(at(700).objects.find(o => o.id === 'first-player').x, 10);
+  const halfway = at(1125).objects.find(o => o.id === 'first-player');
+  const pathMidpoint = api.pointAlong(first.objects[1].pontos, .5);
+  assert.ok(Math.abs(halfway.x - (pathMidpoint.x + 24)) < 1e-9);
+  assert.ok(Math.abs(halfway.y - (pathMidpoint.y + 10)) < 1e-9);
+  assert.ok(Math.abs(at(1549).objects.find(o => o.id === 'first-player').x - 150) < .1);
+  assert.deepEqual(coordinates(at(1550).objects.find(o => o.id === 'next-player')), { x: 150, y: 40 });
+  assert.equal(JSON.stringify([first, second]), original);
+});
+
+test('players without drawn paths still arrive at their trainer-defined next positions', () => {
+  const api = studio();
+  const first = scene(1, [
+    { ...marker('attack-old', 20, 20), numero: 1 },
+    { ...marker('defense-old', 100, 20, 'jogador_defesa'), numero: 1 }
+  ]);
+  const second = scene(2, [
+    { ...marker('defense-new', 80, 60, 'jogador_defesa'), numero: 1 },
+    { ...marker('attack-new', 160, 80), numero: 1 }
+  ]);
+  api.setScenes([first, second]);
+  assert.equal(api.previewDuration(), 2 * api.times.read + api.times.move);
+  const halfway = api.previewAt(1125 / api.previewDuration()).objects;
+  assert.deepEqual(coordinates(halfway.find(o => o.id === 'attack-old')), { x: 90, y: 50 });
+  assert.deepEqual(coordinates(halfway.find(o => o.id === 'defense-old')), { x: 90, y: 40 });
+  assert.deepEqual(coordinates(api.previewAt(1550 / api.previewDuration()).objects.find(o => o.id === 'attack-new')), { x: 160, y: 80 });
+});
+
+test('a dribbler and the ball finish at the positions placed in the next scene', () => {
+  const api = studio();
+  const first = scene(1, [
+    { ...marker('player-old', 10, 10), numero: 1 }, marker('ball-old', 18, 14, 'bola'),
+    action('dribble', 'seta_zigzag', [{ x: 10, y: 10 }, { x: 60, y: 80 }, { x: 110, y: 10 }])
+  ]);
+  const second = scene(2, [
+    { ...marker('player-new', 150, 30), numero: 1 }, marker('ball-new', 160, 35, 'bola')
+  ]);
+  api.setScenes([first, second]);
+  const halfway = api.previewAt(1125 / api.previewDuration()).objects;
+  assert.equal(halfway.find(o => o.id === 'player-old').y, 90);
+  assert.equal(halfway.find(o => o.id === 'ball-old').y, 94.5);
+  const next = api.previewAt(1550 / api.previewDuration()).objects;
+  assert.deepEqual(coordinates(next.find(o => o.id === 'player-new')), { x: 150, y: 30 });
+  assert.deepEqual(coordinates(next.find(o => o.id === 'ball-new')), { x: 160, y: 35 });
+});
+
+test('a different numbered player is not mistaken for the previous actor', () => {
+  const api = studio();
+  api.setScenes([
+    scene(1, [{ ...marker('old', 0, 0), numero: 1 }, action('run', 'seta', [{ x: 0, y: 0 }, { x: 100, y: 0 }])]),
+    scene(2, [{ ...marker('new', 300, 0), numero: 2 }])
+  ]);
+  const before = api.previewAt(1549 / api.previewDuration()).objects.find(o => o.id === 'old');
+  assert.ok(Math.abs(before.x - 100) < .1);
+});
