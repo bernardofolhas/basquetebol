@@ -131,7 +131,8 @@ def test_playbook_coletivo_mantem_jogadas_separadas_e_observacoes_por_cena():
 def test_cena_de_campo_inteiro_mantem_o_campo_inteiro_no_pdf():
     imagem = imagem_estatica_data_uri(STATIC_DIR / 'campos' / 'campo_completo.png')
     desenho = empacotar_desenho_editavel(imagem, {
-        'campoTipo': 'completo', 'largura': 697, 'altura': 1222, 'objectos': [],
+        'campoTipo': 'completo', 'largura': 697, 'altura': 1222,
+        'objectos': [{'tipo': 'seta', 'pontos': [{'x': 100, 'y': 200}, {'x': 200, 'y': 300}]}],
     })
     setplay = Item(passos=[Item(ordem=0, desenho=desenho, imagem_coach=None, observacao='Campo inteiro')])
 

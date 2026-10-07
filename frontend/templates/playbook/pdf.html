@@ -48,7 +48,7 @@
 <!-- PASSOS -->
 {% for passo in passos %}
 <div class="passo">
-    <div class="passo-header">Passo {{ loop.index }}</div>
+    <div class="passo-header">Cena {{ passo.ordem + 1 }}</div>
     <div class="passo-body">
         <!-- Campo com desenho -->
         <div class="passo-campo">
@@ -68,6 +68,7 @@
     </div>
 </div>
 {% endfor %}
+{% if not passos %}<p class="descricao">Esta jogada ainda não tem cenas desenhadas para exportar.</p>{% endif %}
 
 <!-- FOOTER -->
 {{ rodape_pdf(equipa.nome ~ ' · Playbook · ' ~ setplay.nome) }}

@@ -14,6 +14,7 @@ _DATA_URI_RE = re.compile(r"^data:(image/(?:png|jpeg|jpg|webp));base64,([A-Za-z0
 _FORMATO_EDITAVEL = "desenho-tatico-v1"
 _MAX_OBJECTOS = 500
 _MAX_ESTADO_BYTES = 500_000
+_MARCADORES_CENA = frozenset({"jogador_ataque", "jogador_defesa", "bola", "cone", "coach"})
 
 
 def normalizar_data_uri(valor: str | None) -> str | None:
@@ -57,6 +58,25 @@ def decompor_desenho_editavel(valor: str | None) -> tuple[str | None, dict | Non
     if not imagem or not isinstance(estado, dict):
         return None, None
     return imagem, estado
+
+
+def passo_tem_desenho_pdf(passo) -> bool:
+    """Exclui keyframes só com marcadores sem perder desenhos raster antigos."""
+    if normalizar_data_uri(getattr(passo, "imagem_coach", None)):
+        return True
+    imagem, estado = decompor_desenho_editavel(getattr(passo, "desenho", None))
+    if not normalizar_data_uri(imagem):
+        return False
+    if estado is None:
+        return True
+    objectos = estado.get("objectos")
+    if not isinstance(objectos, list):
+        return True
+    return bool(estado.get("fundoLegado")) or any(
+        isinstance(objecto, dict) and not objecto.get("hidden")
+        and objecto.get("tipo") not in _MARCADORES_CENA
+        for objecto in objectos
+    )
 
 
 def empacotar_desenho_editavel(imagem: str | None, estado: object) -> str | None:

@@ -83,6 +83,7 @@ from services.desenho_service import (
     decompor_desenho_editavel,
     imagem_estatica_data_uri,
     normalizar_data_uri,
+    passo_tem_desenho_pdf,
 )
 from services.pdf_service import content_disposition_pdf, preparar_contexto_pdf, renderizar_pdf
 from services.plano_jogo_service import (
@@ -931,6 +932,8 @@ def _passos_setplay_pdf(setplay) -> list[dict]:
     """Prepara imagens autónomas do Playbook para o HTML/PDF."""
     passos = []
     for passo in getattr(setplay, "passos", []) or []:
+        if not passo_tem_desenho_pdf(passo):
+            continue
         desenho, estado = decompor_desenho_editavel(passo.desenho) if passo.desenho else (None, None)
         tipo = estado.get("campoTipo") if isinstance(estado, dict) else None
         if tipo not in {"meio", "completo"} and isinstance(estado, dict):
@@ -1196,10 +1199,7 @@ def _playbook_coletivo(adversario, passos_setplay: dict[int, list[dict]]) -> lis
     jogadas = []
     for momento in adversario.momentos_playbook:
         setplay = momento.setplay
-        if not setplay or not any(
-            passo.desenho or passo.imagem_coach or (passo.observacao or "").strip()
-            for passo in setplay.passos
-        ):
+        if not setplay or not passos_setplay.get(setplay.id):
             continue
         jogadas.append({
             "titulo": setplay.nome,

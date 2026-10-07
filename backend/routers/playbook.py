@@ -22,6 +22,7 @@ from services.desenho_service import (
     compor_desenho_sobre_campo,
     decompor_desenho_editavel,
     empacotar_desenho_editavel,
+    passo_tem_desenho_pdf,
 )
 from services.imagem_playbook_service import preparar_imagem_passo
 from services.importacao_ebp_service import (
@@ -867,16 +868,27 @@ def exportar_pdf_caderno(
     if not caderno:
         return RedirectResponse(url="/equipas")
 
+    passos_por_jogada = {}
     for entrada in caderno.jogadas:
-        for passo in entrada.setplay.passos:
+        passos = [passo for passo in entrada.setplay.passos if passo_tem_desenho_pdf(passo)]
+        passos_por_jogada[entrada.id] = passos
+        for passo in passos:
             passo.imagem_composta_pdf = _imagem_passo_para_pdf(passo)
 
-    grupos = [{"nome": "Sem secção", "jogadas": [entrada for entrada in caderno.jogadas if entrada.secao_id is None]}]
-    grupos.extend({"nome": secao.nome, "jogadas": list(secao.jogadas)} for secao in caderno.secoes)
+    grupos = [{"nome": "Sem secção", "jogadas": [
+        entrada for entrada in caderno.jogadas
+        if entrada.secao_id is None and passos_por_jogada[entrada.id]
+    ]}]
+    grupos.extend({"nome": secao.nome, "jogadas": [
+        entrada for entrada in secao.jogadas if passos_por_jogada[entrada.id]
+    ]} for secao in caderno.secoes)
+    grupos = [grupo for grupo in grupos if grupo["jogadas"]]
     pdf_bytes = renderizar_pdf(request, "playbook/caderno_pdf.html", {
         "caderno": caderno,
         "equipa": caderno.equipa,
-        "grupos": [grupo for grupo in grupos if grupo["jogadas"]],
+        "grupos": grupos,
+        "total_jogadas_pdf": sum(len(grupo["jogadas"]) for grupo in grupos),
+        "passos_por_jogada": passos_por_jogada,
     })
     return Response(
         content=pdf_bytes,
@@ -894,13 +906,14 @@ def exportar_pdf_setplay(setplay_id: int, request: Request, db: Session = Depend
     if not setplay:
         return RedirectResponse(url="/equipas")
 
-    for passo in setplay.passos:
+    passos = [passo for passo in setplay.passos if passo_tem_desenho_pdf(passo)]
+    for passo in passos:
         passo.imagem_composta_pdf = _imagem_passo_para_pdf(passo)
 
     pdf_bytes = renderizar_pdf(request, "playbook/pdf.html", {
         "setplay": setplay,
         "equipa": setplay.playbook.equipa,
-        "passos": setplay.passos,
+        "passos": passos,
     })
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": content_disposition_pdf(f"Jogada {setplay.nome}")})

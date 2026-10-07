@@ -25,26 +25,27 @@
     {{ estilo_pdf() }}
 </head>
 <body>
-{{ cabecalho_pdf(caderno.nome, equipa.nome ~ ' · ' ~ caderno.jogadas|length ~ ' jogada(s)', 'Playbook · ' ~ data_exportacao) }}
+{{ cabecalho_pdf(caderno.nome, equipa.nome ~ ' · ' ~ total_jogadas_pdf ~ ' jogada(s)', 'Playbook · ' ~ data_exportacao) }}
 {% if caderno.descricao %}<div class="intro">{{ caderno.descricao }}</div>{% endif %}
 
 {% for grupo in grupos %}
 <h2 class="section-title"><span>{{ '%02d'|format(loop.index) }}</span>{{ grupo.nome }}</h2>
 {% for entrada in grupo.jogadas %}
+{% set passos=passos_por_jogada[entrada.id] %}
 <article class="play">
-    <header class="play-head"><h2>{{ entrada.setplay.nome }}</h2><small>{{ entrada.setplay.categoria or 'Sem categoria' }} · {{ entrada.setplay.passos|length }} passo(s)</small></header>
+    <header class="play-head"><h2>{{ entrada.setplay.nome }}</h2><small>{{ entrada.setplay.categoria or 'Sem categoria' }} · {{ passos|length }} cena(s)</small></header>
     {% if entrada.setplay.descricao %}<p class="description">{{ entrada.setplay.descricao }}</p>{% endif %}
     <div class="steps">
-        {% for passo in entrada.setplay.passos %}
+        {% for passo in passos %}
         <section class="step">
-            <div class="visual"><img src="{{ passo.imagem_composta_pdf }}" alt="Passo {{ loop.index }}"></div>
-            <div class="note"><b>Passo {{ loop.index }}</b><p>{{ passo.observacao or 'Sem observação.' }}</p></div>
+            <div class="visual"><img src="{{ passo.imagem_composta_pdf }}" alt="Cena {{ passo.ordem + 1 }}"></div>
+            <div class="note"><b>Cena {{ passo.ordem + 1 }}</b><p>{{ passo.observacao or 'Sem observação.' }}</p></div>
         </section>
-        {% else %}<div class="empty">Jogada ainda sem passos.</div>{% endfor %}
+        {% endfor %}
     </div>
 </article>
 {% endfor %}
-{% else %}<div class="empty">Este caderno ainda não tem jogadas.</div>{% endfor %}
+{% else %}<div class="empty">Este caderno ainda não tem cenas desenhadas para exportar.</div>{% endfor %}
 
 {{ rodape_pdf(equipa.nome ~ ' · Playbook · ' ~ caderno.nome) }}
 </body>

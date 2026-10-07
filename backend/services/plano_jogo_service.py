@@ -13,6 +13,7 @@ from services.desenho_service import (
     compor_desenho_sobre_campo,
     decompor_desenho_editavel,
     normalizar_data_uri,
+    passo_tem_desenho_pdf,
 )
 
 
@@ -189,6 +190,8 @@ def graficos_plano(plano) -> list[dict]:
     campo = Path(STATIC_DIR) / "campos" / "campo_meio.png"
     for relacao in (plano.jogadas if plano else []):
         for indice, passo in enumerate(relacao.setplay.passos, start=1):
+            if not passo_tem_desenho_pdf(passo):
+                continue
             desenho = decompor_desenho_editavel(passo.desenho)[0] if passo.desenho else None
             imagem = normalizar_data_uri(passo.imagem_coach) if passo.imagem_coach else None
             if desenho and campo.is_file():
