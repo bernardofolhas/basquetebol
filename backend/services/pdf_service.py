@@ -4,6 +4,7 @@ import base64
 import binascii
 from datetime import date
 from io import BytesIO
+import json
 import re
 import unicodedata
 from urllib.parse import quote
@@ -20,6 +21,15 @@ from services.pdf_filtros_service import obter_filtros_pdf
 
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+_RODAPES_FIXOS = {
+    "calendario_partilhavel_pdf.html",
+    "mesociclo_partilhavel_pdf.html",
+    "equipas/plantel_pdf.html",
+    "jogos/jogos_partilhavel_pdf.html",
+    "planeamento/microciclos/partilhavel_pdf.html",
+    "treino/plano_print.html",
+}
 
 
 def content_disposition_pdf(nome: str) -> str:
@@ -106,5 +116,30 @@ def preparar_contexto_pdf(request, contexto: dict | None = None, identidade: dic
 
 def renderizar_pdf(request, template_nome: str, contexto: dict | None = None) -> bytes:
     """Renderiza HTML independente do layout da aplicação para PDF."""
-    html = templates.get_template(template_nome).render(preparar_contexto_pdf(request, contexto))
-    return weasyprint.HTML(string=html, base_url=str(request.base_url)).write_pdf()
+    dados = preparar_contexto_pdf(request, contexto)
+    html = templates.get_template(template_nome).render(dados)
+    nome_clube = dados["identidade"].get("nome_oficial") or CORES_PADRAO["nome_oficial"]
+    rodape = json.dumps(" ".join(nome_clube.split()), ensure_ascii=False)
+    ocultar = []
+    if template_nome in _RODAPES_FIXOS:
+        ocultar.append(".footer { display: none !important; }")
+    if template_nome == "jogos/calendario_pdf.html":
+        ocultar.append(".rodape { display: none !important; }")
+    if template_nome == "relatorios/scouting_individual_facil.html":
+        ocultar.append(".player-footer { display: none !important; }")
+    # Posters ocupam a página inteira; têm o nome do clube no próprio layout.
+    conteudo_rodape = "none" if template_nome == "relatorios/_poster.html" else rodape
+    css = weasyprint.CSS(string=f"""
+        @page {{
+            @bottom-left {{ content: none; }}
+            @bottom-right {{ content: none; }}
+            @bottom-center {{
+                content: {conteudo_rodape};
+                color: #667085;
+                font: 700 8px Arial, sans-serif;
+                text-align: center;
+            }}
+        }}
+        {''.join(ocultar)}
+    """)
+    return weasyprint.HTML(string=html, base_url=str(request.base_url)).write_pdf(stylesheets=[css])

@@ -13,6 +13,7 @@ from weasyprint import HTML
 from paths import TEMPLATES_DIR
 from routers.exportacoes import _contexto_relatorio, _simbolo_embebido
 from routers.exportacoes import templates as export_templates
+from services.pdf_service import renderizar_pdf
 
 
 TEMPLATES = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -31,6 +32,7 @@ def _simbolo(cor: str, letra: str) -> str:
 def _base() -> dict:
     return {
         "identidade": {
+            "nome_oficial": "Clube Exemplo",
             "cor_principal": "#d10b14",
             "cor_principal_escura": "#a00812",
             "texto_sobre_principal": "#ffffff",
@@ -60,7 +62,7 @@ def test_roster_facil_usa_cabecalho_simples_e_cartoes_legiveis():
     atletas = [
         Item(
             id=indice, nome=nome, numero=str(indice), posicao_principal="Extremo",
-            posicao_alternativa="Base", altura_cm=190, peso_kg=86, mao_dominante="Direita",
+            posicao_alternativa="Base", altura_cm=190, peso_kg=86, idade=24, mao_dominante="Direita",
             observacoes="Boa leitura do jogo", media_epoca=Item(pontos=12.5, assistencias=4.1, ress_total=5.2),
         )
         for indice, nome in enumerate(("Ana Martins", "Beatriz Silva", "Carla Lopes"), 1)
@@ -74,7 +76,7 @@ def test_roster_facil_usa_cabecalho_simples_e_cartoes_legiveis():
     assert "Roster - Rivals BC" in html
     assert len(paginas) == 1
     mural = " ".join(paginas[0].extract_text().split())
-    for valor in ("Roster - Rivals BC", "Ana Martins", "Beatriz Silva", "Carla Lopes", "1,90 m", "86 kg"):
+    for valor in ("Roster - Rivals BC", "Ana Martins", "Beatriz Silva", "Carla Lopes", "1,90 m", "86 kg", "Idade: 24 anos", "Mão: Direita", "Clube Exemplo"):
         assert valor in mural
     assert "Informação complementar" in mural
     assert "Assistências" in mural and "Boa leitura do jogo" in mural
@@ -85,7 +87,7 @@ def test_roster_facil_cabe_doze_cartoes_em_a4_sem_cortar_nomes():
     contexto.update(
         atletas=[Item(id=i, nome=f"Atleta com Nome Completo {i:02d}", numero=str(i),
                       posicao_principal="Extremo", posicao_alternativa=None,
-                      altura_cm=185, peso_kg=80, observacoes=None, media_epoca=None)
+                      altura_cm=185, peso_kg=80, idade=21, mao_dominante="Esquerda", observacoes=None, media_epoca=None)
                  for i in range(1, 13)],
         fotografias={}, secoes_set={"fisico"}, stat_fields=[], stat_labels={},
     )
@@ -94,6 +96,34 @@ def test_roster_facil_cabe_doze_cartoes_em_a4_sem_cortar_nomes():
     assert len(paginas) == 1
     texto = " ".join(paginas[0].extract_text().split())
     assert all(f"Atleta com Nome Completo {i:02d}" in texto for i in range(1, 13))
+    assert texto.count("Idade: 21 anos") == 12
+    assert texto.count("Mão: Esquerda") == 12
+
+
+def test_rodape_exportado_tem_apenas_nome_oficial_centrado():
+    contexto = _base()
+    contexto.update(atletas=[], fotografias={}, secoes_set=set(), stat_fields=[], stat_labels={})
+    pedido = Item(base_url="http://testserver/", query_params={}, state=Item(identidade_clube=contexto["identidade"]))
+    pdf = renderizar_pdf(pedido, "relatorios/roster_facil.html", contexto)
+    texto = PdfReader(BytesIO(pdf)).pages[0].extract_text()
+    assert texto.count("Clube Exemplo") == 1
+    assert "Plataforma de Gestão de Basquetebol" not in texto
+    assert "BASKETBALL INTELLIGENCE" not in texto
+    assert "PÁGINA" not in texto
+
+
+def test_rodape_antigo_do_plantel_nao_duplica_o_nome_do_clube():
+    contexto = _base()
+    contexto.update(
+        equipa=Item(nome="Sub-23", escalao=Item(value="Sub-23"), genero=Item(value="Masculino")),
+        atletas=[], media_idades=None, idades_registadas=0, nome_treinador="Treinador Exemplo",
+    )
+    pedido = Item(base_url="http://testserver/", query_params={}, state=Item(identidade_clube=contexto["identidade"]))
+    pdf = renderizar_pdf(pedido, "equipas/plantel_pdf.html", contexto)
+    texto = PdfReader(BytesIO(pdf)).pages[0].extract_text()
+    assert texto.count("Clube Exemplo") == 1
+    assert texto.count("CLUBE EXEMPLO") == 1  # cabeçalho
+    assert "Treinador Exemplo" not in texto
 
 
 def test_roster_facil_omite_complemento_sem_valores_preenchidos():

@@ -34,7 +34,8 @@ def test_quatro_tipos_e_tres_formatos_tem_template_proprio():
 def test_a3_usa_tamanho_fisico_a3_e_composicao_propria():
     poster = (TEMPLATES / "relatorios" / "_poster.html").read_text(encoding="utf-8")
     assert "size:A3 landscape" in poster
-    assert "SCOUTING STUDIO / POSTER" in poster
+    assert 'class="poster-footer">{{ identidade.nome_oficial' in poster
+    assert "SCOUTING STUDIO / POSTER" not in poster
     assert "poster-player-layout" in poster
     assert "poster-collective-grid" in poster
     assert "poster-game-grid" in poster

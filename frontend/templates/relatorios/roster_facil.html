@@ -14,6 +14,7 @@
 .roster-details h2{margin:0;color:#08294a;font-size:12px;line-height:1.1;overflow-wrap:break-word}
 .roster-position{margin:.4mm 0 1.1mm;color:#08294a;font-size:9.5px;line-height:1.1}
 .roster-measures{margin:0;color:#203a56;font-size:8px;line-height:1.15;white-space:nowrap}
+.roster-facts{display:flex;justify-content:center;gap:2mm;margin:.7mm 0 0;color:#203a56;font-size:8px;line-height:1.15;white-space:nowrap}
 .roster-measures .separator{margin:0 1.5mm;color:#64748b}
 .roster-extra{margin-top:5mm}
 .roster-extra h2{margin:0 0 3mm;padding:2mm 3mm;border-radius:2mm;background:#08294a;color:#fff;font-size:12px}
@@ -39,6 +40,7 @@
     <h2>{{ j.nome }}</h2>
     <p class="roster-position">{{ j.posicao_principal }}{% if j.posicao_alternativa %} / {{ j.posicao_alternativa }}{% endif %}</p>
     {% if 'fisico' in secoes_set %}<p class="roster-measures">{% if j.altura_cm %}Altura: {{ '%.2f'|format(j.altura_cm / 100)|replace('.', ',') }} m{% endif %}{% if j.altura_cm and j.peso_kg %}<span class="separator">|</span>{% endif %}{% if j.peso_kg %}Peso: {{ '%g'|format(j.peso_kg)|replace('.', ',') }} kg{% endif %}</p>{% endif %}
+    {% if j.idade is defined and j.idade is not none or j.mao_dominante is defined and j.mao_dominante %}<p class="roster-facts">{% if j.idade is defined and j.idade is not none %}<span>Idade: {{ j.idade }} anos</span>{% endif %}{% if j.mao_dominante is defined and j.mao_dominante %}<span>Mão: {{ j.mao_dominante }}</span>{% endif %}</p>{% endif %}
   </div>
 </article>{% endif %}</td>{% endfor %}
 </tr>{% endfor %}

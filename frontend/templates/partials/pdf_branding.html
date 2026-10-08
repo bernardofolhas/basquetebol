@@ -17,21 +17,12 @@
     }
     * { box-sizing: border-box; }
     @page {
-        @bottom-left {
-            content: "BASKETBALL INTELLIGENCE";
-            color: #8a98ab;
+        @bottom-center {
+            content: "{{ identidade.nome_oficial|default('Clube de Basquetebol', true)|e }}";
+            color: #667085;
             font-family: "Aptos", "Segoe UI", Arial, sans-serif;
-            font-size: 6px;
+            font-size: 8px;
             font-weight: 700;
-            letter-spacing: .12em;
-        }
-        @bottom-right {
-            content: "PÁGINA " counter(page) " / " counter(pages);
-            color: #8a98ab;
-            font-family: "Aptos", "Segoe UI", Arial, sans-serif;
-            font-size: 6px;
-            font-weight: 700;
-            letter-spacing: .08em;
         }
     }
     body {
@@ -90,16 +81,6 @@
     .pdf-brand-signal span:nth-child(1) { height:4px;opacity:.55; }
     .pdf-brand-signal span:nth-child(2) { height:7px;opacity:.75; }
     .pdf-brand-signal span:nth-child(3) { height:11px; }
-    .pdf-brand-footer {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        border-top: 2px solid var(--pdf-primary);
-        color: var(--pdf-muted);
-        font-size: 7px;
-        margin-top: 14px;
-        padding: 6px 2px 0;
-    }
     body > section > h2,
     .pdf-section-title {
         page-break-after: avoid;
@@ -196,8 +177,4 @@
 {% endmacro %}
 
 {% macro rodape_pdf(detalhe='') %}
-<div class="pdf-brand-footer">
-    <span>{{ identidade.texto_rodape|default('Plataforma de Gestão de Basquetebol') }}</span>
-    <span>{{ detalhe }}</span>
-</div>
 {% endmacro %}

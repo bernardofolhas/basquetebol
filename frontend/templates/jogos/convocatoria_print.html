@@ -24,9 +24,8 @@
         .numero { background: var(--pdf-primary); color: var(--pdf-on-primary); font-weight: bold; font-size: 11px; padding: 2px 6px; border-radius: 3px; min-width: 28px; text-align: center; }
         .obs { border: 1px solid #ccc; padding: 8px; margin-top: 15px; min-height: 50px; }
         .obs h2 { font-size: 11px; text-transform: uppercase; color: #666; margin-bottom: 6px; }
-        .rodape { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .rodape-item { border: 1px solid #ccc; padding: 8px; }
-        .rodape-item label { font-size: 10px; color: #666; text-transform: uppercase; display: block; margin-bottom: 4px; }
+        .contacto-treinador { margin-bottom: 15px; border: 1px solid #ccc; padding: 8px; }
+        .contacto-treinador label { font-size: 10px; color: #666; text-transform: uppercase; display: block; margin-bottom: 4px; }
         @media print { body { padding: 0; } .toolbar { display: none; } }
         .modo-pdf .toolbar { display: none; }
     </style>
@@ -53,6 +52,14 @@
     </table>
 </div>
 
+<div class="contacto-treinador">
+    <label>Treinador Principal</label>
+    {% if jogo.equipa.treinadores %}
+    {{ jogo.equipa.treinadores[0].nome }}
+    {% if jogo.equipa.treinadores[0].telefone %} — {{ jogo.equipa.treinadores[0].telefone }}{% endif %}
+    {% else %}—{% endif %}
+</div>
+
 {% if jogo.convocados %}
 <div class="encontro">
     <h2>📍 Ponto de Encontro</h2>
@@ -76,16 +83,6 @@
     <ul>{% for observacao in jogo.convocados[0].observacoes.splitlines() if observacao.strip() %}<li>{{ observacao }}</li>{% endfor %}</ul>
 </div>
 {% endif %}
-
-<div class="rodape">
-    <div class="rodape-item">
-        <label>Treinador Principal</label>
-        {% if jogo.equipa.treinadores %}
-        {{ jogo.equipa.treinadores[0].nome }}
-        {% if jogo.equipa.treinadores[0].telefone %} — {{ jogo.equipa.treinadores[0].telefone }}{% endif %}
-        {% else %}—{% endif %}
-    </div>
-</div>
 
 {{ rodape_pdf(nome_clube ~ ' · Convocatória') }}
 
