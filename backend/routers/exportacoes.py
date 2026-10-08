@@ -9,7 +9,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from pypdf import PdfReader, PdfWriter
@@ -840,6 +840,17 @@ STAT_HIGHLIGHT_OPTIONS = [
     for campo in STAT_FIELDS
 ] + [(codigo, codigo) for codigo in ("FG%", "2P%", "3P%", "LL%")]
 STAT_HIGHLIGHT_CODES = {codigo for codigo, _ in STAT_HIGHLIGHT_OPTIONS}
+STAT_HIGHLIGHT_FIELDS = {
+    **{codigo: (campo,) for campo, codigo in STAT_CODES.items()},
+    "FG%": ("fg_c", "fg_t"),
+    "2P%": ("dois_c", "dois_t"),
+    "3P%": ("tres_c", "tres_t"),
+    "LL%": ("ll_c", "ll_t"),
+}
+STAT_DEFAULT_COLLECTIVE_FIELDS = (
+    "pontos", "dois_c", "dois_t", "tres_c", "tres_t", "ll_c", "ll_t",
+    "ress_of", "ress_def", "assistencias", "turnovers", "roubos", "eficiencia",
+)
 
 PERFIS_CONTACTOS = {"superadministrador", "administrador", "coordenador", "secretaria"}
 
@@ -1149,9 +1160,8 @@ def _media_exibida_coletiva(adversario) -> dict[str, float | None]:
     return resultado
 
 
-def _indicadores_coletivos(media: dict, selecionados: list[str]) -> list[dict]:
-    padrao = ["pontos", "dois_c", "dois_t", "tres_c", "tres_t", "ll_c", "ll_t", "ress_of", "ress_def", "assistencias", "turnovers", "roubos", "eficiencia"]
-    campos = selecionados or padrao
+def _indicadores_coletivos(media: dict, selecionados: list[str], destaque_codigo: str = "") -> list[dict]:
+    campos = selecionados or STAT_DEFAULT_COLLECTIVE_FIELDS
     indicadores = []
     pares = {"fg_c": ("fg_t", "FG%"), "dois_c": ("dois_t", "2P%"), "tres_c": ("tres_t", "3P%"), "ll_c": ("ll_t", "LL%")}
     usados = set()
@@ -1160,11 +1170,13 @@ def _indicadores_coletivos(media: dict, selecionados: list[str]) -> list[dict]:
             continue
         if campo in pares:
             tentativas, nome = pares[campo]
-            if tentativas in campos and media.get(tentativas):
+            if tentativas in campos and media.get(tentativas) and destaque_codigo not in {STAT_CODES[campo], STAT_CODES[tentativas]}:
                 indicadores.append({"nome": nome, "valor": f"{media[campo] / media[tentativas] * 100:.0f}%"})
                 usados.update((campo, tentativas))
                 continue
-        if any(campo == tentativas and convertidos in campos and media.get(convertidos) is not None for convertidos, (tentativas, _) in pares.items()):
+        if any(campo == tentativas and convertidos in campos and media.get(convertidos) is not None
+               and destaque_codigo not in {STAT_CODES[convertidos], STAT_CODES[tentativas]}
+               for convertidos, (tentativas, _) in pares.items()):
             continue
         indicadores.append({"nome": STAT_CODES[campo], "valor": f"{media[campo]:.1f}"})
         usados.add(campo)
@@ -1178,6 +1190,27 @@ def _destaque_estatistico_coletivo(codigo, tom, indicadores: list[dict]) -> dict
         if any(indicador["nome"] == codigo for indicador in indicadores):
             return {"codigo": codigo, "tom": tom}
     return None
+
+
+def _campos_estatisticos_coletivos(selecionados: list[str], destaque_codigo: str | None) -> list[str]:
+    campos = list(selecionados or STAT_DEFAULT_COLLECTIVE_FIELDS)
+    for campo in STAT_HIGHLIGHT_FIELDS.get(destaque_codigo or "", ()):
+        if campo not in campos:
+            campos.append(campo)
+    return campos
+
+
+def _guardar_destaque_estatistico_coletivo(adversario, codigo, tom, *, limpar=False) -> None:
+    codigo = str(codigo or "").strip()
+    tom = str(tom or "").strip().lower()
+    if limpar or not codigo:
+        adversario.estatistica_destaque = None
+        adversario.estatistica_destaque_tom = None
+        return
+    if codigo not in STAT_HIGHLIGHT_CODES or tom not in {"positivo", "negativo"}:
+        raise HTTPException(400, "Escolhe um indicador e uma leitura válidos.")
+    adversario.estatistica_destaque = codigo
+    adversario.estatistica_destaque_tom = tom
 
 
 def _acoes_principais_coletivas(adversario) -> list:
@@ -1259,6 +1292,13 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
             stat_codes=STAT_CODES,
         )
     elif tipo == "scouting-coletivo":
+        destaque_codigo = dados.get("estatistica_destaque")
+        destaque_tom = dados.get("estatistica_destaque_tom")
+        if destaque_codigo is None:
+            destaque_codigo = alvo.estatistica_destaque
+        if destaque_tom is None:
+            destaque_tom = alvo.estatistica_destaque_tom
+        stat_fields = _campos_estatisticos_coletivos(stat_fields, destaque_codigo)
         jogadores_destaque_ids = None
         if dados.get("configuracao_jogadores_destaque"):
             jogadores_destaque_ids = []
@@ -1294,9 +1334,9 @@ def _contexto_relatorio(tipo: str, alvo, equipa: Equipa, dados, db: Session) -> 
         jogos_referencia = jogos_em_preparacao(
             [ligacao.jogo for ligacao in alvo.jogos if ligacao.jogo]
         )
-        indicadores_coletivos = _indicadores_coletivos(media_exibida, stat_fields)
+        indicadores_coletivos = _indicadores_coletivos(media_exibida, stat_fields, destaque_codigo or "")
         destaque_estatistico = _destaque_estatistico_coletivo(
-            dados.get("estatistica_destaque"), dados.get("estatistica_destaque_tom"), indicadores_coletivos
+            destaque_codigo, destaque_tom, indicadores_coletivos
         )
         cinco_previsto, rotacoes_previstas, rotacoes_por_posicao = _rotacoes_coletivas_por_posicao(alvo)
         substituicoes_por_titular = _substituicoes_coletivas_por_titular(
@@ -1433,6 +1473,12 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
             if "resultados" in configuracao_guardada
             else [resultado.id for resultado in resultados_disponiveis]
         )
+    destaque_guardado = configuracao_guardada.get(
+        "estatistica_destaque", getattr(alvo, "estatistica_destaque", None)
+    )
+    tom_guardado = configuracao_guardada.get(
+        "estatistica_destaque_tom", getattr(alvo, "estatistica_destaque_tom", None)
+    )
     return {
         "utilizador": utilizador,
         "tipo": tipo,
@@ -1449,8 +1495,9 @@ def _contexto_configurador(tipo: str, alvo_id: int, db: Session, utilizador, pre
         "selecionadas": selecionadas,
         "estatisticas_selecionadas": configuracao_guardada.get("estatisticas", []),
         "estatisticas_destaque_opcoes": STAT_HIGHLIGHT_OPTIONS if tipo == "scouting-coletivo" else [],
-        "estatistica_destaque_selecionada": configuracao_guardada.get("estatistica_destaque", "") if configuracao_guardada.get("estatistica_destaque") in STAT_HIGHLIGHT_CODES else "",
-        "estatistica_destaque_tom": configuracao_guardada.get("estatistica_destaque_tom", "positivo") if configuracao_guardada.get("estatistica_destaque_tom") in {"positivo", "negativo"} else "positivo",
+        "estatisticas_destaque_campos": STAT_HIGHLIGHT_FIELDS if tipo == "scouting-coletivo" else {},
+        "estatistica_destaque_selecionada": destaque_guardado if destaque_guardado in STAT_HIGHLIGHT_CODES else "",
+        "estatistica_destaque_tom": tom_guardado if tom_guardado in {"positivo", "negativo"} else "positivo",
         "jogadores_destaque_selecionados": configuracao_guardada.get("jogadores_destaque", []),
         "resultados_disponiveis": resultados_disponiveis,
         "resultados_selecionados": resultados_selecionados,
@@ -1495,6 +1542,34 @@ def fragmento_configurar_relatorio(
         request,
         "exportacoes/_relatorio_formulario.html",
         _contexto_configurador(tipo, alvo_id, db, utilizador, predefinicao_id),
+    )
+
+
+@router.post("/relatorios/scouting-coletivo/{alvo_id}/destaque")
+async def guardar_destaque_estatistico(
+    alvo_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilizador=Depends(exigir_operacao_desportiva),
+):
+    adversario, _, _ = _alvo_relatorio("scouting-coletivo", alvo_id, db, utilizador)
+    dados = await request.form()
+    _guardar_destaque_estatistico_coletivo(
+        adversario,
+        dados.get("estatistica_destaque"),
+        dados.get("estatistica_destaque_tom"),
+        limpar=dados.get("limpar_destaque") == "1",
+    )
+    db.commit()
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JSONResponse({
+            "sucesso": True,
+            "estatistica_destaque": adversario.estatistica_destaque or "",
+            "estatistica_destaque_tom": adversario.estatistica_destaque_tom or "",
+        })
+    return RedirectResponse(
+        f"/exportacoes/relatorios/scouting-coletivo/{alvo_id}?destaque_guardado=1#estatistica-destaque",
+        status_code=303,
     )
 
 

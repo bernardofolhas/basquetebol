@@ -1,4 +1,5 @@
 import base64
+import asyncio
 from datetime import date
 from io import BytesIO
 import os
@@ -16,7 +17,10 @@ from paths import STATIC_DIR, TEMPLATES_DIR
 from routers.exportacoes import (
     _acoes_principais_coletivas,
     _caracteristicas_cinco_coletivo,
+    _campos_estatisticos_coletivos,
+    _contexto_configurador,
     _destaque_estatistico_coletivo,
+    _guardar_destaque_estatistico_coletivo,
     _grupos_resposta_coletiva,
     _indicadores_coletivos,
     _media_exibida_coletiva,
@@ -25,6 +29,7 @@ from routers.exportacoes import (
     _passos_setplay_pdf,
     _playbook_coletivo,
     _resultados_recentes_coletivos,
+    guardar_destaque_estatistico,
 )
 from services.desenho_service import empacotar_desenho_editavel, imagem_estatica_data_uri
 from services.pdf_service import preparar_contexto_pdf, simbolo_cabecalho_sem_fundo
@@ -79,6 +84,65 @@ def test_medias_calculadas_e_percentagens_sem_media_manual():
     assert _destaque_estatistico_coletivo("PTS", "negativo", indicadores) == {"codigo": "PTS", "tom": "negativo"}
     assert _destaque_estatistico_coletivo("FG%", "positivo", indicadores) is None
     assert _destaque_estatistico_coletivo("PTS", "neutro", indicadores) is None
+
+
+def test_destaque_fta_nao_e_substituido_pela_percentagem():
+    media = {campo: None for campo in STAT_FIELDS}
+    media.update(pontos=82, ll_c=18, ll_t=24)
+    indicadores = _indicadores_coletivos(media, ["ll_c", "ll_t"], "FTA")
+    assert [indicador["nome"] for indicador in indicadores] == ["FTM", "FTA"]
+    assert _destaque_estatistico_coletivo("FTA", "negativo", indicadores) == {
+        "codigo": "FTA", "tom": "negativo"
+    }
+    assert _destaque_estatistico_coletivo("FTA", "negativo", []) is None
+    campos = _campos_estatisticos_coletivos([], "FTA")
+    assert "pontos" in campos and "ll_c" in campos and "ll_t" in campos
+    assert _destaque_estatistico_coletivo(
+        "FTA", "negativo", _indicadores_coletivos(media, campos, "FTA")
+    ) == {"codigo": "FTA", "tom": "negativo"}
+
+
+def test_destaque_guardado_pode_ser_positivo_negativo_ou_retirado(monkeypatch):
+    adversario = Item(estatistica_destaque=None, estatistica_destaque_tom=None,
+                     jogadores=[], resultados=[], lideres=[])
+    commits = []
+    db = Item(commit=lambda: commits.append(True))
+    equipa = Item(id=3, nome="Equipa")
+    monkeypatch.setattr(
+        "routers.exportacoes._alvo_relatorio",
+        lambda tipo, alvo_id, sessao, utilizador: (adversario, equipa, "Rival"),
+    )
+    monkeypatch.setattr("routers.exportacoes._predefinicoes_relatorio", lambda *args: [])
+
+    class Pedido:
+        headers = {"X-Requested-With": "XMLHttpRequest"}
+
+        def __init__(self, dados):
+            self.dados = dados
+
+        async def form(self):
+            return self.dados
+
+    for tom in ("positivo", "negativo"):
+        resposta = asyncio.run(guardar_destaque_estatistico(
+            7, Pedido({"estatistica_destaque": "FTA", "estatistica_destaque_tom": tom}), db, Item()
+        ))
+        assert resposta.status_code == 200
+        assert adversario.estatistica_destaque == "FTA"
+        assert adversario.estatistica_destaque_tom == tom
+        configurador = _contexto_configurador("scouting-coletivo", 7, db, Item())
+        assert configurador["estatistica_destaque_selecionada"] == "FTA"
+        assert configurador["estatistica_destaque_tom"] == tom
+        asyncio.run(guardar_destaque_estatistico(
+            7, Pedido({"estatistica_destaque": "FTA", "estatistica_destaque_tom": tom,
+                       "limpar_destaque": "1"}), db, Item()
+        ))
+        assert adversario.estatistica_destaque is None
+        assert adversario.estatistica_destaque_tom is None
+        assert _contexto_configurador("scouting-coletivo", 7, db, Item())[
+            "estatistica_destaque_selecionada"
+        ] == ""
+    assert len(commits) == 4
 
 
 def test_acoes_principais_nao_incluem_momentos_reservados_ao_playbook():

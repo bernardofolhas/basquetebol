@@ -1174,6 +1174,10 @@ def actualizar_estrutura_scouting_coletivo() -> None:
     inspector = inspect(engine)
     tabelas = {
         "scouting_blocos_coletivos": {"avaliacao": "INTEGER NULL"},
+        "scouting_adversarios": {
+            "estatistica_destaque": "VARCHAR(12) NULL",
+            "estatistica_destaque_tom": "VARCHAR(12) NULL",
+        },
         "predefinicoes_relatorios": {"configuracao": "TEXT NULL"},
     }
     with engine.begin() as ligacao:

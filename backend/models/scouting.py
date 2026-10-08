@@ -99,6 +99,8 @@ class ScoutingAdversario(Base):
     nome_normalizado = Column(String(160), nullable=False)
     simbolo = Column(String(255), nullable=True)
     observacoes = Column(Text, nullable=True)
+    estatistica_destaque = Column(String(12), nullable=True)
+    estatistica_destaque_tom = Column(String(12), nullable=True)
     criado_em = Column(DateTime, nullable=False, default=datetime.now)
     atualizado_em = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 

@@ -345,6 +345,11 @@ def test_scouting_coletivo_modular_guarda_e_recarrega_configuracao():
     assert 'data-preset-highlight-players' in formulario
     assert 'name="estatistica_destaque"' in formulario
     assert 'name="estatistica_destaque_tom"' in formulario
+    assert 'data-save-stat-highlight' in formulario
+    assert 'data-clear-stat-highlight' in formulario
+    assert 'data-stat-highlight-status' in formulario
+    assert 'data-highlight-fields' in formulario
+    assert 'guardar_destaque_estatistico' in rota
     assert "presetStatistics.includes(input.value)" in javascript
     assert '"estatisticas": [campo for campo in dados.getlist("estatisticas")' in rota
     assert '"estatistica_destaque":' in rota
