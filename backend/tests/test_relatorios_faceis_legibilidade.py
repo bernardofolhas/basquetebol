@@ -55,27 +55,77 @@ def _pdf(template: str, contexto: dict):
     return html, PdfReader(BytesIO(pdf)).pages
 
 
-def test_roster_facil_usa_cabecalho_simples_e_linhas_legiveis():
+def test_roster_facil_usa_cabecalho_simples_e_cartoes_legiveis():
     contexto = _base()
     atletas = [
         Item(
             id=indice, nome=nome, numero=str(indice), posicao_principal="Extremo",
-            posicao_alternativa="Base", altura_cm=190, mao_dominante="Direita",
+            posicao_alternativa="Base", altura_cm=190, peso_kg=86, mao_dominante="Direita",
             observacoes="Boa leitura do jogo", media_epoca=Item(pontos=12.5, assistencias=4.1, ress_total=5.2),
         )
         for indice, nome in enumerate(("Ana Martins", "Beatriz Silva", "Carla Lopes"), 1)
     ]
     contexto.update(
-        atletas=atletas, fotografias={}, secoes_set={"notas", "estatisticas"},
+        atletas=atletas, fotografias={}, secoes_set={"fisico", "notas", "estatisticas"},
         stat_fields=["pontos", "assistencias", "ress_total"],
         stat_labels={"pontos": "Pontos", "assistencias": "Assistências", "ress_total": "Ressaltos"},
     )
     html, paginas = _pdf("relatorios/roster_facil.html", contexto)
     assert "Roster - Rivals BC" in html
     assert len(paginas) == 1
+    mural = " ".join(paginas[0].extract_text().split())
+    for valor in ("Roster - Rivals BC", "Ana Martins", "Beatriz Silva", "Carla Lopes", "1,90 m", "86 kg"):
+        assert valor in mural
+    assert "Informação complementar" in mural
+    assert "Assistências" in mural and "Boa leitura do jogo" in mural
+
+
+def test_roster_facil_cabe_doze_cartoes_em_a4_sem_cortar_nomes():
+    contexto = _base()
+    contexto.update(
+        atletas=[Item(id=i, nome=f"Atleta com Nome Completo {i:02d}", numero=str(i),
+                      posicao_principal="Extremo", posicao_alternativa=None,
+                      altura_cm=185, peso_kg=80, observacoes=None, media_epoca=None)
+                 for i in range(1, 13)],
+        fotografias={}, secoes_set={"fisico"}, stat_fields=[], stat_labels={},
+    )
+    html, paginas = _pdf("relatorios/roster_facil.html", contexto)
+    assert html.count('class="roster-player"') == 12
+    assert len(paginas) == 1
     texto = " ".join(paginas[0].extract_text().split())
-    for valor in ("Roster - Rivals BC", "Ana Martins", "Beatriz Silva", "Carla Lopes", "Assistências"):
-        assert valor in texto
+    assert all(f"Atleta com Nome Completo {i:02d}" in texto for i in range(1, 13))
+
+
+def test_roster_facil_omite_complemento_sem_valores_preenchidos():
+    contexto = _base()
+    contexto.update(
+        atletas=[Item(id=1, nome="Ana Martins", numero="4", posicao_principal="Base",
+                      posicao_alternativa=None, altura_cm=None, peso_kg=None,
+                      observacoes="  ", media_epoca=Item(pontos=None))],
+        fotografias={}, secoes_set={"fisico", "notas", "estatisticas"},
+        stat_fields=["pontos"], stat_labels={"pontos": "Pontos"},
+    )
+    html, paginas = _pdf("relatorios/roster_facil.html", contexto)
+    assert "Informação complementar" not in html
+    assert "Altura:" not in html and "Peso:" not in html
+    assert len(paginas) == 1
+
+
+def test_roster_facil_continua_na_pagina_seguinte_sem_partir_cartoes():
+    contexto = _base()
+    contexto.update(
+        atletas=[Item(id=i, nome=f"Atleta {i:02d}", numero=str(i),
+                      posicao_principal="Base", posicao_alternativa=None,
+                      altura_cm=185, peso_kg=80, observacoes=None, media_epoca=None)
+                 for i in range(1, 14)],
+        fotografias={}, secoes_set={"fisico"}, stat_fields=[], stat_labels={},
+    )
+    _, paginas = _pdf("relatorios/roster_facil.html", contexto)
+    assert len(paginas) == 2
+    primeira = " ".join(paginas[0].extract_text().split())
+    segunda = " ".join(paginas[1].extract_text().split())
+    assert "Atleta 12" in primeira and "Atleta 13" not in primeira
+    assert "Atleta 13" in segunda
 
 
 def test_plano_de_jogo_facil_usa_o_simbolo_do_adversario_e_titulo_curto():

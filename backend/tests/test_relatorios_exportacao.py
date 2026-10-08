@@ -438,7 +438,7 @@ def test_jogadores_prioritarios_respeitam_a_selecao_e_ordem_do_treinador():
 
 def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
     marcadores = {
-        "roster_facil.html": ("easy-roster", "fotografias.get(j.id)", "Referência rápida"),
+        "roster_facil.html": ("easy-roster", "fotografias.get(j.id)", "roster-portrait"),
         "scouting_coletivo_facil.html": ("Quando defendemos", "Quando atacamos", "Jogadores prioritários"),
         "plano_jogo_facil.html": ("cabecalho_relatorio('Plano de jogo'", "O nosso cinco", "Chaves do jogo", "Estratégias defensivas por situação"),
     }
@@ -447,6 +447,11 @@ def test_restantes_relatorios_faceis_tem_modelos_visuais_proprios():
         assert '_documento.html' not in html
         for esperado in esperados:
             assert esperado in html
+
+
+def test_roster_facil_usa_apenas_identificacao_e_fisico_por_defeito():
+    assert _secoes_padrao("roster", "facil") == ["fotografia", "identificacao", "fisico"]
+    assert "estatisticas" in _secoes_padrao("roster", "completo")
 
 
 def test_relatorios_faceis_com_jogadores_apresentam_fotografias():

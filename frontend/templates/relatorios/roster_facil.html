@@ -2,29 +2,61 @@
 {% from "relatorios/_scouting_cabecalho.html" import cabecalho_relatorio %}
 <!doctype html><html lang="pt"><head><meta charset="utf-8"><title>Roster - {{ alvo_nome }}</title>{{ estilo_pdf() }}{% include "relatorios/_facil_estilos.html" %}
 <style>
-.easy-roster{display:block}
-.roster-player{display:block;margin:0 0 2.5mm;border:1px solid var(--pdf-line);border-radius:2.5mm;background:#fff;padding:2.5mm;page-break-inside:avoid;break-inside:avoid}
-.roster-row{display:flex;align-items:center;gap:3mm;min-height:26mm}
-.roster-player .easy-photo,.roster-player .easy-avatar{flex:0 0 21mm;width:21mm;height:25mm;border-radius:2mm}
-.roster-identity{flex:1 1 47mm;min-width:0}
-.roster-identity h2{margin:0;color:var(--pdf-ink);font-size:14px;line-height:1.15;overflow-wrap:anywhere}
-.roster-number{display:block;margin-bottom:.5mm;color:var(--pdf-primary-dark);font-size:9px;font-weight:800}
-.roster-meta{margin:1.5mm 0 0;color:var(--pdf-muted);font-size:9px;line-height:1.3}
-.roster-meta strong{color:var(--pdf-ink)}
-.roster-stats{display:grid;flex:1 1 105mm;min-width:80mm;grid-template-columns:repeat({{ 6 if orientacao == 'paisagem' else 4 }},minmax(0,1fr));gap:1mm}
-.roster-stat{min-width:0;border:1px solid var(--pdf-line);border-radius:1.5mm;background:var(--pdf-surface);padding:1.3mm 1mm;text-align:center}
-.roster-stat b,.roster-stat small{display:block;overflow-wrap:anywhere}.roster-stat b{font-size:12px;line-height:1.1}.roster-stat small{margin-top:.7mm;color:var(--pdf-muted);font-size:8px;line-height:1.15}
-.roster-note{margin:2mm 0 0;border-top:1px solid var(--pdf-line);padding-top:1.5mm;color:var(--pdf-muted);font-size:8px;white-space:pre-line}
+.easy-roster{display:table;width:100%;table-layout:fixed;border-collapse:separate;border-spacing:1.5mm 2mm;margin:1mm 0 0}
+.easy-roster tr{page-break-inside:avoid;break-inside:avoid}
+.easy-roster td{width:33.333%;padding:0;vertical-align:top}
+.roster-player{min-height:56mm;border:1px solid #c8d1db;border-radius:2.5mm;background:#fff;page-break-inside:avoid;break-inside:avoid}
+.roster-portrait{position:relative;height:39mm;overflow:hidden;border-radius:2mm 2mm 1mm 1mm;background:#e9edf1}
+.roster-portrait .easy-photo,.roster-portrait .easy-avatar{display:block;width:100%;height:39mm;max-width:none;border:0;border-radius:0;box-shadow:none;object-fit:cover;object-position:center 18%}
+.roster-portrait .easy-avatar{display:flex;align-items:center;justify-content:center;background:#e6edf2;color:#08294a;font-size:22px;font-weight:800}
+.roster-number{position:absolute;top:0;left:0;min-width:13mm;height:13mm;padding:0 1.5mm;border-radius:0 0 2mm 0;background:#08294a;color:#ff7b17;font-size:20px;font-weight:900;line-height:13mm;text-align:center}
+.roster-details{padding:1.5mm 1mm 1mm;text-align:center}
+.roster-details h2{margin:0;color:#08294a;font-size:12px;line-height:1.1;overflow-wrap:break-word}
+.roster-position{margin:.4mm 0 1.1mm;color:#08294a;font-size:9.5px;line-height:1.1}
+.roster-measures{margin:0;color:#203a56;font-size:8px;line-height:1.15;white-space:nowrap}
+.roster-measures .separator{margin:0 1.5mm;color:#64748b}
+.roster-extra{margin-top:5mm}
+.roster-extra h2{margin:0 0 3mm;padding:2mm 3mm;border-radius:2mm;background:#08294a;color:#fff;font-size:12px}
+.roster-extra-item{margin:0 0 2mm;padding:2mm 3mm;border:1px solid var(--pdf-line);border-radius:2mm;page-break-inside:avoid;break-inside:avoid}
+.roster-extra-item h3{margin:0 0 1mm;color:#08294a;font-size:10px}
+.roster-extra-item p{margin:0;color:var(--pdf-muted);font-size:8px;line-height:1.35;white-space:pre-line}
+.roster-extra-stats{margin:0 0 1mm;color:var(--pdf-ink);font-size:8px}
+.roster-extra-stats span{display:inline-block;margin:0 2mm 1mm 0;padding:1mm 1.5mm;border-radius:1mm;background:var(--pdf-surface)}
+.roster-extra-stats b{color:#08294a}
+{% if orientacao == 'paisagem' %}
+.roster-player{min-height:63mm}.roster-portrait,.roster-portrait .easy-photo,.roster-portrait .easy-avatar{height:46mm}
+{% endif %}
 </style></head><body>
 {{ cabecalho_relatorio('Roster', alvo_nome, identidade, simbolo_adversario) }}
-<div class="easy-intro"><strong>Referência rápida do adversário</strong><span>{{ atletas|length }} atleta(s)</span></div>
-<main class="easy-roster">
-{% for j in atletas %}<article class="roster-player">
-  <div class="roster-row">
+{% if atletas %}<table class="easy-roster" aria-label="Roster adversário"><tbody>
+{% for linha in atletas|batch(3, none) %}<tr>
+{% for j in linha %}<td>{% if j %}<article class="roster-player">
+  <div class="roster-portrait">
     {% if fotografias.get(j.id) %}<img class="easy-photo" src="{{ fotografias.get(j.id) }}" alt="">{% else %}<div class="easy-avatar">{{ j.nome[:2]|upper }}</div>{% endif %}
-    <div class="roster-identity"><span class="roster-number">#{{ j.numero or '—' }}</span><h2>{{ j.nome }}</h2><p class="roster-meta"><strong>{{ j.posicao_principal }}</strong>{% if j.posicao_alternativa %} / {{ j.posicao_alternativa }}{% endif %}{% if j.altura_cm %} · {{ j.altura_cm|round|int }} cm{% endif %}{% if j.mao_dominante %} · Mão {{ j.mao_dominante }}{% endif %}</p></div>
-    {% if 'estatisticas' in secoes_set and stat_fields and j.media_epoca %}<div class="roster-stats">{% for campo in stat_fields if j.media_epoca|attr(campo) is not none %}<div class="roster-stat"><b>{{ j.media_epoca|attr(campo)|round(1) }}</b><small>{{ stat_labels.get(campo, campo|replace('_',' ')) }}</small></div>{% endfor %}</div>{% endif %}
+    <span class="roster-number">{{ j.numero or '–' }}</span>
   </div>
-  {% if 'notas' in secoes_set and j.observacoes %}<p class="roster-note">{{ j.observacoes|truncate(240) }}</p>{% endif %}
-</article>{% else %}<div class="easy-empty">Sem atletas selecionados.</div>{% endfor %}
-</main>{{ rodape_pdf(equipa.nome ~ ' · Roster adversário') }}</body></html>
+  <div class="roster-details">
+    <h2>{{ j.nome }}</h2>
+    <p class="roster-position">{{ j.posicao_principal }}{% if j.posicao_alternativa %} / {{ j.posicao_alternativa }}{% endif %}</p>
+    {% if 'fisico' in secoes_set %}<p class="roster-measures">{% if j.altura_cm %}Altura: {{ '%.2f'|format(j.altura_cm / 100)|replace('.', ',') }} m{% endif %}{% if j.altura_cm and j.peso_kg %}<span class="separator">|</span>{% endif %}{% if j.peso_kg %}Peso: {{ '%g'|format(j.peso_kg)|replace('.', ',') }} kg{% endif %}</p>{% endif %}
+  </div>
+</article>{% endif %}</td>{% endfor %}
+</tr>{% endfor %}
+</tbody></table>{% else %}<div class="easy-empty">Sem atletas selecionados.</div>{% endif %}
+{% set extras = namespace(existem=false) %}
+{% for j in atletas %}
+  {% set valores = namespace(existem=false) %}
+  {% if 'estatisticas' in secoes_set and j.media_epoca %}{% for campo in stat_fields if j.media_epoca|attr(campo) is not none %}{% set valores.existem=true %}{% endfor %}{% endif %}
+  {% if ('notas' in secoes_set and j.observacoes and j.observacoes|trim) or valores.existem %}{% set extras.existem=true %}{% endif %}
+{% endfor %}
+{% if extras.existem %}<section class="roster-extra"><h2>Informação complementar</h2>
+{% for j in atletas %}
+{% set valores = namespace(existem=false) %}
+{% if 'estatisticas' in secoes_set and j.media_epoca %}{% for campo in stat_fields if j.media_epoca|attr(campo) is not none %}{% set valores.existem=true %}{% endfor %}{% endif %}
+{% if ('notas' in secoes_set and j.observacoes and j.observacoes|trim) or valores.existem %}<article class="roster-extra-item">
+  <h3>#{{ j.numero or '–' }} {{ j.nome }}</h3>
+  {% if valores.existem %}<div class="roster-extra-stats">{% for campo in stat_fields if j.media_epoca|attr(campo) is not none %}<span><b>{{ j.media_epoca|attr(campo)|round(1) }}</b> {{ stat_labels.get(campo, campo|replace('_', ' ')) }}</span>{% endfor %}</div>{% endif %}
+  {% if 'notas' in secoes_set and j.observacoes and j.observacoes|trim %}<p>{{ j.observacoes }}</p>{% endif %}
+</article>{% endif %}{% endfor %}
+</section>{% endif %}
+{{ rodape_pdf(equipa.nome ~ ' · Roster adversário') }}</body></html>

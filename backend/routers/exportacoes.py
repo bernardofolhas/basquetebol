@@ -851,7 +851,9 @@ def _perfil(utilizador) -> str:
 def _secoes_padrao(tipo: str, formato: str) -> list[str]:
     return [
         s["chave"] for s in RELATORIOS_CONFIG[tipo]["secoes"]
-        if formato in s["formatos"] and not (tipo == "scouting-coletivo" and s["chave"] == "playbook")
+        if formato in s["formatos"]
+        and not (tipo == "scouting-coletivo" and s["chave"] == "playbook")
+        and not (tipo == "roster" and formato == "facil" and s["chave"] in {"notas", "estatisticas"})
     ]
 
 
