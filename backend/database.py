@@ -1179,6 +1179,7 @@ def actualizar_estrutura_scouting_coletivo() -> None:
             "estatistica_destaque_tom": "VARCHAR(12) NULL",
         },
         "predefinicoes_relatorios": {"configuracao": "TEXT NULL"},
+        "cadernos_playbook": {"scouting_adversario_id": "INTEGER NULL REFERENCES scouting_adversarios(id) ON DELETE SET NULL"},
     }
     with engine.begin() as ligacao:
         for tabela, definicoes in tabelas.items():
@@ -1193,6 +1194,15 @@ def actualizar_estrutura_scouting_coletivo() -> None:
                     f"ALTER TABLE {tabela} ADD COLUMN {opcao}{coluna} {definicao}"
                 ))
                 logger.info("Coluna '%s' adicionada a %s.", coluna, tabela)
+        if inspector.has_table("cadernos_playbook"):
+            ligacao.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_caderno_scouting_equipa_adversario "
+                "ON cadernos_playbook (equipa_id, scouting_adversario_id)"
+            ))
+            ligacao.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_cadernos_playbook_scouting_adversario_id "
+                "ON cadernos_playbook (scouting_adversario_id)"
+            ))
 
 # Função que abre e fecha sessões automaticamente
 # O "yield" faz com que a sessão seja fechada no final de cada pedido

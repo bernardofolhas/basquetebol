@@ -17,7 +17,7 @@ from flash import set_flash
 from logging_config import obter_logger
 from models.jogador import Jogador
 from models.jogo import ItemPlanoJogoBiblioteca, Jogo, PlanoJogo, PlanoJogoItem
-from models.playbook import PassoSetPlay, Playbook, SetPlay
+from models.playbook import JogadaCadernoPlaybook, PassoSetPlay, Playbook, SetPlay
 from models.scouting import (
     STAT_FIELDS,
     RelatorioScouting,
@@ -64,6 +64,9 @@ from services.plano_jogo_service import (
     normalizar_texto,
 )
 from services.scouting_individual_service import construir_perfil_individual
+from services.scouting_playbook_service import (
+    copiar_setplay_completo, equipa_id_adversario, garantir_caderno_scouting,
+)
 from template_config import Jinja2Templates
 
 
@@ -677,6 +680,19 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             .order_by(ScoutingMomentoPlaybook.ordem, ScoutingMomentoPlaybook.id)
             .all()
         )
+        equipa_id_playbook = equipa_id_adversario(adversario)
+        caderno_scouting = None
+        if equipa_id_playbook and (conceitos or momentos):
+            caderno_scouting = garantir_caderno_scouting(db, adversario, equipa_id_playbook)
+            db.commit()
+        jogadas_para_importar = (
+            db.query(SetPlay)
+            .join(Playbook)
+            .filter(Playbook.equipa_id == equipa_id_playbook, Playbook.clube_id == adversario.clube_id)
+            .order_by(Playbook.nome, SetPlay.nome, SetPlay.id)
+            .all()
+            if equipa_id_playbook else []
+        )
         rotacoes = (
             db.query(ScoutingRotacaoPrevista)
             .options(joinedload(ScoutingRotacaoPrevista.jogador))
@@ -694,7 +710,8 @@ def separador_adversario(adversario_id: int, separador: str, request: Request, d
             estatisticas_coletivas=estatisticas_coletivas,
             media_coletiva=media_coletiva, opcoes_defensivas=opcoes_defensivas,
             itens_coletivos=itens_coletivos, lideres=lideres,
-            conceitos=conceitos, momentos=momentos,
+            conceitos=conceitos, momentos=momentos, jogadas_para_importar=jogadas_para_importar,
+            caderno_scouting=caderno_scouting,
             cinco_previsto=[item for item in rotacoes if item.papel == "titular"],
             rotacoes_previstas=[item for item in rotacoes if item.papel == "rotacao"],
             substituicoes_por_titular={
@@ -1166,6 +1183,8 @@ async def _criar_elemento_desenhado(adversario, request, db, modelo, categoria, 
         return _voltar_coletivo(adversario.id, ancora)
     lista = adversario.conceitos_ofensivos if modelo is ScoutingConceitoOfensivo else adversario.momentos_playbook
     db.add(modelo(clube_id=adversario.clube_id, adversario_id=adversario.id, setplay_id=setplay.id, ordem=len(lista)))
+    db.flush()
+    garantir_caderno_scouting(db, adversario, setplay.playbook.equipa_id)
     db.commit()
     return RedirectResponse(url=f"/playbook/studio/setplays/{setplay.id}", status_code=303)
 
@@ -1194,6 +1213,71 @@ def _modelo_elemento(tipo: str):
     return None, None
 
 
+@router.post("/adversarios/{adversario_id}/coletivo/momentos/importar")
+def importar_jogadas_coletivas(
+    adversario_id: int, request: Request, db: Session = Depends(get_db),
+    utilizador=Depends(exigir_scouting), setplay_ids: list[int] = Form(default=[]),
+):
+    adversario = _adversario_acessivel(db, adversario_id, utilizador)
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    equipa_id = equipa_id_adversario(adversario)
+    if not equipa_id or not setplay_ids:
+        set_flash(request, "Seleciona pelo menos uma jogada para importar.", "error")
+        return _voltar_coletivo(adversario.id, "#playbook-coletivo")
+    origens = db.query(SetPlay).join(Playbook).filter(
+        SetPlay.id.in_(set(setplay_ids[:50])), Playbook.equipa_id == equipa_id,
+        Playbook.clube_id == adversario.clube_id,
+    ).all()
+    destino = _playbook_scouting(db, adversario)
+    if not destino:
+        return _voltar_coletivo(adversario.id, "#playbook-coletivo")
+    ordem = db.query(ScoutingMomentoPlaybook).filter(ScoutingMomentoPlaybook.adversario_id == adversario.id).count()
+    for origem in origens:
+        copia = copiar_setplay_completo(db, origem, destino, origem.categoria or "Scouting · Playbook adversário")
+        db.add(ScoutingMomentoPlaybook(
+            clube_id=adversario.clube_id, adversario_id=adversario.id,
+            setplay_id=copia.id, ordem=ordem,
+        ))
+        ordem += 1
+    db.flush()
+    garantir_caderno_scouting(db, adversario, equipa_id)
+    db.commit()
+    set_flash(request, f"{len(origens)} jogada(s) completa(s) importada(s).")
+    return _voltar_coletivo(adversario.id, "#playbook-coletivo")
+
+
+@router.post("/coletivo/{tipo}/{elemento_id}/copiar")
+def copiar_elemento_desenhado(
+    tipo: str, elemento_id: int, request: Request, db: Session = Depends(get_db),
+    utilizador=Depends(exigir_scouting),
+):
+    modelo, _ = _modelo_elemento(tipo)
+    if modelo is None:
+        return RedirectResponse(url="/scouting", status_code=303)
+    elemento = db.query(modelo).filter(modelo.id == elemento_id).first()
+    adversario = _adversario_acessivel(db, elemento.adversario_id, utilizador) if elemento else None
+    if not adversario:
+        return RedirectResponse(url="/scouting", status_code=303)
+    destino_tipo = "momento" if tipo == "conceito" else "conceito"
+    destino_modelo, ancora = _modelo_elemento(destino_tipo)
+    destino = _playbook_scouting(db, adversario)
+    if not destino or not elemento.setplay:
+        return _voltar_coletivo(adversario.id, ancora)
+    categoria = "Scouting · Playbook adversário" if destino_tipo == "momento" else "Scouting · Conceito ofensivo"
+    copia = copiar_setplay_completo(db, elemento.setplay, destino, categoria)
+    ordem = db.query(destino_modelo).filter(destino_modelo.adversario_id == adversario.id).count()
+    db.add(destino_modelo(
+        clube_id=adversario.clube_id, adversario_id=adversario.id,
+        setplay_id=copia.id, ordem=ordem,
+    ))
+    db.flush()
+    garantir_caderno_scouting(db, adversario, destino.equipa_id)
+    db.commit()
+    set_flash(request, "Jogada copiada com todos os passos e observações.")
+    return _voltar_coletivo(adversario.id, ancora)
+
+
 @router.post("/coletivo/{tipo}/{elemento_id}/eliminar")
 def eliminar_elemento_desenhado(tipo: str, elemento_id: int, request: Request, db: Session = Depends(get_db), utilizador=Depends(exigir_scouting)):
     modelo, ancora = _modelo_elemento(tipo)
@@ -1206,6 +1290,7 @@ def eliminar_elemento_desenhado(tipo: str, elemento_id: int, request: Request, d
     setplay = elemento.setplay
     db.delete(elemento)
     db.flush()
+    db.query(JogadaCadernoPlaybook).filter(JogadaCadernoPlaybook.setplay_id == setplay.id).delete(synchronize_session=False)
     db.delete(setplay)
     db.commit()
     set_flash(request, "Elemento eliminado sem afetar os restantes.")

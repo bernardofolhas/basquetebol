@@ -9,6 +9,7 @@ from auth_deps import AcessoNegado, exigir_autenticacao
 from database import get_db
 from flash import set_flash
 from models.equipa import Equipa
+from models.jogo import Jogo
 from models.playbook import (
     CadernoPlaybook,
     JogadaCadernoPlaybook,
@@ -17,7 +18,8 @@ from models.playbook import (
     SecaoCadernoPlaybook,
     SetPlay,
 )
-from models.scouting import ScoutingConceitoOfensivo, ScoutingMomentoPlaybook
+from models.scouting import ScoutingAdversario, ScoutingAdversarioJogo, ScoutingConceitoOfensivo, ScoutingMomentoPlaybook
+from services.scouting_playbook_service import garantir_caderno_scouting
 from services.desenho_service import (
     compor_desenho_sobre_campo,
     decompor_desenho_editavel,
@@ -144,8 +146,26 @@ def playbook_equipa(equipa_id: int, request: Request, db: Session = Depends(get_
         db.commit()
         db.refresh(playbook)
 
+    adversarios = db.query(ScoutingAdversario).join(ScoutingAdversarioJogo).join(
+        Jogo, ScoutingAdversarioJogo.jogo_id == Jogo.id,
+    ).filter(Jogo.equipa_id == equipa_id, ScoutingAdversario.clube_id == equipa.clube_id).distinct().all()
+    for adversario in adversarios:
+        conceitos_da_equipa = db.query(ScoutingConceitoOfensivo.id).join(SetPlay).join(Playbook).filter(
+            ScoutingConceitoOfensivo.adversario_id == adversario.id, Playbook.equipa_id == equipa_id,
+        ).first()
+        momentos_da_equipa = db.query(ScoutingMomentoPlaybook.id).join(SetPlay).join(Playbook).filter(
+            ScoutingMomentoPlaybook.adversario_id == adversario.id, Playbook.equipa_id == equipa_id,
+        ).first()
+        if conceitos_da_equipa or momentos_da_equipa:
+            garantir_caderno_scouting(db, adversario, equipa_id)
+    if adversarios:
+        db.commit()
+
     categorias = ["Ataque", "Defesa", "Transição Ofensiva", "Transição Defensiva", "Zona", "Bola Parada", "Outro"]
-    for setplay in playbook.setplays:
+    setplays = db.query(SetPlay).join(Playbook).filter(
+        Playbook.equipa_id == equipa_id, Playbook.clube_id == equipa.clube_id,
+    ).order_by(SetPlay.nome, SetPlay.id).all()
+    for setplay in setplays:
         _preparar_preview_setplay(setplay)
     cadernos = (
         db.query(CadernoPlaybook)
@@ -157,7 +177,7 @@ def playbook_equipa(equipa_id: int, request: Request, db: Session = Depends(get_
         "utilizador": utilizador,
         "equipa": equipa,
         "playbook": playbook,
-        "setplays": playbook.setplays,
+        "setplays": setplays,
         "cadernos": cadernos,
         "categorias": categorias,
     })
@@ -203,8 +223,10 @@ def detalhe_caderno_playbook(
     caderno = db.query(CadernoPlaybook).filter(CadernoPlaybook.id == caderno_id).first()
     if not caderno:
         return RedirectResponse(url="/equipas", status_code=303)
-    biblioteca = db.query(Playbook).filter(Playbook.equipa_id == caderno.equipa_id).first()
-    setplays = list(biblioteca.setplays) if biblioteca else []
+    setplays = db.query(SetPlay).join(Playbook).filter(
+        Playbook.equipa_id == caderno.equipa_id,
+        Playbook.clube_id == caderno.clube_id,
+    ).order_by(SetPlay.nome, SetPlay.id).all()
     for setplay in setplays:
         _preparar_preview_setplay(setplay)
     for entrada in caderno.jogadas:

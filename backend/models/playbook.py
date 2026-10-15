@@ -25,10 +25,12 @@ class CadernoPlaybook(Base):
     """Coleção editorial de jogadas da biblioteca de uma equipa."""
 
     __tablename__ = "cadernos_playbook"
+    __table_args__ = (UniqueConstraint("equipa_id", "scouting_adversario_id", name="uq_caderno_scouting_equipa_adversario"),)
     clube_id = Column(Integer, ForeignKey("clubes.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
     equipa_id = Column(Integer, ForeignKey("equipas.id", ondelete="CASCADE"), nullable=False, index=True)
+    scouting_adversario_id = Column(Integer, ForeignKey("scouting_adversarios.id", ondelete="SET NULL"), nullable=True, index=True)
     nome = Column(String, nullable=False)
     descricao = Column(Text, nullable=True)
     ordem = Column(Integer, nullable=False, default=0)
