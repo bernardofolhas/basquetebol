@@ -300,6 +300,9 @@ def _integrar_eventos_planeados_no_microciclo(db: Session, microciclo: Microcicl
             evento_planeamento_clube_id=evento.id,
         ))
         alteracoes += 1
+    if alteracoes:
+        db.flush()
+        renumerar_treinos_equipa(db, equipa_id)
     return alteracoes
 
 
@@ -2209,7 +2212,6 @@ def detalhe_microciclo(micro_id: int, request: Request, db: Session = Depends(ge
     # tenham sido criados depois do microciclo. Assim aparecem na agenda,
     # visão semanal e gráficos de carga desta semana.
     if _integrar_eventos_planeados_no_microciclo(db, microciclo):
-        renumerar_treinos_equipa(db, equipa_id)
         db.commit()
 
     from models.planeamento import SessaoTreino

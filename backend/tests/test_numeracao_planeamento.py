@@ -139,7 +139,17 @@ def test_treino_planeado_pelo_treinador_entra_no_microciclo_existente():
         clube_id=clube.id, mesociclo_id=meso.id, numero=1,
         data_inicio=date(2026, 9, 7), data_fim=date(2026, 9, 13),
     )
-    db.add(micro)
+    micro_anterior = Microciclo(
+        clube_id=clube.id, mesociclo_id=meso.id, numero=1,
+        data_inicio=date(2026, 9, 1), data_fim=date(2026, 9, 6),
+    )
+    db.add_all([micro_anterior, micro])
+    db.flush()
+    treino_anterior = SessaoTreino(
+        clube_id=clube.id, microciclo_id=micro_anterior.id, data=date(2026, 9, 2),
+        numero_treino=1, e_jogo=False, ativa=True,
+    )
+    db.add(treino_anterior)
     db.flush()
     evento = EventoPlaneamentoClube(
         clube_id=clube.id, equipa_id=equipa.id,
@@ -156,7 +166,8 @@ def test_treino_planeado_pelo_treinador_entra_no_microciclo_existente():
             SessaoTreino.evento_planeamento_clube_id == evento.id,
         ).one()
 
-        assert sessao.numero_treino == 1
+        assert treino_anterior.numero_treino == 1
+        assert sessao.numero_treino == 2
         assert sessao.volume_minutos == 90
         assert sessao.intensidade_rpe is None
         assert evento.microciclo_id == micro.id
