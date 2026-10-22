@@ -20,6 +20,7 @@ body{margin:0;color:#10253a;font-family:Aptos,"Segoe UI",sans-serif;font-size:8p
 .plan-grid{display:flex;gap:1.4mm}.plan-card{flex:1;min-width:0;border:1px solid var(--pdf-line);border-radius:1mm;padding:1.2mm}.plan-card h3{margin:0 0 .7mm;border-bottom:1px solid var(--pdf-line);color:#168362;font-size:7px;text-transform:uppercase}.plan-card ul{margin:0;padding-left:2.7mm}.plan-card li{margin-bottom:.5mm;font-size:6px}
 .play-card{padding:1.4mm}.play-card h3{overflow:hidden;margin:0 0 1mm;font-size:7.5px;text-overflow:ellipsis;white-space:nowrap}.play-card img{display:block;width:100%;height:38mm;background:var(--pdf-surface);object-fit:contain}.play-card p{margin:1mm 0 0;font-size:6.5px}
 .detail-grid{display:flex;flex-wrap:wrap;gap:1mm}.detail-card{box-sizing:border-box;width:49%;min-width:0;border:1px solid var(--pdf-line);border-radius:.8mm;background:#fff;padding:1mm 1.5mm;break-inside:avoid}.detail-card strong{display:block;color:#12324b;font-size:6.5px}.detail-card p{margin:.3mm 0 0;color:#31475c;font-size:6px}.detail-card.attention{border-left:1mm solid var(--pdf-primary)}.detail-card.defense{border-left:1mm solid #e6ac33}
+.tactical-card h3{margin:0 0 .8mm;color:#12324b;font-size:8px;text-transform:uppercase}.tactical-group{margin-top:.8mm;border-top:1px solid var(--pdf-line);padding-top:.6mm}.tactical-group h4{margin:0 0 .4mm;color:#18794e;font-size:7px}.tactical-group.is-weak h4{color:#b42332}.tactical-group ul{margin:0;padding-left:3mm}.tactical-group li{margin-bottom:.4mm;color:#31475c;font-size:6.8px;line-height:1.2}.tactical-group li strong{display:inline;color:#12324b;font-size:6.8px}
 .signal-grid{flex-wrap:wrap}.signal{flex:1 1 30%}.play-grid{display:block;font-size:0}.play-card{box-sizing:border-box;display:inline-block;width:31%;margin:0 .5% 1mm;vertical-align:top}.playbook-section{break-inside:auto}
 body{font-size:8.5px;line-height:1.25}
 .report-meta span{font-size:7.5px}.report-meta small,.stat small{font-size:5.5px}.report-title{font-size:10.5px}
@@ -73,19 +74,23 @@ body{font-size:8.5px;line-height:1.25}
 {% if 'resultados' in secoes_set and resultados_recentes|default([]) %}<section class="report-section"><h2 class="report-title">Últimos resultados</h2><table class="result-list"><tbody>{% for resultado in resultados_recentes %}<tr><td>{{ resultado.data|data_pt }}</td><td><strong>{{ resultado.oponente }}</strong><small>{{ 'Casa' if resultado.em_casa else 'Fora' }}{% if resultado.competicao %} · {{ resultado.competicao }}{% endif %}</small></td><td class="{{ 'is-win' if resultado.pontos_marcados > resultado.pontos_sofridos else ('is-loss' if resultado.pontos_marcados < resultado.pontos_sofridos else '') }}">{{ resultado.pontos_marcados }}–{{ resultado.pontos_sofridos }} · {{ 'V' if resultado.pontos_marcados > resultado.pontos_sofridos else ('D' if resultado.pontos_marcados < resultado.pontos_sofridos else 'E') }}</td></tr>{% endfor %}</tbody></table></section>{% endif %}
 {% if 'perfil' in secoes_set and (perfil_ataque or perfil_defesa) %}<section class="report-section"><h2 class="report-title">Perfil coletivo</h2><div class="profile-columns">{% for titulo, entradas, tom in [('Ataque · como jogam', perfil_ataque, 'attack'), ('Defesa · como defendem', perfil_defesa, 'defense')] %}{% if entradas %}<div class="profile-column {{ tom }}"><h3>{{ titulo }}</h3>{% for bloco in entradas %}{% set valor=bloco.avaliacao or 0 %}{% set cor='weak' if valor <= 2 else ('average' if valor == 3 else 'strong') %}<div class="profile-entry"><span>{{ bloco.titulo }}</span><div class="rating-bar" aria-label="{{ valor }} em 5">{% for indice in range(1,6) %}<i class="{% if indice <= valor %}on {{ cor }}{% endif %}"></i>{% endfor %}</div><b>{{ valor }}/5</b></div>{% endfor %}</div>{% endif %}{% endfor %}</div></section>{% endif %}
 {% set itens = itens_coletivos|default({}) %}
-{% set ataque_itens = itens.get('ataque_forte', []) + itens.get('ataque_fraco', []) %}
-{% if 'analise' in secoes_set and ataque_itens %}
-<section class="report-section"><h2 class="report-title">Análise técnico-tática · ataque</h2><div class="detail-grid">
-  {% for rel in ataque_itens if rel.item %}<article class="detail-card attention"><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %}<p>{{ (rel.observacao or rel.valor)|truncate(125) }}</p>{% endif %}</article>{% endfor %}
+{% set ataque_fortes = itens.get('ataque_forte', [])|selectattr('item')|list %}
+{% set ataque_fracos = itens.get('ataque_fraco', [])|selectattr('item')|list %}
+{% set defesa_fortes = itens.get('defesa_forte', [])|selectattr('item')|list %}
+{% set defesa_fracos = itens.get('defesa_fraco', [])|selectattr('item')|list %}
+{% if 'analise' in secoes_set and (ataque_fortes or ataque_fracos or defesa_fortes or defesa_fracos) %}
+<section class="report-section"><h2 class="report-title">Análise técnico-tática</h2><div class="detail-grid">
+  {% if ataque_fortes or ataque_fracos %}<article class="detail-card tactical-card attention"><h3>Ataque do adversário</h3>
+    {% if ataque_fortes %}<div class="tactical-group"><h4>Pontos fortes</h4><ul>{% for rel in ataque_fortes %}<li><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %} · {{ (rel.observacao or rel.valor)|truncate(125) }}{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+    {% if ataque_fracos %}<div class="tactical-group is-weak"><h4>Pontos fracos</h4><ul>{% for rel in ataque_fracos %}<li><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %} · {{ (rel.observacao or rel.valor)|truncate(125) }}{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+  </article>{% endif %}
+  {% if defesa_fortes or defesa_fracos %}<article class="detail-card tactical-card defense"><h3>Defesa do adversário</h3>
+    {% if defesa_fortes %}<div class="tactical-group"><h4>Pontos fortes</h4><ul>{% for rel in defesa_fortes %}<li><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %} · {{ (rel.observacao or rel.valor)|truncate(125) }}{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+    {% if defesa_fracos %}<div class="tactical-group is-weak"><h4>Pontos fracos</h4><ul>{% for rel in defesa_fracos %}<li><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %} · {{ (rel.observacao or rel.valor)|truncate(125) }}{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+  </article>{% endif %}
 </div></section>
 {% endif %}
-{% set defesa_itens = itens.get('defesa_forte', []) + itens.get('defesa_fraco', []) %}
 {% set opcoes_ativas = opcoes_defensivas_facil|default([]) %}
-{% if 'analise' in secoes_set and defesa_itens %}
-<section class="report-section"><h2 class="report-title">Análise técnico-tática · defesa</h2><div class="detail-grid">
-  {% for rel in defesa_itens if rel.item %}<article class="detail-card defense"><strong>{{ rel.item.nome }}</strong>{% if rel.observacao or rel.valor %}<p>{{ (rel.observacao or rel.valor)|truncate(125) }}</p>{% endif %}</article>{% endfor %}
-</div></section>
-{% endif %}
 {% if 'regras_coberturas' in secoes_set and opcoes_ativas %}
 <section class="report-section"><h2 class="report-title">Regras defensivas mais utilizadas</h2><div class="detail-grid">
   {% for opcao in opcoes_ativas %}<article class="detail-card defense rule-card"><strong>{{ opcao.nome }}</strong>{% if opcao.notas %}<p>{{ opcao.notas|truncate(125) }}</p>{% endif %}</article>{% endfor %}
