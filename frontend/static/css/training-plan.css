@@ -1,0 +1,71 @@
+.training-workspace .training-plan-header { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.25rem;padding:1.25rem 0 1.5rem;margin-bottom:.5rem; }
+.training-plan-heading { min-width:0; }
+.training-back { color:var(--text-muted);font-size:.78rem;text-decoration:underline;text-underline-offset:3px; }
+.training-plan-eyebrow { margin:.85rem 0 .25rem;color:var(--clube-primary-dark,var(--clube-primary));font-size:.75rem;font-weight:800;letter-spacing:.04em; }
+.training-plan-header h1 { margin:0;color:var(--text-main);font-size:clamp(1.5rem,2.5vw,2rem);font-weight:800;letter-spacing:-.035em; }
+.training-plan-header h1 span { color:var(--text-muted);font-weight:500; }
+.training-plan-facts { display:flex;flex-wrap:wrap;gap:.35rem 1rem;margin-top:.5rem;color:var(--text-muted);font-size:.83rem; }
+.training-plan-actions { display:flex;flex-wrap:wrap;align-items:center;gap:.5rem; }
+.training-more { position:relative;flex:none; }
+.training-more>summary { display:flex;align-items:center;justify-content:center;gap:.4rem;min-height:36px;padding:.45rem .7rem;list-style:none;border:1px solid var(--border-soft);border-radius:.5rem;background:var(--surface-card);color:var(--text-main);font-size:.78rem;font-weight:700;cursor:pointer; }
+.training-more>summary::-webkit-details-marker { display:none; }
+.training-more>summary::after { content:'\2304'; }
+.training-more[open]>summary { border-color:var(--clube-primary); }
+.training-more-menu { position:absolute;right:0;top:calc(100% + .35rem);z-index:35;width:15rem;max-width:calc(100vw - 2rem);padding:.4rem;border:1px solid var(--border-soft);border-radius:.7rem;background:var(--surface-card);box-shadow:0 8px 24px rgb(15 23 42 / .12); }
+.training-workspace .training-more-menu :is(button,a) { display:block;width:100%;min-height:36px;margin:0;padding:.6rem .7rem;border:0;border-radius:.35rem;background:transparent;color:var(--text-main);font:inherit;font-size:.82rem;font-weight:600;text-align:left;box-shadow:none; }
+.training-more-menu :is(button,a):hover { background:var(--surface-subtle); }
+.training-more-menu form { margin:0; }
+.training-workspace .training-more-menu :is(.training-danger,.ds-button-danger,form[action$='/eliminar'] button) { color:#b91c1c; }
+.training-workspace .training-exercise-toolbar { display:flex;align-items:center;flex-wrap:wrap;gap:.5rem 1.25rem;padding:.9rem 1rem;border-radius:.65rem;box-shadow:none; }
+.training-workspace .training-exercise-toolbar [data-training-block-only] { flex-basis:100%; }
+.training-workspace .training-duration { order:-1;margin:0;margin-right:auto;font-size:.85rem; }
+.training-workspace .training-reorder-status { flex-basis:100%;margin:0;font-size:.75rem; }
+.training-workspace [data-training-group] { overflow:visible;border-radius:.75rem;box-shadow:none; }
+.training-workspace:not(.training-with-blocks) [data-training-group] { border:0;background:transparent; }
+.training-workspace .training-group-body { padding:1rem; }
+.training-workspace:not(.training-with-blocks) .training-group-body { padding:0;border:0; }
+.training-workspace .training-exercise-card { overflow:visible;border-radius:.8rem;box-shadow:none; }
+.training-workspace .training-exercise-card-head { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.6rem 1rem;padding:1rem 1.15rem; }
+.training-workspace .training-exercise-title { grid-column:1;grid-row:1;align-items:center; }
+.training-workspace .training-exercise-card-head h3 { margin:.1rem 0 0;font-size:1.05rem; }
+.training-workspace .training-exercise-number { font-size:.7rem; }
+.training-workspace .training-exercise-actions { grid-column:2;grid-row:1/3;display:flex;align-items:center;gap:.4rem;align-self:center; }
+.training-workspace .training-exercise-meta { grid-column:1;grid-row:2;display:flex;flex-wrap:wrap;gap:.4rem 1rem;margin:0;padding-left:2.65rem;background:none;border:0; }
+.training-workspace .training-exercise-meta>div { display:flex;align-items:baseline;gap:.35rem;padding:0;border:0; }
+.training-workspace .training-exercise-meta dt { font-size:.72rem;text-transform:none;letter-spacing:0; }
+.training-workspace .training-exercise-meta dd { font-size:.8rem; }
+.training-workspace .training-exercise-workbench { grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;overflow-anchor:none; }
+.training-workspace .training-exercise-visuals { grid-column:1;grid-row:1;align-self:stretch;padding:1rem 1.15rem;border-right:1px solid var(--border-soft);border-radius:0 0 0 .8rem;background:var(--surface-card); }
+.training-exercise-notes { grid-column:2;grid-row:1;min-width:0; }
+.training-workspace .training-exercise-visuals>header { flex-wrap:wrap;margin-bottom:.7rem; }
+.training-workspace .training-exercise-visuals h4 { color:var(--text-main);font-size:.8rem;letter-spacing:0;text-transform:none; }
+.training-workspace .training-exercise-organization { grid-column:2;grid-row:1; }
+.training-workspace .training-exercise-coaching { grid-column:2;grid-row:2;border:0!important; }
+.training-workspace .training-exercise-note { padding:1rem 1.15rem .25rem; }
+.training-exercise-note>header { display:flex;align-items:center;justify-content:space-between;gap:.5rem; }
+.training-exercise-note>header label { color:var(--text-main);font-size:.85rem;font-weight:800; }
+.training-exercise-note>header button { min-height:32px;padding:.25rem .5rem;border:0;background:transparent;color:var(--text-muted);font-size:.75rem;font-weight:600; }
+.training-workspace .training-exercise-note textarea { flex:none;min-height:6.5rem;resize:none;overflow:hidden;background:var(--surface-subtle);font-size:.88rem;line-height:1.6;border-radius:.5rem; }
+.training-workspace .training-inline-save { grid-column:2;grid-row:3;border:0;padding:.75rem 1.15rem 1rem;justify-content:space-between; }
+.training-workspace .training-inline-save span { color:var(--text-muted);font-size:.75rem; }
+.training-workspace .training-inline-save span[data-error=true] { color:#b91c1c; }
+.training-workspace .training-exercise-card.is-collapsed .training-exercise-workbench { display:none; }
+.training-workspace .training-exercise-workbench.is-ink-expanded { grid-template-columns:minmax(0,1fr);grid-template-rows:none; }
+.training-workspace .training-exercise-workbench.is-ink-expanded> :is(.training-exercise-visuals,.training-exercise-notes) { grid-column:1;grid-row:auto; }
+.training-workspace .training-exercise-visuals.is-ink-expanded { border-right:0; }
+.training-workspace #training-add-panel button[type=submit],.training-workspace .training-add-trigger { background:var(--clube-primary);color:var(--clube-on-primary,#fff); }
+.training-workspace [hidden] { display:none!important; }
+@media(max-width:700px) {
+    .training-plan-actions { width:100%; }
+    .training-workspace .training-exercise-card-head { padding:.8rem; }
+    .training-workspace .training-exercise-title { grid-column:1/-1; }
+    .training-workspace .training-exercise-actions { grid-column:1/-1;grid-row:3;justify-self:end; }
+    .training-workspace .training-exercise-meta { grid-column:1/-1; }
+    .training-workspace .training-exercise-workbench { grid-template-columns:minmax(0,1fr);grid-template-rows:none; }
+    .training-workspace .training-exercise-workbench> :is(.training-exercise-visuals,.training-exercise-notes) { grid-column:1;grid-row:auto; }
+    .training-workspace .training-exercise-visuals { border-right:0;border-bottom:1px solid var(--border-soft);padding:.8rem; }
+    .training-workspace .training-exercise-note textarea { font-size:16px; }
+    .training-workspace .training-exercise-note { padding:.8rem .8rem 0; }
+}
+@media(pointer:coarse) { .training-more>summary,.training-workspace .training-more-menu :is(button,a),.training-exercise-note>header button,.training-workspace .training-exercise-actions button { min-height:44px; } }
+@media print { .training-plan-actions,.training-back,.training-exercise-actions,.training-exercise-note header button,.training-inline-save { display:none!important; }.training-workspace .training-exercise-card.is-collapsed .training-exercise-workbench { display:grid; }.training-workspace .training-ink-card[hidden] { display:block!important; } }

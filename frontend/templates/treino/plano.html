@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% from "partials/equipa_contexto.html" import equipa_contexto %}
 
 {% block titulo %}Plano de Treino — {{ sessao.data|data_pt }}{% endblock %}
 
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/training-ink.css?v=20261029-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/training-ink.css?v=20261029-4"><link rel="stylesheet" href="/static/css/training-plan.css?v=20261029-1">{% endblock %}
 
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
 <script src="/static/js/tactical-ink-recognizer.js?v=20260910-2"></script>
 <script src="/static/js/training-teams.js?v=20260915-3" defer></script>
+<script src="/static/js/training-plan-ui.js?v=20261029-2" defer></script>
 <div class="training-workspace" data-training-plan="{{ plano.id }}" data-training-session-start="{{ sessao.hora_inicio or plano.hora_inicio or '' }}" data-training-reorder-url="/treino/planos/{{ plano.id }}/exercicios/reordenar">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
 <div class="training-ink-card" data-editor-field="{{ campo.numero }}">
-    <header><span>{{ campo.label }}</span><button type="button" onclick="ampliarCampoTreino(this)" aria-expanded="false">Ampliar</button></header>
+    <header><span data-court-label>{{ campo.label }}</span><span class="training-ink-status" data-ink-status role="status" aria-live="polite">Pronto</span></header>
     <div class="training-ink-stage" style="--training-court-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %}; aspect-ratio: var(--training-court-ratio);">
         <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}">
         <canvas id="{{ canvas_id }}" data-training-ink data-exercicio-id="{{ ex_id }}" data-campo-numero="{{ campo.numero }}" data-campo-tipo="{{ campo.tipo }}" data-desenho="{{ campo.desenho|default('', true)|e }}"{% if campo.estado_desenho %} data-estado="{{ campo.estado_desenho|tojson|forceescape }}"{% endif %} aria-label="Desenhar em {{ campo.label }} com caneta digital"></canvas>
@@ -21,25 +21,34 @@
     <div id="toolbar_{{ canvas_id }}" class="training-ink-toolbar" role="group" aria-label="Ferramentas de desenho">
         <button type="button" data-ferramenta="caneta" class="is-active" aria-pressed="true" onclick="definirFerramenta('{{ canvas_id }}', 'caneta')">Caneta</button>
         <button type="button" data-ferramenta="apagar" aria-pressed="false" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')">Borracha</button>
-        <button type="button" title="Desfazer último traço" aria-label="Desfazer último traço" onclick="desfazerTracoTreino('{{ canvas_id }}')">↶</button>
-        <button type="button" onclick="limparCampoTreino('{{ canvas_id }}')">Limpar</button>
-        <button type="button" onclick="removerCampoSemRecarregar(event, this, {{ ex_id }}, {{ campo.numero }})">Remover campo</button>
-        <button type="button" data-ink-save onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ campo.numero }})">Guardar</button>
+        <button type="button" aria-label="Desfazer último traço" onclick="desfazerTracoTreino('{{ canvas_id }}')">Desfazer</button>
+        <button type="button" data-ink-expand onclick="ampliarCampoTreino(this)" aria-expanded="false">Ampliar</button>
+        <details class="training-more">
+            <summary aria-label="Mais opções do campo">Mais</summary>
+            <div class="training-more-menu">
+                <button type="button" data-ink-save onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ campo.numero }})">Guardar desenho agora</button>
+                <button type="button" onclick="limparCampoTreino('{{ canvas_id }}')">Limpar desenho</button>
+                <button type="button" class="training-danger" onclick="removerCampoSemRecarregar(event, this, {{ ex_id }}, {{ campo.numero }})">Remover campo</button>
+            </div>
+        </details>
     </div>
-    <span class="training-ink-status" data-ink-status role="status" aria-live="polite">Pronto</span>
 </div>
 {% endmacro %}
 
-{% call equipa_contexto(
-    equipa,
-    "Plano de Treino",
-    "Sessão de " ~ (sessao.data|data_pt) ~ ((" · " ~ sessao.local) if sessao.local else ""),
-    "planeamento",
-    "/planeamento/microciclos/" ~ sessao.microciclo_id,
-    "Voltar ao microciclo",
-    "/assiduidade/sessoes/" ~ sessao.id,
-    "Abrir assiduidade"
-) %}
+<header class="training-plan-header">
+    <div class="training-plan-heading">
+        <a class="training-back" href="/planeamento/microciclos/{{ sessao.microciclo_id }}">Voltar ao microciclo</a>
+        <p class="training-plan-eyebrow">{{ equipa.nome }} · {{ equipa.escalao.value }}</p>
+        <h1>Plano de treino{% if sessao.numero_treino %} <span>{{ sessao.numero_treino }}</span>{% endif %}</h1>
+        <div class="training-plan-facts"><span>{{ sessao.data|data_pt }}</span><span>{{ sessao.hora_inicio or 'Hora por definir' }}{% if sessao.hora_fim %} - {{ sessao.hora_fim }}{% endif %}</span><span>{{ sessao.local or 'Pavilhão por definir' }}</span></div>
+    </div>
+    <div class="training-plan-actions">
+        {% if not importacao_ativa or modo_edicao_importacao %}<button type="button" class="ds-button ds-button-primary" data-training-open-add>+ Adicionar exercício</button>{% endif %}
+        <a href="/treino/sessoes/{{ sessao.id }}/pdf" class="ds-button ds-button-secondary">Exportar PDF</a>
+        <details class="training-more">
+        <summary>Mais opções</summary>
+        <div class="training-more-menu">
+        <a href="/assiduidade/sessoes/{{ sessao.id }}">Abrir assiduidade</a>
     {% if not importacao_ativa %}
     <button type="button" onclick="document.getElementById('modal-importar-plano').showModal()"
        class="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
@@ -53,10 +62,6 @@
     <a href="/treino/sessoes/{{ sessao.id }}/print"
        class="rounded-full bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50">
         🖨️ Imprimir
-    </a>
-    <a href="/treino/sessoes/{{ sessao.id }}/pdf"
-       class="rounded-full bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600">
-        📄 Exportar PDF
     </a>
     {% if importacao_ativa %}
     <a href="{% if modo_edicao_importacao %}/treino/sessoes/{{ sessao.id }}{% else %}/treino/sessoes/{{ sessao.id }}?editar=1{% endif %}"
@@ -74,7 +79,10 @@
     <form method="POST" action="/treino/sessoes/{{ sessao.id }}/eliminar" onsubmit="return confirm('Eliminar definitivamente este treino? A ficha, os exercícios e os conteúdos também serão apagados.')">
         <button class="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700">Eliminar treino</button>
     </form>
-{% endcall %}
+        </div>
+        </details>
+    </div>
+</header>
 
 {% macro menu_conteudos_previstos() %}
 <details class="training-guidance-menu" aria-label="Conteúdos previstos para a sessão de treino">
@@ -502,7 +510,7 @@
                         <textarea name="organizacao" rows="3" placeholder="Como montas o exercício, grupos, rotações, material..." class="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-gray-500">Coaching points</label>
+                        <label class="mb-1 block text-xs font-medium text-gray-500">Coaching Points</label>
                         <textarea name="coaching_points" rows="3" placeholder="Pontos-chave de intervenção do treinador..." class="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></textarea>
                     </div>
                 </div>
@@ -600,6 +608,10 @@
                                     </div>
                                 </div>
                                 <div class="training-exercise-actions">
+                                    <button type="button" class="ds-button ds-button-secondary ds-button-sm" data-training-collapse aria-expanded="true" aria-controls="conteudo-exercicio-{{ ex.id }}">Recolher</button>
+                                    <details class="training-more">
+                                    <summary aria-label="Mais opções de {{ ex.nome or 'exercício' }}">Mais</summary>
+                                    <div class="training-more-menu">
                                     <button type="button" onclick="abrirModalExercicio({{ ex.id }})" class="ds-button ds-button-secondary ds-button-sm">Editar dados</button>
                                     <form method="POST" action="/treino/exercicios/{{ ex.id }}/duplicar">
                                         <button type="submit" class="ds-button ds-button-secondary ds-button-sm">Duplicar</button>
@@ -607,25 +619,32 @@
                                     <form method="POST" action="/treino/exercicios/{{ ex.id }}/apagar" data-training-exercise-delete>
                                         <button type="submit" class="ds-button ds-button-danger ds-button-sm">Apagar</button>
                                     </form>
+                                    </div>
+                                    </details>
                                 </div>
-                            </header>
-
                             <dl class="training-exercise-meta">
                                 <div><dt>Hora</dt><dd data-training-exercise-time>{{ ex.hora if ex.hora else '-' }}</dd></div>
                                 {% if ex.minutos %}<div><dt>Duração</dt><dd>{{ ex.minutos }} min</dd></div>{% endif %}
                                 {% if ex.categoria %}<div><dt>Tipo</dt><dd>{{ ex.categoria }}</dd></div>{% endif %}
                                 {% if ex.rpe is not none %}<div><dt>RPE</dt><dd>{{ ex.rpe }}</dd></div>{% endif %}
                             </dl>
+                            </header>
 
-                            <form method="POST" action="/treino/exercicios/{{ ex.id }}/notas" class="training-exercise-workbench" onsubmit="guardarNotasExercicio(event, this, {{ ex.id }})">
+                            <form id="conteudo-exercicio-{{ ex.id }}" method="POST" action="/treino/exercicios/{{ ex.id }}/notas" class="training-exercise-workbench" data-training-notes="{{ ex.id }}" onsubmit="guardarNotasExercicio(event, this, {{ ex.id }})">
                                 <section class="training-exercise-visuals" data-drawing-editor data-exercicio-id="{{ ex.id }}">
                                     <header>
                                         <h4>Quadros táticos</h4>
+                                        <p class="training-ink-hint">Caneta digital · grava automaticamente</p>
                                     </header>
-                                    <p class="training-ink-hint">Caneta digital · grava automaticamente</p>
-                                    <div class="training-ink-add">
+                                    <div class="training-court-navigation">
+                                    <span class="training-court-count" data-court-count></span>
+                                    <details class="training-more training-ink-add">
+                                    <summary>+ Campo</summary>
+                                    <div class="training-more-menu">
                                         <button type="button" onclick="adicionarCampoSemRecarregar(event, this, {{ ex.id }}, 'meio')">+ Meio-campo</button>
                                         <button type="button" onclick="adicionarCampoSemRecarregar(event, this, {{ ex.id }}, 'completo')">+ Campo inteiro</button>
+                                    </div>
+                                    </details>
                                     </div>
                                     <div class="training-ink-grid">
                                         {% for campo in ex.campos_ui %}
@@ -637,17 +656,19 @@
                                     <template data-court-template="meio">{{ campo_desenho('__CANVAS_ID__', ex.id, {'numero': '__CAMPO_NUMERO__', 'tipo': 'meio', 'label': '__CAMPO_LABEL__', 'imagem': 'campo_meio.png?v=20260908-madeira-1', 'desenho': '', 'estado_desenho': none}) }}</template>
                                     <template data-court-template="completo">{{ campo_desenho('__CANVAS_ID__', ex.id, {'numero': '__CAMPO_NUMERO__', 'tipo': 'completo', 'label': '__CAMPO_LABEL__', 'imagem': 'campo_completo.png?v=20260908-madeira-1', 'desenho': '', 'estado_desenho': none}) }}</template>
                                 </section>
-                                <label class="training-exercise-note training-exercise-organization">
-                                    <span>Organização</span>
-                                    <textarea name="organizacao" rows="3" placeholder="Grupos, rotações, material e organização do exercício...">{{ ex.organizacao if ex.organizacao else "" }}</textarea>
-                                </label>
-                                <label class="training-exercise-note training-exercise-coaching">
-                                    <span>Coaching points</span>
-                                    <textarea name="coaching_points" rows="3" placeholder="Pontos-chave de intervenção do treinador...">{{ ex.coaching_points if ex.coaching_points else "" }}</textarea>
-                                </label>
+                                <div class="training-exercise-notes">
+                                <section class="training-exercise-note training-exercise-organization">
+                                    <header><label for="organizacao-{{ ex.id }}">Organização</label><button type="button" data-note-bullet="organizacao" aria-label="Adicionar tópico à organização">+ Tópico</button></header>
+                                    <textarea id="organizacao-{{ ex.id }}" name="organizacao" rows="3" data-autogrow placeholder="Grupos, rotações, material... Um ponto por linha.">{{ ex.organizacao if ex.organizacao else "" }}</textarea>
+                                </section>
+                                <section class="training-exercise-note training-exercise-coaching">
+                                    <header><label for="intervencao-{{ ex.id }}">Coaching Points</label><button type="button" data-note-bullet="coaching_points" aria-label="Adicionar tópico aos Coaching Points">+ Tópico</button></header>
+                                    <textarea id="intervencao-{{ ex.id }}" name="coaching_points" rows="3" data-autogrow placeholder="O que observar e corrigir. Um ponto por linha.">{{ ex.coaching_points if ex.coaching_points else "" }}</textarea>
+                                </section>
                                 <div class="training-inline-save">
-                                    <span data-notes-status="{{ ex.id }}" aria-live="polite"></span>
-                                    <button type="submit" class="ds-button ds-button-primary ds-button-sm">Guardar conteúdo</button>
+                                    <span data-notes-status="{{ ex.id }}" role="status" aria-live="polite">Gravação automática</span>
+                                    <button type="submit" class="ds-button ds-button-secondary ds-button-sm">Guardar</button>
+                                </div>
                                 </div>
                             </form>
 
@@ -1215,6 +1236,7 @@
             }
             if (!novoCartao) throw new Error('O exercício foi guardado, mas não foi possível apresentar o cartão.');
             novoCartao.querySelectorAll('canvas[data-training-ink]').forEach(canvas => inicializarDesenho(canvas.id));
+            window.TrainingPlanUI?.init(novoCartao);
             sincronizarResumoExercicios(documentoAtualizado);
             renumerarExercicios();
 
@@ -1544,8 +1566,10 @@ async function adicionarCampoSemRecarregar(evento, botao, exercicioId, tipo) {
         grelha.querySelector('.training-drawing-empty')?.remove();
         grelha.appendChild(novoCampo);
 
-        painel.querySelector('.is-ink-expanded>header button')?.click();
+        painel.querySelector('.is-ink-expanded [data-ink-expand]')?.click();
         inicializarDesenho(canvasId);
+        window.TrainingPlanUI?.courts(painel, canvasId);
+        botao.closest('details').open = false;
     } catch (erro) {
         window.alert(erro.message || 'Não foi possível acrescentar o campo.');
     } finally {
@@ -1593,6 +1617,7 @@ async function removerCampoSemRecarregar(evento, botao, exercicioId, campoNumero
         }
         if (canvas?.id) delete CANVAS_ESTADO[canvas.id];
         campo?.remove();
+        window.TrainingPlanUI?.courts(painel);
 
         const grelhaEditor = painel.querySelector('.training-ink-grid');
         if (grelhaEditor && !grelhaEditor.querySelector('[data-editor-field]')) {
@@ -1629,6 +1654,7 @@ function fecharModalExercicio(exercicioId) {
 
 async function guardarNotasExercicio(evento, formulario, exercicioId) {
     evento.preventDefault();
+    if (window.TrainingPlanUI) return window.TrainingPlanUI.saveNotes(formulario);
     const botao = formulario.querySelector('button[type="submit"]');
     const estado = formulario.querySelector(`[data-notes-status="${exercicioId}"]`);
     botao.disabled = true;
