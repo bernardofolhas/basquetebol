@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% from "partials/equipa_contexto.html" import equipa_contexto %}
-{% from "partials/tactical_toolbar.html" import tactical_toolbar %}
 
 {% block titulo %}Plano de Treino — {{ sessao.data|data_pt }}{% endblock %}
+
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/training-ink.css?v=20261028-1">{% endblock %}
 
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
@@ -11,36 +12,28 @@
 <div class="training-workspace" data-training-plan="{{ plano.id }}" data-training-session-start="{{ sessao.hora_inicio or plano.hora_inicio or '' }}" data-training-reorder-url="/treino/planos/{{ plano.id }}/exercicios/reordenar">
 
 {% macro campo_desenho(canvas_id, ex_id, campo) %}
-<div class="rounded-2xl border border-gray-200 bg-gray-50 p-3" data-editor-field="{{ campo.numero }}">
-    <div class="mb-2 flex items-center justify-between">
-        <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-500">{{ campo.label }}</p>
-        {% if campo.desenho %}
-        <span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">Guardado</span>
-        {% endif %}
+<div class="training-ink-card" data-editor-field="{{ campo.numero }}">
+    <header><span>{{ campo.label }}</span><button type="button" onclick="ampliarCampoTreino(this)" aria-expanded="false">Ampliar</button></header>
+    <div class="training-ink-stage" style="--training-court-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %}; aspect-ratio: var(--training-court-ratio);">
+        <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}">
+        <canvas id="{{ canvas_id }}" data-training-ink data-exercicio-id="{{ ex_id }}" data-campo-numero="{{ campo.numero }}" data-campo-tipo="{{ campo.tipo }}" data-desenho="{{ campo.desenho|default('', true)|e }}"{% if campo.estado_desenho %} data-estado="{{ campo.estado_desenho|tojson|forceescape }}"{% endif %} aria-label="Desenhar em {{ campo.label }} com caneta digital"></canvas>
     </div>
-    <div class="ds-tactical-editor">
-        <div class="ds-tactical-stage relative overflow-hidden rounded-2xl border border-gray-200 bg-white" style="aspect-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %};">
-            <img src="/static/campos/{{ campo.imagem }}" class="absolute inset-0 h-full w-full object-contain" style="display: block;">
-            <canvas id="{{ canvas_id }}" data-campo-tipo="{{ campo.tipo }}" data-desenho="{{ campo.desenho|default('', true)|e }}"{% if campo.estado_desenho %} data-estado="{{ campo.estado_desenho|tojson|forceescape }}"{% endif %} class="absolute top-0 left-0 h-full w-full cursor-copy" style="touch-action: none;"></canvas>
+    <div id="toolbar_{{ canvas_id }}" class="training-ink-toolbar" role="group" aria-label="Ferramentas de desenho">
+        <button type="button" data-ferramenta="caneta" class="is-active" aria-pressed="true" onclick="definirFerramenta('{{ canvas_id }}', 'caneta')">Caneta</button>
+        <button type="button" data-ferramenta="apagar" aria-pressed="false" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')">Borracha</button>
+        <label>Cor<input type="color" value="#172033" aria-label="Cor da caneta" onchange="definirCorLinha('{{ canvas_id }}', this.value)"></label>
+        <label>Traço<select aria-label="Espessura da caneta" onchange="definirLarguraLinha('{{ canvas_id }}', Number(this.value))"><option value="3">Fino</option><option value="5" selected>Médio</option><option value="8">Grosso</option></select></label>
+        <button type="button" onclick="desfazerTracoTreino('{{ canvas_id }}')">Desfazer</button>
+        <button type="button" onclick="limparCampoTreino('{{ canvas_id }}')">Limpar</button>
+    </div>
+    <div class="training-ink-footer">
+        <span data-ink-status role="status" aria-live="polite">A preparar...</span>
+        <div>
+            <button type="button" onclick="removerCampoSemRecarregar(event, this, {{ ex_id }}, {{ campo.numero }})">Remover</button>
+            <button type="button" data-ink-save onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ campo.numero }})">Guardar</button>
         </div>
-        {{ tactical_toolbar(canvas_id, 'toolbar_' ~ canvas_id) }}
-    </div>
-    <div class="mt-2 flex flex-wrap justify-end gap-2">
-        <form method="POST" action="/treino/exercicios/{{ ex_id }}/campos/{{ campo.numero }}/apagar" onsubmit="removerCampoSemRecarregar(event, this, {{ ex_id }}, {{ campo.numero }})">
-            <button type="submit" class="rounded-lg border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Remover campo</button>
-        </form>
-        <button type="button" onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ campo.numero }})" class="rounded-lg bg-orange-500 px-3 py-1 text-xs font-medium text-white transition hover:bg-orange-600">Guardar desenho</button>
     </div>
 </div>
-{% endmacro %}
-
-{% macro campo_previsualizacao(ex_id, campo) %}
-<a class="training-drawing-preview" data-drawing-preview-field="{{ campo.numero }}" href="/treino/exercicios/{{ ex_id }}/studio?cena={{ campo.numero }}" aria-label="Editar {{ campo.label }} no Studio" title="Editar {{ campo.label }} no Studio">
-    <div class="training-drawing-preview-stage" style="aspect-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %};">
-        <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}" class="training-drawing-court">
-        <img src="{{ campo.desenho|default('', true)|e }}" alt="Desenho de {{ campo.label }}" class="training-drawing-overlay" data-drawing-preview="{{ ex_id }}-{{ campo.numero }}" {% if not campo.desenho %}hidden{% endif %}>
-    </div>
-</a>
 {% endmacro %}
 
 {% call equipa_contexto(
@@ -631,18 +624,24 @@
                             </dl>
 
                             <form method="POST" action="/treino/exercicios/{{ ex.id }}/notas" class="training-exercise-workbench" onsubmit="guardarNotasExercicio(event, this, {{ ex.id }})">
-                                <section class="training-exercise-visuals">
+                                <section class="training-exercise-visuals" data-drawing-editor data-exercicio-id="{{ ex.id }}">
                                     <header>
                                         <h4>Quadros táticos</h4>
-                                        <a href="/treino/exercicios/{{ ex.id }}/studio" class="training-drawing-edit" aria-label="Abrir editor tático no Studio" title="Abrir editor tático no Studio">+</a>
                                     </header>
-                                    <div class="training-drawing-preview-grid">
+                                    <p class="training-ink-hint">Desenha com Apple Pencil ou outra caneta digital. Gravação automática.</p>
+                                    <div class="training-ink-add">
+                                        <button type="button" onclick="adicionarCampoSemRecarregar(event, this, {{ ex.id }}, 'meio')">+ Meio-campo</button>
+                                        <button type="button" onclick="adicionarCampoSemRecarregar(event, this, {{ ex.id }}, 'completo')">+ Campo inteiro</button>
+                                    </div>
+                                    <div class="training-ink-grid">
                                         {% for campo in ex.campos_ui %}
-                                        {{ campo_previsualizacao(ex.id, campo) }}
+                                        {{ campo_desenho('canvas' ~ campo.numero ~ '_' ~ ex.id, ex.id, campo) }}
                                         {% else %}
                                         <div class="training-drawing-empty">Sem quadros</div>
                                         {% endfor %}
                                     </div>
+                                    <template data-court-template="meio">{{ campo_desenho('__CANVAS_ID__', ex.id, {'numero': '__CAMPO_NUMERO__', 'tipo': 'meio', 'label': '__CAMPO_LABEL__', 'imagem': 'campo_meio.png?v=20260908-madeira-1', 'desenho': '', 'estado_desenho': none}) }}</template>
+                                    <template data-court-template="completo">{{ campo_desenho('__CANVAS_ID__', ex.id, {'numero': '__CAMPO_NUMERO__', 'tipo': 'completo', 'label': '__CAMPO_LABEL__', 'imagem': 'campo_completo.png?v=20260908-madeira-1', 'desenho': '', 'estado_desenho': none}) }}</template>
                                 </section>
                                 <label class="training-exercise-note training-exercise-organization">
                                     <span>Organização</span>
@@ -702,33 +701,6 @@
                                 </div>
                             </dialog>
 
-                            <dialog id="modal_desenho_{{ ex.id }}" class="training-editor-dialog training-drawing-dialog" data-drawing-editor data-exercicio-id="{{ ex.id }}" aria-labelledby="titulo_modal_desenho_{{ ex.id }}">
-                                <div class="training-editor-dialog-shell">
-                                    <header class="training-editor-dialog-head">
-                                        <div><p>Exercício {{ loop.index }}</p><h2 id="titulo_modal_desenho_{{ ex.id }}">Editor tático</h2></div>
-                                        <button type="button" onclick="fecharEditorDesenho({{ ex.id }})" aria-label="Fechar">×</button>
-                                    </header>
-                                    <div class="training-drawing-dialog-body">
-                                        <div class="training-drawing-dialog-actions">
-                                            <p>Escolhe apenas os campos necessários para representar o exercício.</p>
-                                            <div>
-                                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos" onsubmit="adicionarCampoSemRecarregar(event, this, {{ ex.id }})"><input type="hidden" name="tipo" value="meio"><button type="submit" class="ds-button ds-button-secondary ds-button-sm">+ Campo meio</button></form>
-                                                <form method="POST" action="/treino/exercicios/{{ ex.id }}/campos" onsubmit="adicionarCampoSemRecarregar(event, this, {{ ex.id }})"><input type="hidden" name="tipo" value="completo"><button type="submit" class="ds-button ds-button-secondary ds-button-sm">+ Campo completo</button></form>
-                                            </div>
-                                        </div>
-                                        <div class="training-drawing-editor-grid">
-                                            {% for campo in ex.campos_ui %}
-                                            {{ campo_desenho('canvas' ~ campo.numero ~ '_' ~ ex.id, ex.id, campo) }}
-                                            {% else %}
-                                            <div class="training-drawing-empty">Acrescenta um campo meio ou completo para começar a desenhar.</div>
-                                            {% endfor %}
-                                        </div>
-                                        <template data-court-template="meio">{{ campo_desenho('__CANVAS_ID__', ex.id, {'numero': '__CAMPO_NUMERO__', 'tipo': 'meio', 'label': '__CAMPO_LABEL__', 'imagem': IMAGENS_CAMPO.meio if IMAGENS_CAMPO is defined else 'campo_meio.png?v=20260908-madeira-1', 'desenho': '', 'estado_desenho': none}) }}</template>
-                                        <template data-court-template="completo">{{ campo_desenho('__CANVAS_ID__', ex.id, {'numero': '__CAMPO_NUMERO__', 'tipo': 'completo', 'label': '__CAMPO_LABEL__', 'imagem': IMAGENS_CAMPO.completo if IMAGENS_CAMPO is defined else 'campo_completo.png?v=20260908-madeira-1', 'desenho': '', 'estado_desenho': none}) }}</template>
-                                    </div>
-                                    <footer class="training-editor-dialog-footer"><button type="button" onclick="fecharEditorDesenho({{ ex.id }})" class="ds-button ds-button-primary">Concluir</button></footer>
-                                </div>
-                            </dialog>
                         </article>
                         {% endfor %}
                     </div>
@@ -1430,37 +1402,41 @@ document.querySelectorAll('form').forEach(function(formulario) {
 <script>
 const CANVAS_ESTADO = {};
 
-function inicializarDesenho(canvasId) {
+async function inicializarDesenho(canvasId) {
     const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const configurarCanvas = () => {
-        const area = canvas.parentElement.getBoundingClientRect();
-        const largura = Math.max(1, Math.round(area.width || 400));
-        const altura = Math.max(1, Math.round(area.height || 300));
-        if (canvas.width === largura && canvas.height === altura) return;
-        canvas.width = largura;
-        canvas.height = altura;
-        redesenhar(canvasId);
-    };
+    if (!canvas || CANVAS_ESTADO[canvasId]) return;
+    // Fixed drawing coordinates preserve strokes when the inline court is resized.
+    canvas.width = canvas.dataset.campoTipo === 'completo' ? 682 : 887;
+    canvas.height = canvas.dataset.campoTipo === 'completo' ? 1182 : 777;
     const ctx = canvas.getContext('2d');
-    CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'seleccionar', formatoLinha: 'reta', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, gestoCaneta: null, ultimoToqueCaneta: null, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 4, corLinha: '#172033', reconhecimentoAtivo: false, reconhecimentoBackup: null };
-    requestAnimationFrame(() => {
-        configurarCanvas();
-        if (canvas.dataset.estado) restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
-    });
-    setTimeout(configurarCanvas, 120);
-    if (canvas.dataset.desenho && !canvas.dataset.estado) {
-        const imagemGuardada = new Image();
-        imagemGuardada.onload = () => {
-            const estado = CANVAS_ESTADO[canvasId];
-            if (!estado) return;
-            configurarCanvas();
+    const est = CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'caneta', formatoLinha: 'reta', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 5, corLinha: '#172033', reconhecimentoAtivo: false, reconhecimentoBackup: null, pronto: false, historico: [], revisao: 0, revisaoGuardada: 0 };
+    try {
+        if (canvas.dataset.estado) {
+            est.estadoOriginal = JSON.parse(canvas.dataset.estado);
+            restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
+            if (est.carregarFundo) await est.carregarFundo;
+        } else if (canvas.dataset.desenho) {
+            const imagemGuardada = await carregarImagemTreino(canvas.dataset.desenho);
             converterImagemLegada(canvasId, imagemGuardada);
-            redesenhar(canvasId);
-        };
-        imagemGuardada.src = canvas.dataset.desenho;
+        }
+        if (window.TacticalLegacy) await window.TacticalLegacy.aguardarRecortes(est.objectos);
+        redesenhar(canvasId);
+        est.pronto = true;
+        definirFerramenta(canvasId, 'caneta');
+        estadoCanetaTreino(est, canvas.dataset.desenho ? 'Guardado' : 'Pronto para desenhar');
+    } catch (_) {
+        estadoCanetaTreino(est, 'Não foi possível carregar o desenho. Atualiza a página.', true);
     }
     ligarEventosDesenho(canvasId);
+}
+
+function carregarImagemTreino(src) {
+    return new Promise((resolve, reject) => {
+        const imagem = new Image();
+        imagem.onload = () => resolve(imagem);
+        imagem.onerror = reject;
+        imagem.src = src;
+    });
 }
 
 function ligarEventosDesenho(canvasId) {
@@ -1470,9 +1446,10 @@ function ligarEventosDesenho(canvasId) {
     if (window.PointerEvent) {
         canvas.addEventListener('pointerdown', (e) => {
             const est = CANVAS_ESTADO[canvasId];
-            if (!est || est.pointerActivo !== null || (e.pointerType === 'touch' && !e.isPrimary)) return;
+            if (!est?.pronto || est.removendo || e.pointerType !== 'pen' || est.pointerActivo !== null || ![0, 5].includes(e.button)) return;
             e.preventDefault();
-            if (tentarAlternarFerramentaApplePencil(canvasId, e)) return;
+            clearTimeout(est.saveTimer);
+            est.antesGesto = clonarObjectosDesenho(est.objectos);
             est.pointerActivo = e.pointerId;
             est.apagarComPonteiro = e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) === 32);
             try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1480,75 +1457,65 @@ function ligarEventosDesenho(canvasId) {
         }, { passive: false });
         canvas.addEventListener('pointermove', (e) => {
             const est = CANVAS_ESTADO[canvasId];
-            if (!est || (est.pointerActivo !== null && est.pointerActivo !== e.pointerId)) return;
-            if (est.pointerActivo !== null) e.preventDefault();
-            atualizarGestoApplePencil(est, e);
+            if (!est || e.pointerType !== 'pen' || est.pointerActivo !== e.pointerId) return;
+            e.preventDefault();
             aoMover(canvasId, e);
         }, { passive: false });
         const terminar = (e) => {
             const est = CANVAS_ESTADO[canvasId];
             if (!est || est.pointerActivo !== e.pointerId) return;
             e.preventDefault();
-            aoSoltar(canvasId, e);
-            registarFimGestoApplePencil(est, e);
-            try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+            if (e.type === 'pointerup') {
+                aoMover(canvasId, e);
+                aoSoltar(canvasId, e);
+                est.historico.push(est.antesGesto);
+                if (est.historico.length > 30) est.historico.shift();
+            } else {
+                est.objectos = est.antesGesto;
+                est.linhaMultipla = null;
+                est.aDesconhar = false;
+                redesenhar(canvasId);
+            }
             est.pointerActivo = null;
             est.apagarComPonteiro = false;
+            try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+            if (e.type === 'pointerup') marcarDesenhoTreino(canvasId);
+            else if (est.revisao !== est.revisaoGuardada) agendarGuardarTreino(canvasId);
         };
         canvas.addEventListener('pointerup', terminar, { passive: false });
         canvas.addEventListener('pointercancel', terminar, { passive: false });
+        canvas.addEventListener('lostpointercapture', terminar, { passive: false });
         return;
     }
-    canvas.addEventListener('mousedown', (e) => aoPremir(canvasId, e));
-    canvas.addEventListener('mousemove', (e) => aoMover(canvasId, e));
-    canvas.addEventListener('mouseup', (e) => aoSoltar(canvasId, e));
-    canvas.addEventListener('mouseleave', (e) => aoSoltar(canvasId, e));
-    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); aoPremir(canvasId, simularMouse(e)); }, { passive: false });
-    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); aoMover(canvasId, simularMouse(e)); }, { passive: false });
-    canvas.addEventListener('touchend', (e) => { e.preventDefault(); aoSoltar(canvasId, simularMouse(e)); }, { passive: false });
+    estadoCanetaTreino(CANVAS_ESTADO[canvasId], 'Este navegador não identifica canetas digitais.', true);
 }
 
-function togglePainelDesenhos(exercicioId, aberto) {
-    if (!aberto) return;
-    const painel = document.querySelector(`[data-drawing-editor][data-exercicio-id="${exercicioId}"]`);
-    if (!painel) return;
-    painel.querySelectorAll('canvas').forEach((canvas) => {
-        const canvasId = canvas.id;
-        if (!CANVAS_ESTADO[canvasId]) {
-            inicializarDesenho(canvasId);
-            setTimeout(() => definirFerramenta(canvasId, 'seleccionar'), 200);
-        }
-    });
+function ampliarCampoTreino(botao) {
+    const campo = botao.closest('[data-editor-field]');
+    const painel = campo.closest('[data-drawing-editor]');
+    const aberto = campo.classList.toggle('is-ink-expanded');
+    painel.classList.toggle('is-ink-expanded', aberto);
+    painel.closest('.training-exercise-workbench')?.classList.toggle('is-ink-expanded', aberto);
+    botao.textContent = aberto ? 'Reduzir' : 'Ampliar';
+    botao.setAttribute('aria-expanded', String(aberto));
 }
 
-function abrirEditorDesenho(exercicioId, campoNumero = null) {
-    const modal = document.getElementById(`modal_desenho_${exercicioId}`);
-    if (!modal) return;
-    modal.showModal();
-    requestAnimationFrame(() => {
-        togglePainelDesenhos(String(exercicioId), true);
-        if (campoNumero !== null) {
-            modal.querySelector(`[data-editor-field="${campoNumero}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-        }
-    });
-}
-
-function fecharEditorDesenho(exercicioId) {
-    document.getElementById(`modal_desenho_${exercicioId}`)?.close();
-}
-
-async function adicionarCampoSemRecarregar(evento, formulario, exercicioId) {
+async function adicionarCampoSemRecarregar(evento, botao, exercicioId, tipo) {
     evento.preventDefault();
-    const botao = formulario.querySelector('button[type="submit"], button:not([type])');
+    const painel = botao.closest('[data-drawing-editor]');
+    const botoesAdicionar = painel.querySelectorAll('.training-ink-add button');
+    botoesAdicionar.forEach(b => b.disabled = true);
     const textoOriginal = botao?.textContent;
     if (botao) {
         botao.disabled = true;
         botao.textContent = 'A acrescentar...';
     }
     try {
-        const resposta = await fetch(formulario.action, {
+        const formulario = new FormData();
+        formulario.set('tipo', tipo);
+        const resposta = await fetch(`/treino/exercicios/${exercicioId}/campos`, {
             method: 'POST',
-            body: new FormData(formulario),
+            body: formulario,
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
@@ -1557,9 +1524,8 @@ async function adicionarCampoSemRecarregar(evento, formulario, exercicioId) {
         const dados = await resposta.json();
         if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível acrescentar o campo.');
 
-        const modal = document.getElementById(`modal_desenho_${exercicioId}`);
-        const grelha = modal?.querySelector('.training-drawing-editor-grid');
-        const modelo = modal?.querySelector(`template[data-court-template="${dados.campo.tipo}"]`);
+        const grelha = painel.querySelector('.training-ink-grid');
+        const modelo = painel.querySelector(`template[data-court-template="${dados.campo.tipo}"]`);
         if (!grelha || !modelo) throw new Error('O editor do novo campo não ficou disponível.');
 
         const canvasId = `canvas${dados.campo.numero}_${exercicioId}`;
@@ -1573,33 +1539,12 @@ async function adicionarCampoSemRecarregar(evento, formulario, exercicioId) {
         grelha.querySelector('.training-drawing-empty')?.remove();
         grelha.appendChild(novoCampo);
 
-        const grelhaPrevisualizacao = document.querySelector(`#exercicio-${exercicioId} .training-drawing-preview-grid`);
-        if (grelhaPrevisualizacao) {
-            const figura = document.createElement('figure');
-            figura.className = 'training-drawing-preview';
-            figura.dataset.drawingPreviewField = String(dados.campo.numero);
-            figura.setAttribute('role', 'button');
-            figura.tabIndex = 0;
-            figura.setAttribute('aria-label', `Editar ${dados.campo.label}`);
-            figura.title = `Editar ${dados.campo.label}`;
-            figura.innerHTML = `<div class="training-drawing-preview-stage" style="aspect-ratio:${dados.campo.tipo === 'meio' ? '887 / 777' : '682 / 1182'}"><img src="/static/campos/${dados.campo.imagem}" alt="${dados.campo.label}" class="training-drawing-court"><img src="" alt="Desenho de ${dados.campo.label}" class="training-drawing-overlay" data-drawing-preview="${exercicioId}-${dados.campo.numero}" hidden></div>`;
-            const abrir = () => abrirEditorDesenho(exercicioId, dados.campo.numero);
-            figura.addEventListener('click', abrir);
-            figura.addEventListener('keydown', (eventoTeclado) => {
-                if (eventoTeclado.key !== 'Enter' && eventoTeclado.key !== ' ') return;
-                eventoTeclado.preventDefault();
-                abrir();
-            });
-            grelhaPrevisualizacao.querySelector('.training-drawing-empty')?.remove();
-            grelhaPrevisualizacao.appendChild(figura);
-        }
-
+        painel.querySelector('.is-ink-expanded>header button')?.click();
         inicializarDesenho(canvasId);
-        setTimeout(() => definirFerramenta(canvasId, 'seleccionar'), 200);
-        novoCampo.scrollIntoView({ block: 'start', behavior: 'smooth' });
     } catch (erro) {
         window.alert(erro.message || 'Não foi possível acrescentar o campo.');
     } finally {
+        botoesAdicionar.forEach(b => b.disabled = false);
         if (botao) {
             botao.disabled = false;
             botao.textContent = textoOriginal;
@@ -1607,18 +1552,27 @@ async function adicionarCampoSemRecarregar(evento, formulario, exercicioId) {
     }
 }
 
-async function removerCampoSemRecarregar(evento, formulario, exercicioId, campoNumero) {
+async function removerCampoSemRecarregar(evento, botao, exercicioId, campoNumero) {
     evento.preventDefault();
     if (!window.confirm('Remover apenas este campo e o respetivo desenho?')) return;
 
-    const botao = formulario.querySelector('button[type="submit"], button:not([type])');
+    const painel = botao.closest('[data-drawing-editor]');
+    const campo = botao.closest('[data-editor-field]');
+    const canvas = campo.querySelector('canvas');
+    const est = CANVAS_ESTADO[canvas.id];
+    if (est) {
+        est.removendo = true;
+        clearTimeout(est.saveTimer);
+    }
     const textoOriginal = botao?.textContent;
     if (botao) {
         botao.disabled = true;
         botao.textContent = 'A remover...';
     }
     try {
-        const resposta = await fetch(formulario.action, {
+        // Finish an in-flight save before deleting so it cannot recreate the court.
+        if (est?.savePromise) await est.savePromise;
+        const resposta = await fetch(`/treino/exercicios/${exercicioId}/campos/${campoNumero}/apagar`, {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
@@ -1628,23 +1582,23 @@ async function removerCampoSemRecarregar(evento, formulario, exercicioId, campoN
         const dados = await resposta.json();
         if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível remover o campo.');
 
-        const modal = document.getElementById(`modal_desenho_${exercicioId}`);
-        const campo = modal?.querySelector(`[data-editor-field="${campoNumero}"]`);
-        const canvas = campo?.querySelector('canvas');
+        if (campo.classList.contains('is-ink-expanded')) {
+            painel.classList.remove('is-ink-expanded');
+            painel.closest('.training-exercise-workbench')?.classList.remove('is-ink-expanded');
+        }
         if (canvas?.id) delete CANVAS_ESTADO[canvas.id];
         campo?.remove();
 
-        const grelhaEditor = modal?.querySelector('.training-drawing-editor-grid');
+        const grelhaEditor = painel.querySelector('.training-ink-grid');
         if (grelhaEditor && !grelhaEditor.querySelector('[data-editor-field]')) {
             grelhaEditor.insertAdjacentHTML('beforeend', '<div class="training-drawing-empty">Acrescenta um campo meio ou completo para começar a desenhar.</div>');
         }
 
-        const grelhaPrevisualizacao = document.querySelector(`#exercicio-${exercicioId} .training-drawing-preview-grid`);
-        grelhaPrevisualizacao?.querySelector(`[data-drawing-preview-field="${campoNumero}"]`)?.remove();
-        if (grelhaPrevisualizacao && !grelhaPrevisualizacao.querySelector('[data-drawing-preview-field]')) {
-            grelhaPrevisualizacao.insertAdjacentHTML('beforeend', '<div class="training-drawing-empty">Sem quadros</div>');
-        }
     } catch (erro) {
+        if (est) {
+            est.removendo = false;
+            if (est.revisao !== est.revisaoGuardada) agendarGuardarTreino(canvas.id);
+        }
         window.alert(erro.message || 'Não foi possível remover o campo.');
         if (botao) {
             botao.disabled = false;
@@ -1769,9 +1723,10 @@ function restaurarEstadoDesenho(canvasId, estadoSerializado) {
         est.larguraLinha = Number(guardado.larguraLinha) || est.larguraLinha;
         est.corLinha = guardado.corLinha || est.corLinha;
         if (guardado.fundoLegado) {
-            const fundo = new Image();
-            fundo.onload = () => { converterImagemLegada(canvasId, fundo, true); redesenhar(canvasId); };
-            fundo.src = guardado.fundoLegado;
+            est.carregarFundo = carregarImagemTreino(guardado.fundoLegado).then(fundo => {
+                converterImagemLegada(canvasId, fundo, true);
+                redesenhar(canvasId);
+            });
         }
         redesenhar(canvasId);
         sincronizarNumeroJogador(canvasId);
@@ -1784,6 +1739,8 @@ function restaurarEstadoDesenho(canvasId, estadoSerializado) {
 
 function estadoDesenhoParaGuardar(est) {
     return {
+        ...est.estadoOriginal,
+        campoTipo: est.canvas.dataset?.campoTipo || est.estadoOriginal?.campoTipo,
         largura: est.canvas.width,
         altura: est.canvas.height,
         objectos: est.objectos,
@@ -1971,12 +1928,14 @@ function aoMover(canvasId, e) {
         return;
     }
     if (est.ferramenta === 'caneta' && est.aDesconhar && est.linhaMultipla) {
-        const ultimo = est.linhaMultipla.pontos[est.linhaMultipla.pontos.length - 1];
-        if (Math.hypot(pos.x - ultimo.x, pos.y - ultimo.y) >= 1.25) {
-            est.linhaMultipla.pontos.push({ x: pos.x, y: pos.y });
-            redesenhar(canvasId);
-            desenharLinhaMultipla(est.ctx, est.linhaMultipla, null);
-        }
+        const eventos = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
+        [...eventos, e].forEach(evento => {
+            const ponto = obterPos(est.canvas, evento);
+            const ultimo = est.linhaMultipla.pontos[est.linhaMultipla.pontos.length - 1];
+            if (Math.hypot(ponto.x - ultimo.x, ponto.y - ultimo.y) >= .5) est.linhaMultipla.pontos.push(ponto);
+        });
+        redesenhar(canvasId);
+        desenharLinhaMultipla(est.ctx, est.linhaMultipla, null);
         return;
     }
     if (est.aDesconhar && est.linhaMultipla?.curva) {
@@ -2104,6 +2063,7 @@ function redesenhar(canvasId) {
         est.ctx.drawImage(est.imagemFundo, 0, 0, est.canvas.width, est.canvas.height);
     }
     est.objectos.forEach(obj => {
+        if (obj.hidden) return;
         if (simbolos.includes(obj.tipo)) desenharSimbolo(est.ctx, obj);
         else if (window.TacticalLegacy?.eRecorte(obj)) window.TacticalLegacy.desenharRecorte(est.ctx, obj, () => redesenhar(canvasId));
         else desenharLinhaMultipla(est.ctx, obj, null);
@@ -2304,6 +2264,7 @@ function fecharPainelTamanho(canvasId) {
 function definirFerramenta(canvasId, ferramenta) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est) return;
+    if (est.canvas.dataset?.trainingInk !== undefined && !['caneta', 'apagar'].includes(ferramenta)) return;
     finalizarLinhaPendente(canvasId);
     est.ferramenta = ferramenta;
     const simbolos = ['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'];
@@ -2404,44 +2365,90 @@ function desfazer(canvasId) {
     redesenhar(canvasId);
 }
 
+function estadoCanetaTreino(est, texto, erro = false) {
+    const status = est.canvas.closest('[data-editor-field]')?.querySelector('[data-ink-status]');
+    if (status) {
+        status.textContent = texto;
+        status.dataset.error = String(erro);
+    }
+}
+
+function agendarGuardarTreino(canvasId) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est || est.removendo) return;
+    clearTimeout(est.saveTimer);
+    est.saveTimer = setTimeout(() => guardarDesenho(canvasId, est.canvas.dataset.exercicioId, est.canvas.dataset.campoNumero), 600);
+}
+
+function marcarDesenhoTreino(canvasId) {
+    const est = CANVAS_ESTADO[canvasId];
+    est.revisao += 1;
+    estadoCanetaTreino(est, 'Por guardar');
+    agendarGuardarTreino(canvasId);
+}
+
+function desfazerTracoTreino(canvasId) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est?.pronto || est.removendo || est.pointerActivo !== null || !est.historico.length) return;
+    est.objectos = est.historico.pop();
+    redesenhar(canvasId);
+    marcarDesenhoTreino(canvasId);
+}
+
+function limparCampoTreino(canvasId) {
+    const est = CANVAS_ESTADO[canvasId];
+    if (!est?.pronto || est.removendo || est.pointerActivo !== null || !window.confirm('Limpar o desenho deste campo?')) return;
+    est.historico.push(clonarObjectosDesenho(est.objectos));
+    est.objectos = [];
+    est.reconhecimentoAtivo = false;
+    est.reconhecimentoBackup = null;
+    redesenhar(canvasId);
+    marcarDesenhoTreino(canvasId);
+}
+
 async function guardarDesenho(canvasId, exercicioId, numeroDesenho) {
     const est = CANVAS_ESTADO[canvasId];
-    if (!est) return;
-    finalizarLinhaPendente(canvasId);
-    if (window.TacticalLegacy) await window.TacticalLegacy.aguardarRecortes(est.objectos);
-    est.objectoSeleccionado = null;
-    redesenhar(canvasId);
-    const desenho = est.canvas.toDataURL('image/png');
-    const estadoEditavel = estadoDesenhoParaGuardar(est);
-    fetch(`/treino/exercicios/${exercicioId}/desenho`, {
-        method: 'POST',
-        body: JSON.stringify({ numero: numeroDesenho, dados: desenho, estado: estadoEditavel }),
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
-        }
-    }).then(r => r.json()).then(data => {
-        if (data.sucesso) {
+    if (!est?.pronto || est.removendo || est.pointerActivo !== null) return;
+    clearTimeout(est.saveTimer);
+    if (est.savePromise) return est.savePromise;
+    const revisao = est.revisao;
+    const estadoEditavel = JSON.parse(JSON.stringify(estadoDesenhoParaGuardar(est)));
+    estadoCanetaTreino(est, 'A guardar...');
+    est.savePromise = (async () => {
+        try {
+            if (window.TacticalLegacy) await window.TacticalLegacy.aguardarRecortes(estadoEditavel.objectos);
+            // Render a snapshot; saving must not interrupt the next Pencil stroke.
+            const exportacao = document.createElement('canvas');
+            exportacao.width = estadoEditavel.largura;
+            exportacao.height = estadoEditavel.altura;
+            const ctx = exportacao.getContext('2d');
+            if (est.imagemFundo) ctx.drawImage(est.imagemFundo, 0, 0, exportacao.width, exportacao.height);
+            estadoEditavel.objectos.forEach(obj => {
+                if (obj.hidden) return;
+                if (['jogador_ataque', 'jogador_defesa', 'cone', 'bola', 'coach'].includes(obj.tipo)) desenharSimbolo(ctx, obj);
+                else if (window.TacticalLegacy?.eRecorte(obj)) window.TacticalLegacy.desenharRecorte(ctx, obj);
+                else desenharLinhaMultipla(ctx, obj, null);
+            });
+            const desenho = exportacao.toDataURL('image/png');
+            const resposta = await fetch(`/treino/exercicios/${exercicioId}/desenho`, {
+                method: 'POST',
+                body: JSON.stringify({ numero: numeroDesenho, dados: desenho, estado: estadoEditavel }),
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '' }
+            });
+            const dados = await resposta.json();
+            if (!resposta.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível guardar. Tenta novamente.');
             est.canvas.dataset.desenho = desenho;
             est.canvas.dataset.estado = JSON.stringify(estadoEditavel);
-            const preview = document.querySelector(`[data-drawing-preview="${exercicioId}-${numeroDesenho}"]`);
-            if (preview) {
-                preview.src = desenho;
-                preview.hidden = false;
-            }
-            const btn = document.querySelector(`[onclick="guardarDesenho('${canvasId}', ${exercicioId}, ${numeroDesenho})"]`);
-            if (btn) {
-                btn.textContent = '✓ Guardado';
-                btn.classList.add('bg-green-500');
-                btn.classList.remove('bg-orange-500');
-                setTimeout(() => {
-                    btn.textContent = 'Guardar desenho';
-                    btn.classList.remove('bg-green-500');
-                    btn.classList.add('bg-orange-500');
-                }, 2000);
-            }
+            est.revisaoGuardada = revisao;
+            estadoCanetaTreino(est, est.revisao === revisao ? 'Guardado' : 'Por guardar');
+            if (est.revisao !== revisao && est.pointerActivo === null) agendarGuardarTreino(canvasId);
+        } catch (erro) {
+            estadoCanetaTreino(est, erro.message || 'Sem ligação. Carrega em Guardar para tentar novamente.', true);
+        } finally {
+            est.savePromise = null;
         }
-    });
+    })();
+    return est.savePromise;
 }
 
 let _bibFormId = null;
@@ -2505,6 +2512,24 @@ function selecionarDaBiblioteca(ex) {
 
 let _bibDebounce = null;
 document.addEventListener('DOMContentLoaded', () => {
+    const campos = document.querySelectorAll('canvas[data-training-ink]');
+    if (window.IntersectionObserver) {
+        const observar = new IntersectionObserver(entradas => {
+            entradas.forEach(entrada => {
+                if (!entrada.isIntersecting) return;
+                observar.unobserve(entrada.target);
+                inicializarDesenho(entrada.target.id);
+            });
+        }, { rootMargin: '350px' });
+        campos.forEach(canvas => observar.observe(canvas));
+    } else {
+        campos.forEach(canvas => inicializarDesenho(canvas.id));
+    }
+    window.addEventListener('beforeunload', evento => {
+        if (!Object.values(CANVAS_ESTADO).some(est => est.revisao !== est.revisaoGuardada || est.pointerActivo !== null || est.savePromise)) return;
+        evento.preventDefault();
+        evento.returnValue = '';
+    });
     const pesquisaEl = document.getElementById('bib_pesquisa');
     if (pesquisaEl) {
         pesquisaEl.addEventListener('input', () => {
