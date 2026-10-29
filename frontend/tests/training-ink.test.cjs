@@ -68,6 +68,13 @@ test('plano oferece caneta e campos inline sem Studio, dialogo ou formularios an
   assert.ok(!macro.includes('tactical_toolbar'));
 });
 
+test('primeiro campo de um exercicio criado sem recarregar e inicializado', () => {
+  const fluxo = template.split('async function adicionarExercicioSemRecarregar(evento) {')[1]
+    .split("addForm?.addEventListener('submit', adicionarExercicioSemRecarregar)")[0];
+  assert.match(fluxo, /novoCartao\.querySelectorAll\('canvas\[data-training-ink\]'\)\.forEach\(canvas => inicializarDesenho\(canvas\.id\)\)/);
+  assert.ok(fluxo.indexOf("novoCartao.querySelectorAll('canvas[data-training-ink]')") < fluxo.indexOf('addForm.reset()'));
+});
+
 test('so a caneta desenha; rato, dedo e uma segunda caneta nao alteram o traco', async () => {
   const h = setup();
   await h.run("inicializarDesenho('court')");

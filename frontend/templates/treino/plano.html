@@ -1214,6 +1214,7 @@
                 ativarPegaTeclado(novoCartao.querySelector('[data-training-exercise-drag]'));
             }
             if (!novoCartao) throw new Error('O exercício foi guardado, mas não foi possível apresentar o cartão.');
+            novoCartao.querySelectorAll('canvas[data-training-ink]').forEach(canvas => inicializarDesenho(canvas.id));
             sincronizarResumoExercicios(documentoAtualizado);
             renumerarExercicios();
 
