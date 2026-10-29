@@ -9,6 +9,7 @@ const script = template.match(/<script>\s*(const CANVAS_ESTADO[\s\S]*?)<\/script
 
 function setup() {
   const listeners = {};
+  const images = [];
   const timers = new Map();
   let timerId = 0;
   const status = {dataset: {}};
@@ -37,6 +38,7 @@ function setup() {
       },
     },
     window: {PointerEvent: true, confirm: () => true},
+    Image: class { set src(value) { this.value = value; images.push(this); } get src() { return this.value; } },
     setTimeout: callback => { const id = ++timerId; timers.set(id, callback); return id; },
     clearTimeout: id => timers.delete(id),
     fetch: async (url, options) => { calls.push(JSON.parse(options.body)); return {ok: true, json: async () => ({sucesso: true})}; },
@@ -52,7 +54,7 @@ function setup() {
     event('pointermove', 'pen', {clientX: 40, clientY: 40});
     event('pointerup', 'pen', {clientX: 50, clientY: 50});
   };
-  return {context, run, event, stroke, canvas, calls, status, timers};
+  return {context, run, event, stroke, canvas, calls, status, timers, images};
 }
 
 test('plano oferece caneta e campos inline sem Studio, dialogo ou formularios aninhados', () => {
@@ -168,4 +170,60 @@ test('erro de gravacao mantem os dados e permite tentar novamente', async () => 
   await h.run("guardarDesenho('court', 42, 1)");
   assert.equal(h.status.textContent, 'Guardado');
   assert.equal(h.status.dataset.error, 'false');
+});
+
+test('desenho antigo nao bloqueia a caneta nem e substituido antes de carregar', async () => {
+  const h = setup();
+  h.canvas.dataset.desenho = 'data:image/png;base64,anterior';
+  h.context.window.TacticalLegacy = {aguardarRecortes: async () => {}, eRecorte: () => false, decomporImagem: () => { throw new Error('Conversao pesada nao deve ocorrer'); }};
+  h.run("inicializarDesenho('court')");
+  assert.equal(h.status.textContent, 'Pronto para desenhar');
+  h.stroke();
+  assert.equal(h.run('CANVAS_ESTADO.court.objectos.length'), 1);
+  const saving = h.run("guardarDesenho('court', 42, 1)");
+  assert.equal(h.calls.length, 0);
+  h.images[0].onload();
+  await saving;
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.calls[0].estado.fundoLegado, 'data:image/png;base64,anterior');
+  assert.equal(h.calls[0].estado.objectos.length, 1);
+  assert.equal(h.status.textContent, 'Guardado');
+});
+
+test('falha do desenho antigo deixa estado explicito sem o apagar', async () => {
+  const h = setup();
+  h.canvas.dataset.desenho = 'data:image/png;base64,anterior';
+  h.run("inicializarDesenho('court')");
+  h.images[0].onerror();
+  await h.run('CANVAS_ESTADO.court.carregarFundo.catch(() => {})');
+  assert.equal(h.run('CANVAS_ESTADO.court.pronto'), true);
+  assert.equal(h.status.dataset.error, 'true');
+  h.stroke();
+  await h.run("guardarDesenho('court', 42, 1)");
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.status.dataset.error, 'true');
+});
+
+test('imagem antiga lenta nao reaparece depois do limite de carregamento', async () => {
+  const h = setup();
+  h.canvas.dataset.desenho = 'data:image/png;base64,anterior';
+  h.run("inicializarDesenho('court')");
+  const limite = [...h.timers.values()][0];
+  limite();
+  await h.run('CANVAS_ESTADO.court.carregarFundo.catch(() => {})');
+  assert.equal(h.images[0].onload, null);
+  assert.equal(h.run('CANVAS_ESTADO.court.pronto'), true);
+  assert.equal(h.status.dataset.error, 'true');
+});
+
+test('limpar e desfazer incluem a imagem antiga de fundo', async () => {
+  const h = setup();
+  h.canvas.dataset.desenho = 'data:image/png;base64,anterior';
+  h.run("inicializarDesenho('court')");
+  h.images[0].onload();
+  await h.run('CANVAS_ESTADO.court.carregarFundo');
+  h.run("limparCampoTreino('court')");
+  assert.equal(h.run('estadoDesenhoParaGuardar(CANVAS_ESTADO.court).fundoLegado'), null);
+  h.run("desfazerTracoTreino('court')");
+  assert.equal(h.run('estadoDesenhoParaGuardar(CANVAS_ESTADO.court).fundoLegado'), 'data:image/png;base64,anterior');
 });

@@ -3,7 +3,7 @@
 
 {% block titulo %}Plano de Treino — {{ sessao.data|data_pt }}{% endblock %}
 
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/training-ink.css?v=20261028-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/training-ink.css?v=20261029-1">{% endblock %}
 
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
@@ -21,18 +21,12 @@
     <div id="toolbar_{{ canvas_id }}" class="training-ink-toolbar" role="group" aria-label="Ferramentas de desenho">
         <button type="button" data-ferramenta="caneta" class="is-active" aria-pressed="true" onclick="definirFerramenta('{{ canvas_id }}', 'caneta')">Caneta</button>
         <button type="button" data-ferramenta="apagar" aria-pressed="false" onclick="definirFerramenta('{{ canvas_id }}', 'apagar')">Borracha</button>
-        <label>Cor<input type="color" value="#172033" aria-label="Cor da caneta" onchange="definirCorLinha('{{ canvas_id }}', this.value)"></label>
-        <label>Traço<select aria-label="Espessura da caneta" onchange="definirLarguraLinha('{{ canvas_id }}', Number(this.value))"><option value="3">Fino</option><option value="5" selected>Médio</option><option value="8">Grosso</option></select></label>
-        <button type="button" onclick="desfazerTracoTreino('{{ canvas_id }}')">Desfazer</button>
+        <button type="button" title="Desfazer último traço" aria-label="Desfazer último traço" onclick="desfazerTracoTreino('{{ canvas_id }}')">↶</button>
         <button type="button" onclick="limparCampoTreino('{{ canvas_id }}')">Limpar</button>
+        <button type="button" onclick="removerCampoSemRecarregar(event, this, {{ ex_id }}, {{ campo.numero }})">Remover campo</button>
+        <button type="button" data-ink-save onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ campo.numero }})">Guardar</button>
     </div>
-    <div class="training-ink-footer">
-        <span data-ink-status role="status" aria-live="polite">A preparar...</span>
-        <div>
-            <button type="button" onclick="removerCampoSemRecarregar(event, this, {{ ex_id }}, {{ campo.numero }})">Remover</button>
-            <button type="button" data-ink-save onclick="guardarDesenho('{{ canvas_id }}', {{ ex_id }}, {{ campo.numero }})">Guardar</button>
-        </div>
-    </div>
+    <span class="training-ink-status" data-ink-status role="status" aria-live="polite">Pronto</span>
 </div>
 {% endmacro %}
 
@@ -628,7 +622,7 @@
                                     <header>
                                         <h4>Quadros táticos</h4>
                                     </header>
-                                    <p class="training-ink-hint">Desenha com Apple Pencil ou outra caneta digital. Gravação automática.</p>
+                                    <p class="training-ink-hint">Caneta digital · grava automaticamente</p>
                                     <div class="training-ink-add">
                                         <button type="button" onclick="adicionarCampoSemRecarregar(event, this, {{ ex.id }}, 'meio')">+ Meio-campo</button>
                                         <button type="button" onclick="adicionarCampoSemRecarregar(event, this, {{ ex.id }}, 'completo')">+ Campo inteiro</button>
@@ -1402,7 +1396,7 @@ document.querySelectorAll('form').forEach(function(formulario) {
 <script>
 const CANVAS_ESTADO = {};
 
-async function inicializarDesenho(canvasId) {
+function inicializarDesenho(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || CANVAS_ESTADO[canvasId]) return;
     // Fixed drawing coordinates preserve strokes when the inline court is resized.
@@ -1410,31 +1404,41 @@ async function inicializarDesenho(canvasId) {
     canvas.height = canvas.dataset.campoTipo === 'completo' ? 1182 : 777;
     const ctx = canvas.getContext('2d');
     const est = CANVAS_ESTADO[canvasId] = { ctx, canvas, ferramenta: 'caneta', formatoLinha: 'reta', objectos: [], imagemFundo: null, aDesconhar: false, linhaMultipla: null, objectoSeleccionado: null, offsetMover: null, posicaoCursor: null, pointerActivo: null, apagarComPonteiro: false, contadores: { ataque: 1, defesa: 1 }, numerosSelecionados: { ataque: 1, defesa: 1 }, larguraLinha: 5, corLinha: '#172033', reconhecimentoAtivo: false, reconhecimentoBackup: null, pronto: false, historico: [], revisao: 0, revisaoGuardada: 0 };
-    try {
-        if (canvas.dataset.estado) {
+    if (canvas.dataset.estado) {
+        try {
             est.estadoOriginal = JSON.parse(canvas.dataset.estado);
             restaurarEstadoDesenho(canvasId, canvas.dataset.estado);
-            if (est.carregarFundo) await est.carregarFundo;
-        } else if (canvas.dataset.desenho) {
-            const imagemGuardada = await carregarImagemTreino(canvas.dataset.desenho);
-            converterImagemLegada(canvasId, imagemGuardada);
+        } catch (_) {
+            if (canvas.dataset.desenho) {
+                est.carregarFundo = carregarImagemTreino(canvas.dataset.desenho).then(imagem => {
+                    if (!est.descartarFundo) est.imagemFundo = imagem;
+                    redesenhar(canvasId);
+                });
+            }
         }
-        if (window.TacticalLegacy) await window.TacticalLegacy.aguardarRecortes(est.objectos);
-        redesenhar(canvasId);
-        est.pronto = true;
-        definirFerramenta(canvasId, 'caneta');
-        estadoCanetaTreino(est, canvas.dataset.desenho ? 'Guardado' : 'Pronto para desenhar');
-    } catch (_) {
-        estadoCanetaTreino(est, 'Não foi possível carregar o desenho. Atualiza a página.', true);
+    } else if (canvas.dataset.desenho) {
+        est.carregarFundo = carregarImagemTreino(canvas.dataset.desenho).then(imagem => {
+            if (!est.descartarFundo) est.imagemFundo = imagem;
+            redesenhar(canvasId);
+        });
     }
+    est.pronto = true;
     ligarEventosDesenho(canvasId);
+    definirFerramenta(canvasId, 'caneta');
+    estadoCanetaTreino(est, 'Pronto para desenhar');
+    est.carregarFundo?.catch(() => estadoCanetaTreino(est, 'Desenho anterior indisponível. Recarrega a página.', true));
 }
 
 function carregarImagemTreino(src) {
     return new Promise((resolve, reject) => {
         const imagem = new Image();
-        imagem.onload = () => resolve(imagem);
-        imagem.onerror = reject;
+        const limite = setTimeout(() => {
+            imagem.onload = null;
+            imagem.onerror = null;
+            reject(new Error('Tempo de carregamento excedido.'));
+        }, 7000);
+        imagem.onload = () => { clearTimeout(limite); resolve(imagem); };
+        imagem.onerror = () => { clearTimeout(limite); reject(new Error('Imagem anterior indisponível.')); };
         imagem.src = src;
     });
 }
@@ -1724,7 +1728,7 @@ function restaurarEstadoDesenho(canvasId, estadoSerializado) {
         est.corLinha = guardado.corLinha || est.corLinha;
         if (guardado.fundoLegado) {
             est.carregarFundo = carregarImagemTreino(guardado.fundoLegado).then(fundo => {
-                converterImagemLegada(canvasId, fundo, true);
+                if (!est.descartarFundo) est.imagemFundo = fundo;
                 redesenhar(canvasId);
             });
         }
@@ -1733,6 +1737,12 @@ function restaurarEstadoDesenho(canvasId, estadoSerializado) {
         sincronizarBotaoReconhecimento(canvasId);
     } catch (_) {
         est.objectos = [];
+        if (est.canvas.dataset.desenho) {
+            est.carregarFundo = carregarImagemTreino(est.canvas.dataset.desenho).then(imagem => {
+                if (!est.descartarFundo) est.imagemFundo = imagem;
+                redesenhar(canvasId);
+            });
+        }
         redesenhar(canvasId);
     }
 }
@@ -2390,7 +2400,12 @@ function marcarDesenhoTreino(canvasId) {
 function desfazerTracoTreino(canvasId) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est?.pronto || est.removendo || est.pointerActivo !== null || !est.historico.length) return;
-    est.objectos = est.historico.pop();
+    const anterior = est.historico.pop();
+    est.objectos = Array.isArray(anterior) ? anterior : anterior.objectos;
+    if (!Array.isArray(anterior)) {
+        est.imagemFundo = anterior.imagemFundo;
+        est.descartarFundo = anterior.descartarFundo;
+    }
     redesenhar(canvasId);
     marcarDesenhoTreino(canvasId);
 }
@@ -2398,8 +2413,10 @@ function desfazerTracoTreino(canvasId) {
 function limparCampoTreino(canvasId) {
     const est = CANVAS_ESTADO[canvasId];
     if (!est?.pronto || est.removendo || est.pointerActivo !== null || !window.confirm('Limpar o desenho deste campo?')) return;
-    est.historico.push(clonarObjectosDesenho(est.objectos));
+    est.historico.push({objectos: clonarObjectosDesenho(est.objectos), imagemFundo: est.imagemFundo, descartarFundo: est.descartarFundo});
     est.objectos = [];
+    est.imagemFundo = null;
+    est.descartarFundo = true;
     est.reconhecimentoAtivo = false;
     est.reconhecimentoBackup = null;
     redesenhar(canvasId);
@@ -2412,11 +2429,12 @@ async function guardarDesenho(canvasId, exercicioId, numeroDesenho) {
     clearTimeout(est.saveTimer);
     if (est.savePromise) return est.savePromise;
     const revisao = est.revisao;
-    const estadoEditavel = JSON.parse(JSON.stringify(estadoDesenhoParaGuardar(est)));
     estadoCanetaTreino(est, 'A guardar...');
     est.savePromise = (async () => {
         try {
-            if (window.TacticalLegacy) await window.TacticalLegacy.aguardarRecortes(estadoEditavel.objectos);
+            if (est.carregarFundo) await est.carregarFundo;
+            const estadoEditavel = JSON.parse(JSON.stringify(estadoDesenhoParaGuardar(est)));
+            if (window.TacticalLegacy) await aguardarDesenhoTreino(window.TacticalLegacy.aguardarRecortes(estadoEditavel.objectos));
             // Render a snapshot; saving must not interrupt the next Pencil stroke.
             const exportacao = document.createElement('canvas');
             exportacao.width = estadoEditavel.largura;
@@ -2449,6 +2467,18 @@ async function guardarDesenho(canvasId, exercicioId, numeroDesenho) {
         }
     })();
     return est.savePromise;
+}
+
+async function aguardarDesenhoTreino(promessa) {
+    let limite;
+    try {
+        await Promise.race([
+            promessa,
+            new Promise((_, reject) => { limite = setTimeout(() => reject(new Error('Imagem anterior indisponível. Tenta novamente.')), 7000); }),
+        ]);
+    } finally {
+        clearTimeout(limite);
+    }
 }
 
 let _bibFormId = null;
@@ -2512,19 +2542,7 @@ function selecionarDaBiblioteca(ex) {
 
 let _bibDebounce = null;
 document.addEventListener('DOMContentLoaded', () => {
-    const campos = document.querySelectorAll('canvas[data-training-ink]');
-    if (window.IntersectionObserver) {
-        const observar = new IntersectionObserver(entradas => {
-            entradas.forEach(entrada => {
-                if (!entrada.isIntersecting) return;
-                observar.unobserve(entrada.target);
-                inicializarDesenho(entrada.target.id);
-            });
-        }, { rootMargin: '350px' });
-        campos.forEach(canvas => observar.observe(canvas));
-    } else {
-        campos.forEach(canvas => inicializarDesenho(canvas.id));
-    }
+    document.querySelectorAll('canvas[data-training-ink]').forEach(canvas => inicializarDesenho(canvas.id));
     window.addEventListener('beforeunload', evento => {
         if (!Object.values(CANVAS_ESTADO).some(est => est.revisao !== est.revisaoGuardada || est.pointerActivo !== null || est.savePromise)) return;
         evento.preventDefault();
