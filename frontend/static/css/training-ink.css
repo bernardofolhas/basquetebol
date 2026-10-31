@@ -11,9 +11,9 @@
 .training-ink-card button:hover { border-color:var(--clube-primary); }
 .training-ink-toolbar button.is-active { border-color:var(--clube-primary);color:var(--clube-primary-dark,var(--clube-primary));background:var(--clube-primary-soft); }
 .training-ink-card button:disabled,.training-ink-add button:disabled { opacity:.5;cursor:wait; }
-.training-ink-stage { position:relative;width:90%;max-width:calc(28.8rem * var(--training-court-ratio));margin-inline:auto;overflow:hidden;border-radius:.4rem;background:#fff; }
+.training-ink-stage { position:relative;width:90%;max-width:calc(28.8rem * var(--training-court-ratio));margin-inline:auto;overflow:hidden;border-radius:.4rem;background:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-user-drag:none; }
 .training-ink-stage img,.training-ink-stage canvas { position:absolute;inset:0;display:block;width:100%;height:100%; }
-.training-ink-stage img { object-fit:fill;pointer-events:none; }
+.training-ink-stage img { object-fit:fill;pointer-events:none;-webkit-user-select:none;user-select:none;-webkit-user-drag:none; }
 .training-ink-stage canvas { touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none; }
 .training-ink-toolbar { display:flex;align-items:center;flex-wrap:wrap;gap:.35rem;padding:.65rem 0 0; }
 .training-ink-toolbar>.training-more { margin-left:auto; }

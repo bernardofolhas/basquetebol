@@ -2,7 +2,7 @@
 
 {% block titulo %}Plano de Treino — {{ sessao.data|data_pt }}{% endblock %}
 
-{% block estilos_extra %}<link rel="stylesheet" href="/static/css/training-ink.css?v=20261029-4"><link rel="stylesheet" href="/static/css/training-plan.css?v=20261029-1">{% endblock %}
+{% block estilos_extra %}<link rel="stylesheet" href="/static/css/training-ink.css?v=20261031-1"><link rel="stylesheet" href="/static/css/training-plan.css?v=20261029-1">{% endblock %}
 
 {% block conteudo %}
 <script src="/static/js/tactical-legacy.js?v=20260907-1"></script>
@@ -15,7 +15,7 @@
 <div class="training-ink-card" data-editor-field="{{ campo.numero }}">
     <header><span data-court-label>{{ campo.label }}</span><span class="training-ink-status" data-ink-status role="status" aria-live="polite">Pronto</span></header>
     <div class="training-ink-stage" style="--training-court-ratio: {% if campo.tipo == 'meio' %}887 / 777{% else %}682 / 1182{% endif %}; aspect-ratio: var(--training-court-ratio);">
-        <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}">
+        <img src="/static/campos/{{ campo.imagem }}" alt="{{ campo.label }}" draggable="false">
         <canvas id="{{ canvas_id }}" data-training-ink data-exercicio-id="{{ ex_id }}" data-campo-numero="{{ campo.numero }}" data-campo-tipo="{{ campo.tipo }}" data-desenho="{{ campo.desenho|default('', true)|e }}"{% if campo.estado_desenho %} data-estado="{{ campo.estado_desenho|tojson|forceescape }}"{% endif %} aria-label="Desenhar em {{ campo.label }} com caneta digital"></canvas>
     </div>
     <div id="toolbar_{{ canvas_id }}" class="training-ink-toolbar" role="group" aria-label="Ferramentas de desenho">
@@ -1470,11 +1470,14 @@ function ligarEventosDesenho(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('dragstart', (e) => e.preventDefault());
+    canvas.addEventListener('selectstart', (e) => e.preventDefault());
+    canvas.addEventListener('mousedown', (e) => e.preventDefault());
     if (window.PointerEvent) {
         canvas.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
             const est = CANVAS_ESTADO[canvasId];
             if (!est?.pronto || est.removendo || e.pointerType !== 'pen' || est.pointerActivo !== null || ![0, 5].includes(e.button)) return;
-            e.preventDefault();
             clearTimeout(est.saveTimer);
             est.antesGesto = clonarObjectosDesenho(est.objectos);
             est.pointerActivo = e.pointerId;

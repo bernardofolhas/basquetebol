@@ -48,6 +48,7 @@ function setup() {
   const event = (type, pointerType = 'pen', extra = {}) => {
     const e = {type, pointerType, pointerId: 7, button: 0, buttons: 1, clientX: 10, clientY: 10, preventDefault() {}, ...extra};
     listeners[type]?.(e);
+    return e;
   };
   const stroke = () => {
     event('pointerdown');
@@ -92,6 +93,18 @@ test('so a caneta desenha; rato, dedo e uma segunda caneta nao alteram o traco',
   assert.equal(h.run('CANVAS_ESTADO.court.objectos.length'), 1);
   assert.equal(h.run('CANVAS_ESTADO.court.objectos[0].pontos.at(-1).x'), 30);
   assert.equal(h.run('CANVAS_ESTADO.court.pointerActivo'), null);
+});
+
+test('quadro impede selecao e arrasto mesmo se a caneta for identificada como rato', async () => {
+  const h = setup();
+  await h.run("inicializarDesenho('court')");
+  for (const type of ['pointerdown', 'mousedown', 'selectstart', 'dragstart']) {
+    let blocked = false;
+    h.event(type, 'mouse', {preventDefault() { blocked = true; }});
+    assert.equal(blocked, true, `${type} deve bloquear o comportamento nativo`);
+  }
+  assert.equal(h.run('CANVAS_ESTADO.court.objectos.length'), 0);
+  assert.match(template, /<img src="\/static\/campos\/\{\{ campo\.imagem \}\}"[^>]*draggable="false"/);
 });
 
 test('cancelamento restaura o estado anterior sem deixar riscos nem borracha pendente', async () => {
