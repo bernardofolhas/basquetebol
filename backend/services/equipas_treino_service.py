@@ -94,11 +94,9 @@ def gerar_equipas_equilibradas(
     lugares = []
     for papel in ("Base", "Poste", "Extremo"):
         for ronda in range(max(necessidade[papel] for necessidade in necessidades)):
-            lugares.extend(
-                (indice, papel)
-                for indice, necessidade in enumerate(necessidades)
-                if necessidade[papel] > ronda
-            )
+            indices = [indice for indice, necessidade in enumerate(necessidades) if necessidade[papel] > ronda]
+            sorteio.shuffle(indices)
+            lugares.extend((indice, papel) for indice in indices)
 
     # Reserva alternativas indispensaveis antes de ocupar vagas da posicao principal.
     reservados = set()

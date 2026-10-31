@@ -1249,20 +1249,28 @@ async def gerar_equipas_aleatorias(
     atletas = _dados_atletas_plano(db, equipa, plano.sessao_id)
     previstos = set(_ids_atletas_previstos(plano, atletas))
     selecionados = [atleta for atleta in atletas if atleta["id"] in previstos]
-    try:
-        equipas_geradas = gerar_equipas_equilibradas(selecionados, tamanho, postes)
-    except ValueError as erro:
-        return JSONResponse({"sucesso": False, "erro": str(erro)}, status_code=422)
     estado = _estado_equipas_guardado(plano, list(previstos), atletas) or {"grupos": []}
     grupos = estado["grupos"]
+    grupo_atual = next((grupo for grupo in grupos if grupo["id"] == grupo_id), None) if grupo_id is not None else None
+    if grupo_id is not None and not grupo_atual:
+        return JSONResponse({"sucesso": False, "erro": "Agrupamento não encontrado."}, status_code=404)
+    assinatura_anterior = (
+        tuple(sorted(tuple(sorted(id_ for id_ in equipa["slots"] if id_ is not None)) for equipa in grupo_atual["equipas"]))
+        if grupo_atual else None
+    )
+    try:
+        for _ in range(20):
+            equipas_geradas = gerar_equipas_equilibradas(selecionados, tamanho, postes)
+            assinatura_nova = tuple(sorted(tuple(sorted(equipa["slots"])) for equipa in equipas_geradas["equipas"]))
+            if assinatura_nova != assinatura_anterior:
+                break
+    except ValueError as erro:
+        return JSONResponse({"sucesso": False, "erro": str(erro)}, status_code=422)
     if grupo_id is None:
         grupo_id = max((grupo["id"] for grupo in grupos), default=0) + 1
         grupo = {"id": grupo_id, "nome": f"Agrupamento {len(grupos) + 1}", **equipas_geradas}
         grupos.append(grupo)
     else:
-        grupo_atual = next((grupo for grupo in grupos if grupo["id"] == grupo_id), None)
-        if not grupo_atual:
-            return JSONResponse({"sucesso": False, "erro": "Agrupamento não encontrado."}, status_code=404)
         grupo = {"id": grupo_id, "nome": grupo_atual["nome"], **equipas_geradas}
         grupos[grupos.index(grupo_atual)] = grupo
     plano.equipas_aleatorias = json.dumps(estado, ensure_ascii=False)

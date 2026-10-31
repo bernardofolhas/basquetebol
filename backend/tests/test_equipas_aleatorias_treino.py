@@ -24,6 +24,21 @@ def _jogadores(total: int) -> list[dict]:
     ]
 
 
+def test_sorteios_variam_sem_perder_a_composicao_por_posicao():
+    jogadores = _jogadores(10)
+    for indice, jogador in enumerate(jogadores):
+        jogador["posicao"] = "Base" if indice < 2 else "Extremo" if indice < 6 else "Poste"
+
+    composicoes = set()
+    for semente in range(20):
+        resultado = gerar_equipas_equilibradas(jogadores, 5, gerador=random.Random(semente))
+        composicoes.add(tuple(sorted(tuple(sorted(equipa["slots"])) for equipa in resultado["equipas"])))
+        for equipa in resultado["equipas"]:
+            papeis = [resultado["posicoes_ids"][str(id_)] for id_ in equipa["slots"]]
+            assert papeis == ["Base", "Extremo", "Extremo", "Poste", "Poste"]
+    assert len(composicoes) >= 3
+
+
 def test_distribuicao_absorve_excedentes_sem_criar_equipa_incompleta():
     equipas_de_tres = gerar_equipas_equilibradas(_jogadores(10), 3, gerador=random.Random(7))
     equipas_de_quatro = gerar_equipas_equilibradas(_jogadores(10), 4, 2, random.Random(7))
